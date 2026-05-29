@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0e17;
+  --card: #111827;
+  --neon: #22d3ee;
+  --accent: #a78bfa;
+}
+
+body {
+  @apply bg-milou-bg text-gray-100 antialiased min-h-screen;
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-5 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 
+           text-white font-medium hover:opacity-90 transition shadow-neon 
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply px-5 py-2.5 rounded-lg border border-milou-border bg-milou-card 
+           text-gray-200 hover:border-cyan-500/50 transition;
+  }
+  .card {
+    @apply bg-milou-card border border-milou-border rounded-xl p-6 shadow-neon;
+  }
+  .input {
+    @apply w-full px-4 py-2.5 rounded-lg bg-milou-bg border border-milou-border 
+           text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/60 
+           focus:ring-1 focus:ring-cyan-500/30 transition;
+  }
+  .label {
+    @apply block text-sm text-gray-400 mb-1.5;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}
