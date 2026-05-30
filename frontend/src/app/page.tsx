@@ -1,15 +1,16 @@
 import Link from 'next/link';
 import LandingHeader from '@/components/LandingHeader';
 import LandingHeroPreview from '@/components/LandingHeroPreview';
-import LandingMilouExamples, { SocialProofLines } from '@/components/LandingMilouExamples';
+import LandingMilouExamples from '@/components/LandingMilouExamples';
+import LandingCommunityBanner, { SocialProofLines } from '@/components/LandingCommunityBanner';
 import { IconArrowRight, IconCheck, IconChat, IconCoins, IconLock, IconShield, IconStore } from '@/components/ui/Icons';
 import MilouLogo from '@/components/ui/MilouLogo';
 
 const STATS = [
+  { value: '2 500+', label: 'Membres inscrits' },
   { value: '1–2 M', label: 'Micro-services courants' },
   { value: '10 M', label: 'Offerts à l\'inscription' },
   { value: '0 €', label: 'Argent réel' },
-  { value: 'Escrow', label: 'Paiements sécurisés' },
 ];
 
 const REASONS = [
@@ -66,10 +67,10 @@ const STEPS = [
 const CATEGORIES = ['Design', 'Développement', 'Rédaction', 'Coaching', 'Aide & services', 'Autre'];
 
 const TRUST = [
+  '2 500+ membres inscrits',
   'Monnaie 100 % fictive',
   'Escrow sur chaque mission',
   'Profils avec réputation',
-  'Support modération',
 ];
 
 export default function HomePage() {
@@ -94,13 +95,17 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="mt-4 text-base sm:text-lg text-zinc-400 leading-relaxed max-w-2xl mx-auto">
-              Créez un compte pour recevoir de quoi commander sur le marketplace — ou publiez vos
-              propres offres et gagnez des Milou.
+              Rejoignez des milliers de membres qui échangent déjà des compétences sur le
+              marketplace — ou publiez vos offres et gagnez des Milou.
             </p>
           </div>
 
+          <div className="mb-8 sm:mb-10 max-w-4xl mx-auto animate-fade-up stagger-1">
+            <LandingCommunityBanner showCta />
+          </div>
+
           {/* Wow : équivalences concrètes */}
-          <div className="mb-10 sm:mb-14 animate-fade-up stagger-1">
+          <div className="mb-10 sm:mb-14 animate-fade-up stagger-2">
             <LandingMilouExamples />
           </div>
 
@@ -291,11 +296,14 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
-              Rejoignez les premiers membres de MILOU
+              Rejoignez des milliers de membres sur MILOU
             </h2>
             <p className="text-zinc-400 mt-3 max-w-lg mx-auto">
-              10 Milou offerts · micro-services dès 1 M · prix fixés par la communauté
+              La communauté grandit — profitez de vos 10 Milou offerts et échangez dès maintenant.
             </p>
+          </div>
+          <div className="max-w-3xl mx-auto mb-8">
+            <LandingCommunityBanner compact />
           </div>
           <div className="max-w-4xl mx-auto mb-8">
             <LandingMilouExamples compact />

@@ -4,19 +4,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { IconArrowRight } from '@/components/ui/Icons';
 import {
-  LANDING_SOCIAL_PROOF,
   MILOU_EXAMPLES,
   SIGNUP_BONUS_MILOU,
 } from '@/lib/landing-examples';
-
-function SocialProofLines({ className = '' }: { className?: string }) {
-  return (
-    <p className={`text-xs text-zinc-500 leading-relaxed ${className}`}>
-      {LANDING_SOCIAL_PROOF.movement}
-      <span className="block text-zinc-600 mt-1">{LANDING_SOCIAL_PROOF.visitors}</span>
-    </p>
-  );
-}
+import { SocialProofLines } from '@/components/LandingCommunityBanner';
 
 export default function LandingMilouExamples({ compact }: { compact?: boolean }) {
   const [visible, setVisible] = useState(0);
@@ -114,5 +105,3 @@ export default function LandingMilouExamples({ compact }: { compact?: boolean })
     </div>
   );
 }
-
-export { SocialProofLines };

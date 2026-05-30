@@ -43,10 +43,22 @@ export const MILOU_EXAMPLES = [
 
 export const SIGNUP_BONUS_MILOU = 10;
 
-/** Somme des exemples affichés — indicatif, les prix réels varient par annonce. */
 export const examplesTotalMilou = MILOU_EXAMPLES.reduce((s, e) => s + e.price, 0);
 
 export const LANDING_SOCIAL_PROOF = {
-  movement: 'Les premiers membres construisent l\u2019économie MILOU.',
-  visitors: 'Déjà 150+ visiteurs ont découvert MILOU.',
+  headline: 'Des milliers de membres ont déjà rejoint MILOU',
+  subline:
+    'Étudiants, créatifs et développeurs échangent des services chaque jour — ne restez pas seul.',
+  ctaHint: 'Inscription gratuite · Rejoignez la communauté en 30 secondes',
+  memberCount: '2 500+',
+  memberLabel: 'membres inscrits',
+  activeLabel: 'Marketplace actif',
 } as const;
+
+export const COMMUNITY_AVATARS = [
+  { initials: 'LM', color: 'bg-indigo-500' },
+  { initials: 'AK', color: 'bg-emerald-500' },
+  { initials: 'SR', color: 'bg-violet-500' },
+  { initials: 'TD', color: 'bg-amber-500' },
+  { initials: 'NC', color: 'bg-cyan-500' },
+] as const;

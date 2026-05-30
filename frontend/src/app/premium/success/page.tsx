@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import PremiumBadge from '@/components/PremiumBadge';
 import { useAuth } from '@/context/AuthContext';
 
 export default function PremiumSuccessPage() {
@@ -19,15 +18,15 @@ export default function PremiumSuccessPage() {
     <>
       {user && <Navbar />}
       <main className="max-w-lg mx-auto px-4 py-20 text-center animate-fade-in">
-        <div className="card border-amber-500/40 bg-amber-500/10">
-          <PremiumBadge size="md" />
-          <h1 className="text-2xl font-bold mt-4 text-white">Bienvenue en Premium !</h1>
-          <p className="text-gray-400 mt-3 text-sm">
+        <div className="card border-amber-500/30">
+          <p className="text-xs uppercase tracking-[0.25em] text-amber-400/80 font-semibold">Premium MILOU</p>
+          <h1 className="text-2xl font-bold mt-3 text-white">Activation en cours</h1>
+          <p className="text-zinc-400 mt-3 text-sm leading-relaxed">
             {loading
-              ? 'Activation en cours…'
+              ? 'Vérification de votre compte…'
               : user?.isPremium
-                ? 'Votre abonnement est actif. Tous vos avantages sont débloqués.'
-                : 'Le paiement est en cours de traitement. Rafraîchissez dans quelques secondes.'}
+                ? 'Tout est prêt. Profitez de vos nouveaux avantages sur le marketplace.'
+                : 'Le paiement est en cours de traitement. Cette page se met à jour automatiquement.'}
           </p>
           {user?.premiumExpiresAt && user.isPremium && (
             <p className="text-amber-200/80 text-sm mt-2">
@@ -36,7 +35,7 @@ export default function PremiumSuccessPage() {
           )}
           <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
             <Link href="/dashboard" className="btn-primary">
-              Voir le dashboard
+              Dashboard
             </Link>
             <Link href="/create" className="btn-secondary">
               Publier une annonce
