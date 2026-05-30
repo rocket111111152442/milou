@@ -6,6 +6,8 @@ import { createNotification } from '@/lib/notifications';
 import { assertCanTransfer } from '@/lib/premium/usage';
 import { syncPremiumStatus } from '@/lib/premium/sync';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const { uid } = await verifyRequest(req);

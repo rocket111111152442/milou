@@ -85,8 +85,19 @@ export const chatApi = {
       method: 'POST',
       body: JSON.stringify({ text }),
     }),
+  deleteMessage: (missionId: string, messageId: string) =>
+    api<{ message: string }>(`/api/missions/${missionId}/messages/${messageId}`, { method: 'DELETE' }),
   markRead: (missionId: string) =>
     api<{ ok: boolean }>(`/api/missions/${missionId}/read`, { method: 'POST' }),
+};
+
+export const codesApi = {
+  redeem: (code: string) =>
+    api<{
+      message: string;
+      balance: number;
+      rewards: { milouAmount: number; premiumDays: number; reputationBonus: number };
+    }>('/api/codes/redeem', { method: 'POST', body: JSON.stringify({ code }) }),
 };
 
 export const premiumApi = {
@@ -165,6 +176,23 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  deleteAnnouncement: (id: string) =>
+    api<{ message: string }>(`/api/admin/announcements/${id}`, { method: 'DELETE' }),
+  setAnnouncementActive: (id: string, active: boolean) =>
+    api<{ message: string }>(`/api/admin/announcements/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active }),
+    }),
+  promoCodes: () => api<{ codes: import('./types').PromoCode[] }>('/api/admin/codes'),
+  createPromoCode: (body: Record<string, unknown>) =>
+    api<{ code: import('./types').PromoCode }>('/api/admin/codes', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updatePromoCode: (id: string, body: Record<string, unknown>) =>
+    api<{ message: string }>(`/api/admin/codes/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deletePromoCode: (id: string) =>
+    api<{ message: string }>(`/api/admin/codes/${id}`, { method: 'DELETE' }),
   adjustBalance: (id: string, amount: number, action: 'add' | 'remove') =>
     api<{ user: User }>(`/api/admin/users/${id}/balance`, {
       method: 'PATCH',

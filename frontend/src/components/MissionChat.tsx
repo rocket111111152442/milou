@@ -62,6 +62,17 @@ export default function MissionChat({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, open]);
 
+  async function handleDeleteMessage(messageId: string) {
+    if (!window.confirm('Supprimer ce message ?')) return;
+    try {
+      await chatApi.deleteMessage(missionId, messageId);
+      setMessages((prev) => prev.filter((m) => m._id !== messageId));
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Suppression impossible');
+    }
+  }
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = text.trim();
@@ -131,14 +142,25 @@ export default function MissionChat({
                   )}
                   <p className="whitespace-pre-wrap break-words">{m.text}</p>
                   {!isSystem && (
-                    <p className="text-[10px] text-gray-500 mt-1 text-right">
-                      {m.createdAt
-                        ? new Date(m.createdAt).toLocaleTimeString('fr-FR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : ''}
-                    </p>
+                    <div className="flex items-center justify-end gap-2 mt-1">
+                      <p className="text-[10px] text-gray-500">
+                        {m.createdAt
+                          ? new Date(m.createdAt).toLocaleTimeString('fr-FR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : ''}
+                      </p>
+                      {isMe && (
+                        <button
+                          type="button"
+                          className="text-[10px] text-red-400/80 hover:text-red-300"
+                          onClick={() => handleDeleteMessage(m._id)}
+                        >
+                          Supprimer
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

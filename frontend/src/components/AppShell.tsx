@@ -10,6 +10,7 @@ const SIDE_LINKS = [
   { href: '/marketplace', label: 'Marketplace', icon: '🛒', color: 'from-violet-500/20 to-violet-600/5' },
   { href: '/create', label: 'Nouvelle annonce', icon: '✨', color: 'from-pink-500/20 to-pink-600/5' },
   { href: '/transfer', label: 'Envoyer des M', icon: '💸', color: 'from-green-500/20 to-green-600/5' },
+  { href: '/codes', label: 'Codes cadeaux', icon: '🎁', color: 'from-amber-500/20 to-orange-600/5' },
   { href: '/premium', label: 'Premium', icon: '⭐', color: 'from-amber-500/20 to-amber-600/5', premiumOnly: false },
   { href: '/profile', label: 'Mon profil', icon: '👤', color: 'from-blue-500/20 to-blue-600/5' },
 ];

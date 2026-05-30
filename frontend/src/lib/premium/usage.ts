@@ -1,4 +1,4 @@
-import { Firestore, Timestamp } from 'firebase-admin/firestore';
+import { Firestore } from 'firebase-admin/firestore';
 import { getLimitsForUser, isPremiumActive } from './index';
 
 function startOfDay() {
@@ -14,24 +14,38 @@ function startOfMonth() {
   return d;
 }
 
+/** Évite les index composites Firestore : filtre createdAt côté serveur. */
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'object' && value !== null && 'toDate' in value) {
+    const d = (value as { toDate?: () => Date }).toDate?.();
+    return d ? d.getTime() : 0;
+  }
+  return new Date(String(value)).getTime();
+}
+
 export async function getUserUsage(db: Firestore, uid: string, userData: Record<string, unknown>) {
   const limits = getLimitsForUser(userData);
-  const monthStart = Timestamp.fromDate(startOfMonth());
-  const dayStart = Timestamp.fromDate(startOfDay());
+  const monthStartMs = startOfMonth().getTime();
+  const dayStartMs = startOfDay().getTime();
 
   const activeStatuses = ['pending', 'in_progress', 'escrow_held'];
 
   const [listingsSnap, transfersSnap, clientMissions, providerMissions] = await Promise.all([
-    db.collection('listings').where('userId', '==', uid).where('createdAt', '>=', monthStart).get(),
-    db
-      .collection('transactions')
-      .where('fromUserId', '==', uid)
-      .where('type', '==', 'transfer')
-      .where('createdAt', '>=', dayStart)
-      .get(),
+    db.collection('listings').where('userId', '==', uid).limit(200).get(),
+    db.collection('transactions').where('fromUserId', '==', uid).limit(300).get(),
     db.collection('missions').where('clientId', '==', uid).get(),
     db.collection('missions').where('providerId', '==', uid).get(),
   ]);
+
+  const listingsThisMonth = listingsSnap.docs.filter(
+    (d) => timestampMs(d.data().createdAt) >= monthStartMs
+  ).length;
+
+  const transfersToday = transfersSnap.docs.filter((d) => {
+    const data = d.data();
+    return data.type === 'transfer' && timestampMs(data.createdAt) >= dayStartMs;
+  }).length;
 
   const missionIds = new Set<string>();
   [...clientMissions.docs, ...providerMissions.docs].forEach((d) => {
@@ -43,8 +57,8 @@ export async function getUserUsage(db: Firestore, uid: string, userData: Record<
     isPremium: isPremiumActive(userData),
     limits,
     usage: {
-      listingsThisMonth: listingsSnap.size,
-      transfersToday: transfersSnap.size,
+      listingsThisMonth,
+      transfersToday,
       activeMissions,
     },
   };

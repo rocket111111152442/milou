@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import AdminUserInspector from '@/components/admin/AdminUserInspector';
 import TransactionList from '@/components/TransactionList';
 import { useAuth } from '@/context/AuthContext';
-import { adminApi } from '@/lib/api';
+import { adminApi, chatApi } from '@/lib/api';
 import type {
   AdminAuditEntry,
   AdminStats,
@@ -14,6 +15,7 @@ import type {
   Mission,
   MissionMessage,
   PlatformAnnouncement,
+  PromoCode,
   Transaction,
   User,
 } from '@/lib/types';
@@ -38,7 +40,8 @@ const MOD_FEATURES = [
   'Journal d\'audit',
   'Export CSV utilisateurs',
   'Offrir Premium gratuit à un utilisateur',
-  'Annonces plateforme',
+  'Annonces plateforme (suppression)',
+  'Codes promo & récompenses',
 ];
 
 type Tab =
@@ -49,7 +52,8 @@ type Tab =
   | 'listings'
   | 'missions'
   | 'audit'
-  | 'announcements';
+  | 'announcements'
+  | 'codes';
 
 function isStaff(role?: string) {
   return role === 'admin' || role === 'moderator';
@@ -68,6 +72,19 @@ export default function AdminPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [audit, setAudit] = useState<AdminAuditEntry[]>([]);
   const [announcements, setAnnouncements] = useState<PlatformAnnouncement[]>([]);
+  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
+  const [codeForm, setCodeForm] = useState({
+    code: '',
+    label: '',
+    milouAmount: 50,
+    premiumDays: 0,
+    reputationBonus: 0,
+    maxUses: 100,
+    maxUsesPerUser: 1,
+    minAccountAgeDays: 0,
+    expiresAt: '',
+    active: true,
+  });
 
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQ, setSearchQ] = useState('');
@@ -90,7 +107,7 @@ export default function AdminPage() {
   }, [searchQ, filterRole, filterStatus]);
 
   const loadAll = useCallback(async () => {
-    const [s, u, t, l, m, a, an] = await Promise.all([
+    const [s, u, t, l, m, a, an, pc] = await Promise.all([
       adminApi.stats(),
       adminApi.users(),
       adminApi.transactions(),
@@ -98,6 +115,7 @@ export default function AdminPage() {
       adminApi.missions(),
       adminApi.audit(),
       adminApi.announcements(),
+      adminApi.promoCodes(),
     ]);
     setStats(s.stats);
     setUsers(u.users);
@@ -106,6 +124,7 @@ export default function AdminPage() {
     setMissions(m.missions);
     setAudit(a.entries);
     setAnnouncements(an.announcements);
+    setPromoCodes(pc.codes);
   }, []);
 
   useEffect(() => {
@@ -161,6 +180,7 @@ export default function AdminPage() {
     { id: 'missions', label: 'Missions' },
     { id: 'audit', label: 'Journal' },
     { id: 'announcements', label: 'Annonces site' },
+    { id: 'codes', label: 'Codes promo' },
   ];
 
   return (
@@ -452,9 +472,25 @@ export default function AdminPage() {
               ) : (
                 <ul className="space-y-2 text-sm">
                   {chatMessages.map((msgItem) => (
-                    <li key={msgItem._id} className="border-b border-milou-border/50 pb-2">
-                      <span className="text-cyan-400">{msgItem.senderName}</span>
-                      <span className="text-gray-600 text-xs ml-2">
+                    <li key={msgItem._id} className="border-b border-milou-border/50 pb-2 group">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-cyan-400">{msgItem.senderName}</span>
+                        {msgItem.senderId !== 'system' && chatMissionId && (
+                          <button
+                            type="button"
+                            className="text-xs text-red-400 opacity-70 hover:opacity-100"
+                            onClick={async () => {
+                              if (!confirm('Supprimer ce message ?')) return;
+                              await chatApi.deleteMessage(chatMissionId, msgItem._id);
+                              setChatMessages((prev) => prev.filter((x) => x._id !== msgItem._id));
+                              setMsg('Message supprimé');
+                            }}
+                          >
+                            Supprimer
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-gray-600 text-xs">
                         {new Date(msgItem.createdAt).toLocaleString('fr-FR')}
                       </span>
                       <p className="text-gray-300 mt-0.5">{msgItem.text}</p>
@@ -527,8 +563,215 @@ export default function AdminPage() {
                   <p className="text-xs text-gray-600 mt-2">
                     {a.active ? 'Active' : 'Inactive'} · {new Date(a.createdAt).toLocaleDateString('fr-FR')}
                   </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {!a.active && (
+                      <button
+                        type="button"
+                        className="btn-secondary text-xs py-1"
+                        onClick={async () => {
+                          await adminApi.setAnnouncementActive(a._id, true);
+                          const r = await adminApi.announcements();
+                          setAnnouncements(r.announcements);
+                          setMsg('Annonce activée');
+                        }}
+                      >
+                        Activer
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="text-xs text-red-400 border border-red-500/30 px-2 py-1 rounded-lg hover:bg-red-500/10"
+                      onClick={async () => {
+                        if (!confirm('Supprimer cette annonce plateforme ?')) return;
+                        await adminApi.deleteAnnouncement(a._id);
+                        setAnnouncements((prev) => prev.filter((x) => x._id !== a._id));
+                        setMsg('Annonce supprimée');
+                      }}
+                    >
+                      Supprimer
+                    </button>
+                  </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {tab === 'codes' && (
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="card space-y-3 border-amber-500/20">
+              <h3 className="font-semibold text-amber-300">Créer un code promo</h3>
+              <input
+                className="input font-mono uppercase"
+                placeholder="CODE (ex: MILOU50)"
+                value={codeForm.code}
+                onChange={(e) => setCodeForm({ ...codeForm, code: e.target.value.toUpperCase() })}
+              />
+              <input
+                className="input"
+                placeholder="Description interne"
+                value={codeForm.label}
+                onChange={(e) => setCodeForm({ ...codeForm, label: e.target.value })}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Milou à gagner</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    value={codeForm.milouAmount}
+                    onChange={(e) => setCodeForm({ ...codeForm, milouAmount: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="label">Jours Premium</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    value={codeForm.premiumDays}
+                    onChange={(e) => setCodeForm({ ...codeForm, premiumDays: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="label">Bonus réputation</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    value={codeForm.reputationBonus}
+                    onChange={(e) => setCodeForm({ ...codeForm, reputationBonus: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="label">Utilisations max (0 = illimité)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    value={codeForm.maxUses}
+                    onChange={(e) => setCodeForm({ ...codeForm, maxUses: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="label">Max / utilisateur</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    value={codeForm.maxUsesPerUser}
+                    onChange={(e) => setCodeForm({ ...codeForm, maxUsesPerUser: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="label">Compte min. (jours)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    value={codeForm.minAccountAgeDays}
+                    onChange={(e) => setCodeForm({ ...codeForm, minAccountAgeDays: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label">Expiration (optionnel)</label>
+                <input
+                  className="input"
+                  type="datetime-local"
+                  value={codeForm.expiresAt}
+                  onChange={(e) => setCodeForm({ ...codeForm, expiresAt: e.target.value })}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={codeForm.active}
+                  onChange={(e) => setCodeForm({ ...codeForm, active: e.target.checked })}
+                />
+                Code actif à la création
+              </label>
+              <button
+                type="button"
+                className="btn-primary w-full"
+                onClick={async () => {
+                  try {
+                    await adminApi.createPromoCode({
+                      ...codeForm,
+                      expiresAt: codeForm.expiresAt || undefined,
+                    });
+                    const r = await adminApi.promoCodes();
+                    setPromoCodes(r.codes);
+                    setCodeForm({
+                      code: '',
+                      label: '',
+                      milouAmount: 50,
+                      premiumDays: 0,
+                      reputationBonus: 0,
+                      maxUses: 100,
+                      maxUsesPerUser: 1,
+                      minAccountAgeDays: 0,
+                      expiresAt: '',
+                      active: true,
+                    });
+                    setMsg('Code créé — les utilisateurs peuvent l\'utiliser sur /codes');
+                  } catch (e) {
+                    setMsg(e instanceof Error ? e.message : 'Erreur');
+                  }
+                }}
+              >
+                Créer le code
+              </button>
+              <p className="text-xs text-gray-600">
+                Page utilisateur : <Link href="/codes" className="text-cyan-400">/codes</Link>
+              </p>
+            </div>
+            <div className="space-y-2 max-h-[32rem] overflow-y-auto">
+              {promoCodes.length === 0 ? (
+                <p className="text-gray-500 text-sm">Aucun code promo.</p>
+              ) : (
+                promoCodes.map((c) => (
+                  <div key={c._id} className={`card text-sm ${c.active ? 'border-amber-500/30' : 'opacity-70'}`}>
+                    <p className="font-mono font-bold text-amber-300">{c.code}</p>
+                    {c.label && <p className="text-gray-500 text-xs">{c.label}</p>}
+                    <p className="text-gray-400 mt-2">
+                      {c.milouAmount > 0 && `${c.milouAmount} M `}
+                      {c.premiumDays > 0 && `· ${c.premiumDays}j Premium `}
+                      {c.reputationBonus > 0 && `· +${c.reputationBonus} rep.`}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {c.usedCount}/{c.maxUses || '∞'} utilisations · max {c.maxUsesPerUser}/pers.
+                      {c.expiresAt && ` · expire ${new Date(c.expiresAt).toLocaleDateString('fr-FR')}`}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <button
+                        type="button"
+                        className="btn-secondary text-xs py-1"
+                        onClick={async () => {
+                          await adminApi.updatePromoCode(c._id, { active: !c.active });
+                          const r = await adminApi.promoCodes();
+                          setPromoCodes(r.codes);
+                        }}
+                      >
+                        {c.active ? 'Désactiver' : 'Activer'}
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs text-red-400 px-2 py-1 border border-red-500/30 rounded-lg"
+                        onClick={async () => {
+                          if (!confirm(`Supprimer le code ${c.code} ?`)) return;
+                          await adminApi.deletePromoCode(c._id);
+                          setPromoCodes((prev) => prev.filter((x) => x._id !== c._id));
+                          setMsg('Code supprimé');
+                        }}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

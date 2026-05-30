@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
+
+export const dynamic = 'force-dynamic';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { requireAdmin, adminError, logAdminAction } from '@/lib/firebase/admin-guard';
 import { tsToIso } from '@/lib/firebase/wallet';

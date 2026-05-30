@@ -45,9 +45,11 @@ export async function PATCH(req: NextRequest) {
     const db = getAdminDb();
 
     if (all) {
-      const snap = await db.collection('notifications').where('userId', '==', uid).where('read', '==', false).get();
+      const snap = await db.collection('notifications').where('userId', '==', uid).limit(200).get();
       const batch = db.batch();
-      snap.docs.forEach((d) => batch.update(d.ref, { read: true }));
+      snap.docs.forEach((d) => {
+        if (!d.data().read) batch.update(d.ref, { read: true });
+      });
       await batch.commit();
       return NextResponse.json({ ok: true });
     }

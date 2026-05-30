@@ -71,3 +71,37 @@ export async function grantPremiumAdmin(db: Firestore, uid: string, months: numb
 
   return expiresAt;
 }
+
+/** Ajoute des jours Premium (prolonge si déjà actif). */
+export async function grantPremiumByDays(db: Firestore, uid: string, days: number) {
+  const ref = db.collection('users').doc(uid);
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  const data = snap.data()!;
+  const now = new Date();
+  let base = now;
+  const exp = premiumExpiresAtToDate(data.premiumExpiresAt);
+  if (data.isPremium && exp && exp.getTime() > now.getTime()) {
+    base = exp;
+  }
+  const expiresAt = new Date(base);
+  expiresAt.setDate(expiresAt.getDate() + Math.max(1, days));
+
+  await ref.update({
+    isPremium: true,
+    premiumExpiresAt: expiresAt,
+    premiumGrantedByAdmin: true,
+    premiumActivatedAt: FieldValue.serverTimestamp(),
+  });
+
+  const listings = await db.collection('listings').where('userId', '==', uid).get();
+  const batch = db.batch();
+  listings.docs.forEach((d) => {
+    if (['open', 'in_progress'].includes(String(d.data().status))) {
+      batch.update(d.ref, { featured: true });
+    }
+  });
+  if (!listings.empty) await batch.commit();
+
+  return expiresAt;
+}

@@ -7,7 +7,8 @@ type TxType =
   | 'service_payment'
   | 'escrow_hold'
   | 'escrow_release'
-  | 'admin_adjustment';
+  | 'admin_adjustment'
+  | 'promo_code';
 
 export async function recordTransaction(
   db: Firestore,

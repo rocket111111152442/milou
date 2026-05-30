@@ -112,6 +112,22 @@ export interface PlatformAnnouncement {
   createdAt: string;
 }
 
+export interface PromoCode {
+  _id: string;
+  code: string;
+  label: string;
+  milouAmount: number;
+  premiumDays: number;
+  reputationBonus: number;
+  maxUses: number;
+  maxUsesPerUser: number;
+  minAccountAgeDays: number;
+  active: boolean;
+  usedCount: number;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
 export interface Transaction {
   _id: string;
   fromUserId?: { firstname: string; lastname: string; email: string } | null;
