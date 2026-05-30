@@ -45,7 +45,7 @@ export default function CompleteProfile() {
         <h1 className="text-xl font-bold mb-2">Finaliser votre compte</h1>
         <p className="text-gray-400 text-sm mb-6">
           Vous êtes connecté, mais votre profil MILOU n&apos;a pas encore été créé dans la base de données.
-          Complétez ce formulaire pour recevoir vos <strong className="text-cyan-400">10 Milou</strong>.
+          Complétez ce formulaire pour recevoir vos <strong className="text-emerald-400">10 Milou</strong>.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

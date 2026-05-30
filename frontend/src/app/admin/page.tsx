@@ -208,13 +208,16 @@ export default function AdminPage() {
   return (
     <>
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-violet-400">Panel Modération MILOU</h1>
-        <p className="text-gray-400 text-sm mb-2">
-          {MOD_FEATURES.length} outils modérateur — examen précis des comptes, économie, annonces et missions
-        </p>
-        <details className="mb-4 text-xs text-gray-500">
-          <summary className="cursor-pointer text-violet-400/80">Liste des fonctionnalités</summary>
+      <main className="max-w-7xl mx-auto px-4 py-8 animate-fade-up">
+        <div className="mb-8">
+          <p className="section-label">Administration</p>
+          <h1 className="page-title mt-1">Panel modération</h1>
+          <p className="page-subtitle">
+            {MOD_FEATURES.length} outils — comptes, économie, annonces et missions
+          </p>
+        </div>
+        <details className="mb-4 text-xs text-zinc-500">
+          <summary className="cursor-pointer text-indigo-400/80">Liste des fonctionnalités</summary>
           <ol className="mt-2 grid sm:grid-cols-2 gap-1 list-decimal list-inside">
             {MOD_FEATURES.map((f) => (
               <li key={f}>{f}</li>
@@ -223,7 +226,7 @@ export default function AdminPage() {
         </details>
 
         {msg && (
-          <p className="mb-4 text-sm text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded-lg px-3 py-2">
+          <p className="mb-4 text-sm text-indigo-300 alert-info">
             {msg}
           </p>
         )}
@@ -234,9 +237,7 @@ export default function AdminPage() {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap ${
-                tab === t.id ? 'bg-violet-500/20 text-violet-300' : 'bg-milou-card text-gray-400'
-              }`}
+              className={tab === t.id ? 'admin-tab admin-tab-active' : 'admin-tab admin-tab-inactive'}
             >
               {t.label}
             </button>

@@ -79,10 +79,10 @@ export default function CreateListingPage() {
         sidebarExtra={
           <div className="space-y-4 text-sm">
             <p className="sidebar-section-title">Aperçu live</p>
-            <div className="p-4 rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-cyan-500/5">
-              <p className="text-xs text-violet-300 mb-1">{previewCategory?.icon} {previewCategory?.label}</p>
+            <div className="p-4 rounded-2xl border border-white/[0.06] bg-milou-surface/50">
+              <p className="text-xs text-indigo-400 mb-1 font-medium">{previewCategory?.label}</p>
               <p className="font-bold text-white truncate">{form.title || 'Titre de votre annonce'}</p>
-              <p className="text-2xl font-black text-cyan-400 mt-2">{form.price} M</p>
+              <p className="text-2xl font-bold text-emerald-400 tabular-nums mt-2">{form.price} M</p>
               <p className="text-xs text-gray-500 mt-2 line-clamp-3">
                 {form.description || 'Votre description apparaîtra ici…'}
               </p>
@@ -110,10 +110,8 @@ export default function CreateListingPage() {
           </div>
         }
       >
-        <div className="hero-glow mb-8 max-w-xl" />
-
         <div className="grid lg:grid-cols-5 gap-8">
-          <form onSubmit={handleSubmit} className="lg:col-span-3 card space-y-4 border-cyan-500/20">
+          <form onSubmit={handleSubmit} className="lg:col-span-3 card space-y-4">
             <div>
               <label className="label">Titre</label>
               <input
@@ -183,17 +181,17 @@ export default function CreateListingPage() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  className={`flex-1 py-2.5 rounded-lg border ${form.type === 'offer' ? 'chip-active' : 'chip'}`}
+                  className={`flex-1 py-2.5 rounded-xl border ${form.type === 'offer' ? 'chip-active' : 'chip'}`}
                   onClick={() => setForm({ ...form, type: 'offer' })}
                 >
-                  📤 J&apos;offre un service
+                  J&apos;offre un service
                 </button>
                 <button
                   type="button"
-                  className={`flex-1 py-2.5 rounded-lg border ${form.type === 'request' ? 'chip-active' : 'chip'}`}
+                  className={`flex-1 py-2.5 rounded-xl border ${form.type === 'request' ? 'chip-active' : 'chip'}`}
                   onClick={() => setForm({ ...form, type: 'request' })}
                 >
-                  📥 Je cherche de l&apos;aide
+                  Je cherche de l&apos;aide
                 </button>
               </div>
             </div>
@@ -207,14 +205,14 @@ export default function CreateListingPage() {
               />
             </div>
             {error && <p className="alert-error py-2">{error}</p>}
-            <button type="submit" className="btn-primary w-full text-lg">
-              🚀 Publier sur le marketplace
+            <button type="submit" className="btn-primary w-full py-3">
+              Publier sur le marketplace
             </button>
           </form>
 
           <div className="lg:col-span-2 space-y-4">
-            <div className="card border-violet-500/20 bg-violet-500/5">
-              <h3 className="font-semibold text-violet-300 mb-2">Conseils</h3>
+            <div className="card">
+              <h3 className="font-semibold text-white mb-2">Conseils</h3>
               <ul className="text-sm text-gray-400 space-y-2 list-disc list-inside">
                 <li>Titre clair et précis</li>
                 <li>Prix réaliste en Milou</li>
@@ -222,8 +220,8 @@ export default function CreateListingPage() {
                 <li>Premium = mise en avant auto</li>
               </ul>
             </div>
-            <div className="card border-emerald-500/20">
-              <p className="text-sm text-gray-400">
+            <div className="card">
+              <p className="text-sm text-zinc-400">
                 Vous pourrez <strong className="text-red-300">supprimer</strong> votre annonce depuis le dashboard ou le
                 marketplace tant qu&apos;aucune mission n&apos;est en cours.
               </p>

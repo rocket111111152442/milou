@@ -1,12 +1,13 @@
 export default function BalanceCard({ balance, label = 'Solde Milou' }: { balance: number; label?: string }) {
   return (
     <div className="card relative overflow-hidden">
-      <div className="absolute -right-8 -top-8 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl" />
-      <p className="text-gray-400 text-sm mb-1">{label}</p>
-      <p className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-violet-400">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+      <p className="text-zinc-500 text-sm font-medium">{label}</p>
+      <p className="text-4xl md:text-5xl font-bold text-white tabular-nums mt-1 tracking-tight">
         {balance.toFixed(2)}
+        <span className="text-xl md:text-2xl text-emerald-400 ml-1 font-semibold">M</span>
       </p>
-      <p className="text-cyan-500/80 text-sm mt-1">Milou — monnaie virtuelle</p>
+      <p className="text-zinc-600 text-xs mt-2">Monnaie virtuelle · sans valeur réelle</p>
     </div>
   );
 }

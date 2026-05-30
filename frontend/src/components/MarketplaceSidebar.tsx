@@ -38,25 +38,20 @@ export default function MarketplaceSidebar({
 }: Props) {
   return (
     <div className="space-y-4 text-sm">
-      <div className="p-3 rounded-xl bg-milou-bg/80 border border-cyan-500/20">
-        <p className="text-xs font-semibold text-cyan-400 uppercase mb-2">En direct</p>
+      <div className="p-3 rounded-2xl bg-milou-surface/60 border border-white/[0.06]">
+        <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">En direct</p>
         <div className="grid grid-cols-2 gap-2">
-          <div className="stat-pill stat-pill-cyan">
-            <span className="stat-value">{stats.total}</span>
-            <span className="stat-label">Annonces</span>
-          </div>
-          <div className="stat-pill stat-pill-amber">
-            <span className="stat-value">{stats.featured}</span>
-            <span className="stat-label">À la une</span>
-          </div>
-          <div className="stat-pill stat-pill-violet">
-            <span className="stat-value">{stats.offers}</span>
-            <span className="stat-label">Offres</span>
-          </div>
-          <div className="stat-pill stat-pill-pink">
-            <span className="stat-value">{stats.requests}</span>
-            <span className="stat-label">Demandes</span>
-          </div>
+          {[
+            { val: stats.total, label: 'Annonces' },
+            { val: stats.featured, label: 'À la une' },
+            { val: stats.offers, label: 'Offres' },
+            { val: stats.requests, label: 'Demandes' },
+          ].map((s) => (
+            <div key={s.label} className="stat-pill">
+              <span className="stat-value">{s.val}</span>
+              <span className="stat-label">{s.label}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -65,17 +60,17 @@ export default function MarketplaceSidebar({
         <div className="flex gap-1">
           <button
             type="button"
-            className={`flex-1 py-2 rounded-lg text-xs ${view === 'grid' ? 'chip-active' : 'chip'}`}
+            className={`flex-1 py-2 rounded-xl text-xs ${view === 'grid' ? 'chip-active' : 'chip'}`}
             onClick={() => onView('grid')}
           >
-            ⊞ Grille
+            Grille
           </button>
           <button
             type="button"
-            className={`flex-1 py-2 rounded-lg text-xs ${view === 'list' ? 'chip-active' : 'chip'}`}
+            className={`flex-1 py-2 rounded-xl text-xs ${view === 'list' ? 'chip-active' : 'chip'}`}
             onClick={() => onView('list')}
           >
-            ≡ Liste
+            Liste
           </button>
         </div>
       </div>
@@ -107,13 +102,13 @@ export default function MarketplaceSidebar({
         <div className="flex flex-col gap-1">
           {[
             { v: '', label: 'Tous' },
-            { v: 'offer', label: '📤 Offres' },
-            { v: 'request', label: '📥 Demandes' },
+            { v: 'offer', label: 'Offres' },
+            { v: 'request', label: 'Demandes' },
           ].map((t) => (
             <button
               key={t.v || 'all'}
               type="button"
-              className={`text-left px-3 py-2 rounded-lg ${typeFilter === t.v ? 'chip-active' : 'chip'}`}
+              className={`text-left px-3 py-2 rounded-xl ${typeFilter === t.v ? 'chip-active' : 'chip'}`}
               onClick={() => onTypeFilter(t.v)}
             >
               {t.label}
@@ -123,8 +118,8 @@ export default function MarketplaceSidebar({
       </div>
 
       {loggedIn && (
-        <label className="flex items-center gap-2 px-3 py-2 rounded-lg chip cursor-pointer hover:border-cyan-500/40">
-          <input type="checkbox" checked={mineOnly} onChange={(e) => onMineOnly(e.target.checked)} className="accent-cyan-500" />
+        <label className="flex items-center gap-2 px-3 py-2 rounded-xl chip cursor-pointer">
+          <input type="checkbox" checked={mineOnly} onChange={(e) => onMineOnly(e.target.checked)} className="accent-indigo-500" />
           <span>Mes annonces seulement</span>
         </label>
       )}
@@ -134,7 +129,7 @@ export default function MarketplaceSidebar({
         <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
           <button
             type="button"
-            className={`text-left px-3 py-1.5 rounded-lg text-xs ${category === 'Tous' ? 'chip-active' : 'chip'}`}
+            className={`text-left px-3 py-1.5 rounded-xl text-xs ${category === 'Tous' ? 'chip-active' : 'chip'}`}
             onClick={() => onCategory('Tous')}
           >
             Toutes
@@ -143,17 +138,17 @@ export default function MarketplaceSidebar({
             <button
               key={c.id}
               type="button"
-              className={`text-left px-3 py-1.5 rounded-lg text-xs ${category === c.id ? 'chip-active' : 'chip'}`}
+              className={`text-left px-3 py-1.5 rounded-xl text-xs ${category === c.id ? 'chip-active' : 'chip'}`}
               onClick={() => onCategory(c.id)}
             >
-              {c.icon} {c.label}
+              {c.label}
             </button>
           ))}
         </div>
       </div>
 
       <Link href="/create" className="btn-primary w-full text-center text-sm block">
-        + Publier une annonce
+        Publier une annonce
       </Link>
     </div>
   );

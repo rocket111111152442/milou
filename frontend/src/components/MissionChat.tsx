@@ -121,10 +121,10 @@ export default function MissionChat({
         aria-label="Fermer"
         onClick={onClose}
       />
-      <div className="relative w-full sm:max-w-lg h-[85vh] sm:h-[32rem] flex flex-col bg-milou-card border border-milou-border rounded-t-2xl sm:rounded-2xl shadow-neon-strong overflow-hidden">
-        <header className="flex items-center justify-between px-4 py-3 border-b border-milou-border bg-milou-bg/80">
+      <div className="relative w-full sm:max-w-lg h-[85vh] sm:h-[32rem] flex flex-col bg-milou-card border border-white/[0.08] rounded-t-2xl sm:rounded-2xl shadow-card overflow-hidden">
+        <header className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-milou-surface/80">
           <div>
-            <p className="text-xs text-cyan-400 uppercase tracking-wide">Discussion mission</p>
+            <p className="text-xs text-indigo-400 uppercase tracking-wide font-medium">Discussion mission</p>
             <h2 className="font-semibold text-white truncate max-w-[240px] sm:max-w-xs">{missionTitle}</h2>
             <p className="text-xs text-gray-500">Avec {otherPartyName}</p>
           </div>
@@ -152,10 +152,10 @@ export default function MissionChat({
                 <div
                   className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
                     isSystem
-                      ? 'bg-violet-500/10 text-violet-300 text-center w-full max-w-full'
+                      ? 'bg-indigo-500/10 text-indigo-300 text-center w-full max-w-full'
                       : isMe
-                        ? 'bg-cyan-600/30 text-cyan-50 rounded-br-md'
-                        : 'bg-milou-card border border-milou-border text-gray-100 rounded-bl-md'
+                        ? 'bg-indigo-600/25 text-white rounded-br-md border border-indigo-500/20'
+                        : 'bg-milou-surface border border-white/[0.06] text-zinc-100 rounded-bl-md'
                   }`}
                 >
                   {!isSystem && !isMe && (
@@ -197,7 +197,7 @@ export default function MissionChat({
               {pendingFiles.map((f) => (
                 <li
                   key={`${f.name}-${f.size}`}
-                  className="text-xs bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full flex items-center gap-1"
+                  className="text-xs bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded-full flex items-center gap-1"
                 >
                   <span className="truncate max-w-[120px]">{f.name}</span>
                   <button
@@ -221,7 +221,7 @@ export default function MissionChat({
 
         <form
           onSubmit={handleSend}
-          className="p-3 border-t border-milou-border bg-milou-card space-y-2"
+          className="p-3 border-t border-white/[0.06] bg-milou-card space-y-2"
         >
           <div className="flex gap-1">
             <input

@@ -1,11 +1,14 @@
+import { IconStar } from '@/components/ui/Icons';
+
 export default function PremiumBadge({ size = 'sm' }: { size?: 'sm' | 'md' }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full font-semibold bg-gradient-to-r from-amber-400/20 to-yellow-500/20 text-amber-300 border border-amber-400/40 ${
-        size === 'md' ? 'px-3 py-1 text-sm' : 'px-2 py-0.5 text-xs'
+      className={`inline-flex items-center gap-1 rounded-lg font-medium bg-amber-500/10 text-amber-300 border border-amber-500/25 ${
+        size === 'md' ? 'px-2.5 py-1 text-sm' : 'px-2 py-0.5 text-xs'
       }`}
     >
-      <span aria-hidden>⭐</span> Premium
+      <IconStar className={size === 'md' ? 'w-3.5 h-3.5' : 'w-3 h-3'} />
+      Premium
     </span>
   );
 }

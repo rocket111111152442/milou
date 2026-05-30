@@ -1,11 +1,19 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 import './globals.css';
 
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-jakarta',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'MILOU — Économie virtuelle',
-  description: 'Plateforme d\'échange de services avec la monnaie fictive Milou',
+  title: 'MILOU — Échangez des services en monnaie virtuelle',
+  description:
+    'Marketplace communautaire pour échanger des compétences avec la monnaie fictive Milou. Gratuit, sans argent réel.',
 };
 
 export const viewport = {
@@ -17,26 +25,19 @@ export const viewport = {
 const Providers = dynamic(() => import('@/components/Providers'), {
   ssr: false,
   loading: () => (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#0a0e17',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#22d3ee',
-        fontFamily: 'system-ui, sans-serif',
-      }}
-    >
-      Chargement MILOU…
+    <div className="min-h-screen bg-milou-bg flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-indigo-600 animate-pulse" />
+        <p className="text-zinc-500 text-sm">Chargement…</p>
+      </div>
     </div>
   ),
 });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
-      <body className="bg-milou-bg text-gray-100 antialiased min-h-screen">
+    <html lang="fr" className={jakarta.variable}>
+      <body className="font-sans bg-milou-bg text-zinc-100 antialiased min-h-screen">
         <Providers>{children}</Providers>
         <Analytics />
       </body>

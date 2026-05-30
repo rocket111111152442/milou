@@ -44,7 +44,7 @@ export default function UsageLimitsCard({ isPremium }: { isPremium?: boolean }) 
               <div className="h-2 rounded-full bg-milou-bg overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
-                    pct > 85 ? 'bg-amber-500' : 'bg-cyan-500'
+                    pct > 85 ? 'bg-amber-500' : 'bg-indigo-500'
                   }`}
                   style={{ width: `${pct}%` }}
                 />

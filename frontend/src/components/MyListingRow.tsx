@@ -23,13 +23,13 @@ export default function MyListingRow({ listing, onDelete, deleting }: Props) {
         <p className="font-medium text-white truncate">{listing.title}</p>
         <div className="flex flex-wrap gap-2 mt-1">
           <span className={`badge border ${st.className}`}>{st.label}</span>
-          <span className="text-xs text-cyan-400">{listing.price} M</span>
+          <span className="text-xs text-emerald-400 tabular-nums">{listing.price} M</span>
           <span className="text-xs text-gray-500 capitalize">{listing.category}</span>
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {listing.status === 'open' && (
-          <Link href="/marketplace" className="text-xs text-violet-400 hover:underline">
+          <Link href="/marketplace" className="text-xs text-indigo-400 hover:text-indigo-300">
             Voir
           </Link>
         )}

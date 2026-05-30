@@ -137,8 +137,8 @@ export default function MarketplacePage() {
     <>
       {user && <Navbar />}
       {!user && !loading && (
-        <div className="border-b border-milou-border bg-gradient-to-r from-violet-900/30 to-cyan-900/20 px-4 py-3 text-center text-sm">
-          <Link href="/login" className="text-cyan-400 hover:underline">
+        <div className="border-b border-white/[0.06] bg-indigo-500/5 px-4 py-3 text-center text-sm text-zinc-400">
+          <Link href="/login" className="text-indigo-400 font-medium hover:text-indigo-300">
             Connectez-vous
           </Link>{' '}
           pour publier, supprimer vos annonces et accepter des missions.
@@ -162,9 +162,7 @@ export default function MarketplacePage() {
           </div>
         }
       >
-        <div className="hero-glow mb-6" />
-
-        <div className="lg:hidden mb-6 p-4 rounded-xl border border-milou-border bg-milou-card/50">
+        <div className="lg:hidden mb-6 p-4 rounded-2xl border border-white/[0.06] bg-milou-card/80">
           {sidebar}
         </div>
 
@@ -172,7 +170,7 @@ export default function MarketplacePage() {
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 className="input flex-1"
-                placeholder="🔍 Rechercher un service, un mot-clé…"
+                placeholder="Rechercher un service, un mot-clé…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -225,10 +223,9 @@ export default function MarketplacePage() {
             </div>
 
             {filtered.length === 0 && !msg && (
-              <div className="text-center py-16 card border-dashed border-violet-500/30">
-                <p className="text-4xl mb-3">🌌</p>
-                <p className="text-gray-300 mb-2 font-medium">Aucune annonce ici</p>
-                <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
+              <div className="text-center py-16 card border-dashed border-white/10">
+                <p className="text-zinc-300 mb-2 font-medium">Aucune annonce ici</p>
+                <p className="text-zinc-500 text-sm mb-6 max-w-sm mx-auto">
                   Changez les filtres ou soyez le premier à proposer un service sur MILOU.
                 </p>
                 {user ? (

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirebaseAuth, getFirebaseConfigError, isFirebaseConfigured } from '@/lib/firebase/client';
 import { formatAuthError } from '@/lib/firebase/errors';
+import AuthLayout from '@/components/AuthLayout';
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ firstname: '', lastname: '', email: '', password: '' });
@@ -26,7 +27,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      setStatus('Création du compte (serveur)…');
+      setStatus('Création du compte…');
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,42 +71,38 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-8">
-      <div className="card w-full max-w-md">
-        <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">
-          MILOU
+    <AuthLayout title="Créer un compte" subtitle="10 Milou offerts à l'inscription — gratuit, sans carte bancaire">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Prénom</label>
+            <input className="input" value={form.firstname} onChange={(e) => setForm({ ...form, firstname: e.target.value })} required autoComplete="given-name" />
+          </div>
+          <div>
+            <label className="label">Nom</label>
+            <input className="input" value={form.lastname} onChange={(e) => setForm({ ...form, lastname: e.target.value })} required autoComplete="family-name" />
+          </div>
+        </div>
+        <div>
+          <label className="label">Email</label>
+          <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required autoComplete="email" />
+        </div>
+        <div>
+          <label className="label">Mot de passe (min. 6 caractères)</label>
+          <input className="input" type="password" minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required autoComplete="new-password" />
+        </div>
+        {error && <p className="text-red-400 text-sm whitespace-pre-line">{error}</p>}
+        {status && !error && <p className="text-indigo-400 text-sm">{status}</p>}
+        <button type="submit" className="btn-primary w-full py-3" disabled={loading}>
+          {loading ? status || 'Création…' : 'Créer mon compte'}
+        </button>
+      </form>
+      <p className="mt-6 text-sm text-zinc-500 text-center">
+        Déjà inscrit ?{' '}
+        <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-medium">
+          Connexion
         </Link>
-        <h1 className="text-xl font-semibold mt-6 mb-2">Créer un compte</h1>
-        <p className="text-cyan-400/80 text-sm mb-6">Bonus : 10 Milou offerts à l&apos;inscription</p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Prénom</label>
-              <input className="input" value={form.firstname} onChange={(e) => setForm({ ...form, firstname: e.target.value })} required />
-            </div>
-            <div>
-              <label className="label">Nom</label>
-              <input className="input" value={form.lastname} onChange={(e) => setForm({ ...form, lastname: e.target.value })} required />
-            </div>
-          </div>
-          <div>
-            <label className="label">Email</label>
-            <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-          </div>
-          <div>
-            <label className="label">Mot de passe (min. 6)</label>
-            <input className="input" type="password" minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-          </div>
-          {error && <p className="text-milou-danger text-sm whitespace-pre-line">{error}</p>}
-          {status && !error && <p className="text-cyan-400/80 text-sm">{status}</p>}
-          <button type="submit" className="btn-primary w-full" disabled={loading}>
-            {loading ? status || 'Création…' : 'S\'inscrire'}
-          </button>
-        </form>
-        <p className="mt-4 text-sm text-gray-500">
-          Déjà inscrit ? <Link href="/login" className="text-cyan-400 hover:underline">Connexion</Link>
-        </p>
-      </div>
-    </main>
+      </p>
+    </AuthLayout>
   );
 }

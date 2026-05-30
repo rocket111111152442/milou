@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import MilouLogo from '@/components/ui/MilouLogo';
+import { IconMenu, IconClose, IconArrowRight } from '@/components/ui/Icons';
 
 const NAV_LINKS = [
   { href: '#pourquoi', label: 'Pourquoi MILOU' },
@@ -12,73 +14,61 @@ const NAV_LINKS = [
 export default function LandingHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const closeMenu = () => setMenuOpen(false);
-
   return (
-    <header className="sticky top-0 z-50 border-b border-milou-border bg-milou-bg/90 backdrop-blur-md safe-top">
+    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-milou-bg/80 backdrop-blur-xl safe-top">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        <div className="h-14 sm:h-16 flex items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent shrink-0"
-          >
-            MILOU
-          </Link>
+        <div className="h-14 sm:h-16 flex items-center justify-between gap-4">
+          <MilouLogo size="md" />
 
-          <nav className="hidden lg:flex items-center gap-6 text-sm text-gray-400">
+          <nav className="hidden lg:flex items-center gap-8 text-sm text-zinc-400">
             {NAV_LINKS.map((l) => (
-              <a key={l.href} href={l.href} className="hover:text-cyan-400 transition whitespace-nowrap">
+              <a key={l.href} href={l.href} className="hover:text-white transition">
                 {l.label}
               </a>
             ))}
           </nav>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <Link href="/login" className="btn-secondary text-xs sm:text-sm py-2 px-3 sm:px-5">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link href="/login" className="btn-ghost hidden sm:inline-flex text-sm">
               Connexion
             </Link>
-            <Link href="/register" className="btn-primary text-xs sm:text-sm py-2 px-3 sm:px-5">
-              <span className="sm:hidden">Inscription</span>
-              <span className="hidden sm:inline">S&apos;inscrire</span>
+            <Link href="/register" className="btn-primary text-sm py-2 px-4 sm:px-5">
+              Commencer
             </Link>
             <button
               type="button"
-              className="lg:hidden p-2 rounded-lg border border-milou-border text-gray-300 hover:border-cyan-500/50"
+              className="lg:hidden p-2 rounded-xl border border-white/10 text-zinc-300 hover:bg-white/5"
               aria-expanded={menuOpen}
-              aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+              aria-label={menuOpen ? 'Fermer' : 'Menu'}
               onClick={() => setMenuOpen((o) => !o)}
             >
-              {menuOpen ? (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              )}
+              {menuOpen ? <IconClose /> : <IconMenu />}
             </button>
           </div>
         </div>
 
         {menuOpen && (
-          <nav className="lg:hidden border-t border-milou-border py-4 flex flex-col gap-3">
+          <nav className="lg:hidden border-t border-white/[0.06] py-4 flex flex-col gap-1 animate-fade-in">
             {NAV_LINKS.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
-                className="text-gray-300 hover:text-cyan-400 py-1"
-                onClick={closeMenu}
+                className="px-3 py-2.5 rounded-xl text-zinc-300 hover:bg-white/5 hover:text-white transition"
+                onClick={() => setMenuOpen(false)}
               >
                 {l.label}
               </a>
             ))}
+            <Link href="/login" className="px-3 py-2.5 text-zinc-400" onClick={() => setMenuOpen(false)}>
+              Connexion
+            </Link>
             <Link
               href="/register"
-              className="btn-primary text-center mt-2"
-              onClick={closeMenu}
+              className="btn-primary text-center mt-2 flex items-center justify-center gap-2"
+              onClick={() => setMenuOpen(false)}
             >
-              S&apos;inscrire gratuitement
+              Commencer gratuitement
+              <IconArrowRight className="w-4 h-4" />
             </Link>
           </nav>
         )}

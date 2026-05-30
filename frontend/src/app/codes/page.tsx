@@ -22,10 +22,9 @@ export default function CodesPage() {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 bg-milou-bg">
-        <div className="card max-w-md text-center">
-          <p className="text-4xl mb-4">🎁</p>
-          <h1 className="text-xl font-bold mb-2">Codes cadeaux MILOU</h1>
-          <p className="text-gray-400 text-sm mb-6">Connectez-vous pour utiliser un code et recevoir des Milou ou du Premium.</p>
+        <div className="card max-w-md text-center animate-fade-up">
+          <h1 className="text-xl font-bold text-white mb-2">Codes cadeaux MILOU</h1>
+          <p className="text-zinc-400 text-sm mb-6">Connectez-vous pour utiliser un code et recevoir des Milou ou du Premium.</p>
           <Link href="/login" className="btn-primary inline-block">
             Se connecter
           </Link>
@@ -67,11 +66,9 @@ export default function CodesPage() {
           <span className="text-cyan-400 font-semibold">{user.balance.toFixed(2)} M</span>
         }
       >
-        <div className="hero-glow mb-8 max-w-md" />
-
         <div className="grid lg:grid-cols-2 gap-8 max-w-4xl">
-          <form onSubmit={handleRedeem} className="card border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-violet-500/5 space-y-4">
-            <p className="text-amber-300 font-semibold">🎟️ Utiliser un code</p>
+          <form onSubmit={handleRedeem} className="card space-y-4">
+            <p className="text-white font-semibold">Utiliser un code</p>
             <div>
               <label className="label">Votre code</label>
               <input

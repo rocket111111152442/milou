@@ -87,7 +87,8 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-milou-bg">
-        <p className="text-cyan-400 text-lg animate-pulse">Chargement du tableau de bord…</p>
+        <div className="w-8 h-8 rounded-lg bg-indigo-600 animate-pulse" />
+        <p className="text-zinc-500 text-sm">Chargement du tableau de bord…</p>
       </div>
     );
   }
@@ -125,8 +126,8 @@ export default function DashboardPage() {
           <div className="flex flex-wrap gap-2 items-center">
             {user.isPremium && <PremiumBadge />}
             {!user.isPremium && (
-              <Link href="/premium" className="btn-secondary text-sm border-amber-500/40 text-amber-300">
-                ⭐ Premium
+              <Link href="/premium" className="btn-secondary text-sm border-amber-500/30 text-amber-300">
+                Premium
               </Link>
             )}
             <Link href="/transfer" className="btn-primary text-sm">
@@ -140,25 +141,27 @@ export default function DashboardPage() {
         sidebarExtra={
           <div className="space-y-3 text-sm">
             <p className="sidebar-section-title">Raccourcis</p>
-            <Link href="/marketplace" className="sidebar-link bg-gradient-to-r from-violet-500/15 to-transparent">
-              <span>🛒</span> Explorer le marketplace
+            <Link href="/marketplace" className="sidebar-link">
+              <span className="w-5 h-5 rounded bg-indigo-500/20" />
+              Explorer le marketplace
             </Link>
-            <Link href="/create" className="sidebar-link bg-gradient-to-r from-pink-500/15 to-transparent">
-              <span>✨</span> Nouvelle annonce
+            <Link href="/create" className="sidebar-link">
+              <span className="w-5 h-5 rounded bg-indigo-500/20" />
+              Nouvelle annonce
             </Link>
-            <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
-              <p className="text-emerald-400 text-xs font-semibold">Annonces ouvertes</p>
-              <p className="text-2xl font-bold text-white">{openListings}</p>
+            <div className="p-3 rounded-xl border border-white/[0.06] bg-milou-surface/50">
+              <p className="text-zinc-500 text-xs font-medium uppercase tracking-wide">Annonces ouvertes</p>
+              <p className="text-2xl font-bold text-white tabular-nums">{openListings}</p>
             </div>
-            <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5">
-              <p className="text-amber-400 text-xs font-semibold">Missions actives</p>
-              <p className="text-2xl font-bold text-white">{missions.length}</p>
+            <div className="p-3 rounded-xl border border-white/[0.06] bg-milou-surface/50">
+              <p className="text-zinc-500 text-xs font-medium uppercase tracking-wide">Missions actives</p>
+              <p className="text-2xl font-bold text-white tabular-nums">{missions.length}</p>
             </div>
           </div>
         }
       >
         {announcement && (
-          <div className="card border-violet-500/40 bg-gradient-to-r from-violet-500/15 to-pink-500/10 mb-6 relative">
+          <div className="card border-indigo-500/20 bg-indigo-500/5 mb-6 relative">
             {(user.role === 'admin' || user.role === 'moderator') && (
               <button
                 type="button"
@@ -176,12 +179,10 @@ export default function DashboardPage() {
                 Supprimer le bandeau
               </button>
             )}
-            <p className="font-semibold text-violet-300">📢 {announcement.title}</p>
-            <p className="text-gray-300 text-sm mt-1">{announcement.message}</p>
+            <p className="font-semibold text-indigo-300">{announcement.title}</p>
+            <p className="text-zinc-400 text-sm mt-1">{announcement.message}</p>
           </div>
         )}
-
-        <div className="hero-glow mb-8" />
 
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2">
@@ -191,15 +192,15 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          <section className="card border-cyan-500/20 bg-gradient-to-br from-milou-card to-cyan-950/20">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-cyan-300">
+          <section className="card">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
               Missions en cours
               <UnreadBadge count={missions.reduce((sum, m) => sum + (m.unreadCount || 0), 0)} />
             </h2>
             {missions.length === 0 ? (
               <p className="text-gray-500 text-sm">
                 Aucune mission active.{' '}
-                <Link href="/marketplace" className="text-cyan-400 hover:underline">
+                <Link href="/marketplace" className="text-indigo-400 hover:text-indigo-300">
                   Parcourir le marketplace
                 </Link>
               </p>
@@ -211,8 +212,8 @@ export default function DashboardPage() {
                   return (
                   <li
                     key={m._id}
-                    className={`p-3 rounded-xl bg-milou-bg/80 border ${
-                      overdue ? 'border-red-500/40' : 'border-cyan-500/20'
+                    className={`p-3 rounded-xl bg-milou-surface/60 border ${
+                      overdue ? 'border-red-500/30' : 'border-white/[0.06]'
                     }`}
                   >
                     <p className="font-medium">{m.listingId?.title || 'Mission'}</p>
@@ -234,7 +235,7 @@ export default function DashboardPage() {
                         className="btn-secondary text-xs py-1.5 inline-flex items-center gap-2"
                         onClick={() => setChatMission(m)}
                       >
-                        💬 Chat
+                        Chat
                         <UnreadBadge count={m.unreadCount || 0} />
                       </button>
                       {m.clientId?.email === user.email && (
@@ -248,7 +249,7 @@ export default function DashboardPage() {
                             await loadDashboard();
                           }}
                         >
-                          Valider ✓
+                          Valider
                         </button>
                       )}
                     </div>
@@ -259,10 +260,10 @@ export default function DashboardPage() {
             )}
           </section>
 
-          <section className="card border-pink-500/20 bg-gradient-to-br from-milou-card to-pink-950/15">
+          <section className="card">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-pink-200">Mes annonces</h2>
-              <Link href="/create" className="text-cyan-400 text-sm hover:underline">
+              <h2 className="text-lg font-semibold text-white">Mes annonces</h2>
+              <Link href="/create" className="text-indigo-400 text-sm hover:text-indigo-300">
                 + Créer
               </Link>
             </div>
@@ -288,11 +289,11 @@ export default function DashboardPage() {
         </div>
 
         {completedMissions.length > 0 && (
-          <section className="card border-violet-500/20 mb-8">
-            <h2 className="text-lg font-semibold mb-4 text-violet-300">Missions terminées — avis</h2>
+          <section className="card mb-8">
+            <h2 className="text-lg font-semibold mb-4 text-white">Missions terminées — avis</h2>
             <ul className="space-y-4">
               {completedMissions.slice(0, 3).map((m) => (
-                <li key={m._id} className="p-3 rounded-xl bg-milou-bg border border-violet-500/20">
+                <li key={m._id} className="p-3 rounded-xl bg-milou-surface/60 border border-white/[0.06]">
                   <p className="font-medium text-sm">{m.listingId?.title || 'Mission'}</p>
                   {m.completedReason === 'deadline_missed' && (
                     <p className="text-xs text-red-400 mt-1">
@@ -308,8 +309,8 @@ export default function DashboardPage() {
           </section>
         )}
 
-        <section className="card border-milou-border">
-          <h2 className="text-lg font-semibold mb-4">Historique des transactions</h2>
+        <section className="card">
+          <h2 className="text-lg font-semibold mb-4 text-white">Historique des transactions</h2>
           <TransactionList transactions={transactions} />
         </section>
       </AppShell>

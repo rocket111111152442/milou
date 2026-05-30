@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirebaseAuth, getFirebaseConfigError, isFirebaseConfigured } from '@/lib/firebase/client';
 import { formatAuthError } from '@/lib/firebase/errors';
+import AuthLayout from '@/components/AuthLayout';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -33,30 +34,27 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4">
-      <div className="card w-full max-w-md">
-        <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">
-          MILOU
+    <AuthLayout title="Connexion" subtitle="Accédez à votre espace MILOU">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="label">Email</label>
+          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+        </div>
+        <div>
+          <label className="label">Mot de passe</label>
+          <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+        </div>
+        {error && <p className="text-red-400 text-sm">{error}</p>}
+        <button type="submit" className="btn-primary w-full py-3" disabled={loading}>
+          {loading ? 'Connexion…' : 'Se connecter'}
+        </button>
+      </form>
+      <p className="mt-6 text-sm text-zinc-500 text-center">
+        Pas de compte ?{' '}
+        <Link href="/register" className="text-indigo-400 hover:text-indigo-300 font-medium">
+          S&apos;inscrire gratuitement
         </Link>
-        <h1 className="text-xl font-semibold mt-6 mb-6">Connexion</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="label">Email</label>
-            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </div>
-          <div>
-            <label className="label">Mot de passe</label>
-            <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </div>
-          {error && <p className="text-milou-danger text-sm">{error}</p>}
-          <button type="submit" className="btn-primary w-full" disabled={loading}>
-            {loading ? 'Connexion...' : 'Se connecter'}
-          </button>
-        </form>
-        <p className="mt-4 text-sm text-gray-500">
-          Pas de compte ? <Link href="/register" className="text-cyan-400 hover:underline">S&apos;inscrire</Link>
-        </p>
-      </div>
-    </main>
+      </p>
+    </AuthLayout>
   );
 }

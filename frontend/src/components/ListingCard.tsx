@@ -15,7 +15,7 @@ interface Props {
   deleting?: boolean;
 }
 
-const CAT_ICONS = Object.fromEntries(SERVICE_CATEGORIES.map((c) => [c.id, c.icon]));
+const CAT_LABELS = Object.fromEntries(SERVICE_CATEGORIES.map((c) => [c.id, c.label]));
 
 export default function ListingCard({
   listing,
@@ -31,77 +31,84 @@ export default function ListingCard({
   const isOwner = currentUserId && ownerId === currentUserId;
   const st = LISTING_STATUS_LABELS[listing.status] || {
     label: listing.status,
-    className: 'bg-gray-600/20 text-gray-400',
+    className: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/20',
   };
-  const catIcon = CAT_ICONS[listing.category] || '✨';
+  const catLabel = CAT_LABELS[listing.category] || listing.category;
 
   return (
     <article
       className={`listing-card ${listing.featured ? 'listing-card-featured' : ''} ${
         compact ? 'listing-card-compact' : ''
-      }`}
+      } group`}
     >
-      <div className="flex flex-wrap gap-2 mb-3">
+      <div className="flex flex-wrap gap-1.5 mb-3">
         {listing.featured && (
-          <span className="badge bg-amber-500/20 text-amber-200 border border-amber-400/40 animate-pulse">
-            ★ À la une
+          <span className="badge bg-amber-500/15 text-amber-300 border border-amber-500/25">
+            À la une
           </span>
         )}
         <span
           className={`badge border ${
             listing.type === 'offer'
-              ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
-              : 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30'
+              ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'
+              : 'bg-violet-500/10 text-violet-300 border-violet-500/20'
           }`}
         >
-          {listing.type === 'offer' ? '📤 Offre' : '📥 Demande'}
+          {listing.type === 'offer' ? 'Offre' : 'Demande'}
         </span>
-        <span className="badge bg-violet-500/10 text-violet-300 border border-violet-500/20">
-          {catIcon} {listing.category}
+        <span className="badge bg-white/[0.04] text-zinc-400 border border-white/[0.08]">
+          {catLabel}
         </span>
         {listing.missionType === 'micro-job' && (
-          <span className="badge bg-orange-500/15 text-orange-300 border border-orange-500/25">⚡ Micro-job</span>
+          <span className="badge bg-orange-500/10 text-orange-300 border border-orange-500/20">
+            Micro-job
+          </span>
         )}
         <span className={`badge border ${st.className}`}>{st.label}</span>
       </div>
 
-      <h3 className="text-lg font-bold text-white mb-2 leading-snug">{listing.title}</h3>
-      <p className={`text-gray-400 mb-4 ${compact ? 'text-xs line-clamp-2' : 'text-sm line-clamp-3'}`}>
+      <h3 className="text-base font-semibold text-white mb-2 leading-snug group-hover:text-indigo-200 transition">
+        {listing.title}
+      </h3>
+      <p className={`text-zinc-400 mb-4 ${compact ? 'text-xs line-clamp-2' : 'text-sm line-clamp-3'}`}>
         {listing.description}
       </p>
 
       {listing.tags?.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
+        <div className="flex flex-wrap gap-1.5 mb-4">
           {listing.tags.map((t) => (
             <span key={t} className="tag-chip">
-              #{t}
+              {t}
             </span>
           ))}
         </div>
       )}
 
-      <div className="flex items-end justify-between gap-3 flex-wrap">
+      <div className="flex items-end justify-between gap-3 flex-wrap pt-3 border-t border-white/[0.04]">
         <div>
-          <p className="text-2xl font-black bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-            {listing.price} M
+          <p className="text-2xl font-bold text-emerald-400 tabular-nums">
+            {listing.price}
+            <span className="text-sm font-medium text-zinc-500 ml-0.5">M</span>
           </p>
-          {listing.estimatedDelay && <p className="text-xs text-gray-500">⏱ {listing.estimatedDelay}</p>}
+          {listing.estimatedDelay && (
+            <p className="text-xs text-zinc-500 mt-0.5">{listing.estimatedDelay}</p>
+          )}
           {author && (
-            <p className="text-xs text-gray-500 mt-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5">
-                👤 {author.firstname} {author.lastname}
-                {author.reputation != null && ` · ★ ${author.reputation}`}
-                {author.averageRating ? ` (${author.averageRating}/5)` : ''}
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <span className="text-xs text-zinc-500">
+                {author.firstname} {author.lastname}
+                {author.reputation != null && ` · ${author.reputation} rep.`}
+                {author.averageRating ? ` · ${author.averageRating}/5` : ''}
               </span>
               {author.isPremium && <PremiumBadge />}
-            </p>
+            </div>
           )}
         </div>
 
         <div className="flex flex-col gap-2 shrink-0">
           {showActions && listing.status === 'open' && onAccept && !isOwner && (
             <button type="button" onClick={() => onAccept(listing._id)} className="btn-primary text-sm">
-              Accepter →
+              Accepter
             </button>
           )}
           {isOwner && onDelete && listing.status === 'open' && (
@@ -111,13 +118,13 @@ export default function ListingCard({
               onClick={() => {
                 if (window.confirm('Retirer cette annonce du marketplace ?')) onDelete(listing._id);
               }}
-              className="text-sm px-4 py-2 rounded-lg bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500/30 disabled:opacity-50"
+              className="btn-danger text-sm"
             >
-              {deleting ? 'Suppression…' : '🗑 Supprimer'}
+              {deleting ? 'Suppression…' : 'Supprimer'}
             </button>
           )}
           {isOwner && listing.status !== 'open' && (
-            <span className="text-xs text-gray-500 text-center">Votre annonce</span>
+            <span className="text-xs text-zinc-600 text-center">Votre annonce</span>
           )}
         </div>
       </div>
