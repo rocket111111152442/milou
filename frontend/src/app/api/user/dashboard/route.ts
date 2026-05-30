@@ -76,6 +76,7 @@ export async function GET(req: NextRequest) {
 
     const listings = listingsSnap.docs.map((d) => ({
       _id: d.id,
+      authorId: String(d.data().userId || ''),
       ...d.data(),
       createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() || '',
     }));

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
+import AppShell from '@/components/AppShell';
 import BalanceCard from '@/components/BalanceCard';
 import TransactionList from '@/components/TransactionList';
 import CompleteProfile from '@/components/CompleteProfile';
@@ -13,6 +14,7 @@ import UnreadBadge from '@/components/UnreadBadge';
 import UsageLimitsCard from '@/components/UsageLimitsCard';
 import PremiumBadge from '@/components/PremiumBadge';
 import MissionReviewForm from '@/components/MissionReviewForm';
+import MyListingRow from '@/components/MyListingRow';
 import { Transaction, Listing, Mission } from '@/lib/types';
 
 export default function DashboardPage() {
@@ -23,6 +25,8 @@ export default function DashboardPage() {
   const [chatMission, setChatMission] = useState<Mission | null>(null);
   const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
   const [completedMissions, setCompletedMissions] = useState<Mission[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [listMsg, setListMsg] = useState('');
 
   function getOtherPartyName(m: Mission): string {
     const isClient = m.clientUid === user?.id || m.clientId?.email === user?.email;
@@ -34,11 +38,25 @@ export default function DashboardPage() {
     if (!user) return Promise.resolve();
     return userApi.dashboard().then((d) => {
       setTransactions(d.transactions as Transaction[]);
-      setListings((d.listings as Listing[]).slice(0, 5));
+      setListings(d.listings as Listing[]);
       setMissions(d.missions as Mission[]);
       setCompletedMissions((d.completedMissions as Mission[]) || []);
     });
   };
+
+  async function handleDeleteListing(id: string) {
+    setListMsg('');
+    setDeletingId(id);
+    try {
+      await listingsApi.delete(id);
+      setListMsg('Annonce supprimée.');
+      await loadDashboard();
+    } catch (err) {
+      setListMsg(err instanceof Error ? err.message : 'Erreur');
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   useEffect(() => {
     fetch('/api/announcements/active')
@@ -56,10 +74,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div
-        className="min-h-screen flex flex-col items-center justify-center gap-3"
-        style={{ background: '#0a0e17' }}
-      >
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-milou-bg">
         <p className="text-cyan-400 text-lg animate-pulse">Chargement du tableau de bord…</p>
       </div>
     );
@@ -71,13 +86,9 @@ export default function DashboardPage() {
 
   if (authError && !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#0a0e17' }}>
+      <div className="min-h-screen flex items-center justify-center px-4 bg-milou-bg">
         <div className="card max-w-md">
           <p className="text-milou-danger mb-4">{authError}</p>
-          <p className="text-gray-400 text-sm mb-4">
-            Vérifiez <code className="text-cyan-400">frontend/.env.local</code> et redémarrez{' '}
-            <code className="text-cyan-400">npm run dev</code>.
-          </p>
           <Link href="/login" className="btn-primary inline-block">
             Retour connexion
           </Link>
@@ -90,66 +101,86 @@ export default function DashboardPage() {
     return <CompleteProfile />;
   }
 
+  const openListings = listings.filter((l) => l.status === 'open').length;
+
   return (
     <>
       <Navbar />
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {announcement && (
-          <div className="card border-violet-500/40 bg-violet-500/10">
-            <p className="font-semibold text-violet-300">{announcement.title}</p>
-            <p className="text-gray-300 text-sm mt-1">{announcement.message}</p>
-          </div>
-        )}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex flex-wrap items-center gap-2">
-              Bonjour, {user.firstname}
-              {user.isPremium && <PremiumBadge />}
-            </h1>
-            <p className="text-gray-400">Votre tableau de bord MILOU</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+      <AppShell
+        title={`Bonjour, ${user.firstname}`}
+        subtitle="Votre espace MILOU — missions, annonces et Milou"
+        headerRight={
+          <div className="flex flex-wrap gap-2 items-center">
+            {user.isPremium && <PremiumBadge />}
             {!user.isPremium && (
-              <Link
-                href="/premium"
-                className="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-400/50 transition"
-              >
-                ⭐ Devenir Premium
+              <Link href="/premium" className="btn-secondary text-sm border-amber-500/40 text-amber-300">
+                ⭐ Premium
               </Link>
             )}
             <Link href="/transfer" className="btn-primary text-sm">
-              Envoyer des Milou
+              Envoyer des M
             </Link>
             <Link href="/create" className="btn-secondary text-sm">
-              Nouvelle annonce
+              + Annonce
             </Link>
           </div>
-        </div>
+        }
+        sidebarExtra={
+          <div className="space-y-3 text-sm">
+            <p className="sidebar-section-title">Raccourcis</p>
+            <Link href="/marketplace" className="sidebar-link bg-gradient-to-r from-violet-500/15 to-transparent">
+              <span>🛒</span> Explorer le marketplace
+            </Link>
+            <Link href="/create" className="sidebar-link bg-gradient-to-r from-pink-500/15 to-transparent">
+              <span>✨</span> Nouvelle annonce
+            </Link>
+            <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+              <p className="text-emerald-400 text-xs font-semibold">Annonces ouvertes</p>
+              <p className="text-2xl font-bold text-white">{openListings}</p>
+            </div>
+            <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5">
+              <p className="text-amber-400 text-xs font-semibold">Missions actives</p>
+              <p className="text-2xl font-bold text-white">{missions.length}</p>
+            </div>
+          </div>
+        }
+      >
+        {announcement && (
+          <div className="card border-violet-500/40 bg-gradient-to-r from-violet-500/15 to-pink-500/10 mb-6">
+            <p className="font-semibold text-violet-300">📢 {announcement.title}</p>
+            <p className="text-gray-300 text-sm mt-1">{announcement.message}</p>
+          </div>
+        )}
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="hero-glow mb-8" />
+
+        <div className="grid lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2">
             <BalanceCard balance={user.balance} />
           </div>
           <UsageLimitsCard isPremium={user.isPremium} />
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          <section className="card">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          <section className="card border-cyan-500/20 bg-gradient-to-br from-milou-card to-cyan-950/20">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-cyan-300">
               Missions en cours
-              <UnreadBadge
-                count={missions.reduce((sum, m) => sum + (m.unreadCount || 0), 0)}
-              />
+              <UnreadBadge count={missions.reduce((sum, m) => sum + (m.unreadCount || 0), 0)} />
             </h2>
             {missions.length === 0 ? (
-              <p className="text-gray-500 text-sm">Aucune mission active.</p>
+              <p className="text-gray-500 text-sm">
+                Aucune mission active.{' '}
+                <Link href="/marketplace" className="text-cyan-400 hover:underline">
+                  Parcourir le marketplace
+                </Link>
+              </p>
             ) : (
               <ul className="space-y-3">
                 {missions.map((m) => (
-                  <li key={m._id} className="p-3 rounded-lg bg-milou-bg border border-milou-border">
+                  <li key={m._id} className="p-3 rounded-xl bg-milou-bg/80 border border-cyan-500/20">
                     <p className="font-medium">{m.listingId?.title || 'Mission'}</p>
                     <p className="text-sm text-gray-400">
-                      {m.amount} M · En cours · {getOtherPartyName(m)}
+                      {m.amount} M · {getOtherPartyName(m)}
                     </p>
                     <div className="flex flex-wrap gap-2 mt-2">
                       <button
@@ -157,7 +188,7 @@ export default function DashboardPage() {
                         className="btn-secondary text-xs py-1.5 inline-flex items-center gap-2"
                         onClick={() => setChatMission(m)}
                       >
-                        Ouvrir le chat
+                        💬 Chat
                         <UnreadBadge count={m.unreadCount || 0} />
                       </button>
                       {m.clientId?.email === user.email && (
@@ -171,7 +202,7 @@ export default function DashboardPage() {
                             await loadDashboard();
                           }}
                         >
-                          Valider la mission
+                          Valider ✓
                         </button>
                       )}
                     </div>
@@ -181,36 +212,40 @@ export default function DashboardPage() {
             )}
           </section>
 
-          <section className="card">
+          <section className="card border-pink-500/20 bg-gradient-to-br from-milou-card to-pink-950/15">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Mes annonces</h2>
-              <Link href="/create" className="text-cyan-400 text-sm">
+              <h2 className="text-lg font-semibold text-pink-200">Mes annonces</h2>
+              <Link href="/create" className="text-cyan-400 text-sm hover:underline">
                 + Créer
               </Link>
             </div>
+            {listMsg && <p className="alert-success text-xs mb-3 py-2">{listMsg}</p>}
             {listings.length === 0 ? (
-              <p className="text-gray-500 text-sm">Aucune annonce — créez-en une pour le marketplace.</p>
+              <p className="text-gray-500 text-sm">Aucune annonce — publiez sur le marketplace.</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-2 max-h-80 overflow-y-auto pr-1">
                 {listings.map((l) => (
-                  <li key={l._id} className="flex justify-between text-sm p-2 rounded bg-milou-bg">
-                    <span>{l.title}</span>
-                    <span className="text-cyan-400">
-                      {l.price} M · {l.status}
-                    </span>
-                  </li>
+                  <MyListingRow
+                    key={l._id}
+                    listing={l}
+                    onDelete={handleDeleteListing}
+                    deleting={deletingId === l._id}
+                  />
                 ))}
               </ul>
             )}
+            <p className="text-xs text-gray-600 mt-3">
+              Suppression possible si l&apos;annonce est disponible ou terminée (pas en mission).
+            </p>
           </section>
         </div>
 
         {completedMissions.length > 0 && (
-          <section className="card">
-            <h2 className="text-lg font-semibold mb-4">Missions terminées — laisser un avis</h2>
+          <section className="card border-violet-500/20 mb-8">
+            <h2 className="text-lg font-semibold mb-4 text-violet-300">Missions terminées — avis</h2>
             <ul className="space-y-4">
               {completedMissions.slice(0, 3).map((m) => (
-                <li key={m._id} className="p-3 rounded-lg bg-milou-bg border border-milou-border">
+                <li key={m._id} className="p-3 rounded-xl bg-milou-bg border border-violet-500/20">
                   <p className="font-medium text-sm">{m.listingId?.title || 'Mission'}</p>
                   {m.clientId?.email === user.email && (
                     <MissionReviewForm missionId={m._id} onDone={() => loadDashboard()} />
@@ -221,11 +256,11 @@ export default function DashboardPage() {
           </section>
         )}
 
-        <section className="card">
+        <section className="card border-milou-border">
           <h2 className="text-lg font-semibold mb-4">Historique des transactions</h2>
           <TransactionList transactions={transactions} />
         </section>
-      </main>
+      </AppShell>
 
       {chatMission && user && (
         <MissionChat

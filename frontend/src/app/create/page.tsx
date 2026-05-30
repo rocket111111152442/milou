@@ -1,17 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
+import AppShell from '@/components/AppShell';
 import { useAuth } from '@/context/AuthContext';
-import { listingsApi } from '@/lib/api';
-import { SERVICE_CATEGORIES } from '@/lib/premium/config';
+import { listingsApi, premiumApi } from '@/lib/api';
+import { SERVICE_CATEGORIES, PREMIUM_FEATURES } from '@/lib/premium/config';
 
 export default function CreateListingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [error, setError] = useState('');
+  const [usage, setUsage] = useState<{ used: number; max: number } | null>(null);
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -22,6 +24,19 @@ export default function CreateListingPage() {
     estimatedDelay: '3 jours',
     missionType: 'standard',
   });
+
+  useEffect(() => {
+    if (!user) return;
+    premiumApi
+      .usage()
+      .then((u) => {
+        setUsage({
+          used: u.usage.listingsThisMonth,
+          max: u.limits.maxListingsPerMonth,
+        });
+      })
+      .catch(() => {});
+  }, [user]);
 
   if (loading || !user) {
     return <div className="min-h-screen flex items-center justify-center text-cyan-400">Chargement...</div>;
@@ -48,103 +63,174 @@ export default function CreateListingPage() {
     }
   }
 
+  const previewCategory = SERVICE_CATEGORIES.find((c) => c.id === form.category);
+
   return (
     <>
       <Navbar />
-      <main className="max-w-xl mx-auto px-4 py-8 animate-fade-in">
-        <h1 className="text-2xl font-bold mb-2">Créer une annonce</h1>
-        <p className="text-gray-400 text-sm mb-6">
-          Marketplace de services étudiants & communautaires — échange en Milou
-        </p>
-        {!user.isPremium && (
-          <p className="text-xs text-amber-400/90 mb-4">
-            Compte gratuit : limite d&apos;annonces par mois.{' '}
-            <Link href="/premium" className="underline">
-              Premium
-            </Link>{' '}
-            pour publier plus et être mis en avant.
-          </p>
-        )}
-        <form onSubmit={handleSubmit} className="card space-y-4">
-          <div>
-            <label className="label">Titre</label>
-            <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-          </div>
-          <div>
-            <label className="label">Description</label>
-            <textarea
-              className="input min-h-[120px]"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              required
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Type de service</label>
-              <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                {SERVICE_CATEGORIES.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.icon} {c.label}
-                  </option>
-                ))}
-              </select>
+      <AppShell
+        title="Créer une annonce"
+        subtitle="Publiez sur le marketplace — visible par toute la communauté"
+        headerRight={
+          <Link href="/marketplace" className="btn-secondary text-sm">
+            ← Marketplace
+          </Link>
+        }
+        sidebarExtra={
+          <div className="space-y-4 text-sm">
+            <p className="sidebar-section-title">Aperçu live</p>
+            <div className="p-4 rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-cyan-500/5">
+              <p className="text-xs text-violet-300 mb-1">{previewCategory?.icon} {previewCategory?.label}</p>
+              <p className="font-bold text-white truncate">{form.title || 'Titre de votre annonce'}</p>
+              <p className="text-2xl font-black text-cyan-400 mt-2">{form.price} M</p>
+              <p className="text-xs text-gray-500 mt-2 line-clamp-3">
+                {form.description || 'Votre description apparaîtra ici…'}
+              </p>
             </div>
-            <div>
-              <label className="label">Format mission</label>
-              <select
-                className="input"
-                value={form.missionType}
-                onChange={(e) => setForm({ ...form, missionType: e.target.value })}
-              >
-                <option value="standard">Mission classique</option>
-                <option value="micro-job">Micro-job rapide</option>
-              </select>
-            </div>
+            {!user.isPremium && (
+              <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5">
+                <p className="text-amber-300 text-xs font-semibold">Compte gratuit</p>
+                <p className="text-gray-400 text-xs mt-1">
+                  {usage ? `${usage.used}/${usage.max} annonces ce mois` : 'Limite mensuelle d\'annonces'}
+                </p>
+                <Link href="/premium" className="text-amber-400 text-xs underline mt-2 inline-block">
+                  Passer Premium →
+                </Link>
+              </div>
+            )}
+            <p className="sidebar-section-title">Avantages Premium</p>
+            <ul className="space-y-1 text-xs text-gray-500">
+              {PREMIUM_FEATURES.slice(0, 5).map((f) => (
+                <li key={f.id} className="flex gap-2">
+                  <span className="text-amber-400">★</span>
+                  {f.label}
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+        }
+      >
+        <div className="hero-glow mb-8 max-w-xl" />
+
+        <div className="grid lg:grid-cols-5 gap-8">
+          <form onSubmit={handleSubmit} className="lg:col-span-3 card space-y-4 border-cyan-500/20">
             <div>
-              <label className="label">Prix (Milou)</label>
+              <label className="label">Titre</label>
               <input
                 className="input"
-                type="number"
-                min={1}
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="Ex : Aide maths terminale"
                 required
               />
             </div>
             <div>
-              <label className="label">Délai estimé</label>
-              <input
-                className="input"
-                value={form.estimatedDelay}
-                onChange={(e) => setForm({ ...form, estimatedDelay: e.target.value })}
+              <label className="label">Description</label>
+              <textarea
+                className="input min-h-[140px]"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Détaillez ce que vous proposez ou recherchez…"
+                required
               />
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Catégorie</label>
+                <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                  {SERVICE_CATEGORIES.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.icon} {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Format</label>
+                <select
+                  className="input"
+                  value={form.missionType}
+                  onChange={(e) => setForm({ ...form, missionType: e.target.value })}
+                >
+                  <option value="standard">Mission classique</option>
+                  <option value="micro-job">Micro-job rapide ⚡</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Prix (M)</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Délai estimé</label>
+                <input
+                  className="input"
+                  value={form.estimatedDelay}
+                  onChange={(e) => setForm({ ...form, estimatedDelay: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="label">Type</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={`flex-1 py-2.5 rounded-lg border ${form.type === 'offer' ? 'chip-active' : 'chip'}`}
+                  onClick={() => setForm({ ...form, type: 'offer' })}
+                >
+                  📤 J&apos;offre un service
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2.5 rounded-lg border ${form.type === 'request' ? 'chip-active' : 'chip'}`}
+                  onClick={() => setForm({ ...form, type: 'request' })}
+                >
+                  📥 Je cherche de l&apos;aide
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="label">Tags (virgules)</label>
+              <input
+                className="input"
+                placeholder="maths, logo, python"
+                value={form.tags}
+                onChange={(e) => setForm({ ...form, tags: e.target.value })}
+              />
+            </div>
+            {error && <p className="alert-error py-2">{error}</p>}
+            <button type="submit" className="btn-primary w-full text-lg">
+              🚀 Publier sur le marketplace
+            </button>
+          </form>
+
+          <div className="lg:col-span-2 space-y-4">
+            <div className="card border-violet-500/20 bg-violet-500/5">
+              <h3 className="font-semibold text-violet-300 mb-2">Conseils</h3>
+              <ul className="text-sm text-gray-400 space-y-2 list-disc list-inside">
+                <li>Titre clair et précis</li>
+                <li>Prix réaliste en Milou</li>
+                <li>Ajoutez des tags pour être trouvé</li>
+                <li>Premium = mise en avant auto</li>
+              </ul>
+            </div>
+            <div className="card border-emerald-500/20">
+              <p className="text-sm text-gray-400">
+                Vous pourrez <strong className="text-red-300">supprimer</strong> votre annonce depuis le dashboard ou le
+                marketplace tant qu&apos;aucune mission n&apos;est en cours.
+              </p>
+            </div>
           </div>
-          <div>
-            <label className="label">Type d&apos;annonce</label>
-            <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as 'offer' | 'request' })}>
-              <option value="offer">Offre (je propose)</option>
-              <option value="request">Demande (je cherche)</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">Tags (séparés par virgule)</label>
-            <input
-              className="input"
-              placeholder="maths, logo, python"
-              value={form.tags}
-              onChange={(e) => setForm({ ...form, tags: e.target.value })}
-            />
-          </div>
-          {error && <p className="text-milou-danger text-sm">{error}</p>}
-          <button type="submit" className="btn-primary w-full">
-            Publier l&apos;annonce
-          </button>
-        </form>
-      </main>
+        </div>
+      </AppShell>
     </>
   );
 }

@@ -133,7 +133,9 @@ export interface ListingAuthor {
 
 export interface Listing {
   _id: string;
-  userId: ListingAuthor;
+  /** UID propriétaire (marketplace) */
+  authorId?: string;
+  userId: ListingAuthor | string;
   title: string;
   description: string;
   category: string;

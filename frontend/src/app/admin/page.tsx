@@ -375,7 +375,8 @@ export default function AdminPage() {
                 <div>
                   <p className="font-medium">{l.title}</p>
                   <p className="text-sm text-gray-400">
-                    {l.status} · {l.price} M · {l.userId.email}
+                    {l.status} · {l.price} M ·{' '}
+                    {typeof l.userId === 'object' && l.userId?.email ? l.userId.email : '—'}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

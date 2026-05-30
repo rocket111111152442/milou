@@ -59,6 +59,8 @@ export const listingsApi = {
     api<{ missionId: string }>(`/api/listings/${id}/accept`, { method: 'POST' }),
   completeMission: (id: string) =>
     api<{ message: string }>(`/api/listings/missions/${id}/complete`, { method: 'POST' }),
+  delete: (id: string) =>
+    api<{ message: string }>(`/api/listings/${id}`, { method: 'DELETE' }),
 };
 
 export const userApi = {

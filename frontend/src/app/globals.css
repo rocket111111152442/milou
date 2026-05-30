@@ -127,3 +127,124 @@ body {
 .card:hover {
   @apply shadow-neon;
 }
+
+/* Layout app connectée : sidebar gauche + contenu droite */
+.app-shell {
+  @apply flex w-full max-w-[1600px] mx-auto;
+}
+
+.app-sidebar {
+  @apply w-64 shrink-0 sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-y-auto;
+}
+
+.sidebar-link {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300 border border-transparent
+         hover:border-cyan-500/30 hover:text-white transition;
+}
+
+.sidebar-link-active {
+  @apply text-cyan-300 border-cyan-500/40 bg-cyan-500/10 font-medium;
+}
+
+.sidebar-section-title {
+  @apply text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2;
+}
+
+.page-title {
+  @apply text-3xl font-black bg-gradient-to-r from-cyan-300 via-violet-300 to-pink-300 bg-clip-text text-transparent;
+}
+
+.page-subtitle {
+  @apply text-gray-400 mt-1;
+}
+
+.page-header {
+  @apply relative overflow-hidden;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.06) 0%, rgba(167, 139, 250, 0.08) 50%, rgba(236, 72, 153, 0.05) 100%);
+}
+
+.chip {
+  @apply border border-milou-border bg-milou-bg/60 text-gray-400 transition hover:border-violet-500/40 hover:text-gray-200;
+}
+
+.chip-active {
+  @apply border-cyan-500/50 bg-cyan-500/15 text-cyan-300;
+}
+
+.stat-pill {
+  @apply flex flex-col items-center p-2 rounded-lg border;
+}
+
+.stat-pill-cyan {
+  @apply border-cyan-500/25 bg-cyan-500/10;
+}
+.stat-pill-amber {
+  @apply border-amber-500/25 bg-amber-500/10;
+}
+.stat-pill-violet {
+  @apply border-violet-500/25 bg-violet-500/10;
+}
+.stat-pill-pink {
+  @apply border-pink-500/25 bg-pink-500/10;
+}
+
+.stat-value {
+  @apply text-lg font-bold text-white;
+}
+
+.stat-label {
+  @apply text-[10px] text-gray-500 uppercase;
+}
+
+.listing-card {
+  @apply card hover:border-cyan-500/40 transition-all duration-300 animate-fade-in;
+}
+
+.listing-card-featured {
+  @apply border-amber-400/40 ring-2 ring-amber-500/20 shadow-[0_0_30px_-5px_rgba(251,191,36,0.25)];
+}
+
+.listing-card-compact {
+  @apply p-4;
+}
+
+.tag-chip {
+  @apply text-xs px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20;
+}
+
+.my-listing-row {
+  @apply flex items-center justify-between gap-3 p-3 rounded-xl bg-milou-bg border border-milou-border
+         hover:border-cyan-500/30 transition;
+}
+
+.alert-banner {
+  @apply px-4 py-3 rounded-xl text-sm border flex items-center gap-2;
+}
+
+.alert-success {
+  @apply alert-banner bg-emerald-500/10 border-emerald-500/30 text-emerald-300;
+}
+
+.alert-error {
+  @apply alert-banner bg-red-500/10 border-red-500/30 text-red-300;
+}
+
+.alert-info {
+  @apply alert-banner bg-cyan-500/10 border-cyan-500/30 text-cyan-300;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+.hero-glow {
+  background: linear-gradient(90deg, #22d3ee, #a78bfa, #ec4899, #22d3ee);
+  background-size: 200% auto;
+  animation: shimmer 6s linear infinite;
+  @apply h-1 rounded-full w-full max-w-md opacity-60;
+}

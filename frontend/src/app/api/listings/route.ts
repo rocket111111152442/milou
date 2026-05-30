@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
       listings.push({
         _id: d.id,
         ...data,
+        authorId: String(data.userId || ''),
         featured,
         userId: author,
         createdAt: data.createdAt?.toDate?.()?.toISOString?.() || '',
