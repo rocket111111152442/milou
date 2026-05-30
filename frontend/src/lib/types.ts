@@ -202,10 +202,19 @@ export interface Mission {
   createdAt: string;
 }
 
+export interface ChatAttachment {
+  name: string;
+  url: string;
+  mimeType: string;
+  size: number;
+  kind: 'image' | 'pdf' | 'file' | 'archive';
+}
+
 export interface MissionMessage {
   _id: string;
   senderId: string;
   senderName: string;
   text: string;
+  attachments?: ChatAttachment[];
   createdAt: string;
 }

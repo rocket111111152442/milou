@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MissionMessage } from '@/lib/types';
 import { chatApi } from '@/lib/api';
+import ChatMessageContent from '@/components/ChatMessageContent';
 
 interface Props {
   missionId: string;
@@ -25,10 +26,13 @@ export default function MissionChat({
 }: Props) {
   const [messages, setMessages] = useState<MissionMessage[]>([]);
   const [text, setText] = useState('');
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const markRead = async () => {
     try {
@@ -60,7 +64,16 @@ export default function MissionChat({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, open]);
+  }, [messages, open, pendingFiles]);
+
+  function addFiles(list: FileList | null) {
+    if (!list?.length) return;
+    setPendingFiles((prev) => {
+      const map = new Map(prev.map((f) => [`${f.name}-${f.size}`, f]));
+      Array.from(list).forEach((f) => map.set(`${f.name}-${f.size}`, f));
+      return Array.from(map.values()).slice(0, 10);
+    });
+  }
 
   async function handleDeleteMessage(messageId: string) {
     if (!window.confirm('Supprimer ce message ?')) return;
@@ -76,15 +89,23 @@ export default function MissionChat({
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed && pendingFiles.length === 0) return;
     setSending(true);
+    setError('');
     try {
-      const { message } = await chatApi.send(missionId, trimmed);
+      let message: MissionMessage;
+      if (pendingFiles.length > 0) {
+        const res = await chatApi.sendFiles(missionId, trimmed, pendingFiles);
+        message = res.message;
+        setPendingFiles([]);
+      } else {
+        const res = await chatApi.send(missionId, trimmed);
+        message = res.message;
+      }
       setMessages((prev) => [...prev, message]);
       setText('');
-      setError('');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Envoi impossible');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Envoi impossible');
     } finally {
       setSending(false);
     }
@@ -120,14 +141,14 @@ export default function MissionChat({
           {loading && messages.length === 0 && (
             <p className="text-center text-gray-500 text-sm">Chargement des messages…</p>
           )}
+          <p className="text-center text-[10px] text-gray-600 pb-1">
+            Images, PDF, ZIP, dossiers (max 15 Mo/fichier, 10 fichiers)
+          </p>
           {messages.map((m) => {
             const isMe = m.senderId === currentUserId;
             const isSystem = m.senderId === 'system';
             return (
-              <div
-                key={m._id}
-                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-              >
+              <div key={m._id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div
                   className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
                     isSystem
@@ -140,7 +161,7 @@ export default function MissionChat({
                   {!isSystem && !isMe && (
                     <p className="text-xs text-gray-500 mb-0.5">{m.senderName}</p>
                   )}
-                  <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                  <ChatMessageContent text={m.text} attachments={m.attachments} />
                   {!isSystem && (
                     <div className="flex items-center justify-end gap-2 mt-1">
                       <p className="text-[10px] text-gray-500">
@@ -169,20 +190,99 @@ export default function MissionChat({
           <div ref={bottomRef} />
         </div>
 
+        {pendingFiles.length > 0 && (
+          <div className="px-3 py-2 border-t border-milou-border/50 bg-milou-bg/80 max-h-24 overflow-y-auto">
+            <p className="text-xs text-gray-500 mb-1">Fichiers à envoyer ({pendingFiles.length})</p>
+            <ul className="flex flex-wrap gap-1">
+              {pendingFiles.map((f) => (
+                <li
+                  key={`${f.name}-${f.size}`}
+                  className="text-xs bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full flex items-center gap-1"
+                >
+                  <span className="truncate max-w-[120px]">{f.name}</span>
+                  <button
+                    type="button"
+                    className="text-red-400"
+                    onClick={() =>
+                      setPendingFiles((prev) =>
+                        prev.filter((x) => x.name !== f.name || x.size !== f.size)
+                      )
+                    }
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {error && <p className="px-4 text-milou-danger text-xs">{error}</p>}
 
-        <form onSubmit={handleSend} className="p-3 border-t border-milou-border flex gap-2 bg-milou-card">
-          <input
-            className="input flex-1 text-sm"
-            placeholder="Écrire un message…"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            maxLength={2000}
-            disabled={sending}
-          />
-          <button type="submit" className="btn-primary px-4 shrink-0" disabled={sending || !text.trim()}>
-            {sending ? '…' : 'Envoyer'}
-          </button>
+        <form
+          onSubmit={handleSend}
+          className="p-3 border-t border-milou-border bg-milou-card space-y-2"
+        >
+          <div className="flex gap-1">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              multiple
+              accept="image/*,.pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+            <input
+              ref={folderInputRef}
+              type="file"
+              className="hidden"
+              multiple
+              // @ts-expect-error webkitdirectory non standard
+              webkitdirectory=""
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+            <button
+              type="button"
+              className="btn-secondary text-xs px-2 py-1.5"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending}
+              title="Images, PDF, documents"
+            >
+              📎 Fichiers
+            </button>
+            <button
+              type="button"
+              className="btn-secondary text-xs px-2 py-1.5"
+              onClick={() => folderInputRef.current?.click()}
+              disabled={sending}
+              title="Envoyer un dossier entier"
+            >
+              📁 Dossier
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <input
+              className="input flex-1 text-sm"
+              placeholder="Message ou légende…"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={2000}
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              className="btn-primary px-4 shrink-0"
+              disabled={sending || (!text.trim() && pendingFiles.length === 0)}
+            >
+              {sending ? '…' : 'Envoyer'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

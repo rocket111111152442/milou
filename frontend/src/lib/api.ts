@@ -85,6 +85,22 @@ export const chatApi = {
       method: 'POST',
       body: JSON.stringify({ text }),
     }),
+  sendFiles: async (missionId: string, text: string, files: File[]) => {
+    const user = getFirebaseAuth().currentUser;
+    if (!user) throw new Error('Non connecté');
+    const token = await user.getIdToken();
+    const form = new FormData();
+    if (text.trim()) form.append('text', text.trim());
+    files.forEach((f) => form.append('files', f));
+    const res = await fetch(`/api/missions/${missionId}/messages/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Envoi impossible');
+    return data as { message: import('./types').MissionMessage };
+  },
   deleteMessage: (missionId: string, messageId: string) =>
     api<{ message: string }>(`/api/missions/${missionId}/messages/${messageId}`, { method: 'DELETE' }),
   markRead: (missionId: string) =>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { deleteChatAttachments } from '@/lib/firebase/storage-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +41,14 @@ export async function DELETE(
     if (!allowed) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
     }
+
+    const data = msgSnap.data()!;
+    const paths = Array.isArray(data.attachments)
+      ? data.attachments
+          .map((a: { storagePath?: string }) => a.storagePath)
+          .filter((p): p is string => Boolean(p))
+      : [];
+    if (paths.length) await deleteChatAttachments(paths);
 
     await msgRef.delete();
     return NextResponse.json({ message: 'Message supprimé' });

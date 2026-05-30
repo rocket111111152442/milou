@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { mapMessageDoc } from '@/lib/mission-messages';
+
+export const dynamic = 'force-dynamic';
 
 async function getMissionIfParticipant(missionId: string, uid: string) {
   const snap = await getAdminDb().collection('missions').doc(missionId).get();
@@ -25,26 +28,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .collection('missions')
       .doc(params.id)
       .collection('messages')
-      .orderBy('createdAt', 'asc')
-      .limit(200)
+      .limit(250)
       .get();
 
-    const messages = snap.docs.map((d) => {
-      const data = d.data();
-      return {
-        _id: d.id,
-        senderId: data.senderId,
-        senderName: data.senderName || '',
-        text: data.text,
-        createdAt: data.createdAt?.toDate?.()?.toISOString?.() || '',
-      };
-    });
+    const messages = snap.docs
+      .map((d) => mapMessageDoc(d.id, d.data()))
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     return NextResponse.json({ messages });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erreur';
     const status = msg.includes('Accès') ? 403 : msg.includes('introuvable') ? 404 : 400;
-    return NextResponse.json({ error: msg }, { status });
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
 }
 
@@ -71,18 +66,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         senderId: uid,
         senderName,
         text: trimmed,
+        attachments: [],
         createdAt: FieldValue.serverTimestamp(),
       });
 
-    return NextResponse.json({
-      message: {
-        _id: ref.id,
-        senderId: uid,
-        senderName,
-        text: trimmed,
-        createdAt: new Date().toISOString(),
-      },
-    });
+    const saved = await ref.get();
+    return NextResponse.json({ message: mapMessageDoc(ref.id, saved.data()!) });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erreur';
     return NextResponse.json({ error: msg }, { status: 400 });

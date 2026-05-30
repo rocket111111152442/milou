@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import ChatMessageContent from '@/components/ChatMessageContent';
 import AdminUserInspector from '@/components/admin/AdminUserInspector';
 import TransactionList from '@/components/TransactionList';
 import { useAuth } from '@/context/AuthContext';
@@ -514,7 +515,9 @@ export default function AdminPage() {
                       <span className="text-gray-600 text-xs">
                         {new Date(msgItem.createdAt).toLocaleString('fr-FR')}
                       </span>
-                      <p className="text-gray-300 mt-0.5">{msgItem.text}</p>
+                      <div className="text-gray-300 mt-0.5">
+                        <ChatMessageContent text={msgItem.text} attachments={msgItem.attachments} />
+                      </div>
                     </li>
                   ))}
                 </ul>
