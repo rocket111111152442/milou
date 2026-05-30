@@ -161,6 +161,7 @@ export function userToJson(id: string, data: Record<string, unknown>) {
     moderatorNotes: String(data.moderatorNotes ?? ''),
     isPremium: premiumActive,
     premiumExpiresAt: exp ? exp.toISOString() : null,
+    premiumActivatedAt: data.premiumActivatedAt ? tsToIso(data.premiumActivatedAt) : null,
     lastSeenAt: data.lastSeenAt ? tsToIso(data.lastSeenAt) : null,
     isOnline: Boolean(data.isOnline),
     reviewCount: Number(data.reviewCount ?? 0),

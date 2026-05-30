@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import TransactionList from '@/components/TransactionList';
 import PremiumBadge from '@/components/PremiumBadge';
+import AdminBadge from '@/components/AdminBadge';
 import { adminApi } from '@/lib/api';
 import type { AdminUserDetailResponse, User, UserRole, UserStatus } from '@/lib/types';
 
@@ -134,6 +135,7 @@ export default function AdminUserInspector({ userId, onUserUpdated, onMessage }:
           <div>
             <h2 className="text-xl font-bold text-white flex flex-wrap items-center gap-2">
               {u.firstname} {u.lastname}
+              {u.role === 'admin' && <AdminBadge />}
               {u.isPremium && <PremiumBadge />}
             </h2>
             <p className="text-gray-400 text-sm">{u.email}</p>

@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar';
 import AppShell from '@/components/AppShell';
 import BalanceCard from '@/components/BalanceCard';
 import PremiumBadge from '@/components/PremiumBadge';
+import AdminBadge from '@/components/AdminBadge';
 import OnlineStatus from '@/components/OnlineStatus';
 import { useAuth } from '@/context/AuthContext';
 import { reviewsApi, userApi } from '@/lib/api';
@@ -49,6 +50,7 @@ export default function ProfilePage() {
         subtitle={`${user.firstname} ${user.lastname} · membre depuis ${new Date(user.createdAt).toLocaleDateString('fr-FR')}`}
         headerRight={
           <div className="flex items-center gap-2">
+            {user.role === 'admin' && <AdminBadge size="md" />}
             {user.isPremium && <PremiumBadge size="md" />}
             <OnlineStatus userId={user.id} />
           </div>

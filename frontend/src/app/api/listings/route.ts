@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
         email: '',
         reputation: 0,
         isPremium: false,
+        role: 'user',
         averageRating: 0,
       };
       let authorPremium = false;
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest) {
             email: String(u.email || ''),
             reputation: Number(u.reputation || 0),
             isPremium: authorPremium,
+            role: String(u.role || 'user'),
             averageRating: Number(u.averageRating || 0),
           };
         }
@@ -111,7 +113,7 @@ export async function POST(req: NextRequest) {
       price: Number(price),
       type,
       tags: Array.isArray(tags) ? tags : [],
-      estimatedDelay: estimatedDelay || '',
+      estimatedDelay: String(estimatedDelay || '').trim() || '5 minutes',
       missionType: missionType || 'standard',
       featured: premium,
       status: 'open',

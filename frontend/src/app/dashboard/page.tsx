@@ -13,6 +13,7 @@ import MissionChat from '@/components/MissionChat';
 import UnreadBadge from '@/components/UnreadBadge';
 import UsageLimitsCard from '@/components/UsageLimitsCard';
 import PremiumBadge from '@/components/PremiumBadge';
+import AdminBadge from '@/components/AdminBadge';
 import MissionReviewForm from '@/components/MissionReviewForm';
 import MyListingRow from '@/components/MyListingRow';
 import { Transaction, Listing, Mission } from '@/lib/types';
@@ -124,6 +125,7 @@ export default function DashboardPage() {
         subtitle="Votre espace MILOU — missions, annonces et Milou"
         headerRight={
           <div className="flex flex-wrap gap-2 items-center">
+            {user.role === 'admin' && <AdminBadge />}
             {user.isPremium && <PremiumBadge />}
             {!user.isPremium && (
               <Link href="/premium" className="btn-secondary text-sm border-amber-500/30 text-amber-300">

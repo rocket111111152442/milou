@@ -134,6 +134,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [pathname, router]);
 
+  useEffect(() => {
+    if (!user?.id || !isFirebaseConfigured()) return;
+    const t = setInterval(() => {
+      refreshUser();
+    }, 60000);
+    return () => clearInterval(t);
+  }, [user?.id]);
+
   return (
     <AuthContext.Provider
       value={{ user, loading, needsProfile, authError, setUser, logout, refreshUser }}

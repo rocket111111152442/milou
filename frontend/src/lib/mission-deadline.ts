@@ -6,27 +6,35 @@ export const DEADLINE_PENALTY_COMMENT = "n'as pas respecté la date de la missio
 
 const DEFAULT_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Parse "3 jours", "1 semaine", "48 heures", etc. */
+/** Parse "3 jours", "2 heures 30 minutes", "1 semaine", etc. */
 export function parseEstimatedDelayMs(text: string): number {
   const raw = String(text || '').toLowerCase().trim();
   if (!raw) return DEFAULT_DELAY_MS;
 
-  const match = raw.match(/(\d+(?:[.,]\d+)?)\s*(jour|jours|j|semaine|semaines|sem|s|mois|m|heure|heures|h|minute|minutes|min)/);
-  if (!match) {
+  const day = 24 * 60 * 60 * 1000;
+  const unitMs = (unit: string) => {
+    if (unit.startsWith('h') || unit === 'heure' || unit === 'heures') return 60 * 60 * 1000;
+    if (unit.startsWith('min')) return 60 * 1000;
+    if (unit.startsWith('sem') || unit === 's') return 7 * day;
+    if (unit === 'mois' || unit === 'm') return 30 * day;
+    return day;
+  };
+
+  const matches = Array.from(
+    raw.matchAll(/(\d+(?:[.,]\d+)?)\s*(minute|minutes|min|heure|heures|h|jour|jours|j|semaine|semaines|sem|s|mois|m)/g)
+  );
+  if (matches.length === 0) {
     const n = parseInt(raw, 10);
     if (!Number.isNaN(n) && n > 0) return n * 24 * 60 * 60 * 1000;
     return DEFAULT_DELAY_MS;
   }
 
-  const value = parseFloat(match[1].replace(',', '.'));
-  const unit = match[2];
-  const day = 24 * 60 * 60 * 1000;
+  const total = matches.reduce((sum, match) => {
+    const value = parseFloat(match[1].replace(',', '.'));
+    return sum + value * unitMs(match[2]);
+  }, 0);
 
-  if (unit.startsWith('h') || unit === 'heure' || unit === 'heures') return value * 60 * 60 * 1000;
-  if (unit.startsWith('min')) return value * 60 * 1000;
-  if (unit.startsWith('sem') || unit === 's') return value * 7 * day;
-  if (unit === 'mois' || unit === 'm') return value * 30 * day;
-  return value * day;
+  return total > 0 ? total : DEFAULT_DELAY_MS;
 }
 
 export function computeDueAt(start: Date, estimatedDelay: string): Date {

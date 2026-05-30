@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { presenceApi } from '@/lib/api';
 import NotificationBell from '@/components/NotificationBell';
 import PremiumBadge from '@/components/PremiumBadge';
+import AdminBadge from '@/components/AdminBadge';
 import MilouLogo from '@/components/ui/MilouLogo';
 import {
   IconClose,
@@ -100,6 +101,7 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          {user.role === 'admin' && <AdminBadge />}
           {user.isPremium && <PremiumBadge />}
           <NotificationBell />
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-milou-surface border border-white/[0.06]">

@@ -2,6 +2,7 @@
 
 import { Listing } from '@/lib/types';
 import PremiumBadge from '@/components/PremiumBadge';
+import AdminBadge from '@/components/AdminBadge';
 import { getListingOwnerId, LISTING_STATUS_LABELS } from '@/lib/listing-utils';
 import { SERVICE_CATEGORIES } from '@/lib/premium/config';
 
@@ -100,6 +101,7 @@ export default function ListingCard({
                 {author.reputation != null && ` · ${author.reputation} rep.`}
                 {author.averageRating ? ` · ${author.averageRating}/5` : ''}
               </span>
+              {author.role === 'admin' && <AdminBadge />}
               {author.isPremium && <PremiumBadge />}
             </div>
           )}

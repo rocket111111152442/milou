@@ -9,6 +9,22 @@ import { useAuth } from '@/context/AuthContext';
 import { listingsApi, premiumApi } from '@/lib/api';
 import { SERVICE_CATEGORIES, PREMIUM_FEATURES } from '@/lib/premium/config';
 
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i);
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => i * 5);
+
+function pluralizeDelay(value: number, singular: string, plural: string) {
+  return `${value} ${value > 1 ? plural : singular}`;
+}
+
+function formatEstimatedDelay(delay: { days: number; hours: number; minutes: number }) {
+  const parts = [];
+  if (delay.days > 0) parts.push(pluralizeDelay(delay.days, 'jour', 'jours'));
+  if (delay.hours > 0) parts.push(pluralizeDelay(delay.hours, 'heure', 'heures'));
+  if (delay.minutes > 0) parts.push(pluralizeDelay(delay.minutes, 'minute', 'minutes'));
+  return parts.join(' ') || '5 minutes';
+}
+
 export default function CreateListingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -21,9 +37,9 @@ export default function CreateListingPage() {
     price: 5,
     type: 'offer' as 'offer' | 'request',
     tags: '',
-    estimatedDelay: '3 jours',
     missionType: 'standard',
   });
+  const [delay, setDelay] = useState({ days: 3, hours: 0, minutes: 0 });
 
   useEffect(() => {
     if (!user) return;
@@ -54,7 +70,7 @@ export default function CreateListingPage() {
         price: Number(form.price),
         type: form.type,
         tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
-        estimatedDelay: form.estimatedDelay,
+        estimatedDelay: formatEstimatedDelay(delay),
         missionType: form.missionType,
       });
       router.push('/marketplace');
@@ -64,6 +80,17 @@ export default function CreateListingPage() {
   }
 
   const previewCategory = SERVICE_CATEGORIES.find((c) => c.id === form.category);
+  const estimatedDelay = formatEstimatedDelay(delay);
+
+  function setDelayPart(part: 'days' | 'hours' | 'minutes', value: number) {
+    setDelay((current) => {
+      const next = { ...current, [part]: value };
+      if (next.days === 0 && next.hours === 0 && next.minutes === 0) {
+        next.minutes = 5;
+      }
+      return next;
+    });
+  }
 
   return (
     <>
@@ -83,6 +110,7 @@ export default function CreateListingPage() {
               <p className="text-xs text-indigo-400 mb-1 font-medium">{previewCategory?.label}</p>
               <p className="font-bold text-white truncate">{form.title || 'Titre de votre annonce'}</p>
               <p className="text-2xl font-bold text-emerald-400 tabular-nums mt-2">{form.price} M</p>
+              <p className="text-xs text-zinc-500 mt-1">{estimatedDelay}</p>
               <p className="text-xs text-gray-500 mt-2 line-clamp-3">
                 {form.description || 'Votre description apparaîtra ici…'}
               </p>
@@ -169,11 +197,45 @@ export default function CreateListingPage() {
               </div>
               <div>
                 <label className="label">Délai estimé</label>
-                <input
-                  className="input"
-                  value={form.estimatedDelay}
-                  onChange={(e) => setForm({ ...form, estimatedDelay: e.target.value })}
-                />
+                <div className="grid grid-cols-3 gap-2">
+                  <select
+                    className="input"
+                    value={delay.days}
+                    onChange={(e) => setDelayPart('days', Number(e.target.value))}
+                    aria-label="Jours"
+                  >
+                    {DAY_OPTIONS.map((value) => (
+                      <option key={value} value={value}>
+                        {value} j
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="input"
+                    value={delay.hours}
+                    onChange={(e) => setDelayPart('hours', Number(e.target.value))}
+                    aria-label="Heures"
+                  >
+                    {HOUR_OPTIONS.map((value) => (
+                      <option key={value} value={value}>
+                        {value} h
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="input"
+                    value={delay.minutes}
+                    onChange={(e) => setDelayPart('minutes', Number(e.target.value))}
+                    aria-label="Minutes"
+                  >
+                    {MINUTE_OPTIONS.map((value) => (
+                      <option key={value} value={value}>
+                        {value} min
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-zinc-500 mt-1">Délai retenu : {estimatedDelay}</p>
               </div>
             </div>
             <div>

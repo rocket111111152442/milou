@@ -16,6 +16,7 @@ export interface User {
   moderatorNotes?: string;
   isPremium?: boolean;
   premiumExpiresAt?: string | null;
+  premiumActivatedAt?: string | null;
   lastSeenAt?: string | null;
   isOnline?: boolean;
   reviewCount?: number;
@@ -165,6 +166,7 @@ export interface ListingAuthor {
   email: string;
   reputation?: number;
   isPremium?: boolean;
+  role?: UserRole;
   averageRating?: number;
 }
 
