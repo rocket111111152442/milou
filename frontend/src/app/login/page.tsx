@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client';
+import { formatAuthError } from '@/lib/firebase/errors';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -25,7 +26,7 @@ export default function LoginPage() {
       await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
       router.push('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Identifiants invalides');
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
     }

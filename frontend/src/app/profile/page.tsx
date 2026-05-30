@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import BalanceCard from '@/components/BalanceCard';
 import { useAuth } from '@/context/AuthContext';
-import { fetchMyListings } from '@/lib/firestore-client';
+import { userApi } from '@/lib/api';
 import { Listing } from '@/lib/types';
 
 export default function ProfilePage() {
@@ -13,7 +13,9 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!user) return;
-    fetchMyListings(user.id).then((ls) => setListings(ls.filter((l) => l.status === 'open')));
+    userApi.dashboard().then((d) =>
+      setListings((d.listings as Listing[]).filter((l) => l.status === 'open'))
+    );
   }, [user]);
 
   if (loading || !user) {

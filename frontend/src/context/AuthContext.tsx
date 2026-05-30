@@ -3,14 +3,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '@/lib/firebase/client';
+import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client';
 import { User } from '@/lib/types';
-import { authApi } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  needsProfile: boolean;
+  authError: string | null;
   setUser: (user: User | null) => void;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -19,75 +19,125 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 const PUBLIC_PATHS = ['/', '/login', '/register'];
 
-async function loadUserProfile(uid: string): Promise<User | null> {
-  const snap = await getDoc(doc(getFirebaseDb(), 'users', uid));
-  if (!snap.exists()) return null;
-  const d = snap.data();
-  return {
-    id: snap.id,
-    firstname: d.firstname,
-    lastname: d.lastname,
-    email: d.email,
-    balance: d.balance ?? 0,
-    role: d.role ?? 'user',
-    reputation: d.reputation ?? 0,
-    totalEarned: d.totalEarned ?? 0,
-    totalSpent: d.totalSpent ?? 0,
-    transactionCount: d.transactionCount ?? 0,
-    createdAt: d.createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
-  };
+/** Lecture profil via API serveur (évite les bugs Firestore navigateur) */
+async function loadUserProfile(_uid: string, idToken: string): Promise<User | null> {
+  const res = await fetch('/api/auth/me', {
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Profil inaccessible');
+  }
+  const { user } = await res.json();
+  return user as User;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsProfile, setNeedsProfile] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
   const logout = async () => {
-    if (isFirebaseConfigured()) await signOut(getFirebaseAuth());
+    try {
+      if (isFirebaseConfigured()) await signOut(getFirebaseAuth());
+    } catch {
+      /* ignore */
+    }
     setUser(null);
+    setNeedsProfile(false);
     router.push('/login');
   };
 
   const refreshUser = async () => {
     const firebaseAuth = getFirebaseAuth();
-    if (!firebaseAuth.currentUser) return;
+    const current = firebaseAuth.currentUser;
+    if (!current) return;
     try {
-      if (isFirebaseConfigured()) {
-        const u = await loadUserProfile(firebaseAuth.currentUser.uid);
-        setUser(u);
-      } else {
-        const { user: u } = await authApi.me();
-        setUser(u);
-      }
-    } catch {
-      await logout();
+      const token = await current.getIdToken();
+      const u = await loadUserProfile(current.uid, token);
+      setUser(u);
+      setNeedsProfile(!u);
+      setAuthError(null);
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : 'Erreur profil');
     }
   };
 
   useEffect(() => {
     if (!isFirebaseConfigured()) {
+      setAuthError('Firebase non configuré dans .env.local');
       setLoading(false);
       return;
     }
 
-    const unsub = onAuthStateChanged(getFirebaseAuth(), async (firebaseUser) => {
-      if (!firebaseUser) {
-        setUser(null);
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
         setLoading(false);
-        if (!PUBLIC_PATHS.includes(pathname)) router.push('/login');
-        return;
+        setAuthError('Connexion Firebase trop lente. Rafraîchissez la page (F5).');
       }
-      const profile = await loadUserProfile(firebaseUser.uid);
-      setUser(profile);
-      setLoading(false);
-    });
-    return () => unsub();
+    }, 12000);
+
+    const unsub = onAuthStateChanged(
+      getFirebaseAuth(),
+      async (firebaseUser) => {
+        clearTimeout(timeout);
+        if (cancelled) return;
+
+        if (!firebaseUser) {
+          setUser(null);
+          setNeedsProfile(false);
+          setLoading(false);
+          if (!PUBLIC_PATHS.includes(pathname)) router.push('/login');
+          return;
+        }
+
+        try {
+          const token = await firebaseUser.getIdToken();
+          const profile = await loadUserProfile(firebaseUser.uid, token);
+          setUser(profile);
+          setNeedsProfile(!profile);
+          setAuthError(null);
+        } catch (e) {
+          console.error(e);
+          const msg = e instanceof Error ? e.message : '';
+          if (msg.includes('Admin') || msg.includes('private key')) {
+            setAuthError(
+              'Clé serveur manquante dans .env.local (FIREBASE_CLIENT_EMAIL et FIREBASE_PRIVATE_KEY). Redémarrez npm run dev.'
+            );
+          } else {
+            setAuthError(
+              'Profil introuvable. Utilisez « Finaliser votre compte » ou republiez les règles Firestore.'
+            );
+          }
+          setUser(null);
+          setNeedsProfile(true);
+        }
+        setLoading(false);
+      },
+      (error) => {
+        clearTimeout(timeout);
+        console.error(error);
+        setAuthError(error.message);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+      unsub();
+    };
   }, [pathname, router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, setUser, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{ user, loading, needsProfile, authError, setUser, logout, refreshUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

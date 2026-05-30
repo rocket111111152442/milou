@@ -47,10 +47,39 @@ export const txApi = {
 };
 
 export const listingsApi = {
+  list: (params?: string) =>
+    fetch(`/api/listings${params ? `?${params}` : ''}`).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur');
+      return data as { listings: import('./types').Listing[] };
+    }),
+  create: (body: object) =>
+    api<{ id: string }>('/api/listings', { method: 'POST', body: JSON.stringify(body) }),
   accept: (id: string) =>
     api<{ missionId: string }>(`/api/listings/${id}/accept`, { method: 'POST' }),
   completeMission: (id: string) =>
     api<{ message: string }>(`/api/listings/missions/${id}/complete`, { method: 'POST' }),
+};
+
+export const userApi = {
+  dashboard: () =>
+    api<{
+      transactions: import('./types').Transaction[];
+      listings: import('./types').Listing[];
+      missions: import('./types').Mission[];
+    }>('/api/user/dashboard'),
+};
+
+export const chatApi = {
+  list: (missionId: string) =>
+    api<{ messages: import('./types').MissionMessage[] }>(`/api/missions/${missionId}/messages`),
+  send: (missionId: string, text: string) =>
+    api<{ message: import('./types').MissionMessage }>(`/api/missions/${missionId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+  markRead: (missionId: string) =>
+    api<{ ok: boolean }>(`/api/missions/${missionId}/read`, { method: 'POST' }),
 };
 
 export const adminApi = {

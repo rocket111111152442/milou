@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import ListingCard from '@/components/ListingCard';
 import { useAuth } from '@/context/AuthContext';
 import { listingsApi } from '@/lib/api';
-import { fetchListings } from '@/lib/firestore-client';
 import { Listing } from '@/lib/types';
 
 const CATEGORIES = ['Tous', 'Design', 'Dev', 'Rédaction', 'Coaching', 'Autre'];
@@ -18,7 +18,16 @@ export default function MarketplacePage() {
   const [msg, setMsg] = useState('');
 
   const load = () => {
-    fetchListings(category, typeFilter).then(setListings).catch(console.error);
+    const params = new URLSearchParams();
+    if (category && category !== 'Tous') params.set('category', category);
+    if (typeFilter) params.set('type', typeFilter);
+    listingsApi
+      .list(params.toString())
+      .then((r) => setListings(r.listings))
+      .catch((err) => {
+        console.error(err);
+        setMsg(err instanceof Error ? err.message : 'Impossible de charger les annonces.');
+      });
   };
 
   useEffect(() => {
@@ -88,8 +97,22 @@ export default function MarketplacePage() {
             />
           ))}
         </div>
-        {listings.length === 0 && (
-          <p className="text-center text-gray-500 py-12">Aucune annonce disponible.</p>
+        {listings.length === 0 && !msg && (
+          <div className="text-center py-12 card max-w-lg mx-auto">
+            <p className="text-gray-300 mb-2">Aucune annonce pour le moment</p>
+            <p className="text-gray-500 text-sm mb-4">
+              Le marketplace est vide tant que personne n&apos;a publié de service.
+            </p>
+            {user ? (
+              <Link href="/create" className="btn-primary inline-block text-sm">
+                Créer la première annonce
+              </Link>
+            ) : (
+              <Link href="/register" className="btn-primary inline-block text-sm">
+                S&apos;inscrire et publier
+              </Link>
+            )}
+          </div>
         )}
       </main>
     </>

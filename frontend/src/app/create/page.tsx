@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
-import { createListing } from '@/lib/firestore-client';
+import { listingsApi } from '@/lib/api';
 
 export default function CreateListingPage() {
   const { user, loading } = useAuth();
@@ -29,7 +29,7 @@ export default function CreateListingPage() {
     if (!user) return;
     setError('');
     try {
-      await createListing(user.id, {
+      await listingsApi.create({
         title: form.title,
         description: form.description,
         category: form.category,

@@ -13,9 +13,19 @@ export async function POST(req: NextRequest) {
     const auth = getAdminAuth();
     const db = getAdminDb();
 
-    const existing = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
-    if (!existing.empty) {
-      return NextResponse.json({ error: 'Email déjà utilisé' }, { status: 409 });
+    const emailNorm = email.toLowerCase();
+
+    try {
+      await auth.getUserByEmail(emailNorm);
+      return NextResponse.json(
+        { error: 'Cet e-mail est déjà utilisé. Allez sur Connexion.' },
+        { status: 409 }
+      );
+    } catch (e: unknown) {
+      const code = e && typeof e === 'object' && 'code' in e ? String((e as { code: string }).code) : '';
+      if (code !== 'auth/user-not-found') {
+        throw e;
+      }
     }
 
     const userRecord = await auth.createUser({
@@ -60,8 +70,21 @@ export async function POST(req: NextRequest) {
     };
 
     return NextResponse.json({ user });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur';
+  } catch (err: unknown) {
+    const code = err && typeof err === 'object' && 'code' in err ? String((err as { code: string }).code) : '';
+    if (code === 'auth/email-already-exists') {
+      return NextResponse.json(
+        { error: 'Cet e-mail est déjà utilisé. Allez sur Connexion.' },
+        { status: 409 }
+      );
+    }
+    const msg = err instanceof Error ? err.message : 'Erreur serveur';
+    if (msg.includes('DECODER') || msg.includes('private key')) {
+      return NextResponse.json(
+        { error: 'Clé Firebase Admin invalide dans .env.local (FIREBASE_PRIVATE_KEY).' },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

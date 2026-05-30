@@ -39,9 +39,20 @@ export interface Listing {
 export interface Mission {
   _id: string;
   listingId: Listing;
+  clientUid?: string;
+  providerUid?: string;
   clientId: { firstname: string; lastname: string; email: string };
   providerId: { firstname: string; lastname: string; email: string };
   amount: number;
   status: string;
+  unreadCount?: number;
+  createdAt: string;
+}
+
+export interface MissionMessage {
+  _id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
   createdAt: string;
 }

@@ -47,8 +47,13 @@ export async function fetchListings(category?: string, typeFilter?: string): Pro
     if (!['open', 'in_progress'].includes(String(data.status))) continue;
     if (category && category !== 'Tous' && data.category !== category) continue;
     if (typeFilter && data.type !== typeFilter) continue;
-    const authorSnap = await getDoc(doc(db, 'users', data.userId as string));
-    const author = authorSnap.exists() ? authorSnap.data() : undefined;
+    let author: Record<string, unknown> | undefined;
+    try {
+      const authorSnap = await getDoc(doc(db, 'users', data.userId as string));
+      author = authorSnap.exists() ? authorSnap.data() : undefined;
+    } catch {
+      author = { firstname: 'Utilisateur', lastname: '', email: '', reputation: 0 };
+    }
     listings.push(mapListing(d.id, data, author));
   }
   return listings;

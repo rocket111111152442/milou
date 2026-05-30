@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     const { uid } = await verifyRequest(req);
     const snap = await getAdminDb().collection('users').doc(uid).get();
     if (!snap.exists) {
-      return NextResponse.json({ error: 'Profil introuvable' }, { status: 404 });
+      return NextResponse.json({ error: 'Profil non créé — complétez l’inscription' }, { status: 404 });
     }
     return NextResponse.json({ user: userToJson(snap.id, snap.data()!) });
   } catch (err) {

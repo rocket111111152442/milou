@@ -51,6 +51,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    await missionRef.collection('messages').add({
+      senderId: 'system',
+      senderName: 'MILOU',
+      text: 'Mission démarrée. Utilisez ce fil pour vous écrire et coordonner le service.',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
     await listingRef.update({ status: 'in_progress' });
 
     return NextResponse.json({ missionId: missionRef.id, message: 'Mission démarrée' });

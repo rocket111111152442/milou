@@ -5,30 +5,67 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client';
-import { authApi } from '@/lib/api';
+import { formatAuthError } from '@/lib/firebase/errors';
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ firstname: '', lastname: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState('');
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     if (!isFirebaseConfigured()) {
-      setError('Firebase non configuré — voir DEPLOY-FIREBASE.md');
+      setError('Firebase non configuré. Vérifiez frontend/.env.local puis redémarrez npm run dev.');
       return;
     }
+
+    const email = form.email.trim().toLowerCase();
     setLoading(true);
+
     try {
-      await authApi.register(form);
-      await signInWithEmailAndPassword(getFirebaseAuth(), form.email, form.password);
-      router.push('/dashboard');
+      setStatus('Création du compte (serveur)…');
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstname: form.firstname.trim(),
+          lastname: form.lastname.trim(),
+          email,
+          password: form.password,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Inscription refusée');
+      }
+
+      setStatus('Connexion…');
+      try {
+        await signInWithEmailAndPassword(getFirebaseAuth(), email, form.password);
+        router.push('/dashboard');
+      } catch (signInErr) {
+        const code =
+          signInErr && typeof signInErr === 'object' && 'code' in signInErr
+            ? String((signInErr as { code: string }).code)
+            : '';
+        if (code === 'auth/network-request-failed') {
+          setError(
+            'Compte créé sur le serveur, mais le navigateur ne joint pas Firebase Auth. ' +
+              'Console Firebase → Authentication → Paramètres → Domaines autorisés : ajoutez « localhost ». ' +
+              'Puis allez sur Connexion.'
+          );
+        } else {
+          throw signInErr;
+        }
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur');
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
+      if (!error) setStatus('');
     }
   }
 
@@ -59,9 +96,10 @@ export default function RegisterPage() {
             <label className="label">Mot de passe (min. 6)</label>
             <input className="input" type="password" minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
           </div>
-          {error && <p className="text-milou-danger text-sm">{error}</p>}
+          {error && <p className="text-milou-danger text-sm whitespace-pre-line">{error}</p>}
+          {status && !error && <p className="text-cyan-400/80 text-sm">{status}</p>}
           <button type="submit" className="btn-primary w-full" disabled={loading}>
-            {loading ? 'Création...' : 'S\'inscrire'}
+            {loading ? status || 'Création…' : 'S\'inscrire'}
           </button>
         </form>
         <p className="mt-4 text-sm text-gray-500">

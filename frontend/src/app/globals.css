@@ -10,7 +10,73 @@
 }
 
 body {
-  @apply bg-milou-bg text-gray-100 antialiased min-h-screen;
+  @apply bg-milou-bg text-gray-100 antialiased min-h-screen overflow-x-hidden;
+}
+
+/* Landing : vertical (téléphone portrait) vs horizontal (ordinateur) */
+.landing-page {
+  @apply w-full max-w-[100vw] overflow-x-hidden;
+}
+
+.landing-stack {
+  @apply flex flex-col gap-6 w-full;
+}
+
+.landing-row {
+  @apply flex flex-col gap-6 w-full;
+}
+
+@media (min-width: 1024px) {
+  .landing-row {
+    @apply flex-row gap-10 lg:gap-12 items-center;
+  }
+
+  .landing-row-reverse {
+    @apply flex-row-reverse;
+  }
+}
+
+.landing-hero-grid {
+  @apply flex flex-col gap-10;
+}
+
+@media (min-width: 1024px) {
+  .landing-hero-grid {
+    @apply grid grid-cols-2 gap-12 items-center;
+  }
+}
+
+/* Téléphone : empiler, pleine largeur, texte centré optionnel */
+@media (max-width: 1023px) {
+  .landing-mobile-center {
+    @apply text-center items-center;
+  }
+
+  .landing-mobile-center .landing-actions {
+    @apply w-full max-w-sm mx-auto;
+  }
+}
+
+/* Portrait mobile : colonne stricte */
+@media (max-width: 1023px) and (orientation: portrait) {
+  .landing-portrait-only {
+    @apply flex-col;
+  }
+}
+
+/* Paysage tablette / petit écran horizontal : un peu plus de colonnes */
+@media (min-width: 640px) and (max-width: 1023px) and (orientation: landscape) {
+  .landing-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 @layer components {
