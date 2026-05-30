@@ -26,7 +26,9 @@ export default function LandingHeroPreview() {
             </span>
           </div>
 
-          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Exemples du marketplace</p>
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+            Annonces réelles · prix indicatifs
+          </p>
 
           <div className="space-y-2">
             {MILOU_EXAMPLES.map((item) => (

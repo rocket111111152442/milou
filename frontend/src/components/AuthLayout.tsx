@@ -3,9 +3,9 @@ import MilouLogo from '@/components/ui/MilouLogo';
 import { IconCheck } from '@/components/ui/Icons';
 
 const perks = [
-  '10 Milou offerts — logo + vidéo + bot Discord',
+  '10 Milou offerts — explorez le marketplace',
+  'Micro-services dès 1 M, prix fixés par les membres',
   'Aucune carte bancaire requise',
-  'Marketplace et chat inclus',
 ];
 
 export default function AuthLayout({

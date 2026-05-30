@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import LandingHeader from '@/components/LandingHeader';
 import LandingHeroPreview from '@/components/LandingHeroPreview';
-import LandingMilouExamples from '@/components/LandingMilouExamples';
+import LandingMilouExamples, { SocialProofLines } from '@/components/LandingMilouExamples';
 import { IconArrowRight, IconCheck, IconChat, IconCoins, IconLock, IconShield, IconStore } from '@/components/ui/Icons';
 import MilouLogo from '@/components/ui/MilouLogo';
 
 const STATS = [
-  { value: '1 M', label: '≈ un logo' },
+  { value: '1–2 M', label: 'Micro-services courants' },
   { value: '10 M', label: 'Offerts à l\'inscription' },
   { value: '0 €', label: 'Argent réel' },
   { value: 'Escrow', label: 'Paiements sécurisés' },
@@ -21,7 +21,7 @@ const REASONS = [
   },
   {
     title: '10 Milou pour démarrer',
-    desc: 'Assez pour commander un logo, un montage vidéo et un bot Discord — dès votre première connexion.',
+    desc: 'De quoi explorer le marketplace et commander plusieurs micro-services (logo, bannière, correction…) dès la première connexion.',
     icon: IconStore,
     color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
   },
@@ -113,8 +113,8 @@ export default function HomePage() {
               <ul className="space-y-3 mb-8">
                 {[
                   'Recevez 10 Milou immédiatement — sans carte bancaire',
-                  'Commandez des services (logo, vidéo, dev…) dès aujourd\'hui',
-                  'Proposez vos compétences et encaissez des Milou',
+                  'Commandez des micro-services (design, rédaction, vidéo courte…)',
+                  'Proposez vos compétences et fixez vos propres prix',
                   'Échanges sécurisés avec escrow et chat intégré',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-sm sm:text-base text-zinc-300">
@@ -132,6 +132,7 @@ export default function HomePage() {
                   Voir le marketplace
                 </Link>
               </div>
+              <SocialProofLines className="mt-4 text-center lg:text-left" />
             </div>
 
             <div className="animate-fade-up stagger-3 order-1 lg:order-2">
@@ -290,10 +291,10 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
-              Logo, vidéo, bot Discord — tout ça avec vos 10 Milou
+              Rejoignez les premiers membres de MILOU
             </h2>
             <p className="text-zinc-400 mt-3 max-w-lg mx-auto">
-              Inscrivez-vous gratuitement et commencez à échanger dès maintenant.
+              10 Milou offerts · micro-services dès 1 M · prix fixés par la communauté
             </p>
           </div>
           <div className="max-w-4xl mx-auto mb-8">
@@ -304,6 +305,7 @@ export default function HomePage() {
               S&apos;inscrire gratuitement
               <IconArrowRight className="w-4 h-4" />
             </Link>
+            <SocialProofLines className="mt-4 max-w-sm mx-auto text-center" />
           </div>
         </div>
       </section>
