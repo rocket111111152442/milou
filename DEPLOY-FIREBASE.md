@@ -20,6 +20,13 @@ La navigation (marketplace, profil, solde) lit **Firestore directement** → ré
 3. **Build** → **Authentication** → **Commencer** → activez **E-mail/Mot de passe**
 4. **Build** → **Firestore Database** → **Créer** → mode **production** → région `europe-west`
 5. **Règles** → collez le contenu du fichier `firestore.rules` à la racine du projet → **Publier**
+6. *(Optionnel)* **Index** : si Firebase affiche un lien « créer un index », vous pouvez cliquer dessus **ou** déployer `firestore.indexes.json` avec la CLI Firebase. Les transferts MILOU fonctionnent sans index grâce au code serveur, mais d’autres requêtes peuvent en bénéficier.
+
+### Storage (fichiers dans le chat mission)
+
+1. **Build** → **Storage** → **Commencer** (si pas encore activé).
+2. **Règles** → collez le fichier `storage.rules` à la racine du projet → **Publier**.
+3. Vérifiez que `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` est bien renseigné sur Vercel (ex. `milou-money.firebasestorage.app`).
 
 ### Config Web (frontend)
 
