@@ -8,6 +8,7 @@ import PremiumBadge from '@/components/PremiumBadge';
 import OnlineStatus from '@/components/OnlineStatus';
 import { useAuth } from '@/context/AuthContext';
 import { reviewsApi, userApi } from '@/lib/api';
+import ReportReviewButton from '@/components/ReportReviewButton';
 import { Listing, Review } from '@/lib/types';
 
 export default function ProfilePage() {
@@ -112,7 +113,16 @@ export default function ProfilePage() {
                   <p className="text-gray-600 text-xs mt-1">
                     {r.from ? `${r.from.firstname} ${r.from.lastname}` : 'Utilisateur'} ·{' '}
                     {new Date(r.createdAt).toLocaleDateString('fr-FR')}
+                    {r.autoPenalty && ' · Automatique'}
                   </p>
+                  {!r.autoPenalty && (
+                    <ReportReviewButton
+                      reviewId={r._id}
+                      onReported={() =>
+                        reviewsApi.forUser(user.id).then((res) => setReviews(res.reviews))
+                      }
+                    />
+                  )}
                 </li>
               ))}
             </ul>

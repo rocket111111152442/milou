@@ -129,6 +129,11 @@ export const reviewsApi = {
     api<{ message: string }>('/api/reviews', { method: 'POST', body: JSON.stringify(body) }),
   forUser: (userId: string) =>
     api<{ reviews: import('./types').Review[] }>(`/api/reviews?userId=${userId}`),
+  report: (reviewId: string, body: { reason: string; details: string }) =>
+    api<{ message: string }>(`/api/reviews/${reviewId}/report`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };
 
 export const adminApi = {
@@ -193,6 +198,10 @@ export const adminApi = {
     api<{ message: string }>(`/api/admin/codes/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deletePromoCode: (id: string) =>
     api<{ message: string }>(`/api/admin/codes/${id}`, { method: 'DELETE' }),
+  reviewReports: (status = 'pending') =>
+    api<{ reports: import('./types').ReviewReport[] }>(`/api/admin/review-reports?status=${status}`),
+  deleteReview: (id: string) =>
+    api<{ message: string }>(`/api/admin/reviews/${id}`, { method: 'DELETE' }),
   adjustBalance: (id: string, amount: number, action: 'add' | 'remove') =>
     api<{ user: User }>(`/api/admin/users/${id}/balance`, {
       method: 'PATCH',

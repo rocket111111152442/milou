@@ -16,6 +16,7 @@ import type {
   MissionMessage,
   PlatformAnnouncement,
   PromoCode,
+  ReviewReport,
   Transaction,
   User,
 } from '@/lib/types';
@@ -42,6 +43,7 @@ const MOD_FEATURES = [
   'Offrir Premium gratuit à un utilisateur',
   'Annonces plateforme (suppression)',
   'Codes promo & récompenses',
+  'Signalements d\'avis & suppression',
 ];
 
 type Tab =
@@ -53,7 +55,16 @@ type Tab =
   | 'missions'
   | 'audit'
   | 'announcements'
-  | 'codes';
+  | 'codes'
+  | 'review-reports';
+
+const REPORT_REASON_LABELS: Record<string, string> = {
+  injuste: 'Avis injuste ou faux',
+  harcelement: 'Insulte / harcèlement',
+  hors_sujet: 'Pas lié à la mission',
+  erreur: 'Erreur',
+  autre: 'Autre',
+};
 
 function isStaff(role?: string) {
   return role === 'admin' || role === 'moderator';
@@ -73,6 +84,7 @@ export default function AdminPage() {
   const [audit, setAudit] = useState<AdminAuditEntry[]>([]);
   const [announcements, setAnnouncements] = useState<PlatformAnnouncement[]>([]);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
+  const [reviewReports, setReviewReports] = useState<ReviewReport[]>([]);
   const [codeForm, setCodeForm] = useState({
     code: '',
     label: '',
@@ -137,6 +149,14 @@ export default function AdminPage() {
   }, [user, loadAll]);
 
   useEffect(() => {
+    if (tab !== 'review-reports' || !isStaff(user?.role)) return;
+    adminApi
+      .reviewReports('pending')
+      .then((r) => setReviewReports(r.reports))
+      .catch((e) => setMsg(e instanceof Error ? e.message : 'Erreur'));
+  }, [tab, user]);
+
+  useEffect(() => {
     if (tab === 'users' && isStaff(user?.role)) {
       refreshUsers().catch(() => {});
     }
@@ -181,6 +201,7 @@ export default function AdminPage() {
     { id: 'audit', label: 'Journal' },
     { id: 'announcements', label: 'Annonces site' },
     { id: 'codes', label: 'Codes promo' },
+    { id: 'review-reports', label: 'Avis signalés' },
   ];
 
   return (
@@ -499,6 +520,79 @@ export default function AdminPage() {
                 </ul>
               )}
             </div>
+          </div>
+        )}
+
+        {tab === 'review-reports' && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-400">
+              Avis signalés par les utilisateurs — examinez et supprimez si nécessaire (note recalculée
+              automatiquement).
+            </p>
+            {reviewReports.length === 0 ? (
+              <p className="text-gray-500 text-sm card">Aucun signalement en attente.</p>
+            ) : (
+              reviewReports.map((rep) => {
+                const snap = rep.reviewSnapshot;
+                return (
+                  <div key={rep._id} className="card border-amber-500/30 text-sm space-y-2">
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <span className="badge bg-amber-500/20 text-amber-300">En attente</span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(rep.createdAt).toLocaleString('fr-FR')}
+                      </span>
+                    </div>
+                    <p className="text-gray-400">
+                      Signalé par{' '}
+                      <strong className="text-white">
+                        {rep.reporter?.firstname} {rep.reporter?.lastname}
+                      </strong>{' '}
+                      ({rep.reporter?.email})
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Motif : </span>
+                      {REPORT_REASON_LABELS[rep.reason] || rep.reason}
+                    </p>
+                    <p className="text-gray-300 bg-milou-bg p-2 rounded-lg">{rep.details}</p>
+                    {snap && (
+                      <div className="border border-milou-border rounded-lg p-3 bg-milou-bg/50">
+                        <p className="text-amber-400 text-xs mb-1">Avis concerné</p>
+                        <p>
+                          {snap.rating === 0 ? '☆☆☆☆☆ (0/5)' : `${snap.rating}/5`} — par {snap.fromName}
+                          {snap.autoPenalty && ' (automatique)'}
+                        </p>
+                        {snap.comment && <p className="text-gray-400 mt-1 italic">&quot;{snap.comment}&quot;</p>}
+                        <p className="text-xs text-gray-600 mt-1">ID avis : {rep.reviewId}</p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      <button
+                        type="button"
+                        className="btn-primary text-xs py-1.5 bg-red-600/80 hover:bg-red-600"
+                        onClick={async () => {
+                          if (!confirm('Supprimer définitivement cet avis ?')) return;
+                          await adminApi.deleteReview(rep.reviewId);
+                          setReviewReports((prev) => prev.filter((x) => x._id !== rep._id));
+                          setMsg('Avis supprimé — profil utilisateur mis à jour');
+                        }}
+                      >
+                        Supprimer l&apos;avis
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary text-xs py-1.5"
+                        onClick={async () => {
+                          const r = await adminApi.reviewReports('pending');
+                          setReviewReports(r.reports);
+                        }}
+                      >
+                        Actualiser
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 

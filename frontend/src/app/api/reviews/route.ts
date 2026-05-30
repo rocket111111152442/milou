@@ -106,12 +106,17 @@ export async function GET(req: NextRequest) {
     const snap = await getAdminDb()
       .collection('reviews')
       .where('toUserId', '==', userId)
-      .orderBy('createdAt', 'desc')
-      .limit(20)
+      .limit(50)
       .get();
 
+    const sorted = [...snap.docs].sort(
+      (a, b) =>
+        (b.data().createdAt?.toDate?.()?.getTime?.() ?? 0) -
+        (a.data().createdAt?.toDate?.()?.getTime?.() ?? 0)
+    );
+
     const reviews = await Promise.all(
-      snap.docs.map(async (d) => {
+      sorted.slice(0, 20).map(async (d) => {
         const data = d.data();
         const fromSnap = await getAdminDb().collection('users').doc(data.fromUserId).get();
         const from = fromSnap.exists ? userToJson(fromSnap.id, fromSnap.data()!) : null;
@@ -119,6 +124,7 @@ export async function GET(req: NextRequest) {
           _id: d.id,
           rating: data.rating,
           comment: data.comment,
+          autoPenalty: Boolean(data.autoPenalty),
           from,
           createdAt: tsToIso(data.createdAt),
         };

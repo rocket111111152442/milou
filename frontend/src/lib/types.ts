@@ -57,6 +57,27 @@ export interface Review {
   comment?: string;
   from?: Pick<User, 'id' | 'firstname' | 'lastname' | 'email'> | null;
   createdAt: string;
+  autoPenalty?: boolean;
+}
+
+export interface ReviewReport {
+  _id: string;
+  reviewId: string;
+  reporterId: string;
+  reason: string;
+  details: string;
+  status: string;
+  reviewSnapshot?: {
+    rating: number;
+    comment: string;
+    missionId: string;
+    fromUserId: string;
+    toUserId: string;
+    fromName: string;
+    autoPenalty?: boolean;
+  };
+  reporter?: Pick<User, 'id' | 'firstname' | 'lastname' | 'email'> | null;
+  createdAt: string;
 }
 
 export interface AdminStats {
