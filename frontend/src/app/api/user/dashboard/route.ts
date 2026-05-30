@@ -4,6 +4,8 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { countUnreadMessages } from '@/lib/mission-unread';
 import type { Firestore, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
+export const dynamic = 'force-dynamic';
+
 async function mapMissionDoc(
   db: Firestore,
   uid: string,

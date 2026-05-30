@@ -103,9 +103,10 @@ export default function MarketplacePage() {
     setDeletingId(id);
     try {
       await listingsApi.delete(id);
+      setListings((prev) => prev.filter((l) => l._id !== id));
       setMsgType('success');
       setMsg('Annonce supprimée du site.');
-      load();
+      void load();
     } catch (err) {
       setMsgType('error');
       setMsg(err instanceof Error ? err.message : 'Erreur');

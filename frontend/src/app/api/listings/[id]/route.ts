@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { verifyRequest } from '@/lib/firebase/auth-server';
+
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const db = getAdminDb();
@@ -41,14 +44,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       return NextResponse.json({ error: 'Cette annonce ne peut pas être supprimée.' }, { status: 400 });
     }
 
-    const activeMission = await db
-      .collection('missions')
-      .where('listingId', '==', params.id)
-      .where('status', 'in', ['pending', 'in_progress', 'escrow_held'])
-      .limit(1)
-      .get();
+    const missionSnap = await db.collection('missions').where('listingId', '==', params.id).get();
+    const hasActiveMission = missionSnap.docs.some((d) =>
+      ['pending', 'in_progress', 'escrow_held'].includes(String(d.data().status))
+    );
 
-    if (!activeMission.empty && !isStaff) {
+    if (hasActiveMission && !isStaff) {
       return NextResponse.json(
         { error: 'Terminez ou annulez la mission avant de supprimer l\'annonce.' },
         { status: 400 }

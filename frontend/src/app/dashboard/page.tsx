@@ -49,6 +49,7 @@ export default function DashboardPage() {
     setDeletingId(id);
     try {
       await listingsApi.delete(id);
+      setListings((prev) => prev.filter((l) => l._id !== id));
       setListMsg('Annonce supprimée.');
       await loadDashboard();
     } catch (err) {

@@ -14,6 +14,7 @@ async function authHeaders(): Promise<HeadersInit> {
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = await authHeaders();
   const res = await fetch(path, {
+    cache: 'no-store',
     ...options,
     headers: { ...headers, ...(options.headers || {}) },
   });
@@ -47,12 +48,15 @@ export const txApi = {
 };
 
 export const listingsApi = {
-  list: (params?: string) =>
-    fetch(`/api/listings${params ? `?${params}` : ''}`).then(async (res) => {
+  list: (params?: string) => {
+    const qs = new URLSearchParams(params || '');
+    qs.set('_', String(Date.now()));
+    return fetch(`/api/listings?${qs.toString()}`, { cache: 'no-store' }).then(async (res) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur');
       return data as { listings: import('./types').Listing[] };
-    }),
+    });
+  },
   create: (body: object) =>
     api<{ id: string }>('/api/listings', { method: 'POST', body: JSON.stringify(body) }),
   accept: (id: string) =>

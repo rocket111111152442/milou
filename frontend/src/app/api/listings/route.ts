@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
+
+export const dynamic = 'force-dynamic';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { isPremiumActive } from '@/lib/premium';
