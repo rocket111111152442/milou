@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { tsToIso } from '@/lib/firebase/wallet';
+import { jsonNoStore } from '@/lib/http';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -11,12 +14,12 @@ export async function GET() {
       .get();
 
     if (snap.empty) {
-      return NextResponse.json({ announcement: null });
+      return jsonNoStore({ announcement: null });
     }
 
     const d = snap.docs[0];
     const data = d.data();
-    return NextResponse.json({
+    return jsonNoStore({
       announcement: {
         _id: d.id,
         title: data.title,
@@ -26,6 +29,6 @@ export async function GET() {
       },
     });
   } catch {
-    return NextResponse.json({ announcement: null });
+    return jsonNoStore({ announcement: null });
   }
 }

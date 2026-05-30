@@ -45,6 +45,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Avis déjà envoyé' }, { status: 400 });
     }
 
+    const missionReviews = await db.collection('reviews').where('missionId', '==', missionId).limit(20).get();
+    if (
+      missionReviews.docs.some(
+        (d) => d.data().autoPenalty && d.data().toUserId === actualTo
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'Un avis automatique existe déjà pour cette mission (délai dépassé)' },
+        { status: 400 }
+      );
+    }
+
     await db.collection('reviews').add({
       missionId,
       fromUserId: uid,

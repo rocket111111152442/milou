@@ -585,7 +585,7 @@ export default function AdminPage() {
                         if (!confirm('Supprimer cette annonce plateforme ?')) return;
                         await adminApi.deleteAnnouncement(a._id);
                         setAnnouncements((prev) => prev.filter((x) => x._id !== a._id));
-                        setMsg('Annonce supprimée');
+                        setMsg('Annonce plateforme supprimée — le bandeau disparaît au prochain chargement');
                       }}
                     >
                       Supprimer

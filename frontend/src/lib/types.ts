@@ -174,6 +174,9 @@ export interface Mission {
   providerId: { firstname: string; lastname: string; email: string };
   amount: number;
   status: string;
+  dueAt?: string | null;
+  estimatedDelay?: string;
+  completedReason?: string | null;
   unreadCount?: number;
   createdAt: string;
 }

@@ -106,7 +106,6 @@ export default function MarketplacePage() {
       setListings((prev) => prev.filter((l) => l._id !== id));
       setMsgType('success');
       setMsg('Annonce supprimée du site.');
-      void load();
     } catch (err) {
       setMsgType('error');
       setMsg(err instanceof Error ? err.message : 'Erreur');

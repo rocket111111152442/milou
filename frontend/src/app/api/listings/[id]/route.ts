@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { verifyRequest } from '@/lib/firebase/auth-server';
+import { jsonNoStore } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -40,7 +43,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       );
     }
 
-    if (!isStaff && status !== 'open' && status !== 'closed') {
+    if (!isStaff && !['open', 'closed', 'in_progress'].includes(status)) {
       return NextResponse.json({ error: 'Cette annonce ne peut pas être supprimée.' }, { status: 400 });
     }
 
@@ -56,8 +59,17 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       );
     }
 
-    await ref.delete();
-    return NextResponse.json({ message: 'Annonce supprimée du site' });
+    if (isStaff) {
+      await ref.delete();
+    } else {
+      await ref.update({
+        status: 'deleted',
+        deletedAt: FieldValue.serverTimestamp(),
+        deletedBy: uid,
+      });
+    }
+
+    return jsonNoStore({ message: 'Annonce supprimée du site', id: params.id });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Erreur' },

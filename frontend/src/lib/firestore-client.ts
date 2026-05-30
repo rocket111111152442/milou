@@ -44,7 +44,8 @@ export async function fetchListings(category?: string, typeFilter?: string): Pro
   const listings: Listing[] = [];
   for (const d of snap.docs) {
     const data = d.data();
-    if (!['open', 'in_progress'].includes(String(data.status))) continue;
+    const st = String(data.status);
+    if (st === 'deleted' || st === 'moderated' || !['open', 'in_progress'].includes(st)) continue;
     if (category && category !== 'Tous' && data.category !== category) continue;
     if (typeFilter && data.type !== typeFilter) continue;
     let author: Record<string, unknown> | undefined;
@@ -63,7 +64,9 @@ export async function fetchMyListings(userId: string): Promise<Listing[]> {
   const db = getFirebaseDb();
   const q = query(collection(db, 'listings'), where('userId', '==', userId), limit(50));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => mapListing(d.id, d.data()));
+  return snap.docs
+    .filter((d) => String(d.data().status) !== 'deleted')
+    .map((d) => mapListing(d.id, d.data()));
 }
 
 export async function fetchMyTransactions(userId: string): Promise<Transaction[]> {

@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
-
-export const dynamic = 'force-dynamic';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { isPremiumActive } from '@/lib/premium';
 import { assertCanCreateListing } from '@/lib/premium/usage';
 import { syncPremiumStatus } from '@/lib/premium/sync';
+import { jsonNoStore } from '@/lib/http';
+import { isListingPublic, isListingVisible } from '@/lib/listings';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,7 +23,7 @@ export async function GET(req: NextRequest) {
 
     for (const d of snap.docs) {
       const data = d.data();
-      if (!['open', 'in_progress'].includes(String(data.status))) continue;
+      if (!isListingVisible(data.status) || !isListingPublic(data.status)) continue;
       if (category && category !== 'Tous') {
         const cat = String(data.category || '');
         if (cat !== category && cat.toLowerCase() !== category.toLowerCase()) continue;
@@ -75,7 +78,7 @@ export async function GET(req: NextRequest) {
     listings.sort((a, b) => (b._sort as number) - (a._sort as number));
     const result = listings.map(({ _sort, ...rest }) => rest);
 
-    return NextResponse.json({ listings: result });
+    return jsonNoStore({ listings: result });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Erreur' },

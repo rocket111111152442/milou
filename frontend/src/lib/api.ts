@@ -74,7 +74,7 @@ export const userApi = {
       listings: import('./types').Listing[];
       missions: import('./types').Mission[];
       completedMissions?: import('./types').Mission[];
-    }>('/api/user/dashboard'),
+    }>(`/api/user/dashboard?_=${Date.now()}`),
 };
 
 export const chatApi = {

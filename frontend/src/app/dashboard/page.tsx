@@ -8,7 +8,7 @@ import BalanceCard from '@/components/BalanceCard';
 import TransactionList from '@/components/TransactionList';
 import CompleteProfile from '@/components/CompleteProfile';
 import { useAuth } from '@/context/AuthContext';
-import { listingsApi, userApi } from '@/lib/api';
+import { adminApi, listingsApi, userApi } from '@/lib/api';
 import MissionChat from '@/components/MissionChat';
 import UnreadBadge from '@/components/UnreadBadge';
 import UsageLimitsCard from '@/components/UsageLimitsCard';
@@ -23,7 +23,11 @@ export default function DashboardPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [chatMission, setChatMission] = useState<Mission | null>(null);
-  const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
+  const [announcement, setAnnouncement] = useState<{
+    _id: string;
+    title: string;
+    message: string;
+  } | null>(null);
   const [completedMissions, setCompletedMissions] = useState<Mission[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [listMsg, setListMsg] = useState('');
@@ -50,8 +54,9 @@ export default function DashboardPage() {
     try {
       await listingsApi.delete(id);
       setListings((prev) => prev.filter((l) => l._id !== id));
-      setListMsg('Annonce supprimée.');
+      setListMsg('Annonce supprimée du site.');
       await loadDashboard();
+      loadAnnouncement();
     } catch (err) {
       setListMsg(err instanceof Error ? err.message : 'Erreur');
     } finally {
@@ -59,11 +64,17 @@ export default function DashboardPage() {
     }
   }
 
-  useEffect(() => {
-    fetch('/api/announcements/active')
+  const loadAnnouncement = () => {
+    fetch(`/api/announcements/active?_=${Date.now()}`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => setAnnouncement(d.announcement))
-      .catch(() => {});
+      .then((d) => setAnnouncement(d.announcement || null))
+      .catch(() => setAnnouncement(null));
+  };
+
+  useEffect(() => {
+    loadAnnouncement();
+    const t = setInterval(loadAnnouncement, 60000);
+    return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
@@ -147,7 +158,24 @@ export default function DashboardPage() {
         }
       >
         {announcement && (
-          <div className="card border-violet-500/40 bg-gradient-to-r from-violet-500/15 to-pink-500/10 mb-6">
+          <div className="card border-violet-500/40 bg-gradient-to-r from-violet-500/15 to-pink-500/10 mb-6 relative">
+            {(user.role === 'admin' || user.role === 'moderator') && (
+              <button
+                type="button"
+                className="absolute top-3 right-3 text-xs text-red-400 hover:text-red-300"
+                onClick={async () => {
+                  if (!confirm('Supprimer ce bandeau pour tous les utilisateurs ?')) return;
+                  try {
+                    await adminApi.deleteAnnouncement(announcement._id);
+                    setAnnouncement(null);
+                  } catch (err) {
+                    alert(err instanceof Error ? err.message : 'Erreur');
+                  }
+                }}
+              >
+                Supprimer le bandeau
+              </button>
+            )}
             <p className="font-semibold text-violet-300">📢 {announcement.title}</p>
             <p className="text-gray-300 text-sm mt-1">{announcement.message}</p>
           </div>
@@ -177,12 +205,29 @@ export default function DashboardPage() {
               </p>
             ) : (
               <ul className="space-y-3">
-                {missions.map((m) => (
-                  <li key={m._id} className="p-3 rounded-xl bg-milou-bg/80 border border-cyan-500/20">
+                {missions.map((m) => {
+                  const overdue = m.dueAt && new Date(m.dueAt).getTime() < Date.now();
+                  const isProvider = m.providerId?.email === user.email;
+                  return (
+                  <li
+                    key={m._id}
+                    className={`p-3 rounded-xl bg-milou-bg/80 border ${
+                      overdue ? 'border-red-500/40' : 'border-cyan-500/20'
+                    }`}
+                  >
                     <p className="font-medium">{m.listingId?.title || 'Mission'}</p>
                     <p className="text-sm text-gray-400">
                       {m.amount} M · {getOtherPartyName(m)}
                     </p>
+                    {m.dueAt && (
+                      <p className={`text-xs mt-1 ${overdue ? 'text-red-400' : 'text-gray-500'}`}>
+                        {overdue ? '⚠ Délai dépassé — ' : 'Date limite : '}
+                        {new Date(m.dueAt).toLocaleString('fr-FR')}
+                        {isProvider && !overdue && ' · À terminer avant cette date'}
+                        {m.clientId?.email === user.email &&
+                          ' · Validez quand le travail est terminé'}
+                      </p>
+                    )}
                     <div className="flex flex-wrap gap-2 mt-2">
                       <button
                         type="button"
@@ -208,7 +253,8 @@ export default function DashboardPage() {
                       )}
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -248,7 +294,12 @@ export default function DashboardPage() {
               {completedMissions.slice(0, 3).map((m) => (
                 <li key={m._id} className="p-3 rounded-xl bg-milou-bg border border-violet-500/20">
                   <p className="font-medium text-sm">{m.listingId?.title || 'Mission'}</p>
-                  {m.clientId?.email === user.email && (
+                  {m.completedReason === 'deadline_missed' && (
+                    <p className="text-xs text-red-400 mt-1">
+                      Clôturée automatiquement — délai non respecté
+                    </p>
+                  )}
+                  {m.clientId?.email === user.email && m.completedReason !== 'deadline_missed' && (
                     <MissionReviewForm missionId={m._id} onDone={() => loadDashboard()} />
                   )}
                 </li>

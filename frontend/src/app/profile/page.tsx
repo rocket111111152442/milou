@@ -105,7 +105,9 @@ export default function ProfilePage() {
             <ul className="space-y-3">
               {reviews.map((r) => (
                 <li key={r._id} className="text-sm border-b border-milou-border/50 pb-3">
-                  <p className="text-amber-400">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</p>
+                  <p className={r.rating === 0 ? 'text-red-400' : 'text-amber-400'}>
+                    {r.rating === 0 ? '☆☆☆☆☆ (0/5)' : `${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}`}
+                  </p>
                   {r.comment && <p className="text-gray-300 mt-1">{r.comment}</p>}
                   <p className="text-gray-600 text-xs mt-1">
                     {r.from ? `${r.from.firstname} ${r.from.lastname}` : 'Utilisateur'} ·{' '}

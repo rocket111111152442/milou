@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { holdEscrow } from '@/lib/firebase/wallet';
 import { createNotification } from '@/lib/notifications';
 import { assertCanAcceptMission } from '@/lib/premium/usage';
 import { syncPremiumStatus } from '@/lib/premium/sync';
+import { computeDueAt } from '@/lib/mission-deadline';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -47,6 +48,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const missionRef = db.collection('missions').doc();
     await holdEscrow(db, clientId, listing.price, params.id, missionRef.id);
 
+    const startedAt = new Date();
+    const estimatedDelay = String(listing.estimatedDelay || '7 jours');
+    const dueAt = computeDueAt(startedAt, estimatedDelay);
+
     await missionRef.set({
       listingId: params.id,
       clientId,
@@ -54,13 +59,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       amount: listing.price,
       status: 'in_progress',
       escrowHeld: true,
+      estimatedDelay,
+      dueAt: Timestamp.fromDate(dueAt),
       createdAt: FieldValue.serverTimestamp(),
     });
 
     await missionRef.collection('messages').add({
       senderId: 'system',
       senderName: 'MILOU',
-      text: 'Mission démarrée. Utilisez ce fil pour vous écrire et coordonner le service.',
+      text: `Mission démarrée. Date limite : ${dueAt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} (${estimatedDelay}). Le client doit valider la mission une fois le travail terminé.`,
       createdAt: FieldValue.serverTimestamp(),
     });
 
