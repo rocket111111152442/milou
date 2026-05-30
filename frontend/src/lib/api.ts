@@ -129,6 +129,11 @@ export const adminApi = {
     api<{ user: User }>(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   resetPassword: (id: string) =>
     api<{ message: string; resetLink: string }>(`/api/admin/users/${id}/reset-password`, { method: 'POST' }),
+  setPremium: (id: string, body: { action: 'grant' | 'revoke'; months?: number }) =>
+    api<{ message: string; user: User; expiresAt?: string }>(`/api/admin/users/${id}/premium`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   transactions: (params?: { type?: string; minAmount?: number; userId?: string }) => {
     const sp = new URLSearchParams();
     if (params?.type) sp.set('type', params.type);

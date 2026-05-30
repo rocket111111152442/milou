@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import TransactionList from '@/components/TransactionList';
+import PremiumBadge from '@/components/PremiumBadge';
 import { adminApi } from '@/lib/api';
 import type { AdminUserDetailResponse, User, UserRole, UserStatus } from '@/lib/types';
 
@@ -23,6 +24,7 @@ export default function AdminUserInspector({ userId, onUserUpdated, onMessage }:
     status: 'active' as UserStatus,
   });
   const [balanceAmount, setBalanceAmount] = useState('10');
+  const [premiumMonths, setPremiumMonths] = useState('1');
   const [subTab, setSubTab] = useState<'overview' | 'tx' | 'listings' | 'missions'>('overview');
 
   const load = useCallback(async () => {
@@ -98,6 +100,23 @@ export default function AdminUserInspector({ userId, onUserUpdated, onMessage }:
     }
   }
 
+  async function setPremium(action: 'grant' | 'revoke') {
+    try {
+      if (action === 'grant' && !confirm(`Offrir Premium gratuit (${premiumMonths} mois) à cet utilisateur ?`)) return;
+      if (action === 'revoke' && !confirm('Retirer le Premium de cet utilisateur ?')) return;
+
+      const r = await adminApi.setPremium(userId!, {
+        action,
+        months: action === 'grant' ? Number(premiumMonths) || 1 : undefined,
+      });
+      onUserUpdated?.(r.user);
+      onMessage?.(r.message);
+      await load();
+    } catch (e) {
+      onMessage?.(e instanceof Error ? e.message : 'Erreur');
+    }
+  }
+
   async function resetPassword() {
     try {
       const r = await adminApi.resetPassword(userId!);
@@ -113,8 +132,9 @@ export default function AdminUserInspector({ userId, onUserUpdated, onMessage }:
       <div className="card border-violet-500/30">
         <div className="flex flex-wrap justify-between gap-4 mb-4">
           <div>
-            <h2 className="text-xl font-bold text-white">
+            <h2 className="text-xl font-bold text-white flex flex-wrap items-center gap-2">
               {u.firstname} {u.lastname}
+              {u.isPremium && <PremiumBadge />}
             </h2>
             <p className="text-gray-400 text-sm">{u.email}</p>
             <p className="text-xs text-gray-500 mt-1 font-mono break-all">ID : {u.id}</p>
@@ -142,6 +162,14 @@ export default function AdminUserInspector({ userId, onUserUpdated, onMessage }:
             <p className="text-gray-500">Inscrit le</p>
             <p className="font-medium">{new Date(u.createdAt).toLocaleDateString('fr-FR')}</p>
           </div>
+          <div className="bg-milou-bg rounded-lg p-3 sm:col-span-2 lg:col-span-4">
+            <p className="text-gray-500">Premium MILOU</p>
+            <p className="font-medium text-amber-300">
+              {u.isPremium
+                ? `Actif${u.premiumExpiresAt ? ` jusqu'au ${new Date(u.premiumExpiresAt).toLocaleDateString('fr-FR')}` : ''}`
+                : 'Non actif'}
+            </p>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-4 text-xs text-gray-400 border-t border-milou-border pt-4">
@@ -161,6 +189,47 @@ export default function AdminUserInspector({ userId, onUserUpdated, onMessage }:
               <li>{detail.counts.transactions} transaction(s) liées</li>
             </ul>
           </div>
+        </div>
+      </div>
+
+      <div className="card space-y-3 border-amber-500/20">
+        <h3 className="font-semibold text-amber-300">Premium gratuit (admin)</h3>
+        <p className="text-xs text-gray-500">
+          Offrir ou retirer Premium sans paiement Stripe. L&apos;utilisateur reçoit une notification.
+        </p>
+        <div className="flex flex-wrap gap-2 items-center">
+          <input
+            className="input w-20"
+            type="number"
+            min={1}
+            max={120}
+            value={premiumMonths}
+            onChange={(e) => setPremiumMonths(e.target.value)}
+            title="Durée en mois"
+          />
+          <span className="text-sm text-gray-400">mois</span>
+          <button
+            type="button"
+            className="btn-primary text-sm bg-gradient-to-r from-amber-500 to-yellow-500"
+            onClick={() => setPremium('grant')}
+          >
+            Offrir Premium
+          </button>
+          <button
+            type="button"
+            className="btn-secondary text-sm"
+            onClick={() => {
+              setPremiumMonths('12');
+              void setPremium('grant');
+            }}
+          >
+            Offrir 12 mois
+          </button>
+          {u.isPremium && (
+            <button type="button" className="btn-secondary text-sm text-amber-200" onClick={() => setPremium('revoke')}>
+              Retirer Premium
+            </button>
+          )}
         </div>
       </div>
 

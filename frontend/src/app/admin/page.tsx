@@ -37,6 +37,7 @@ const MOD_FEATURES = [
   'Annulation mission (admin)',
   'Journal d\'audit',
   'Export CSV utilisateurs',
+  'Offrir Premium gratuit à un utilisateur',
   'Annonces plateforme',
 ];
 
@@ -285,6 +286,7 @@ export default function AdminPage() {
                     <th className="text-left p-3">Utilisateur</th>
                     <th className="text-left">Statut</th>
                     <th className="text-right">Solde</th>
+                    <th className="text-left">Premium</th>
                     <th className="text-left">Rôle</th>
                     <th className="text-right p-3">Actions</th>
                   </tr>
@@ -310,6 +312,13 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="text-right text-cyan-400">{u.balance.toFixed(2)} M</td>
+                      <td>
+                        {u.isPremium ? (
+                          <span className="badge bg-amber-500/20 text-amber-300">⭐ Premium</span>
+                        ) : (
+                          <span className="text-gray-600 text-xs">—</span>
+                        )}
+                      </td>
                       <td className="capitalize">{u.role}</td>
                       <td className="text-right p-3">
                         <button
