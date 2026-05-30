@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyRequest } from '@/lib/firebase/auth-server';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { requireAdmin, adminError, logAdminAction } from '@/lib/firebase/admin-guard';
 import { transferMilou, userToJson } from '@/lib/firebase/wallet';
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { uid } = await verifyRequest(req);
-    const adminSnap = await getAdminDb().collection('users').doc(uid).get();
-    if (adminSnap.data()?.role !== 'admin') {
-      return NextResponse.json({ error: 'Accès admin requis' }, { status: 403 });
-    }
+    const adminId = await requireAdmin(req);
 
     const { amount, action } = await req.json();
     const num = Math.abs(Number(amount));
@@ -37,12 +33,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       });
     }
 
+    await logAdminAction(adminId, 'balance_adjust', { type: 'user', id: params.id }, { amount: num, action });
+
     const updated = await db.collection('users').doc(params.id).get();
     return NextResponse.json({ user: userToJson(updated.id, updated.data()!) });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Erreur' },
-      { status: 400 }
-    );
+    return adminError(err);
   }
 }

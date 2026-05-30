@@ -10,6 +10,9 @@ import { useAuth } from '@/context/AuthContext';
 import { listingsApi, userApi } from '@/lib/api';
 import MissionChat from '@/components/MissionChat';
 import UnreadBadge from '@/components/UnreadBadge';
+import UsageLimitsCard from '@/components/UsageLimitsCard';
+import PremiumBadge from '@/components/PremiumBadge';
+import MissionReviewForm from '@/components/MissionReviewForm';
 import { Transaction, Listing, Mission } from '@/lib/types';
 
 export default function DashboardPage() {
@@ -18,6 +21,8 @@ export default function DashboardPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [chatMission, setChatMission] = useState<Mission | null>(null);
+  const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
+  const [completedMissions, setCompletedMissions] = useState<Mission[]>([]);
 
   function getOtherPartyName(m: Mission): string {
     const isClient = m.clientUid === user?.id || m.clientId?.email === user?.email;
@@ -27,12 +32,20 @@ export default function DashboardPage() {
 
   const loadDashboard = () => {
     if (!user) return Promise.resolve();
-    return userApi.dashboard().then(({ transactions: tx, listings: ls, missions: ms }) => {
-      setTransactions(tx as Transaction[]);
-      setListings((ls as Listing[]).slice(0, 5));
-      setMissions(ms as Mission[]);
+    return userApi.dashboard().then((d) => {
+      setTransactions(d.transactions as Transaction[]);
+      setListings((d.listings as Listing[]).slice(0, 5));
+      setMissions(d.missions as Mission[]);
+      setCompletedMissions((d.completedMissions as Mission[]) || []);
     });
   };
+
+  useEffect(() => {
+    fetch('/api/announcements/active')
+      .then((r) => r.json())
+      .then((d) => setAnnouncement(d.announcement))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -81,12 +94,29 @@ export default function DashboardPage() {
     <>
       <Navbar />
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+        {announcement && (
+          <div className="card border-violet-500/40 bg-violet-500/10">
+            <p className="font-semibold text-violet-300">{announcement.title}</p>
+            <p className="text-gray-300 text-sm mt-1">{announcement.message}</p>
+          </div>
+        )}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Bonjour, {user.firstname}</h1>
+            <h1 className="text-2xl font-bold flex flex-wrap items-center gap-2">
+              Bonjour, {user.firstname}
+              {user.isPremium && <PremiumBadge />}
+            </h1>
             <p className="text-gray-400">Votre tableau de bord MILOU</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {!user.isPremium && (
+              <Link
+                href="/premium"
+                className="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-400/50 transition"
+              >
+                ⭐ Devenir Premium
+              </Link>
+            )}
             <Link href="/transfer" className="btn-primary text-sm">
               Envoyer des Milou
             </Link>
@@ -96,7 +126,12 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <BalanceCard balance={user.balance} />
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <BalanceCard balance={user.balance} />
+          </div>
+          <UsageLimitsCard isPremium={user.isPremium} />
+        </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
           <section className="card">
@@ -169,6 +204,22 @@ export default function DashboardPage() {
             )}
           </section>
         </div>
+
+        {completedMissions.length > 0 && (
+          <section className="card">
+            <h2 className="text-lg font-semibold mb-4">Missions terminées — laisser un avis</h2>
+            <ul className="space-y-4">
+              {completedMissions.slice(0, 3).map((m) => (
+                <li key={m._id} className="p-3 rounded-lg bg-milou-bg border border-milou-border">
+                  <p className="font-medium text-sm">{m.listingId?.title || 'Mission'}</p>
+                  {m.clientId?.email === user.email && (
+                    <MissionReviewForm missionId={m._id} onDone={() => loadDashboard()} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section className="card">
           <h2 className="text-lg font-semibold mb-4">Historique des transactions</h2>

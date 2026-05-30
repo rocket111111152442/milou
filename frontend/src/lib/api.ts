@@ -39,7 +39,7 @@ export const authApi = {
 };
 
 export const txApi = {
-  transfer: (body: { recipientEmail: string; amount: number }) =>
+  transfer: (body: { recipientEmail: string; amount: number; confirmEmail?: string }) =>
     api<{ balance: number }>('/api/transactions/transfer', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -67,6 +67,7 @@ export const userApi = {
       transactions: import('./types').Transaction[];
       listings: import('./types').Listing[];
       missions: import('./types').Mission[];
+      completedMissions?: import('./types').Mission[];
     }>('/api/user/dashboard'),
 };
 
@@ -82,19 +83,96 @@ export const chatApi = {
     api<{ ok: boolean }>(`/api/missions/${missionId}/read`, { method: 'POST' }),
 };
 
+export const premiumApi = {
+  usage: () => api<import('./types').PremiumUsage>('/api/premium/usage'),
+  checkout: () =>
+    api<{ url: string }>('/api/premium/checkout', { method: 'POST', body: '{}' }),
+};
+
+export const notificationsApi = {
+  list: () =>
+    api<{ notifications: import('./types').AppNotification[]; unreadCount: number }>(
+      '/api/notifications'
+    ),
+  markRead: (opts: { ids?: string[]; all?: boolean }) =>
+    api<{ ok: boolean }>('/api/notifications', {
+      method: 'PATCH',
+      body: JSON.stringify(opts),
+    }),
+};
+
+export const presenceApi = {
+  heartbeat: () => api<{ ok: boolean }>('/api/user/presence', { method: 'POST', body: '{}' }),
+  get: (userId: string) =>
+    api<{ isOnline: boolean; lastSeenAt: string | null }>(`/api/user/presence?userId=${userId}`),
+};
+
+export const reviewsApi = {
+  create: (body: { missionId: string; rating: number; comment?: string }) =>
+    api<{ message: string }>('/api/reviews', { method: 'POST', body: JSON.stringify(body) }),
+  forUser: (userId: string) =>
+    api<{ reviews: import('./types').Review[] }>(`/api/reviews?userId=${userId}`),
+};
+
 export const adminApi = {
-  users: () => api<{ users: User[] }>('/api/admin/users'),
-  transactions: () => api<{ transactions: Transaction[] }>('/api/admin/transactions'),
+  stats: () => api<{ stats: import('./types').AdminStats }>('/api/admin/stats'),
+  users: (params?: { q?: string; role?: string; status?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.q) sp.set('q', params.q);
+    if (params?.role) sp.set('role', params.role);
+    if (params?.status) sp.set('status', params.status);
+    const q = sp.toString();
+    return api<{ users: User[] }>(`/api/admin/users${q ? `?${q}` : ''}`);
+  },
+  userDetail: (id: string) => api<import('./types').AdminUserDetailResponse>(`/api/admin/users/${id}`),
+  updateUser: (id: string, body: Record<string, unknown>) =>
+    api<{ user: User }>(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  resetPassword: (id: string) =>
+    api<{ message: string; resetLink: string }>(`/api/admin/users/${id}/reset-password`, { method: 'POST' }),
+  transactions: (params?: { type?: string; minAmount?: number; userId?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.type) sp.set('type', params.type);
+    if (params?.minAmount) sp.set('minAmount', String(params.minAmount));
+    if (params?.userId) sp.set('userId', params.userId);
+    const q = sp.toString();
+    return api<{ transactions: Transaction[] }>(`/api/admin/transactions${q ? `?${q}` : ''}`);
+  },
   listings: () => api<{ listings: Listing[] }>('/api/admin/listings'),
+  missions: () => api<{ missions: import('./types').Mission[] }>('/api/admin/missions'),
+  missionMessages: (id: string) =>
+    api<{ messages: import('./types').MissionMessage[] }>(`/api/admin/missions/${id}/messages`),
+  updateMission: (id: string, status: string) =>
+    api<{ message: string }>(`/api/admin/missions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+  audit: () => api<{ entries: import('./types').AdminAuditEntry[] }>('/api/admin/audit'),
+  announcements: () =>
+    api<{ announcements: import('./types').PlatformAnnouncement[] }>('/api/admin/announcements'),
+  createAnnouncement: (body: { title: string; message: string; active: boolean }) =>
+    api<{ announcement: import('./types').PlatformAnnouncement }>('/api/admin/announcements', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   adjustBalance: (id: string, amount: number, action: 'add' | 'remove') =>
     api<{ user: User }>(`/api/admin/users/${id}/balance`, {
       method: 'PATCH',
       body: JSON.stringify({ amount, action }),
     }),
   deleteUser: (id: string) => api<{ message: string }>(`/api/admin/users/${id}`, { method: 'DELETE' }),
+  deleteListing: (id: string) => api<{ message: string }>(`/api/admin/listings/${id}`, { method: 'DELETE' }),
   moderateListing: (id: string, status: string) =>
     api<{ listing: Listing }>(`/api/admin/listings/${id}/moderate`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+  exportUsersCsv: async () => {
+    const headers = await authHeaders();
+    const res = await fetch('/api/admin/export/users', { headers });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Export impossible');
+    }
+    return res.blob();
+  },
 };

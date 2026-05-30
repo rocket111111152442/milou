@@ -1,4 +1,5 @@
 import { FieldValue, Firestore } from 'firebase-admin/firestore';
+import { isPremiumActive, premiumExpiresAtToDate } from '@/lib/premium';
 
 type TxType =
   | 'registration'
@@ -136,8 +137,14 @@ export async function releaseEscrow(
   });
 }
 
+export function tsToIso(v: unknown): string {
+  const t = v as { toDate?: () => Date } | undefined;
+  return t?.toDate?.()?.toISOString?.() || new Date().toISOString();
+}
+
 export function userToJson(id: string, data: Record<string, unknown>) {
-  const created = data.createdAt as { toDate?: () => Date } | undefined;
+  const premiumActive = isPremiumActive(data);
+  const exp = premiumExpiresAtToDate(data.premiumExpiresAt);
   return {
     id,
     firstname: String(data.firstname ?? ''),
@@ -145,10 +152,19 @@ export function userToJson(id: string, data: Record<string, unknown>) {
     email: String(data.email ?? ''),
     balance: Number(data.balance ?? 0),
     role: (data.role as string) ?? 'user',
+    status: (data.status as string) ?? 'active',
     reputation: Number(data.reputation ?? 0),
     totalEarned: Number(data.totalEarned ?? 0),
     totalSpent: Number(data.totalSpent ?? 0),
     transactionCount: Number(data.transactionCount ?? 0),
-    createdAt: created?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+    moderatorNotes: String(data.moderatorNotes ?? ''),
+    isPremium: premiumActive,
+    premiumExpiresAt: exp ? exp.toISOString() : null,
+    lastSeenAt: data.lastSeenAt ? tsToIso(data.lastSeenAt) : null,
+    isOnline: Boolean(data.isOnline),
+    reviewCount: Number(data.reviewCount ?? 0),
+    averageRating: Number(data.averageRating ?? 0),
+    createdAt: tsToIso(data.createdAt),
+    suspendedAt: data.suspendedAt ? tsToIso(data.suspendedAt) : null,
   };
 }

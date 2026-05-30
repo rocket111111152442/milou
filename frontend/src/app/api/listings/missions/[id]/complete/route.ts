@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { releaseEscrow } from '@/lib/firebase/wallet';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -25,6 +26,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     await releaseEscrow(db, mission.providerId, mission.amount, mission.listingId, params.id);
     await missionRef.update({ status: 'completed', escrowHeld: false });
     await db.collection('listings').doc(mission.listingId).update({ status: 'closed' });
+
+    await Promise.all([
+      createNotification(db, {
+        userId: mission.providerId,
+        type: 'mission_completed',
+        title: 'Mission validée',
+        body: `${mission.amount} M ont été crédités sur votre compte`,
+        link: '/dashboard',
+      }),
+      createNotification(db, {
+        userId: mission.clientId,
+        type: 'mission_completed',
+        title: 'Mission terminée',
+        body: 'Vous pouvez laisser un avis à votre prestataire',
+        link: '/dashboard',
+      }),
+    ]);
 
     return NextResponse.json({ message: 'Mission validée' });
   } catch (err) {

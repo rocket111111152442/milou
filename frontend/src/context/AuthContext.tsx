@@ -17,7 +17,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-const PUBLIC_PATHS = ['/', '/login', '/register'];
+const PUBLIC_PATHS = ['/', '/login', '/register', '/premium', '/premium/success', '/marketplace'];
 
 /** Lecture profil via API serveur (évite les bugs Firestore navigateur) */
 async function loadUserProfile(_uid: string, idToken: string): Promise<User | null> {

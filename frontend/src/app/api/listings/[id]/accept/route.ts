@@ -3,11 +3,17 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { holdEscrow } from '@/lib/firebase/wallet';
+import { createNotification } from '@/lib/notifications';
+import { assertCanAcceptMission } from '@/lib/premium/usage';
+import { syncPremiumStatus } from '@/lib/premium/sync';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { uid } = await verifyRequest(req);
     const db = getAdminDb();
+    const userData = await syncPremiumStatus(db, uid);
+    await assertCanAcceptMission(db, uid, userData);
+
     const listingRef = db.collection('listings').doc(params.id);
     const listingSnap = await listingRef.get();
 
@@ -59,6 +65,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     });
 
     await listingRef.update({ status: 'in_progress' });
+
+    await Promise.all([
+      createNotification(db, {
+        userId: clientId,
+        type: 'mission_started',
+        title: 'Mission démarrée',
+        body: `Escrow de ${listing.price} M — en attente de validation`,
+        link: '/dashboard',
+      }),
+      createNotification(db, {
+        userId: providerId,
+        type: 'mission_started',
+        title: 'Nouvelle mission',
+        body: `Un client a accepté votre annonce « ${listing.title} »`,
+        link: '/dashboard',
+      }),
+    ]);
 
     return NextResponse.json({ missionId: missionRef.id, message: 'Mission démarrée' });
   } catch (err) {

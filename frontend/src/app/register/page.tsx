@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client';
+import { getFirebaseAuth, getFirebaseConfigError, isFirebaseConfigured } from '@/lib/firebase/client';
 import { formatAuthError } from '@/lib/firebase/errors';
 
 export default function RegisterPage() {
@@ -18,7 +18,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     if (!isFirebaseConfigured()) {
-      setError('Firebase non configuré. Vérifiez frontend/.env.local puis redémarrez npm run dev.');
+      setError(getFirebaseConfigError());
       return;
     }
 

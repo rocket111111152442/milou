@@ -22,6 +22,24 @@ export function isFirebaseConfigured(): boolean {
   );
 }
 
+/** Message d’aide si Firebase manque (local vs Vercel). */
+export function getFirebaseConfigError(): string {
+  const onVercel =
+    typeof window !== 'undefined' &&
+    (window.location.hostname.endsWith('.vercel.app') ||
+      !window.location.hostname.includes('localhost'));
+
+  if (onVercel) {
+    return (
+      'Firebase n’est pas configuré sur Vercel. ' +
+      'Allez sur vercel.com → votre projet → Settings → Environment Variables, ' +
+      'ajoutez toutes les variables NEXT_PUBLIC_FIREBASE_* (copiées depuis frontend/.env.local), ' +
+      'cochez Production, puis Deployments → Redeploy.'
+    );
+  }
+  return 'Firebase non configuré. Vérifiez frontend/.env.local puis redémarrez npm run dev.';
+}
+
 function getClientApp(): FirebaseApp {
   if (typeof window === 'undefined') {
     throw new Error('Firebase uniquement dans le navigateur');

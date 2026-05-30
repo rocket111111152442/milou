@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client';
+import { getFirebaseAuth, getFirebaseConfigError, isFirebaseConfigured } from '@/lib/firebase/client';
 import { formatAuthError } from '@/lib/firebase/errors';
 
 export default function LoginPage() {
@@ -18,7 +18,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     if (!isFirebaseConfigured()) {
-      setError('Firebase non configuré — voir DEPLOY-FIREBASE.md');
+      setError(getFirebaseConfigError());
       return;
     }
     setLoading(true);

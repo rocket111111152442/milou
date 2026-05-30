@@ -1,14 +1,114 @@
+export type UserRole = 'user' | 'admin' | 'moderator';
+export type UserStatus = 'active' | 'suspended' | 'banned';
+
 export interface User {
   id: string;
   firstname: string;
   lastname: string;
   email: string;
   balance: number;
-  role: 'user' | 'admin';
+  role: UserRole;
+  status?: UserStatus;
   reputation: number;
   totalEarned: number;
   totalSpent: number;
   transactionCount: number;
+  moderatorNotes?: string;
+  isPremium?: boolean;
+  premiumExpiresAt?: string | null;
+  lastSeenAt?: string | null;
+  isOnline?: boolean;
+  reviewCount?: number;
+  averageRating?: number;
+  createdAt: string;
+  suspendedAt?: string | null;
+}
+
+export interface PremiumUsage {
+  isPremium: boolean;
+  limits: {
+    maxListingsPerMonth: number;
+    maxTransfersPerDay: number;
+    maxActiveMissions: number;
+    maxTransferAmount: number;
+    marketplaceBoost: number;
+  };
+  usage: {
+    listingsThisMonth: number;
+    transfersToday: number;
+    activeMissions: number;
+  };
+}
+
+export interface AppNotification {
+  _id: string;
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  link?: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface Review {
+  _id: string;
+  rating: number;
+  comment?: string;
+  from?: Pick<User, 'id' | 'firstname' | 'lastname' | 'email'> | null;
+  createdAt: string;
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  activeUsers: number;
+  suspendedUsers: number;
+  bannedUsers: number;
+  totalMilouInCirculation: number;
+  totalListings: number;
+  openListings: number;
+  totalMissions: number;
+  activeMissions: number;
+  totalTransactions: number;
+  registrationsLast7Days: number;
+  topBalances: { id: string; name: string; email: string; balance: number }[];
+}
+
+export interface AdminUserDetailResponse {
+  user: User;
+  auth: {
+    emailVerified: boolean;
+    disabled: boolean;
+    lastSignIn: string | null;
+    creationTime: string | null;
+  };
+  transactions: Transaction[];
+  listings: Listing[];
+  missionsAsClient: Mission[];
+  missionsAsProvider: Mission[];
+  counts: {
+    listings: number;
+    missions: number;
+    transactions: number;
+  };
+}
+
+export interface AdminAuditEntry {
+  _id: string;
+  adminId: string;
+  adminName?: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  details: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface PlatformAnnouncement {
+  _id: string;
+  title: string;
+  message: string;
+  active: boolean;
   createdAt: string;
 }
 
@@ -22,9 +122,18 @@ export interface Transaction {
   createdAt: string;
 }
 
+export interface ListingAuthor {
+  firstname: string;
+  lastname: string;
+  email: string;
+  reputation?: number;
+  isPremium?: boolean;
+  averageRating?: number;
+}
+
 export interface Listing {
   _id: string;
-  userId: { firstname: string; lastname: string; email: string; reputation?: number };
+  userId: ListingAuthor;
   title: string;
   description: string;
   category: string;
@@ -32,6 +141,8 @@ export interface Listing {
   type: 'offer' | 'request';
   tags: string[];
   estimatedDelay?: string;
+  missionType?: string;
+  featured?: boolean;
   status: string;
   createdAt: string;
 }

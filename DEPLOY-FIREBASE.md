@@ -109,3 +109,17 @@ Le dossier `backend/` (Express + MongoDB) n’est plus nécessaire pour la versi
 - **Vercel** : bande passante généreuse en hobby
 
 Aucune monnaie réelle — Milou reste 100 % fictif.
+
+---
+
+## Premium MILOU (Stripe)
+
+Voir le guide détaillé : **`PREMIUM-STRIPE.md`**
+
+Variables supplémentaires sur Vercel :
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_ID`
+- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_STRIPE_PRICE_LABEL` (optionnel, ex. `4,99 € / mois`)

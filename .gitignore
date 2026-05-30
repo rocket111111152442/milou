@@ -2,6 +2,8 @@ node_modules/
 .next/
 .env
 .env.local
+vercel-import.env
+frontend/vercel-import.env
 dist/
 *.log
 .DS_Store

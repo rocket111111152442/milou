@@ -8,7 +8,12 @@ import { useAuth } from '@/context/AuthContext';
 import { listingsApi } from '@/lib/api';
 import { Listing } from '@/lib/types';
 
-const CATEGORIES = ['Tous', 'Design', 'Dev', 'Rédaction', 'Coaching', 'Autre'];
+import { SERVICE_CATEGORIES } from '@/lib/premium/config';
+
+const CATEGORIES = ['Tous', ...SERVICE_CATEGORIES.map((c) => c.id)];
+const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  SERVICE_CATEGORIES.map((c) => [c.id, `${c.icon} ${c.label}`])
+);
 
 export default function MarketplacePage() {
   const { user, loading, refreshUser } = useAuth();
@@ -16,11 +21,13 @@ export default function MarketplacePage() {
   const [category, setCategory] = useState('Tous');
   const [typeFilter, setTypeFilter] = useState('');
   const [msg, setMsg] = useState('');
+  const [search, setSearch] = useState('');
 
   const load = () => {
     const params = new URLSearchParams();
     if (category && category !== 'Tous') params.set('category', category);
     if (typeFilter) params.set('type', typeFilter);
+    if (search.trim()) params.set('q', search.trim());
     listingsApi
       .list(params.toString())
       .then((r) => setListings(r.listings))
@@ -32,7 +39,7 @@ export default function MarketplacePage() {
 
   useEffect(() => {
     load();
-  }, [category, typeFilter]);
+  }, [category, typeFilter, search]);
 
   async function handleAccept(id: string) {
     if (!user) return;
@@ -61,16 +68,24 @@ export default function MarketplacePage() {
           </div>
         )}
 
+        <input
+          className="input mb-4 max-w-md"
+          placeholder="Rechercher un service…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
         <div className="flex flex-wrap gap-2 mb-6">
           {CATEGORIES.map((c) => (
             <button
               key={c}
+              type="button"
               onClick={() => setCategory(c)}
               className={`px-3 py-1.5 rounded-lg text-sm ${
                 category === c ? 'bg-cyan-500/20 text-cyan-400' : 'bg-milou-card text-gray-400'
               }`}
             >
-              {c}
+              {c === 'Tous' ? 'Tous' : CATEGORY_LABELS[c] || c}
             </button>
           ))}
           <select
