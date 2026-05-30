@@ -40,6 +40,7 @@ const config: Config = {
         'fade-up': 'fade-up 0.5s ease-out forwards',
         'fade-in': 'fade-in 0.4s ease-out forwards',
         float: 'float 6s ease-in-out infinite',
+        'pulse-slow': 'pulse-slow 4s ease-in-out infinite',
       },
       keyframes: {
         'fade-up': {
@@ -53,6 +54,10 @@ const config: Config = {
         float: {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-8px)' },
+        },
+        'pulse-slow': {
+          '0%, 100%': { opacity: '0.4' },
+          '50%': { opacity: '0.7' },
         },
       },
     },
