@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getFirebaseAuth } from '@/lib/firebase/client';
-import { sendVerificationCode } from '@/lib/client/verification';
 import { useAuth } from '@/context/AuthContext';
 import { formatAuthError } from '@/lib/firebase/errors';
 
@@ -34,16 +33,6 @@ export default function CompleteProfile() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur');
 
-      const current = auth.currentUser;
-      if (current && !current.emailVerified) {
-        try {
-          await sendVerificationCode();
-        } catch {
-          /* renvoi possible sur /verify-email */
-        }
-        router.push('/verify-email');
-        return;
-      }
       await refreshUser();
       router.push('/dashboard');
     } catch (err) {

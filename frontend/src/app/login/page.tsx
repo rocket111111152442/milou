@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -13,14 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [info, setInfo] = useState('');
   const router = useRouter();
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('verified') === '1') {
-      setInfo('E-mail vérifié. Vous pouvez vous connecter.');
-    }
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,11 +24,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const cred = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
-      if (!cred.user.emailVerified) {
-        router.push('/verify-email');
-        return;
-      }
+      await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
       router.push('/dashboard');
     } catch (err) {
       setError(formatAuthError(err));
@@ -55,7 +44,6 @@ export default function LoginPage() {
           <label className="label">Mot de passe</label>
           <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
         </div>
-        {info && !error && <p className="text-emerald-400 text-sm">{info}</p>}
         {error && <p className="text-red-400 text-sm">{error}</p>}
         <button type="submit" className="btn-primary w-full py-3" disabled={loading}>
           {loading ? 'Connexion…' : 'Se connecter'}

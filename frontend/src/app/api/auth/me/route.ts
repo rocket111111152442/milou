@@ -6,7 +6,7 @@ import { syncPremiumStatus } from '@/lib/premium/sync';
 
 export async function GET(req: NextRequest) {
   try {
-    const { uid } = await verifyRequest(req, { allowUnverifiedEmail: true });
+    const { uid } = await verifyRequest(req);
     const snap = await getAdminDb().collection('users').doc(uid).get();
     if (!snap.exists) {
       return NextResponse.json({ error: 'Profil non créé — complétez l’inscription' }, { status: 404 });

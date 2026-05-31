@@ -3,7 +3,6 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createNotification } from '@/lib/notifications';
-import { sendEmail } from '@/lib/email-server';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -60,25 +59,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     await Promise.all(
       adminsSnap.docs.map(async (adminDoc) => {
-        const admin = adminDoc.data();
-        const email = String(admin.email || '').trim();
-        if (email) {
-          await sendEmail({
-            to: email,
-            subject: `[MILOU] Litige mission — ${listingTitle}`,
-            text: [
-              `Un client refuse de valider la mission « ${listingTitle} ».`,
-              '',
-              `Montant escrow : ${mission.amount} M`,
-              `Mission : ${params.id}`,
-              '',
-              `Motif du client :`,
-              trimmed,
-              '',
-              `Traitez le litige dans l’espace admin : ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin`,
-            ].join('\n'),
-          });
-        }
         await createNotification(db, {
           userId: adminDoc.id,
           type: 'admin_dispute',

@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
       email: email.toLowerCase(),
       password,
       displayName: `${firstname} ${lastname}`,
+      emailVerified: true,
     });
 
     await db.collection('users').doc(userRecord.uid).set({

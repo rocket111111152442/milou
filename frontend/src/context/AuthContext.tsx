@@ -11,7 +11,6 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   needsProfile: boolean;
-  needsEmailVerification: boolean;
   needsPostalCode: boolean;
   authError: string | null;
   setUser: (user: User | null) => void;
@@ -24,13 +23,11 @@ const PUBLIC_PATHS = [
   '/',
   '/login',
   '/register',
-  '/verify-email',
   '/premium',
   '/premium/success',
   '/marketplace',
 ];
 
-/** Lecture profil via API serveur (évite les bugs Firestore navigateur) */
 async function loadUserProfile(_uid: string, idToken: string): Promise<User | null> {
   const res = await fetch('/api/auth/me', {
     headers: { Authorization: `Bearer ${idToken}` },
@@ -48,7 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsProfile, setNeedsProfile] = useState(false);
-  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   const [needsPostalCode, setNeedsPostalCode] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
@@ -62,7 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     setNeedsProfile(false);
-    setNeedsEmailVerification(false);
     setNeedsPostalCode(false);
     router.push('/login');
   };
@@ -107,21 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!firebaseUser) {
           setUser(null);
           setNeedsProfile(false);
-          setNeedsEmailVerification(false);
           setNeedsPostalCode(false);
           setLoading(false);
           if (!PUBLIC_PATHS.includes(pathname)) router.push('/login');
-          return;
-        }
-
-        const unverified = !firebaseUser.emailVerified;
-        setNeedsEmailVerification(unverified);
-        if (unverified) {
-          setUser(null);
-          setNeedsProfile(false);
-          setNeedsPostalCode(false);
-          setLoading(false);
-          if (pathname !== '/verify-email') router.push('/verify-email');
           return;
         }
 
@@ -178,7 +161,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         needsProfile,
-        needsEmailVerification,
         needsPostalCode,
         authError,
         setUser,

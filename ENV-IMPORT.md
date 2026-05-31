@@ -33,22 +33,6 @@ Ensuite sur **Vercel** :
 
 ---
 
-## E-mails (obligatoire pour que tout le monde reçoive les messages)
-
-Voir **`EMAIL-MILOU.md`** à la racine du projet.
-
-Sur Vercel, ajoutez au minimum :
-
-- `SMTP_USER` — adresse Gmail MILOU (ex. `milou.contact@gmail.com`)
-- `SMTP_PASS` — mot de passe d’application Google (16 caractères)
-- `MILOU_EMAIL_FROM` — `MILOU <milou.contact@gmail.com>`
-- `SMTP_HOST` = `smtp.gmail.com`
-- `SMTP_PORT` = `587`
-
-Puis **Redeploy**.
-
----
-
 ## Variables Stripe à compléter
 
 | Variable | Où la trouver |

@@ -4,6 +4,7 @@ node_modules/
 .env.local
 vercel-import.env
 frontend/vercel-import.env
+frontend/milou-vercel.env
 vercel-resend-import.env
 frontend/vercel-resend-import.env
 frontend/vercel-smtp-import.env

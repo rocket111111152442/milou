@@ -10,7 +10,6 @@ const PUBLIC_PATHS = [
   '/',
   '/login',
   '/register',
-  '/verify-email',
   '/premium',
   '/premium/success',
   '/marketplace',

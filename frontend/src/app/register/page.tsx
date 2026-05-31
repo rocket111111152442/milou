@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirebaseAuth, getFirebaseConfigError, isFirebaseConfigured } from '@/lib/firebase/client';
-import { sendVerificationCode } from '@/lib/client/verification';
 import { formatAuthError } from '@/lib/firebase/errors';
 import AuthLayout from '@/components/AuthLayout';
 
@@ -48,9 +47,7 @@ export default function RegisterPage() {
       setStatus('Connexion…');
       try {
         await signInWithEmailAndPassword(getFirebaseAuth(), email, form.password);
-        setStatus('Envoi du code…');
-        await sendVerificationCode();
-        router.push('/verify-email');
+        router.push('/dashboard');
       } catch (signInErr) {
         const code =
           signInErr && typeof signInErr === 'object' && 'code' in signInErr

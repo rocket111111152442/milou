@@ -1,5 +1,4 @@
 import { Firestore } from 'firebase-admin/firestore';
-import { sendEmail } from '@/lib/email-server';
 import { normalizePostalCode } from '@/lib/postal-code';
 import { createNotification } from '@/lib/notifications';
 
@@ -15,34 +14,7 @@ type ListingNotifyPayload = {
   postalCode?: string;
 };
 
-function listingSummary(payload: ListingNotifyPayload) {
-  const typeLabel = payload.type === 'offer' ? 'Offre de service' : 'Demande d\'aide';
-  const location =
-    payload.isInPerson && payload.postalCode
-      ? `\nLieu : mission en présentiel — code postal ${payload.postalCode}`
-      : payload.isInPerson
-        ? '\nLieu : mission en présentiel'
-        : '';
-  return [
-    `Une nouvelle annonce est disponible sur le marketplace MILOU.`,
-    '',
-    `Titre : ${payload.title}`,
-    `Type : ${typeLabel}`,
-    `Catégorie : ${payload.category}`,
-    `Prix : ${payload.price} M`,
-    location,
-    '',
-    `Description :`,
-    payload.description.slice(0, 800),
-    '',
-    `Voir le marketplace : ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/marketplace`,
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
-/** Notifications in-app (toujours disponibles, sans domaine Resend). */
-async function notifyUsersInApp(db: Firestore, payload: ListingNotifyPayload) {
+export async function notifyUsersOnNewListing(db: Firestore, payload: ListingNotifyPayload) {
   const snap = await db.collection('users').limit(500).get();
   const listingPostal = payload.isInPerson ? normalizePostalCode(payload.postalCode) : '';
   const typeLabel = payload.type === 'offer' ? 'Offre' : 'Demande';
@@ -65,54 +37,5 @@ async function notifyUsersInApp(db: Firestore, payload: ListingNotifyPayload) {
         link: '/marketplace',
       });
     })
-  );
-}
-
-/** E-mails Resend si configuré (nécessite un domaine vérifié pour tous les destinataires). */
-async function notifyUsersByEmail(db: Firestore, payload: ListingNotifyPayload) {
-  const snap = await db.collection('users').limit(500).get();
-  const listingPostal = payload.isInPerson ? normalizePostalCode(payload.postalCode) : '';
-  const summary = listingSummary(payload);
-  const broadcastSubject = `Nouvelle annonce : ${payload.title}`;
-  const localSubject = `Mission près de chez vous (${listingPostal}) : ${payload.title}`;
-
-  await Promise.all(
-    snap.docs.map(async (doc) => {
-      if (doc.id === payload.authorId) return;
-      const data = doc.data();
-      const email = String(data.email || '').trim();
-      if (!email) return;
-
-      const broadcast = await sendEmail({
-        to: email,
-        subject: broadcastSubject,
-        text: `Bonjour ${data.firstname || ''},\n\n${summary}`,
-      });
-      if (!broadcast.ok) return;
-
-      if (listingPostal) {
-        const userPostal = normalizePostalCode(data.postalCode);
-        if (userPostal && userPostal === listingPostal) {
-          await sendEmail({
-            to: email,
-            subject: localSubject,
-            text: [
-              `Bonjour ${data.firstname || ''},`,
-              '',
-              `Une annonce correspond à votre code postal (${listingPostal}).`,
-              '',
-              summary,
-            ].join('\n'),
-          });
-        }
-      }
-    })
-  );
-}
-
-export async function notifyUsersOnNewListing(db: Firestore, payload: ListingNotifyPayload) {
-  await notifyUsersInApp(db, payload);
-  await notifyUsersByEmail(db, payload).catch((err) =>
-    console.error('[listing-notify-email]', err)
   );
 }

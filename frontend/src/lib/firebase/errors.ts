@@ -10,7 +10,7 @@ export function formatAuthError(err: unknown): string {
       'auth/invalid-credential': 'E-mail ou mot de passe incorrect.',
       'auth/too-many-requests': 'Trop de tentatives. Réessayez dans quelques minutes.',
       'auth/requires-recent-login':
-        'Pour des raisons de sécurité, reconnectez-vous puis renvoyez l’e-mail de vérification.',
+        'Pour des raisons de sécurité, reconnectez-vous puis réessayez.',
       'auth/network-request-failed':
         'Le navigateur n’atteint pas Firebase (pas forcément votre Wi‑Fi).\n\n' +
         '1. Firebase Console → Authentication → Paramètres → Domaines autorisés → vérifiez que « localhost » est listé\n' +
