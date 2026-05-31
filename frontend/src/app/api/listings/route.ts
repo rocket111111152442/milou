@@ -10,7 +10,6 @@ import { isListingPublic, isListingVisible } from '@/lib/listings';
 import { normalizePostalCode } from '@/lib/postal-code';
 import { notifyUsersOnNewListing } from '@/lib/listing-notifications';
 import { expireOldOpenListings } from '@/lib/listing-expiry';
-import { normalizePostalCode } from '@/lib/postal-code';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
