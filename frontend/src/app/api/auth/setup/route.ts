@@ -3,7 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { recordTransaction, userToJson } from '@/lib/firebase/wallet';
-import { normalizePostalCode } from '@/lib/email';
+import { isValidPostalCode, normalizePostalCode } from '@/lib/postal-code';
 
 /** Crée le profil Firestore + bonus 10 Milou après inscription Firebase côté client */
 export async function POST(req: NextRequest) {
@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
     const { firstname, lastname, postalCode } = await req.json();
     const normalizedPostalCode = normalizePostalCode(postalCode);
 
-    if (!firstname?.trim() || !lastname?.trim() || !normalizedPostalCode) {
-      return NextResponse.json({ error: 'Prénom, nom et code postal requis' }, { status: 400 });
+    if (!firstname?.trim() || !lastname?.trim() || !isValidPostalCode(normalizedPostalCode)) {
+      return NextResponse.json({ error: 'Prénom, nom et code postal valide (5 chiffres) requis' }, { status: 400 });
     }
 
     const db = getAdminDb();

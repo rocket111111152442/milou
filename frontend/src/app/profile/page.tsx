@@ -98,6 +98,10 @@ export default function ProfilePage() {
                 <dd className="text-white">{user.email}</dd>
               </div>
               <div>
+                <dt className="text-zinc-500 text-xs uppercase tracking-wide mb-1">Code postal</dt>
+                <dd className="text-white">{user.postalCode || '—'}</dd>
+              </div>
+              <div>
                 <dt className="text-zinc-500 text-xs uppercase tracking-wide mb-1">Rôle</dt>
                 <dd className="text-white capitalize">{user.role}</dd>
               </div>

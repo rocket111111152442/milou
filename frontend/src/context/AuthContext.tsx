@@ -5,12 +5,14 @@ import { useRouter, usePathname } from 'next/navigation';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client';
 import { User } from '@/lib/types';
+import { userNeedsPostalCode } from '@/lib/postal-code';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   needsProfile: boolean;
   needsEmailVerification: boolean;
+  needsPostalCode: boolean;
   authError: string | null;
   setUser: (user: User | null) => void;
   logout: () => void;
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [needsProfile, setNeedsProfile] = useState(false);
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
+  const [needsPostalCode, setNeedsPostalCode] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
@@ -60,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setNeedsProfile(false);
     setNeedsEmailVerification(false);
+    setNeedsPostalCode(false);
     router.push('/login');
   };
 
@@ -72,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = await loadUserProfile(current.uid, token);
       setUser(u);
       setNeedsProfile(!u);
+      setNeedsPostalCode(u ? userNeedsPostalCode(u.postalCode) : false);
       setAuthError(null);
     } catch (e) {
       setAuthError(e instanceof Error ? e.message : 'Erreur profil');
@@ -103,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           setNeedsProfile(false);
           setNeedsEmailVerification(false);
+          setNeedsPostalCode(false);
           setLoading(false);
           if (!PUBLIC_PATHS.includes(pathname)) router.push('/login');
           return;
@@ -113,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (unverified) {
           setUser(null);
           setNeedsProfile(false);
+          setNeedsPostalCode(false);
           setLoading(false);
           if (pathname !== '/verify-email') router.push('/verify-email');
           return;
@@ -123,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const profile = await loadUserProfile(firebaseUser.uid, token);
           setUser(profile);
           setNeedsProfile(!profile);
+          setNeedsPostalCode(profile ? userNeedsPostalCode(profile.postalCode) : false);
           setAuthError(null);
         } catch (e) {
           console.error(e);
@@ -171,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         needsProfile,
         needsEmailVerification,
+        needsPostalCode,
         authError,
         setUser,
         logout,
