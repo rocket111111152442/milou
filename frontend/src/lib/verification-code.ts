@@ -48,6 +48,7 @@ export async function issueVerificationCode(db: Firestore, uid: string, email: s
   return {
     expiresInMinutes: 15,
     emailSent: sent.ok,
+    channel: sent.ok ? sent.channel : undefined,
   };
 }
 

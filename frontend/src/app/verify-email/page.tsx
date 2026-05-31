@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import AuthLayout from '@/components/AuthLayout';
 import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client';
-import { sendVerificationEmail } from '@/lib/firebase/email-verification';
 import { sendVerificationCode, confirmVerificationCode } from '@/lib/client/verification';
 import { formatAuthError } from '@/lib/firebase/errors';
 
@@ -26,26 +25,23 @@ export default function VerifyEmailPage() {
 
     setSending(true);
     setError('');
+    setMsg('');
     try {
       const data = await sendVerificationCode();
-      await sendVerificationEmail(user).catch(() => {});
 
-      if (data.resendCodeDelivered) {
-        setMsg('Code envoyé par e-mail. Consultez votre boîte mail (et les spams).');
-      } else {
+      if (data.resendCodeDelivered && data.linkDelivered) {
         setMsg(
-          'Un e-mail avec un lien de confirmation a été envoyé. Ouvrez-le, cliquez sur le lien, puis sur « J’ai validé mon e-mail ». Vous pouvez aussi saisir le code si vous l’avez reçu.'
+          'Deux e-mails ont été envoyés : un avec votre code à 6 chiffres, un avec un lien de confirmation. Utilisez l’un ou l’autre. Pensez aux spams.'
+        );
+      } else if (data.resendCodeDelivered) {
+        setMsg('Code à 6 chiffres envoyé. Consultez votre boîte mail (et les spams).');
+      } else if (data.linkDelivered) {
+        setMsg(
+          'Un e-mail avec un lien de confirmation a été envoyé. Ouvrez-le, cliquez sur le lien, puis sur « J’ai validé mon e-mail ».'
         );
       }
     } catch (err) {
-      try {
-        await sendVerificationEmail(user);
-        setMsg(
-          'Un e-mail de vérification a été envoyé (lien Firebase). Cliquez sur le lien, puis sur « J’ai validé mon e-mail ».'
-        );
-      } catch (inner) {
-        setError(formatAuthError(inner));
-      }
+      setError(formatAuthError(err));
     } finally {
       setSending(false);
     }
@@ -97,7 +93,7 @@ export default function VerifyEmailPage() {
       if (auth.currentUser?.emailVerified) {
         router.replace('/dashboard');
       } else {
-        setError('Pas encore validé. Ouvrez l’e-mail Firebase et cliquez sur le lien, puis réessayez.');
+        setError('Pas encore validé. Ouvrez l’e-mail MILOU, cliquez sur le lien, puis réessayez.');
       }
     } catch (err) {
       setError(formatAuthError(err));

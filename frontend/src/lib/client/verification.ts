@@ -21,6 +21,7 @@ export function sendVerificationCode(): Promise<{
   message: string;
   expiresInMinutes: number;
   resendCodeDelivered?: boolean;
+  linkDelivered?: boolean;
 }> {
   return authPost('/api/auth/verification/send');
 }
