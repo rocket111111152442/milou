@@ -12,6 +12,8 @@ import { notifyUsersOnNewListing } from '@/lib/listing-notifications';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   try {
@@ -155,7 +157,7 @@ export async function POST(req: NextRequest) {
 
     const ref = await db.collection('listings').add(listingData);
 
-    void notifyUsersOnNewListing(db, {
+    const notifyResult = await notifyUsersOnNewListing(db, {
       listingId: ref.id,
       title: listingData.title,
       description: listingData.description,
@@ -165,9 +167,13 @@ export async function POST(req: NextRequest) {
       authorId: uid,
       isInPerson: inPerson,
       postalCode: normalizedPostal || undefined,
-    }).catch((err) => console.error('[listing-notify]', err));
+    });
 
-    return NextResponse.json({ id: ref.id, featured: premium });
+    return NextResponse.json({
+      id: ref.id,
+      featured: premium,
+      notify: notifyResult,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Erreur' },

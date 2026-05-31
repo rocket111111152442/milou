@@ -33,6 +33,14 @@ Ensuite sur **Vercel** :
 
 ---
 
+## Gmail (notifications annonces)
+
+Voir **`GMAIL-NOTIFS.md`**.
+
+Variables : `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`.
+
+---
+
 ## Variables Stripe à compléter
 
 | Variable | Où la trouver |
