@@ -18,9 +18,10 @@ La navigation (marketplace, profil, solde) lit **Firestore directement** → ré
 1. https://console.firebase.google.com → **Créer un projet** (ex. `milou-app`)
 2. Désactivez Google Analytics si vous voulez (optionnel)
 3. **Build** → **Authentication** → **Commencer** → activez **E-mail/Mot de passe**
-4. **Build** → **Firestore Database** → **Créer** → mode **production** → région `europe-west`
-5. **Règles** → collez le contenu du fichier `firestore.rules` à la racine du projet → **Publier**
-6. *(Optionnel)* **Index** : si Firebase affiche un lien « créer un index », vous pouvez cliquer dessus **ou** déployer `firestore.indexes.json` avec la CLI Firebase. Les transferts MILOU fonctionnent sans index grâce au code serveur, mais d’autres requêtes peuvent en bénéficier.
+4. **Authentication** → **Modèles** → **Vérification de l’adresse e-mail** : personnalisez le texte (expéditeur = Firebase). Les inscrits doivent cliquer le lien avant d’accéder au dashboard.
+5. **Build** → **Firestore Database** → **Créer** → mode **production** → région `europe-west`
+6. **Règles** → collez le contenu du fichier `firestore.rules` à la racine du projet → **Publier**
+7. *(Optionnel)* **Index** : si Firebase affiche un lien « créer un index », vous pouvez cliquer dessus **ou** déployer `firestore.indexes.json` avec la CLI Firebase. Les transferts MILOU fonctionnent sans index grâce au code serveur, mais d’autres requêtes peuvent en bénéficier.
 
 ### Storage (fichiers dans le chat mission)
 

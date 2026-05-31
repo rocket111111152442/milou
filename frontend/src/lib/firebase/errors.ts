@@ -9,6 +9,8 @@ export function formatAuthError(err: unknown): string {
       'auth/weak-password': 'Mot de passe trop faible (minimum 6 caractères).',
       'auth/invalid-credential': 'E-mail ou mot de passe incorrect.',
       'auth/too-many-requests': 'Trop de tentatives. Réessayez dans quelques minutes.',
+      'auth/requires-recent-login':
+        'Pour des raisons de sécurité, reconnectez-vous puis renvoyez l’e-mail de vérification.',
       'auth/network-request-failed':
         'Le navigateur n’atteint pas Firebase (pas forcément votre Wi‑Fi).\n\n' +
         '1. Firebase Console → Authentication → Paramètres → Domaines autorisés → vérifiez que « localhost » est listé\n' +

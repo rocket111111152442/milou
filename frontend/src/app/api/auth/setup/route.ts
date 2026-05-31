@@ -8,7 +8,7 @@ import { normalizePostalCode } from '@/lib/email';
 /** Crée le profil Firestore + bonus 10 Milou après inscription Firebase côté client */
 export async function POST(req: NextRequest) {
   try {
-    const { uid, email } = await verifyRequest(req);
+    const { uid, email } = await verifyRequest(req, { allowUnverifiedEmail: true });
     const { firstname, lastname, postalCode } = await req.json();
     const normalizedPostalCode = normalizePostalCode(postalCode);
 

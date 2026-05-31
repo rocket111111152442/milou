@@ -1,12 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { getFirebaseAuth } from '@/lib/firebase/client';
+import { sendVerificationEmail } from '@/lib/firebase/email-verification';
 import { useAuth } from '@/context/AuthContext';
 import { formatAuthError } from '@/lib/firebase/errors';
 
 export default function CompleteProfile() {
   const { refreshUser } = useAuth();
+  const router = useRouter();
   const [form, setForm] = useState({ firstname: '', lastname: '', postalCode: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,7 +34,19 @@ export default function CompleteProfile() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur');
 
+      const auth = getFirebaseAuth();
+      const current = auth.currentUser;
+      if (current && !current.emailVerified) {
+        try {
+          await sendVerificationEmail(current);
+        } catch {
+          /* l’utilisateur pourra renvoyer depuis /verify-email */
+        }
+        router.push('/verify-email');
+        return;
+      }
       await refreshUser();
+      router.push('/dashboard');
     } catch (err) {
       setError(formatAuthError(err));
     } finally {
