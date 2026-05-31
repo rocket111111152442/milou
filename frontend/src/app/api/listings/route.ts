@@ -7,7 +7,7 @@ import { assertCanCreateListing } from '@/lib/premium/usage';
 import { syncPremiumStatus } from '@/lib/premium/sync';
 import { jsonNoStore } from '@/lib/http';
 import { isListingPublic, isListingVisible } from '@/lib/listings';
-import { normalizePostalCode } from '@/lib/email';
+import { normalizePostalCode } from '@/lib/postal-code';
 import { notifyUsersOnNewListing } from '@/lib/listing-notifications';
 
 export const dynamic = 'force-dynamic';

@@ -1,5 +1,6 @@
 import { Firestore } from 'firebase-admin/firestore';
-import { sendEmail, normalizePostalCode } from '@/lib/email';
+import { sendEmail } from '@/lib/email-server';
+import { normalizePostalCode } from '@/lib/postal-code';
 import { createNotification } from '@/lib/notifications';
 
 type ListingNotifyPayload = {

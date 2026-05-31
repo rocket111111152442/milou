@@ -3,7 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createNotification } from '@/lib/notifications';
-import { sendEmail } from '@/lib/email';
+import { sendEmail } from '@/lib/email-server';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
