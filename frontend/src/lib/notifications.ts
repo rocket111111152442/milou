@@ -5,6 +5,8 @@ export type NotificationType =
   | 'transfer_sent'
   | 'mission_started'
   | 'mission_completed'
+  | 'mission_disputed'
+  | 'admin_dispute'
   | 'message'
   | 'premium_activated'
   | 'review_received'
