@@ -4,13 +4,25 @@ type EmailPayload = {
   text: string;
 };
 
-const FROM_EMAIL = process.env.MILOU_EMAIL_FROM || 'MILOU <notifications@milou.app>';
+export type SendEmailResult = { ok: true } | { ok: false; reason: string };
 
-export async function sendEmail({ to, subject, text }: EmailPayload) {
-  const apiKey = process.env.RESEND_API_KEY;
+/** Expéditeur par défaut Resend (domaine de test, fonctionne sans domaine perso). */
+const DEFAULT_FROM = 'MILOU <onboarding@resend.dev>';
+
+function getFromEmail() {
+  const raw = process.env.MILOU_EMAIL_FROM?.trim();
+  return raw || DEFAULT_FROM;
+}
+
+export async function sendEmail({ to, subject, text }: EmailPayload): Promise<SendEmailResult> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
-    console.info(`[email disabled] ${subject} -> ${to}`);
-    return false;
+    console.warn('[email] RESEND_API_KEY absente');
+    return {
+      ok: false,
+      reason:
+        'RESEND_API_KEY manquante. Vercel → Settings → Environment Variables → ajoutez-la pour Production, puis Redeploy.',
+    };
   }
 
   const res = await fetch('https://api.resend.com/emails', {
@@ -20,20 +32,32 @@ export async function sendEmail({ to, subject, text }: EmailPayload) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: FROM_EMAIL,
-      to,
+      from: getFromEmail(),
+      to: [to],
       subject,
       text,
     }),
   });
 
   if (!res.ok) {
-    const message = await res.text().catch(() => '');
-    console.error(`Email failed for ${to}: ${message}`);
-    return false;
+    const raw = await res.text().catch(() => '');
+    let detail = raw;
+    try {
+      const parsed = JSON.parse(raw) as { message?: string };
+      if (parsed.message) detail = parsed.message;
+    } catch {
+      /* garder raw */
+    }
+    console.error(`[email] Resend error ${res.status} -> ${to}: ${detail}`);
+    return {
+      ok: false,
+      reason: detail
+        ? `Resend (${res.status}) : ${detail}`
+        : `Resend a refusé l’envoi (HTTP ${res.status}). Vérifiez MILOU_EMAIL_FROM et votre domaine sur resend.com.`,
+    };
   }
 
-  return true;
+  return { ok: true };
 }
 
 export function normalizePostalCode(value: unknown) {

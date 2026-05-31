@@ -55,16 +55,19 @@ export async function notifyUsersOnNewListing(db: Firestore, payload: ListingNot
       const email = String(data.email || '').trim();
       if (!email) return;
 
-      await sendEmail({
+      const broadcast = await sendEmail({
         to: email,
         subject: broadcastSubject,
         text: `Bonjour ${data.firstname || ''},\n\n${summary}`,
       });
+      if (!broadcast.ok) {
+        console.error(`[listing-notify] ${email}: ${broadcast.reason}`);
+      }
 
       if (listingPostal) {
         const userPostal = normalizePostalCode(data.postalCode);
         if (userPostal && userPostal === listingPostal) {
-          await sendEmail({
+          const local = await sendEmail({
             to: email,
             subject: localSubject,
             text: [
@@ -75,6 +78,9 @@ export async function notifyUsersOnNewListing(db: Firestore, payload: ListingNot
               summary,
             ].join('\n'),
           });
+          if (!local.ok) {
+            console.error(`[listing-notify-local] ${email}: ${local.reason}`);
+          }
         }
       }
     })

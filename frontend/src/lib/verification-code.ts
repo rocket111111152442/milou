@@ -21,13 +21,6 @@ export async function issueVerificationCode(db: Firestore, uid: string, email: s
   }
 
   const code = generateSixDigitCode();
-  await ref.set({
-    code,
-    email: email.toLowerCase(),
-    attempts: 0,
-    lastSentAt: FieldValue.serverTimestamp(),
-    expiresAt: Timestamp.fromDate(new Date(Date.now() + CODE_TTL_MS)),
-  });
 
   const sent = await sendEmail({
     to: email,
@@ -44,11 +37,17 @@ export async function issueVerificationCode(db: Firestore, uid: string, email: s
     ].join('\n'),
   });
 
-  if (!sent) {
-    throw new Error(
-      'Impossible d’envoyer le code par e-mail. Vérifiez RESEND_API_KEY sur Vercel.'
-    );
+  if (!sent.ok) {
+    throw new Error(sent.reason);
   }
+
+  await ref.set({
+    code,
+    email: email.toLowerCase(),
+    attempts: 0,
+    lastSentAt: FieldValue.serverTimestamp(),
+    expiresAt: Timestamp.fromDate(new Date(Date.now() + CODE_TTL_MS)),
+  });
 
   return { expiresInMinutes: 15 };
 }
