@@ -71,7 +71,7 @@ export function publicUserFields(id: string, data: Record<string, unknown>) {
     transactionCount: Number(data.transactionCount || 0),
     isPremium: Boolean(data.isPremium),
     role: String(data.role || 'user'),
-    createdAt: data.createdAt,
+    createdAt: typeof data.createdAt === 'string' ? data.createdAt : '',
     reliabilityScore,
   };
 }

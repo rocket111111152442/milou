@@ -275,13 +275,9 @@ export default function DashboardPage() {
                 {missions.map((m) => {
                   const overdue = m.dueAt && new Date(m.dueAt).getTime() < Date.now();
                   const isProvider =
-                    m.providerUid === user.id ||
-                    m.providerId === user.id ||
-                    m.providerId?.email === user.email;
+                    m.providerUid === user.id || m.providerId?.email === user.email;
                   const isClient =
-                    m.clientUid === user.id ||
-                    m.clientId === user.id ||
-                    m.clientId?.email === user.email;
+                    m.clientUid === user.id || m.clientId?.email === user.email;
                   const isDisputed = m.status === 'disputed';
                   return (
                   <li

@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       ...data,
       isPremium: isPremiumActive(data),
     });
-    publicData.createdAt = data.createdAt ? tsToIso(data.createdAt) : undefined;
+    const createdAt = data.createdAt ? tsToIso(data.createdAt) : '';
 
     const openListingsSnap = await getAdminDb()
       .collection('listings')
@@ -42,12 +42,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({
       user: {
         ...publicData,
+        createdAt,
         badges: getUserBadges({
           isPremium: publicData.isPremium,
           role: publicData.role as 'user' | 'admin' | 'moderator',
           transactionCount: publicData.transactionCount,
           reviewCount: publicData.reviewCount,
-          createdAt: publicData.createdAt || '',
+          createdAt,
         }),
       },
       listings,

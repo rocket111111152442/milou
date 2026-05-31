@@ -3,6 +3,7 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { userToJson } from '@/lib/firebase/wallet';
 import { computeReliabilityScore, getUserBadges } from '@/lib/user-trust';
+import { UserRole } from '@/lib/types';
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -26,7 +27,13 @@ export async function PATCH(req: NextRequest) {
     const snap = await ref.get();
     const user = userToJson(uid, snap.data()!);
     const reliabilityScore = computeReliabilityScore(user);
-    const badges = getUserBadges(user);
+    const badges = getUserBadges({
+      isPremium: user.isPremium,
+      role: user.role as UserRole,
+      transactionCount: user.transactionCount,
+      reviewCount: user.reviewCount,
+      createdAt: user.createdAt,
+    });
 
     return NextResponse.json({ user: { ...user, reliabilityScore, badges } });
   } catch (err) {
