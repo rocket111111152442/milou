@@ -90,7 +90,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-milou-bg">
-        <div className="w-8 h-8 rounded-lg bg-indigo-600 animate-pulse" />
+        <img src="/milou-logo.svg" alt="" width={32} height={32} className="animate-pulse" />
         <p className="text-zinc-500 text-sm">Chargement du tableau de bord…</p>
       </div>
     );

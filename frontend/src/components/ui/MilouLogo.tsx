@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface Props {
   size?: 'sm' | 'md' | 'lg';
@@ -6,22 +7,41 @@ interface Props {
   showText?: boolean;
 }
 
+const LOGO_SRC = '/milou-logo.svg';
+
 const sizes = {
-  sm: { box: 'w-7 h-7 text-xs', text: 'text-lg' },
-  md: { box: 'w-8 h-8 text-sm', text: 'text-xl' },
-  lg: { box: 'w-10 h-10 text-base', text: 'text-2xl' },
+  sm: { px: 28, text: 'text-lg' },
+  md: { px: 32, text: 'text-xl' },
+  lg: { px: 40, text: 'text-2xl' },
 };
+
+/** Icône seule (chargement, etc.) */
+export function MilouLogoMark({
+  size = 'md',
+  className = '',
+}: {
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}) {
+  const { px } = sizes[size];
+  return (
+    <Image
+      src={LOGO_SRC}
+      alt=""
+      width={px}
+      height={px}
+      className={`shrink-0 ${className}`}
+      aria-hidden
+      unoptimized
+    />
+  );
+}
 
 export default function MilouLogo({ size = 'md', href = '/', showText = true }: Props) {
   const s = sizes[size];
   const mark = (
     <>
-      <span
-        className={`${s.box} rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shrink-0 shadow-soft`}
-        aria-hidden
-      >
-        M
-      </span>
+      <MilouLogoMark size={size} />
       {showText && (
         <span className={`${s.text} font-bold tracking-tight text-white`}>MILOU</span>
       )}

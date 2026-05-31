@@ -27,7 +27,7 @@ const Providers = dynamic(() => import('@/components/Providers'), {
   loading: () => (
     <div className="min-h-screen bg-milou-bg flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-indigo-600 animate-pulse" />
+        <img src="/milou-logo.svg" alt="" width={32} height={32} className="animate-pulse" />
         <p className="text-zinc-500 text-sm">Chargement…</p>
       </div>
     </div>
