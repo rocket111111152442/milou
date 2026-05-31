@@ -29,7 +29,7 @@ export async function getUserUsage(db: Firestore, uid: string, userData: Record<
   const monthStartMs = startOfMonth().getTime();
   const dayStartMs = startOfDay().getTime();
 
-  const activeStatuses = ['pending', 'in_progress', 'escrow_held'];
+  const activeStatuses = ['pending', 'in_progress', 'escrow_held', 'disputed'];
 
   const [listingsSnap, transfersSnap, clientMissions, providerMissions] = await Promise.all([
     db.collection('listings').where('userId', '==', uid).limit(200).get(),

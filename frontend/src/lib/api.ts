@@ -63,6 +63,11 @@ export const listingsApi = {
     api<{ missionId: string }>(`/api/listings/${id}/accept`, { method: 'POST' }),
   completeMission: (id: string) =>
     api<{ message: string }>(`/api/listings/missions/${id}/complete`, { method: 'POST' }),
+  disputeMission: (id: string, reason: string) =>
+    api<{ message: string }>(`/api/listings/missions/${id}/dispute`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
   delete: (id: string) =>
     api<{ message: string }>(`/api/listings/${id}`, { method: 'DELETE' }),
 };
@@ -188,6 +193,11 @@ export const adminApi = {
     api<{ message: string }>(`/api/admin/missions/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    }),
+  resolveDispute: (missionId: string, decision: 'release' | 'refund', adminNote?: string) =>
+    api<{ message: string }>(`/api/admin/disputes/${missionId}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, adminNote }),
     }),
   audit: () => api<{ entries: import('./types').AdminAuditEntry[] }>('/api/admin/audit'),
   announcements: () =>

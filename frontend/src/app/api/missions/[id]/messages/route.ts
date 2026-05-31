@@ -13,7 +13,7 @@ async function getMissionIfParticipant(missionId: string, uid: string) {
   if (data.clientId !== uid && data.providerId !== uid) {
     throw new Error('Accès refusé à cette conversation');
   }
-  if (data.status !== 'in_progress') {
+  if (!['in_progress', 'disputed'].includes(String(data.status))) {
     throw new Error('La mission est terminée, le chat est fermé');
   }
   return data;

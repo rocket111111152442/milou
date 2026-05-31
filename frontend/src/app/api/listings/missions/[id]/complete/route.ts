@@ -16,6 +16,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
     const mission = missionSnap.data()!;
 
+    if (mission.status === 'disputed') {
+      return NextResponse.json(
+        { error: 'Mission en litige — en attente de décision administrateur' },
+        { status: 400 }
+      );
+    }
     if (mission.status !== 'in_progress') {
       return NextResponse.json({ error: 'Mission déjà terminée' }, { status: 400 });
     }

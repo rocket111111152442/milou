@@ -7,6 +7,8 @@ import { assertCanCreateListing } from '@/lib/premium/usage';
 import { syncPremiumStatus } from '@/lib/premium/sync';
 import { jsonNoStore } from '@/lib/http';
 import { isListingPublic, isListingVisible } from '@/lib/listings';
+import { normalizePostalCode } from '@/lib/email';
+import { notifyUsersOnNewListing } from '@/lib/listing-notifications';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -93,32 +95,77 @@ export async function POST(req: NextRequest) {
   try {
     const { uid } = await verifyRequest(req);
     const body = await req.json();
-    const { title, description, category, price, type, tags, estimatedDelay, missionType } = body;
+    const {
+      title,
+      description,
+      category,
+      price,
+      type,
+      tags,
+      estimatedDelay,
+      missionType,
+      isInPerson,
+      postalCode,
+    } = body;
+    const listingPrice = Number(price);
+    const listingType = type === 'request' ? 'request' : 'offer';
+    const inPerson = Boolean(isInPerson);
+    const normalizedPostal = inPerson ? normalizePostalCode(postalCode) : '';
 
-    if (!title || !description || !category || !price || !type) {
+    if (!title || !description || !category || !listingPrice || !type) {
       return NextResponse.json({ error: 'Données invalides' }, { status: 400 });
+    }
+    if (inPerson && !normalizedPostal) {
+      return NextResponse.json(
+        { error: 'Indiquez un code postal pour une mission en présentiel.' },
+        { status: 400 }
+      );
     }
 
     const db = getAdminDb();
     const userData = await syncPremiumStatus(db, uid);
     await assertCanCreateListing(db, uid, userData);
 
+    const balance = Number(userData.balance || 0);
+    if (listingType === 'request' && listingPrice > balance) {
+      return NextResponse.json(
+        { error: `Solde insuffisant : il vous faut ${listingPrice} M pour publier cette demande (vous paierez le prestataire).` },
+        { status: 400 }
+      );
+    }
+
     const premium = isPremiumActive(userData);
 
-    const ref = await db.collection('listings').add({
+    const listingData = {
       userId: uid,
       title: String(title).trim(),
       description: String(description).trim(),
       category: String(category).trim(),
-      price: Number(price),
-      type,
+      price: listingPrice,
+      type: listingType,
       tags: Array.isArray(tags) ? tags : [],
       estimatedDelay: String(estimatedDelay || '').trim() || '5 minutes',
       missionType: missionType || 'standard',
+      isInPerson: inPerson,
+      postalCode: normalizedPostal || null,
       featured: premium,
       status: 'open',
       createdAt: FieldValue.serverTimestamp(),
-    });
+    };
+
+    const ref = await db.collection('listings').add(listingData);
+
+    void notifyUsersOnNewListing(db, {
+      listingId: ref.id,
+      title: listingData.title,
+      description: listingData.description,
+      price: listingPrice,
+      type: listingType,
+      category: listingData.category,
+      authorId: uid,
+      isInPerson: inPerson,
+      postalCode: normalizedPostal || undefined,
+    }).catch((err) => console.error('[listing-notify]', err));
 
     return NextResponse.json({ id: ref.id, featured: premium });
   } catch (err) {

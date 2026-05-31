@@ -104,6 +104,26 @@ export async function holdEscrow(
   });
 }
 
+/** Rembourse le client lorsque la validation est refusée (litige admin). */
+export async function refundEscrowToClient(
+  db: Firestore,
+  clientId: string,
+  amount: number,
+  listingId: string,
+  missionId: string,
+  description = 'Remboursement — litige validé par un administrateur'
+) {
+  await transferMilou(db, {
+    fromUserId: null,
+    toUserId: clientId,
+    amount,
+    type: 'escrow_release',
+    description,
+    listingId,
+    missionId,
+  });
+}
+
 export async function releaseEscrow(
   db: Firestore,
   providerId: string,
@@ -151,6 +171,7 @@ export function userToJson(id: string, data: Record<string, unknown>) {
     firstname: String(data.firstname ?? ''),
     lastname: String(data.lastname ?? ''),
     email: String(data.email ?? ''),
+    postalCode: String(data.postalCode ?? ''),
     balance: Number(data.balance ?? 0),
     role: (data.role as string) ?? 'user',
     status: (data.status as string) ?? 'active',

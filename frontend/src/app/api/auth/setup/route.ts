@@ -3,15 +3,17 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { verifyRequest } from '@/lib/firebase/auth-server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { recordTransaction, userToJson } from '@/lib/firebase/wallet';
+import { normalizePostalCode } from '@/lib/email';
 
 /** Crée le profil Firestore + bonus 10 Milou après inscription Firebase côté client */
 export async function POST(req: NextRequest) {
   try {
     const { uid, email } = await verifyRequest(req);
-    const { firstname, lastname } = await req.json();
+    const { firstname, lastname, postalCode } = await req.json();
+    const normalizedPostalCode = normalizePostalCode(postalCode);
 
-    if (!firstname?.trim() || !lastname?.trim()) {
-      return NextResponse.json({ error: 'Prénom et nom requis' }, { status: 400 });
+    if (!firstname?.trim() || !lastname?.trim() || !normalizedPostalCode) {
+      return NextResponse.json({ error: 'Prénom, nom et code postal requis' }, { status: 400 });
     }
 
     const db = getAdminDb();
@@ -26,6 +28,7 @@ export async function POST(req: NextRequest) {
       firstname: firstname.trim(),
       lastname: lastname.trim(),
       email: email.toLowerCase(),
+      postalCode: normalizedPostalCode,
       balance: 10,
       role: 'user',
       status: 'active',

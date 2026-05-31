@@ -38,6 +38,8 @@ export default function CreateListingPage() {
     type: 'offer' as 'offer' | 'request',
     tags: '',
     missionType: 'standard',
+    isInPerson: false,
+    postalCode: '',
   });
   const [delay, setDelay] = useState({ days: 3, hours: 0, minutes: 0 });
 
@@ -72,6 +74,8 @@ export default function CreateListingPage() {
         tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
         estimatedDelay: formatEstimatedDelay(delay),
         missionType: form.missionType,
+        isInPerson: form.isInPerson,
+        postalCode: form.isInPerson ? form.postalCode.trim() : undefined,
       });
       router.push('/marketplace');
     } catch (err) {
@@ -81,6 +85,8 @@ export default function CreateListingPage() {
 
   const previewCategory = SERVICE_CATEGORIES.find((c) => c.id === form.category);
   const estimatedDelay = formatEstimatedDelay(delay);
+  const needsBalance = form.type === 'request';
+  const hasEnoughBalance = !needsBalance || Number(form.price) <= user.balance;
 
   function setDelayPart(part: 'days' | 'hours' | 'minutes', value: number) {
     setDelay((current) => {
@@ -257,6 +263,34 @@ export default function CreateListingPage() {
                 </button>
               </div>
             </div>
+            <div className="p-4 rounded-xl border border-white/[0.06] bg-milou-surface/40 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.isInPerson}
+                  onChange={(e) => setForm({ ...form, isInPerson: e.target.checked })}
+                  className="rounded border-white/20"
+                />
+                <span className="text-sm text-white">Mission en vrai (présentiel)</span>
+              </label>
+              {form.isInPerson && (
+                <div>
+                  <label className="label">Code postal du lieu</label>
+                  <input
+                    className="input"
+                    value={form.postalCode}
+                    onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
+                    required={form.isInPerson}
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    placeholder="Ex : 75001"
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Les utilisateurs inscrits avec le même code postal recevront un e-mail dédié.
+                  </p>
+                </div>
+              )}
+            </div>
             <div>
               <label className="label">Tags (virgules)</label>
               <input
@@ -267,8 +301,22 @@ export default function CreateListingPage() {
               />
             </div>
             {error && <p className="alert-error py-2">{error}</p>}
-            <button type="submit" className="btn-primary w-full py-3">
-              Publier sur le marketplace
+            {needsBalance && !hasEnoughBalance && (
+              <p className="alert-error py-2 text-sm">
+                Solde insuffisant pour cette demande : votre solde est de {user.balance.toFixed(2)} M (prix :{' '}
+                {form.price} M).
+              </p>
+            )}
+            <button
+              type="submit"
+              className="btn-primary w-full py-3"
+              disabled={!hasEnoughBalance || (form.isInPerson && !form.postalCode.trim())}
+            >
+              {!hasEnoughBalance && needsBalance
+                ? 'Solde insuffisant'
+                : form.isInPerson && !form.postalCode.trim()
+                  ? 'Code postal requis'
+                  : 'Publier sur le marketplace'}
             </button>
           </form>
 

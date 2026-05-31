@@ -459,32 +459,81 @@ export default function AdminPage() {
         {tab === 'missions' && (
           <div className="grid lg:grid-cols-2 gap-4">
             <div className="space-y-2">
-              {missions.map((m) => (
-                <div key={m._id} className="card text-sm">
+              {missions.map((m) => {
+                const disputed = m.status === 'disputed';
+                const disputeReason =
+                  typeof (m as { disputeReason?: string }).disputeReason === 'string'
+                    ? (m as { disputeReason: string }).disputeReason
+                    : '';
+                return (
+                <div
+                  key={m._id}
+                  className={`card text-sm ${disputed ? 'border-amber-500/40 bg-amber-500/5' : ''}`}
+                >
                   <p className="font-medium">Mission {m._id.slice(0, 10)}…</p>
-                  <p className="text-gray-400">{m.status} · {m.amount} M</p>
+                  <p className="text-gray-400">
+                    {m.status} · {m.amount} M
+                    {disputed && <span className="text-amber-300 ml-2">· Litige</span>}
+                  </p>
                   <p className="text-gray-500 text-xs mt-1">
                     {m.clientId.email} ↔ {m.providerId.email}
                   </p>
+                  {disputed && disputeReason && (
+                    <p className="text-xs text-amber-200/90 mt-2 whitespace-pre-wrap border-t border-amber-500/20 pt-2">
+                      Motif client : {disputeReason}
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-2 mt-2">
                     <button type="button" className="btn-secondary text-xs py-1" onClick={() => openMissionChat(m._id)}>
                       Lire le chat
                     </button>
-                    <button
-                      type="button"
-                      className="btn-secondary text-xs py-1"
-                      onClick={async () => {
-                        await adminApi.updateMission(m._id, 'cancelled');
-                        const r = await adminApi.missions();
-                        setMissions(r.missions);
-                        setMsg('Mission annulée');
-                      }}
-                    >
-                      Annuler
-                    </button>
+                    {disputed ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-primary text-xs py-1"
+                          onClick={async () => {
+                            if (!confirm('Libérer le paiement au prestataire ?')) return;
+                            await adminApi.resolveDispute(m._id, 'release');
+                            const r = await adminApi.missions();
+                            setMissions(r.missions);
+                            setMsg('Litige tranché — prestataire payé');
+                          }}
+                        >
+                          Valider la transaction
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary text-xs py-1 border-red-500/30 text-red-300"
+                          onClick={async () => {
+                            if (!confirm('Rembourser le client et annuler la mission ?')) return;
+                            await adminApi.resolveDispute(m._id, 'refund');
+                            const r = await adminApi.missions();
+                            setMissions(r.missions);
+                            setMsg('Litige tranché — client remboursé');
+                          }}
+                        >
+                          Refuser la transaction
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn-secondary text-xs py-1"
+                        onClick={async () => {
+                          await adminApi.updateMission(m._id, 'cancelled');
+                          const r = await adminApi.missions();
+                          setMissions(r.missions);
+                          setMsg('Mission annulée');
+                        }}
+                      >
+                        Annuler
+                      </button>
+                    )}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
             <div className="card max-h-96 overflow-y-auto">
               <h3 className="font-semibold mb-2 text-violet-300">

@@ -7,7 +7,7 @@ import { formatAuthError } from '@/lib/firebase/errors';
 
 export default function CompleteProfile() {
   const { refreshUser } = useAuth();
-  const [form, setForm] = useState({ firstname: '', lastname: '' });
+  const [form, setForm] = useState({ firstname: '', lastname: '', postalCode: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -64,6 +64,18 @@ export default function CompleteProfile() {
               value={form.lastname}
               onChange={(e) => setForm({ ...form, lastname: e.target.value })}
               required
+            />
+          </div>
+          <div>
+            <label className="label">Code postal</label>
+            <input
+              className="input"
+              value={form.postalCode}
+              onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
+              required
+              inputMode="numeric"
+              autoComplete="postal-code"
+              placeholder="Ex : 75001"
             />
           </div>
           {error && <p className="text-milou-danger text-sm">{error}</p>}

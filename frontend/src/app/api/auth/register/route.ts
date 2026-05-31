@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { recordTransaction } from '@/lib/firebase/wallet';
 import { FieldValue } from 'firebase-admin/firestore';
+import { normalizePostalCode } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   try {
-    const { firstname, lastname, email, password } = await req.json();
-    if (!firstname || !lastname || !email || !password || password.length < 6) {
+    const { firstname, lastname, email, password, postalCode } = await req.json();
+    const normalizedPostalCode = normalizePostalCode(postalCode);
+    if (!firstname || !lastname || !email || !password || password.length < 6 || !normalizedPostalCode) {
       return NextResponse.json({ error: 'Données invalides' }, { status: 400 });
     }
 
@@ -38,6 +40,7 @@ export async function POST(req: NextRequest) {
       firstname,
       lastname,
       email: email.toLowerCase(),
+      postalCode: normalizedPostalCode,
       balance: 10,
       role: 'user',
       status: 'active',

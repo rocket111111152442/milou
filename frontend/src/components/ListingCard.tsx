@@ -65,6 +65,11 @@ export default function ListingCard({
             Micro-job
           </span>
         )}
+        {listing.isInPerson && (
+          <span className="badge bg-teal-500/10 text-teal-300 border border-teal-500/20">
+            Présentiel{listing.postalCode ? ` · ${listing.postalCode}` : ''}
+          </span>
+        )}
         <span className={`badge border ${st.className}`}>{st.label}</span>
       </div>
 

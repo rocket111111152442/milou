@@ -9,7 +9,7 @@ import { formatAuthError } from '@/lib/firebase/errors';
 import AuthLayout from '@/components/AuthLayout';
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({ firstname: '', lastname: '', email: '', password: '' });
+  const [form, setForm] = useState({ firstname: '', lastname: '', email: '', password: '', postalCode: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
@@ -36,6 +36,7 @@ export default function RegisterPage() {
           lastname: form.lastname.trim(),
           email,
           password: form.password,
+          postalCode: form.postalCode.trim(),
         }),
       });
       const data = await res.json();
@@ -86,6 +87,18 @@ export default function RegisterPage() {
         <div>
           <label className="label">Email</label>
           <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required autoComplete="email" />
+        </div>
+        <div>
+          <label className="label">Code postal</label>
+          <input
+            className="input"
+            value={form.postalCode}
+            onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
+            required
+            inputMode="numeric"
+            autoComplete="postal-code"
+            placeholder="Ex : 75001"
+          />
         </div>
         <div>
           <label className="label">Mot de passe (min. 6 caractères)</label>

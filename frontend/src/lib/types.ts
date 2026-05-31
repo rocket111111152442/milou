@@ -6,6 +6,7 @@ export interface User {
   firstname: string;
   lastname: string;
   email: string;
+  postalCode?: string;
   balance: number;
   role: UserRole;
   status?: UserStatus;
@@ -182,6 +183,8 @@ export interface Listing {
   type: 'offer' | 'request';
   tags: string[];
   estimatedDelay?: string;
+  isInPerson?: boolean;
+  postalCode?: string;
   missionType?: string;
   featured?: boolean;
   status: string;
@@ -200,6 +203,8 @@ export interface Mission {
   dueAt?: string | null;
   estimatedDelay?: string;
   completedReason?: string | null;
+  disputeReason?: string | null;
+  disputedAt?: string | null;
   unreadCount?: number;
   createdAt: string;
 }

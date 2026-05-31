@@ -15,6 +15,7 @@ import UsageLimitsCard from '@/components/UsageLimitsCard';
 import PremiumBadge from '@/components/PremiumBadge';
 import AdminBadge from '@/components/AdminBadge';
 import MissionReviewForm from '@/components/MissionReviewForm';
+import MissionDisputeForm from '@/components/MissionDisputeForm';
 import MyListingRow from '@/components/MyListingRow';
 import { Transaction, Listing, Mission } from '@/lib/types';
 
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const [completedMissions, setCompletedMissions] = useState<Mission[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [listMsg, setListMsg] = useState('');
+  const [disputeMissionId, setDisputeMissionId] = useState<string | null>(null);
 
   function getOtherPartyName(m: Mission): string {
     const isClient = m.clientUid === user?.id || m.clientId?.email === user?.email;
@@ -211,6 +213,8 @@ export default function DashboardPage() {
                 {missions.map((m) => {
                   const overdue = m.dueAt && new Date(m.dueAt).getTime() < Date.now();
                   const isProvider = m.providerId?.email === user.email;
+                  const isClient = m.clientId?.email === user.email;
+                  const isDisputed = m.status === 'disputed';
                   return (
                   <li
                     key={m._id}
@@ -221,7 +225,15 @@ export default function DashboardPage() {
                     <p className="font-medium">{m.listingId?.title || 'Mission'}</p>
                     <p className="text-sm text-gray-400">
                       {m.amount} M · {getOtherPartyName(m)}
+                      {isDisputed && (
+                        <span className="ml-2 text-amber-400">· En attente admin</span>
+                      )}
                     </p>
+                    {isDisputed && m.disputeReason && (
+                      <p className="text-xs text-amber-300/90 mt-1 line-clamp-2">
+                        Motif : {m.disputeReason}
+                      </p>
+                    )}
                     {m.dueAt && (
                       <p className={`text-xs mt-1 ${overdue ? 'text-red-400' : 'text-gray-500'}`}>
                         {overdue ? '⚠ Délai dépassé — ' : 'Date limite : '}
@@ -240,21 +252,43 @@ export default function DashboardPage() {
                         Chat
                         <UnreadBadge count={m.unreadCount || 0} />
                       </button>
-                      {m.clientId?.email === user.email && (
-                        <button
-                          type="button"
-                          className="btn-primary text-xs py-1.5"
-                          onClick={async () => {
-                            await listingsApi.completeMission(m._id);
-                            setChatMission(null);
-                            await refreshUser();
-                            await loadDashboard();
-                          }}
-                        >
-                          Valider
-                        </button>
+                      {isClient && !isDisputed && disputeMissionId !== m._id && (
+                        <>
+                          <button
+                            type="button"
+                            className="btn-primary text-xs py-1.5"
+                            onClick={async () => {
+                              if (!confirm('Valider la mission et libérer le paiement au prestataire ?')) return;
+                              await listingsApi.completeMission(m._id);
+                              setChatMission(null);
+                              setDisputeMissionId(null);
+                              await refreshUser();
+                              await loadDashboard();
+                            }}
+                          >
+                            Valider
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary text-xs py-1.5 border-amber-500/40 text-amber-200"
+                            onClick={() => setDisputeMissionId(m._id)}
+                          >
+                            Ne pas valider
+                          </button>
+                        </>
                       )}
                     </div>
+                    {isClient && disputeMissionId === m._id && !isDisputed && (
+                      <MissionDisputeForm
+                        missionId={m._id}
+                        onCancel={() => setDisputeMissionId(null)}
+                        onDone={async () => {
+                          setDisputeMissionId(null);
+                          setChatMission(null);
+                          await loadDashboard();
+                        }}
+                      />
+                    )}
                   </li>
                   );
                 })}
