@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getFirebaseAuth } from '@/lib/firebase/client';
-import { sendVerificationEmail } from '@/lib/firebase/email-verification';
+import { sendVerificationCode } from '@/lib/client/verification';
 import { useAuth } from '@/context/AuthContext';
 import { formatAuthError } from '@/lib/firebase/errors';
 
@@ -34,13 +34,12 @@ export default function CompleteProfile() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur');
 
-      const auth = getFirebaseAuth();
       const current = auth.currentUser;
       if (current && !current.emailVerified) {
         try {
-          await sendVerificationEmail(current);
+          await sendVerificationCode();
         } catch {
-          /* l’utilisateur pourra renvoyer depuis /verify-email */
+          /* renvoi possible sur /verify-email */
         }
         router.push('/verify-email');
         return;

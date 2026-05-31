@@ -1,21 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import AuthLayout from '@/components/AuthLayout';
 import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client';
-import { sendVerificationEmail } from '@/lib/firebase/email-verification';
+import { sendVerificationCode, confirmVerificationCode } from '@/lib/client/verification';
 import { formatAuthError } from '@/lib/firebase/errors';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(false);
+  const [sending, setSending] = useState(false);
+  const autoSent = useRef(false);
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return;
@@ -28,43 +30,47 @@ export default function VerifyEmailPage() {
     setEmail(user.email || '');
     if (user.emailVerified) {
       router.replace('/dashboard');
+      return;
+    }
+    if (!autoSent.current) {
+      autoSent.current = true;
+      setSending(true);
+      sendVerificationCode()
+        .then(() => setMsg('Un code à 6 chiffres a été envoyé à votre adresse e-mail.'))
+        .catch((err) => setError(formatAuthError(err)))
+        .finally(() => setSending(false));
     }
   }, [router]);
 
   async function handleResend() {
     setError('');
     setMsg('');
+    setSending(true);
+    try {
+      await sendVerificationCode();
+      setMsg('Nouveau code envoyé. Vérifiez votre boîte mail (et les spams).');
+    } catch (err) {
+      setError(formatAuthError(err));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setMsg('');
     setLoading(true);
     try {
+      await confirmVerificationCode(code);
       const user = getFirebaseAuth().currentUser;
-      if (!user) throw new Error('Session expirée. Reconnectez-vous.');
-      await sendVerificationEmail(user);
-      setMsg('E-mail de vérification envoyé. Consultez votre boîte de réception (et les spams).');
+      if (user) await user.reload();
+      setMsg('Compte vérifié ! Redirection…');
+      router.replace('/dashboard');
     } catch (err) {
       setError(formatAuthError(err));
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleChecked() {
-    setError('');
-    setChecking(true);
-    try {
-      const auth = getFirebaseAuth();
-      const user = auth.currentUser;
-      if (!user) throw new Error('Session expirée. Reconnectez-vous.');
-      await user.reload();
-      if (auth.currentUser?.emailVerified) {
-        setMsg('E-mail vérifié ! Redirection…');
-        router.replace('/dashboard');
-      } else {
-        setError('Pas encore vérifié. Cliquez sur le lien dans l’e-mail, puis réessayez.');
-      }
-    } catch (err) {
-      setError(formatAuthError(err));
-    } finally {
-      setChecking(false);
     }
   }
 
@@ -76,33 +82,53 @@ export default function VerifyEmailPage() {
   return (
     <AuthLayout
       title="Vérifiez votre e-mail"
-      subtitle="Un lien de confirmation a été envoyé pour sécuriser votre compte MILOU"
+      subtitle="Entrez le code à 6 chiffres reçu par e-mail"
     >
-      <div className="space-y-4 text-sm text-zinc-400">
+      <div className="space-y-2 text-sm text-zinc-400">
         <p>
-          Nous avons envoyé un message à{' '}
-          <strong className="text-white">{email || 'votre adresse'}</strong>. Ouvrez-le et cliquez sur le
-          lien de vérification.
+          Code envoyé à <strong className="text-white">{email || 'votre adresse'}</strong>
+          {sending && <span className="text-indigo-400"> — envoi…</span>}
         </p>
-        <p className="text-xs text-zinc-500">
-          L’e-mail part de Firebase (noreply@…). Pensez à regarder les courriers indésirables.
-        </p>
+        <p className="text-xs text-zinc-500">Valable 15 minutes. Pensez aux courriers indésirables.</p>
       </div>
 
-      {msg && <p className="text-emerald-400 text-sm mt-4">{msg}</p>}
-      {error && <p className="text-red-400 text-sm mt-4 whitespace-pre-line">{error}</p>}
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <div>
+          <label className="label">Code de vérification</label>
+          <input
+            className="input text-center text-2xl tracking-[0.4em] font-mono"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="000000"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            required
+          />
+        </div>
 
-      <div className="flex flex-col gap-2 mt-6">
-        <button type="button" className="btn-primary w-full py-3" onClick={handleChecked} disabled={checking}>
-          {checking ? 'Vérification…' : 'J’ai cliqué sur le lien'}
+        {msg && <p className="text-emerald-400 text-sm">{msg}</p>}
+        {error && <p className="text-red-400 text-sm whitespace-pre-line">{error}</p>}
+
+        <button
+          type="submit"
+          className="btn-primary w-full py-3"
+          disabled={loading || code.length !== 6}
+        >
+          {loading ? 'Vérification…' : 'Valider le code'}
         </button>
-        <button type="button" className="btn-secondary w-full py-3" onClick={handleResend} disabled={loading}>
-          {loading ? 'Envoi…' : 'Renvoyer l’e-mail'}
+        <button
+          type="button"
+          className="btn-secondary w-full py-3"
+          onClick={handleResend}
+          disabled={sending}
+        >
+          {sending ? 'Envoi…' : 'Renvoyer le code'}
         </button>
-        <button type="button" className="text-zinc-500 text-sm hover:text-zinc-300 mt-2" onClick={handleLogout}>
+        <button type="button" className="text-zinc-500 text-sm hover:text-zinc-300 w-full" onClick={handleLogout}>
           Utiliser un autre compte
         </button>
-      </div>
+      </form>
 
       <p className="mt-6 text-sm text-zinc-500 text-center">
         <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-medium">
