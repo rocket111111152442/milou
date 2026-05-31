@@ -54,6 +54,27 @@ export async function uploadChatAttachments(
   return results;
 }
 
+export async function uploadListingImage(
+  listingId: string,
+  file: { buffer: Buffer; name: string; mimeType: string }
+): Promise<string> {
+  const bucket = getAdminBucket();
+  const safeName = sanitizeFileName(file.name);
+  const storagePath = `listings/${listingId}/${randomUUID()}_${safeName}`;
+  const token = randomUUID();
+  const ref = bucket.file(storagePath);
+
+  await ref.save(file.buffer, {
+    metadata: {
+      contentType: file.mimeType || 'image/jpeg',
+      metadata: { firebaseStorageDownloadTokens: token },
+    },
+  });
+
+  const encoded = encodeURIComponent(storagePath);
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encoded}?alt=media&token=${token}`;
+}
+
 export async function deleteChatAttachments(paths: string[]) {
   const bucket = getAdminBucket();
   await Promise.all(

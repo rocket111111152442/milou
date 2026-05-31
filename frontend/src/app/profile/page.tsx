@@ -9,13 +9,16 @@ import PremiumBadge from '@/components/PremiumBadge';
 import AdminBadge from '@/components/AdminBadge';
 import OnlineStatus from '@/components/OnlineStatus';
 import { useAuth } from '@/context/AuthContext';
+import ProfileEditor from '@/components/ProfileEditor';
+import ProfileBadges from '@/components/ProfileBadges';
+import { getUserBadges } from '@/lib/user-trust';
 import { reviewsApi, userApi } from '@/lib/api';
 import ReportReviewButton from '@/components/ReportReviewButton';
 import { Listing, Review } from '@/lib/types';
 import { IconArrowRight, IconStar } from '@/components/ui/Icons';
 
 export default function ProfilePage() {
-  const { user, loading } = useAuth();
+  const { user, loading, setUser } = useAuth();
   const [listings, setListings] = useState<Listing[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
 
@@ -57,6 +60,8 @@ export default function ProfilePage() {
         }
       >
         <div className="space-y-6 animate-fade-up">
+          <ProfileBadges badges={getUserBadges(user)} />
+          <ProfileEditor user={user} onSaved={(u) => setUser(u)} />
           <BalanceCard balance={user.balance} />
 
           {!user.isPremium && (

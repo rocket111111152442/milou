@@ -6,8 +6,10 @@ import Navbar from '@/components/Navbar';
 import AppShell from '@/components/AppShell';
 import MarketplaceSidebar from '@/components/MarketplaceSidebar';
 import ListingCard from '@/components/ListingCard';
+import AcceptListingModal from '@/components/AcceptListingModal';
 import { useAuth } from '@/context/AuthContext';
 import { listingsApi } from '@/lib/api';
+import { normalizePostalCode } from '@/lib/postal-code';
 import { Listing } from '@/lib/types';
 import { getListingOwnerId } from '@/lib/listing-utils';
 
@@ -24,12 +26,21 @@ export default function MarketplacePage() {
   const [mineOnly, setMineOnly] = useState(false);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [nearMe, setNearMe] = useState(false);
+  const [postalFilter, setPostalFilter] = useState('');
+  const [acceptTarget, setAcceptTarget] = useState<{ id: string; title: string } | null>(null);
 
   const load = () => {
     const params = new URLSearchParams();
     if (category && category !== 'Tous') params.set('category', category);
     if (typeFilter) params.set('type', typeFilter);
     if (search.trim()) params.set('q', search.trim());
+    if (nearMe && user?.postalCode) {
+      params.set('nearMe', '1');
+      params.set('viewerPostal', normalizePostalCode(user.postalCode));
+    }
+    const pc = normalizePostalCode(postalFilter);
+    if (pc) params.set('postalCode', pc);
     listingsApi
       .list(params.toString())
       .then((r) => setListings(r.listings))
@@ -42,7 +53,7 @@ export default function MarketplacePage() {
 
   useEffect(() => {
     load();
-  }, [category, typeFilter, search]);
+  }, [category, typeFilter, search, nearMe, postalFilter, user?.postalCode]);
 
   const filtered = useMemo(() => {
     let list = [...listings];
@@ -83,15 +94,34 @@ export default function MarketplacePage() {
     [listings]
   );
 
-  async function handleAccept(id: string) {
+  function promptAccept(id: string, title: string) {
+    setAcceptTarget({ id, title });
+  }
+
+  async function handleAccept(id: string, message: string) {
     if (!user) return;
     setMsg('');
     try {
-      await listingsApi.accept(id);
+      await listingsApi.accept(id, message || undefined);
       setMsgType('success');
       setMsg('Mission démarrée ! Les Milou sont en escrow.');
       await refreshUser();
       load();
+    } catch (err) {
+      setMsgType('error');
+      setMsg(err instanceof Error ? err.message : 'Erreur');
+      throw err;
+    }
+  }
+
+  async function handleDuplicate(id: string) {
+    setMsg('');
+    try {
+      const { id: newId } = await listingsApi.duplicate(id);
+      setMsgType('success');
+      setMsg('Brouillon créé — complétez-le depuis « Mes annonces ».');
+      load();
+      return newId;
     } catch (err) {
       setMsgType('error');
       setMsg(err instanceof Error ? err.message : 'Erreur');
@@ -126,10 +156,15 @@ export default function MarketplacePage() {
       onMaxPrice={setMaxPrice}
       mineOnly={mineOnly}
       onMineOnly={setMineOnly}
+      nearMe={nearMe}
+      onNearMe={setNearMe}
+      postalFilter={postalFilter}
+      onPostalFilter={setPostalFilter}
       view={view}
       onView={setView}
       stats={stats}
       loggedIn={!!user}
+      hasPostal={!!user?.postalCode}
     />
   );
 
@@ -213,8 +248,9 @@ export default function MarketplacePage() {
                   key={l._id}
                   listing={l}
                   showActions={!!user}
-                  onAccept={user ? handleAccept : undefined}
+                  onAccept={user ? (id) => promptAccept(id, l.title) : undefined}
                   onDelete={user ? handleDelete : undefined}
+                  onDuplicate={user ? handleDuplicate : undefined}
                   currentUserId={user?.id}
                   compact={view === 'list'}
                   deleting={deletingId === l._id}
@@ -241,6 +277,15 @@ export default function MarketplacePage() {
             )}
         </div>
       </AppShell>
+
+      <AcceptListingModal
+        open={!!acceptTarget}
+        listingTitle={acceptTarget?.title || ''}
+        onClose={() => setAcceptTarget(null)}
+        onConfirm={async (message) => {
+          if (acceptTarget) await handleAccept(acceptTarget.id, message);
+        }}
+      />
     </>
   );
 }

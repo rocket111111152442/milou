@@ -8,7 +8,9 @@ import BalanceCard from '@/components/BalanceCard';
 import TransactionList from '@/components/TransactionList';
 import CompleteProfile from '@/components/CompleteProfile';
 import { useAuth } from '@/context/AuthContext';
+import MissionStepsBar from '@/components/MissionStepsBar';
 import { adminApi, listingsApi, userApi } from '@/lib/api';
+import { UserStats } from '@/lib/types';
 import MissionChat from '@/components/MissionChat';
 import UnreadBadge from '@/components/UnreadBadge';
 import UsageLimitsCard from '@/components/UsageLimitsCard';
@@ -34,6 +36,8 @@ export default function DashboardPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [listMsg, setListMsg] = useState('');
   const [disputeMissionId, setDisputeMissionId] = useState<string | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [tab, setTab] = useState<'active' | 'todo' | 'archives'>('active');
 
   function getOtherPartyName(m: Mission): string {
     const isClient = m.clientUid === user?.id || m.clientId?.email === user?.email;
@@ -83,6 +87,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return;
     loadDashboard().catch(console.error);
+    userApi.stats().then((s) => setStats(s.stats)).catch(() => {});
     const interval = setInterval(() => loadDashboard().catch(console.error), 15000);
     return () => clearInterval(interval);
   }, [user]);
@@ -118,6 +123,9 @@ export default function DashboardPage() {
   }
 
   const openListings = listings.filter((l) => l.status === 'open').length;
+  const draftListings = listings.filter((l) => l.status === 'draft');
+  const archivedListings = listings.filter((l) => ['expired', 'closed', 'completed'].includes(l.status));
+  const todoListings = [...draftListings, ...listings.filter((l) => l.status === 'open')];
 
   return (
     <>
@@ -195,6 +203,60 @@ export default function DashboardPage() {
           <UsageLimitsCard isPremium={user.isPremium} />
         </div>
 
+        {stats && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+            {[
+              { label: 'M ce mois (gagnés)', value: stats.milouEarnedThisMonth.toFixed(1) },
+              { label: 'M ce mois (dépensés)', value: stats.milouSpentThisMonth.toFixed(1) },
+              { label: 'Missions terminées', value: stats.completedMissions },
+              { label: 'Annonces ouvertes', value: stats.openListings },
+            ].map((s) => (
+              <div key={s.label} className="card py-3 text-center">
+                <p className="text-xl font-bold text-white tabular-nums">{s.value}</p>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mt-1">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2 mb-6">
+          {(['active', 'todo', 'archives'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={tab === t ? 'chip-active px-4 py-2 rounded-xl text-sm' : 'chip px-4 py-2 rounded-xl text-sm'}
+              onClick={() => setTab(t)}
+            >
+              {t === 'active' ? 'Missions' : t === 'todo' ? 'À faire' : 'Archives'}
+            </button>
+          ))}
+          <Link href="/transactions" className="chip px-4 py-2 rounded-xl text-sm ml-auto">
+            Historique complet →
+          </Link>
+        </div>
+
+        {tab !== 'active' && (
+          <section className="card mb-8">
+            <h2 className="text-lg font-semibold text-white mb-4">
+              {tab === 'todo' ? 'Brouillons et annonces' : 'Annonces archivées'}
+            </h2>
+            <ul className="space-y-2">
+              {(tab === 'todo' ? todoListings : archivedListings).map((l) => (
+                <MyListingRow
+                  key={l._id}
+                  listing={l}
+                  onDelete={handleDeleteListing}
+                  deleting={deletingId === l._id}
+                />
+              ))}
+            </ul>
+            {(tab === 'todo' ? todoListings : archivedListings).length === 0 && (
+              <p className="text-zinc-500 text-sm">Rien ici pour le moment.</p>
+            )}
+          </section>
+        )}
+
+        {tab === 'active' && (
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
           <section className="card">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
@@ -212,8 +274,14 @@ export default function DashboardPage() {
               <ul className="space-y-3">
                 {missions.map((m) => {
                   const overdue = m.dueAt && new Date(m.dueAt).getTime() < Date.now();
-                  const isProvider = m.providerId?.email === user.email;
-                  const isClient = m.clientId?.email === user.email;
+                  const isProvider =
+                    m.providerUid === user.id ||
+                    m.providerId === user.id ||
+                    m.providerId?.email === user.email;
+                  const isClient =
+                    m.clientUid === user.id ||
+                    m.clientId === user.id ||
+                    m.clientId?.email === user.email;
                   const isDisputed = m.status === 'disputed';
                   return (
                   <li
@@ -289,6 +357,13 @@ export default function DashboardPage() {
                         }}
                       />
                     )}
+                    <MissionStepsBar
+                      missionId={m._id}
+                      steps={m.steps}
+                      isClient={!!isClient}
+                      isProvider={!!isProvider}
+                      onUpdate={() => loadDashboard()}
+                    />
                   </li>
                   );
                 })}
@@ -323,8 +398,9 @@ export default function DashboardPage() {
             </p>
           </section>
         </div>
+        )}
 
-        {completedMissions.length > 0 && (
+        {tab === 'active' && completedMissions.length > 0 && (
           <section className="card mb-8">
             <h2 className="text-lg font-semibold mb-4 text-white">Missions terminées — avis</h2>
             <ul className="space-y-4">
@@ -336,7 +412,7 @@ export default function DashboardPage() {
                       Clôturée automatiquement — délai non respecté
                     </p>
                   )}
-                  {m.clientId?.email === user.email && m.completedReason !== 'deadline_missed' && (
+                  {m.completedReason !== 'deadline_missed' && (
                     <MissionReviewForm missionId={m._id} onDone={() => loadDashboard()} />
                   )}
                 </li>
@@ -345,10 +421,15 @@ export default function DashboardPage() {
           </section>
         )}
 
+        {tab === 'active' && (
         <section className="card">
-          <h2 className="text-lg font-semibold mb-4 text-white">Historique des transactions</h2>
-          <TransactionList transactions={transactions} />
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-white">Dernières transactions</h2>
+            <Link href="/transactions" className="text-sm text-indigo-400">Tout voir</Link>
+          </div>
+          <TransactionList transactions={transactions.slice(0, 8)} />
         </section>
+        )}
       </AppShell>
 
       {chatMission && user && (

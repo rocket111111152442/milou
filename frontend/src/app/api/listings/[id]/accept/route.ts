@@ -7,10 +7,13 @@ import { createNotification } from '@/lib/notifications';
 import { assertCanAcceptMission } from '@/lib/premium/usage';
 import { syncPremiumStatus } from '@/lib/premium/sync';
 import { computeDueAt } from '@/lib/mission-deadline';
+import { buildDefaultMissionSteps } from '@/lib/mission-steps';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { uid } = await verifyRequest(req);
+    const body = await req.json().catch(() => ({}));
+    const introMessage = String(body.message || '').trim().slice(0, 500);
     const db = getAdminDb();
     const userData = await syncPremiumStatus(db, uid);
     await assertCanAcceptMission(db, uid, userData);
@@ -61,6 +64,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       escrowHeld: true,
       estimatedDelay,
       dueAt: Timestamp.fromDate(dueAt),
+      steps: buildDefaultMissionSteps(),
+      clientReviewed: false,
+      providerReviewed: false,
       createdAt: FieldValue.serverTimestamp(),
     });
 
@@ -70,6 +76,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       text: `Mission démarrée. Date limite : ${dueAt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} (${estimatedDelay}). Le client doit valider la mission une fois le travail terminé.`,
       createdAt: FieldValue.serverTimestamp(),
     });
+
+    if (introMessage) {
+      const accepterSnap = await db.collection('users').doc(uid).get();
+      const accepter = accepterSnap.data();
+      await missionRef.collection('messages').add({
+        senderId: uid,
+        senderName: accepter
+          ? `${accepter.firstname || ''} ${accepter.lastname || ''}`.trim()
+          : 'Membre',
+        text: introMessage,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
 
     await listingRef.update({ status: 'in_progress' });
 

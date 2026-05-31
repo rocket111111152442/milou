@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { Listing } from '@/lib/types';
 import PremiumBadge from '@/components/PremiumBadge';
 import AdminBadge from '@/components/AdminBadge';
+import ReportListingButton from '@/components/ReportListingButton';
 import { getListingOwnerId, LISTING_STATUS_LABELS } from '@/lib/listing-utils';
 import { SERVICE_CATEGORIES } from '@/lib/premium/config';
 
@@ -10,6 +12,7 @@ interface Props {
   listing: Listing;
   onAccept?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onDuplicate?: (id: string) => void;
   showActions?: boolean;
   currentUserId?: string;
   compact?: boolean;
@@ -22,6 +25,7 @@ export default function ListingCard({
   listing,
   onAccept,
   onDelete,
+  onDuplicate,
   showActions,
   currentUserId,
   compact,
@@ -73,6 +77,12 @@ export default function ListingCard({
         <span className={`badge border ${st.className}`}>{st.label}</span>
       </div>
 
+      {listing.images && listing.images.length > 0 && (
+        <div className={`mb-3 rounded-xl overflow-hidden border border-white/[0.06] ${compact ? 'h-24' : 'h-36'}`}>
+          <img src={listing.images[0]} alt="" className="w-full h-full object-cover" />
+        </div>
+      )}
+
       <h3 className="text-base font-semibold text-white mb-2 leading-snug group-hover:text-indigo-200 transition">
         {listing.title}
       </h3>
@@ -101,11 +111,14 @@ export default function ListingCard({
           )}
           {author && (
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className="text-xs text-zinc-500">
+              <Link
+                href={`/profile/${ownerId}`}
+                className="text-xs text-zinc-500 hover:text-indigo-300"
+              >
                 {author.firstname} {author.lastname}
                 {author.reputation != null && ` · ${author.reputation} rep.`}
                 {author.averageRating ? ` · ${author.averageRating}/5` : ''}
-              </span>
+              </Link>
               {author.role === 'admin' && <AdminBadge />}
               {author.isPremium && <PremiumBadge />}
             </div>
@@ -130,9 +143,19 @@ export default function ListingCard({
               {deleting ? 'Suppression…' : 'Supprimer'}
             </button>
           )}
-          {isOwner && listing.status !== 'open' && (
+          {isOwner && onDuplicate && (
+            <button
+              type="button"
+              className="btn-secondary text-sm"
+              onClick={() => onDuplicate(listing._id)}
+            >
+              Dupliquer
+            </button>
+          )}
+          {isOwner && listing.status !== 'open' && !onDuplicate && (
             <span className="text-xs text-zinc-600 text-center">Votre annonce</span>
           )}
+          {!isOwner && showActions && <ReportListingButton listingId={listing._id} />}
         </div>
       </div>
     </article>

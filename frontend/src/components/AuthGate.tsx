@@ -13,6 +13,9 @@ const PUBLIC_PATHS = [
   '/premium',
   '/premium/success',
   '/marketplace',
+  '/rules',
+  '/how-it-works',
+  '/faq',
 ];
 
 export default function AuthGate({ children }: { children: ReactNode }) {

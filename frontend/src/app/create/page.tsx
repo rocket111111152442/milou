@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/context/AuthContext';
+import ListingImageUpload from '@/components/ListingImageUpload';
 import { listingsApi, premiumApi } from '@/lib/api';
 import { SERVICE_CATEGORIES, PREMIUM_FEATURES } from '@/lib/premium/config';
 
@@ -42,6 +43,7 @@ export default function CreateListingPage() {
     postalCode: '',
   });
   const [delay, setDelay] = useState({ days: 3, hours: 0, minutes: 0 });
+  const [images, setImages] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -60,12 +62,11 @@ export default function CreateListingPage() {
     return <div className="min-h-screen flex items-center justify-center text-cyan-400">Chargement...</div>;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitListing(publish: boolean) {
     if (!user) return;
     setError('');
     try {
-      await listingsApi.create({
+      const res = await listingsApi.create({
         title: form.title,
         description: form.description,
         category: form.category,
@@ -76,11 +77,18 @@ export default function CreateListingPage() {
         missionType: form.missionType,
         isInPerson: form.isInPerson,
         postalCode: form.isInPerson ? form.postalCode.trim() : undefined,
+        images,
+        publish,
       });
-      router.push('/marketplace');
+      router.push(res.draft ? '/dashboard' : '/marketplace');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur');
     }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await submitListing(true);
   }
 
   const previewCategory = SERVICE_CATEGORIES.find((c) => c.id === form.category);
@@ -291,6 +299,7 @@ export default function CreateListingPage() {
                 </div>
               )}
             </div>
+            <ListingImageUpload images={images} onChange={setImages} />
             <div>
               <label className="label">Tags (virgules)</label>
               <input
@@ -307,17 +316,26 @@ export default function CreateListingPage() {
                 {form.price} M).
               </p>
             )}
-            <button
-              type="submit"
-              className="btn-primary w-full py-3"
-              disabled={!hasEnoughBalance || (form.isInPerson && !form.postalCode.trim())}
-            >
-              {!hasEnoughBalance && needsBalance
-                ? 'Solde insuffisant'
-                : form.isInPerson && !form.postalCode.trim()
-                  ? 'Code postal requis'
-                  : 'Publier sur le marketplace'}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                className="btn-secondary flex-1 py-3"
+                onClick={() => submitListing(false)}
+              >
+                Enregistrer en brouillon
+              </button>
+              <button
+                type="submit"
+                className="btn-primary flex-1 py-3"
+                disabled={!hasEnoughBalance || (form.isInPerson && !form.postalCode.trim())}
+              >
+                {!hasEnoughBalance && needsBalance
+                  ? 'Solde insuffisant'
+                  : form.isInPerson && !form.postalCode.trim()
+                    ? 'Code postal requis'
+                    : 'Publier'}
+              </button>
+            </div>
           </form>
 
           <div className="lg:col-span-2 space-y-4">

@@ -187,6 +187,9 @@ export function userToJson(id: string, data: Record<string, unknown>) {
     isOnline: Boolean(data.isOnline),
     reviewCount: Number(data.reviewCount ?? 0),
     averageRating: Number(data.averageRating ?? 0),
+    bio: String(data.bio ?? ''),
+    skills: Array.isArray(data.skills) ? data.skills.map(String).slice(0, 12) : [],
+    avatarUrl: String(data.avatarUrl ?? ''),
     createdAt: tsToIso(data.createdAt),
     suspendedAt: data.suspendedAt ? tsToIso(data.suspendedAt) : null,
   };

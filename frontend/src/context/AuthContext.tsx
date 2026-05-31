@@ -26,7 +26,16 @@ const PUBLIC_PATHS = [
   '/premium',
   '/premium/success',
   '/marketplace',
+  '/rules',
+  '/how-it-works',
+  '/faq',
 ];
+
+function isPublicPath(pathname: string) {
+  if (PUBLIC_PATHS.includes(pathname)) return true;
+  if (pathname.startsWith('/profile/')) return true;
+  return false;
+}
 
 async function loadUserProfile(_uid: string, idToken: string): Promise<User | null> {
   const res = await fetch('/api/auth/me', {
@@ -104,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setNeedsProfile(false);
           setNeedsPostalCode(false);
           setLoading(false);
-          if (!PUBLIC_PATHS.includes(pathname)) router.push('/login');
+          if (!isPublicPath(pathname)) router.push('/login');
           return;
         }
 

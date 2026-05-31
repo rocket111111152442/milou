@@ -14,10 +14,15 @@ interface Props {
   onMaxPrice: (p: string) => void;
   mineOnly: boolean;
   onMineOnly: (v: boolean) => void;
+  nearMe?: boolean;
+  onNearMe?: (v: boolean) => void;
+  postalFilter?: string;
+  onPostalFilter?: (v: string) => void;
   view: 'grid' | 'list';
   onView: (v: 'grid' | 'list') => void;
   stats: { total: number; offers: number; requests: number; featured: number };
   loggedIn: boolean;
+  hasPostal?: boolean;
 }
 
 export default function MarketplaceSidebar({
@@ -31,10 +36,15 @@ export default function MarketplaceSidebar({
   onMaxPrice,
   mineOnly,
   onMineOnly,
+  nearMe,
+  onNearMe,
+  postalFilter,
+  onPostalFilter,
   view,
   onView,
   stats,
   loggedIn,
+  hasPostal,
 }: Props) {
   return (
     <div className="space-y-4 text-sm">
@@ -122,6 +132,32 @@ export default function MarketplaceSidebar({
           <input type="checkbox" checked={mineOnly} onChange={(e) => onMineOnly(e.target.checked)} className="accent-indigo-500" />
           <span>Mes annonces seulement</span>
         </label>
+      )}
+
+      {loggedIn && onNearMe && (
+        <label className="flex items-center gap-2 px-3 py-2 rounded-xl chip cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!nearMe}
+            onChange={(e) => onNearMe(e.target.checked)}
+            disabled={!hasPostal}
+            className="accent-indigo-500"
+          />
+          <span>Près de chez moi{!hasPostal ? ' (code postal requis)' : ''}</span>
+        </label>
+      )}
+
+      {onPostalFilter && (
+        <div>
+          <p className="sidebar-section-title">Code postal</p>
+          <input
+            className="input text-sm"
+            placeholder="Ex : 75001"
+            value={postalFilter || ''}
+            onChange={(e) => onPostalFilter(e.target.value)}
+            inputMode="numeric"
+          />
+        </div>
       )}
 
       <div>

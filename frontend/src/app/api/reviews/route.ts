@@ -79,12 +79,18 @@ export async function POST(req: NextRequest) {
       reputation: FieldValue.increment(1),
     });
 
+    const reviewFlag =
+      mission.clientId === uid
+        ? { clientReviewed: true }
+        : { providerReviewed: true };
+    await missionRef.update(reviewFlag);
+
     await createNotification(db, {
       userId: actualTo,
       type: 'review_received',
       title: 'Nouvel avis reçu',
       body: `Note ${r}/5 sur votre mission`,
-      link: '/profile',
+      link: `/profile/${actualTo}`,
     });
 
     return NextResponse.json({ message: 'Avis enregistré' });

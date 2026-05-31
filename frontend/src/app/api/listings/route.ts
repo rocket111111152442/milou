@@ -9,6 +9,8 @@ import { jsonNoStore } from '@/lib/http';
 import { isListingPublic, isListingVisible } from '@/lib/listings';
 import { normalizePostalCode } from '@/lib/postal-code';
 import { notifyUsersOnNewListing } from '@/lib/listing-notifications';
+import { expireOldOpenListings } from '@/lib/listing-expiry';
+import { normalizePostalCode } from '@/lib/postal-code';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -21,8 +23,14 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get('category');
     const typeFilter = searchParams.get('type');
     const q = searchParams.get('q')?.toLowerCase();
+    const nearMe = searchParams.get('nearMe') === '1';
+    const postalFilter = normalizePostalCode(searchParams.get('postalCode') || '');
+    const viewerPostal = normalizePostalCode(searchParams.get('viewerPostal') || '');
 
-    const snap = await getAdminDb().collection('listings').limit(150).get();
+    const db = getAdminDb();
+    await expireOldOpenListings(db).catch(() => {});
+
+    const snap = await db.collection('listings').limit(150).get();
     const listings: Array<Record<string, unknown> & { _sort: number }> = [];
 
     for (const d of snap.docs) {
@@ -66,6 +74,12 @@ export async function GET(req: NextRequest) {
       const desc = String(data.description || '').toLowerCase();
       if (q && !title.includes(q) && !desc.includes(q)) continue;
 
+      const listingPostal = normalizePostalCode(data.postalCode);
+      if (postalFilter && listingPostal !== postalFilter) continue;
+      if (nearMe && viewerPostal) {
+        if (!listingPostal || listingPostal !== viewerPostal) continue;
+      }
+
       const featured = Boolean(data.featured) || authorPremium;
       const created = data.createdAt?.toDate?.()?.getTime?.() || 0;
       const sortScore = (featured ? 1000 : 0) + (authorPremium ? 500 : 0) + created / 1e10;
@@ -108,12 +122,15 @@ export async function POST(req: NextRequest) {
       missionType,
       isInPerson,
       postalCode,
+      images,
+      publish,
     } = body;
     const listingPrice = Number(price);
     const listingType = type === 'request' ? 'request' : 'offer';
     const inPerson = Boolean(isInPerson);
     const normalizedPostal = inPerson ? normalizePostalCode(postalCode) : '';
 
+    const asDraft = publish === false;
     if (!title || !description || !category || !listingPrice || !type) {
       return NextResponse.json({ error: 'Données invalides' }, { status: 400 });
     }
@@ -129,7 +146,7 @@ export async function POST(req: NextRequest) {
     await assertCanCreateListing(db, uid, userData);
 
     const balance = Number(userData.balance || 0);
-    if (listingType === 'request' && listingPrice > balance) {
+    if (!asDraft && listingType === 'request' && listingPrice > balance) {
       return NextResponse.json(
         { error: `Solde insuffisant : il vous faut ${listingPrice} M pour publier cette demande (vous paierez le prestataire).` },
         { status: 400 }
@@ -137,6 +154,9 @@ export async function POST(req: NextRequest) {
     }
 
     const premium = isPremiumActive(userData);
+    const imageUrls = Array.isArray(images)
+      ? images.map(String).filter(Boolean).slice(0, 5)
+      : [];
 
     const listingData = {
       userId: uid,
@@ -151,11 +171,16 @@ export async function POST(req: NextRequest) {
       isInPerson: inPerson,
       postalCode: normalizedPostal || null,
       featured: premium,
-      status: 'open',
+      images: imageUrls,
+      status: asDraft ? 'draft' : 'open',
       createdAt: FieldValue.serverTimestamp(),
     };
 
     const ref = await db.collection('listings').add(listingData);
+
+    if (asDraft) {
+      return NextResponse.json({ id: ref.id, featured: premium, draft: true });
+    }
 
     const notifyResult = await notifyUsersOnNewListing(db, {
       listingId: ref.id,

@@ -20,9 +20,16 @@ const SIDE_LINKS = [
   { href: '/marketplace', label: 'Marketplace', icon: IconStore },
   { href: '/create', label: 'Nouvelle annonce', icon: IconPlus },
   { href: '/transfer', label: 'Envoyer des M', icon: IconSend },
+  { href: '/transactions', label: 'Historique M', icon: IconSend },
   { href: '/codes', label: 'Codes cadeaux', icon: IconGift },
   { href: '/premium', label: 'Premium', icon: IconStar, hideIfPremium: true },
   { href: '/profile', label: 'Mon profil', icon: IconUser },
+];
+
+const INFO_LINKS = [
+  { href: '/how-it-works', label: 'Comment ça marche' },
+  { href: '/rules', label: 'Règles' },
+  { href: '/faq', label: 'FAQ' },
 ];
 
 interface Props {
@@ -65,6 +72,22 @@ export default function AppShell({ children, sidebarExtra, title, subtitle, head
             </Link>
           )}
         </nav>
+
+        <div className="space-y-0.5">
+          <p className="sidebar-section-title px-3">Transparence</p>
+          {INFO_LINKS.map((l) => {
+            const active = pathname === l.href;
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`sidebar-link text-sm ${active ? 'sidebar-link-active' : ''}`}
+              >
+                {l.label}
+              </Link>
+            );
+          })}
+        </div>
 
         {sidebarExtra}
 

@@ -6,6 +6,10 @@ service firebase.storage {
       allow read: if request.auth != null;
       allow write: if false;
     }
+    match /listings/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -37,6 +37,10 @@ async function mapMissionDoc(
     unreadCount,
     clientUid: data.clientId,
     providerUid: data.providerId,
+    steps: data.steps || [],
+    deliveredAt: data.deliveredAt?.toDate?.()?.toISOString?.() || null,
+    clientReviewed: Boolean(data.clientReviewed),
+    providerReviewed: Boolean(data.providerReviewed),
     listingId: listingSnap.exists
       ? { _id: listingSnap.id, title: listingSnap.data()?.title, ...listingSnap.data() }
       : null,

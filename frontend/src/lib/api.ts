@@ -58,9 +58,40 @@ export const listingsApi = {
     });
   },
   create: (body: object) =>
-    api<{ id: string }>('/api/listings', { method: 'POST', body: JSON.stringify(body) }),
-  accept: (id: string) =>
-    api<{ missionId: string }>(`/api/listings/${id}/accept`, { method: 'POST' }),
+    api<{ id: string; draft?: boolean }>('/api/listings', { method: 'POST', body: JSON.stringify(body) }),
+  uploadImage: async (file: File, listingId?: string) => {
+    const user = getFirebaseAuth().currentUser;
+    if (!user) throw new Error('Non connecté');
+    const token = await user.getIdToken();
+    const form = new FormData();
+    form.append('file', file);
+    if (listingId) form.append('listingId', listingId);
+    const res = await fetch('/api/listings/upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Upload impossible');
+    return data as { url: string };
+  },
+  duplicate: (id: string) =>
+    api<{ id: string }>(`/api/listings/${id}/duplicate`, { method: 'POST', body: '{}' }),
+  report: (id: string, body: { reason: string; details?: string }) =>
+    api<{ message: string }>(`/api/listings/${id}/report`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  accept: (id: string, message?: string) =>
+    api<{ missionId: string }>(`/api/listings/${id}/accept`, {
+      method: 'POST',
+      body: JSON.stringify(message ? { message } : {}),
+    }),
+  updateMissionStep: (missionId: string, stepId: string, done: boolean) =>
+    api<{ steps: import('./types').Mission['steps'] }>(
+      `/api/listings/missions/${missionId}/steps`,
+      { method: 'PATCH', body: JSON.stringify({ stepId, done }) }
+    ),
   completeMission: (id: string) =>
     api<{ message: string }>(`/api/listings/missions/${id}/complete`, { method: 'POST' }),
   disputeMission: (id: string, reason: string) =>
@@ -80,6 +111,27 @@ export const userApi = {
       missions: import('./types').Mission[];
       completedMissions?: import('./types').Mission[];
     }>(`/api/user/dashboard?_=${Date.now()}`),
+  stats: () => api<{ stats: import('./types').UserStats }>('/api/user/stats'),
+  transactions: () => api<{ transactions: import('./types').Transaction[] }>('/api/user/transactions'),
+};
+
+export const profileApi = {
+  public: (userId: string) =>
+    fetch(`/api/users/${userId}`, { cache: 'no-store' }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur');
+      return data as {
+        user: import('./types').PublicUserProfile & {
+          badges?: { id: string; label: string; className: string }[];
+        };
+        listings: Pick<
+          import('./types').Listing,
+          '_id' | 'title' | 'price' | 'type' | 'category' | 'images' | 'status' | 'createdAt'
+        >[];
+      };
+    }),
+  update: (body: { bio?: string; skills?: string[]; avatarUrl?: string }) =>
+    api<{ user: User }>('/api/users/profile', { method: 'PATCH', body: JSON.stringify(body) }),
 };
 
 export const chatApi = {
@@ -148,6 +200,7 @@ export const presenceApi = {
 export const reviewsApi = {
   create: (body: { missionId: string; rating: number; comment?: string }) =>
     api<{ message: string }>('/api/reviews', { method: 'POST', body: JSON.stringify(body) }),
+  pending: () => api<{ pending: import('./types').PendingReviewMission[] }>('/api/reviews/pending'),
   forUser: (userId: string) =>
     api<{ reviews: import('./types').Review[] }>(`/api/reviews?userId=${userId}`),
   report: (reviewId: string, body: { reason: string; details: string }) =>

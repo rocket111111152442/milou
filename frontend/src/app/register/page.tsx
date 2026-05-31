@@ -13,11 +13,16 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (!acceptedTerms) {
+      setError('Vous devez accepter les règles et conditions d\'utilisation MILOU.');
+      return;
+    }
     if (!isFirebaseConfigured()) {
       setError(getFirebaseConfigError());
       return;
@@ -104,9 +109,25 @@ export default function RegisterPage() {
           <label className="label">Mot de passe (min. 6 caractères)</label>
           <input className="input" type="password" minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required autoComplete="new-password" />
         </div>
+        <label className="flex items-start gap-2 text-sm text-zinc-400 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            className="mt-1 accent-indigo-500"
+            required
+          />
+          <span>
+            J&apos;accepte les{' '}
+            <Link href="/rules" className="text-indigo-400 hover:text-indigo-300" target="_blank">
+              règles de la communauté
+            </Link>{' '}
+            et les conditions d&apos;utilisation de MILOU (monnaie fictive, pas d&apos;argent réel).
+          </span>
+        </label>
         {error && <p className="text-red-400 text-sm whitespace-pre-line">{error}</p>}
         {status && !error && <p className="text-indigo-400 text-sm">{status}</p>}
-        <button type="submit" className="btn-primary w-full py-3" disabled={loading}>
+        <button type="submit" className="btn-primary w-full py-3" disabled={loading || !acceptedTerms}>
           {loading ? status || 'Création…' : 'Créer mon compte'}
         </button>
       </form>

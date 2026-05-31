@@ -9,3 +9,7 @@ export function isListingPublic(status: unknown): boolean {
   const s = String(status || '');
   return s === 'open' || s === 'in_progress';
 }
+
+export function isListingDraft(status: unknown): boolean {
+  return String(status || '') === 'draft';
+}

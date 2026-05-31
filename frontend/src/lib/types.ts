@@ -22,8 +22,32 @@ export interface User {
   isOnline?: boolean;
   reviewCount?: number;
   averageRating?: number;
+  bio?: string;
+  skills?: string[];
+  avatarUrl?: string;
+  reliabilityScore?: number;
+  badges?: { id: string; label: string; className: string }[];
   createdAt: string;
   suspendedAt?: string | null;
+}
+
+export interface PublicUserProfile {
+  id: string;
+  firstname: string;
+  lastname: string;
+  postalCode?: string;
+  bio?: string;
+  skills?: string[];
+  avatarUrl?: string;
+  reputation: number;
+  reviewCount: number;
+  averageRating: number;
+  transactionCount: number;
+  isPremium?: boolean;
+  role?: UserRole;
+  reliabilityScore: number;
+  badges?: { id: string; label: string; className: string }[];
+  createdAt?: string;
 }
 
 export interface PremiumUsage {
@@ -188,6 +212,17 @@ export interface Listing {
   missionType?: string;
   featured?: boolean;
   status: string;
+  images?: string[];
+  createdAt: string;
+}
+
+export interface ListingReport {
+  _id: string;
+  listingId: string;
+  reporterId: string;
+  reason: string;
+  details: string;
+  status: string;
   createdAt: string;
 }
 
@@ -205,8 +240,33 @@ export interface Mission {
   completedReason?: string | null;
   disputeReason?: string | null;
   disputedAt?: string | null;
+  steps?: import('@/lib/mission-steps').MissionStep[];
+  deliveredAt?: string | null;
+  clientReviewed?: boolean;
+  providerReviewed?: boolean;
   unreadCount?: number;
   createdAt: string;
+}
+
+export interface UserStats {
+  balance: number;
+  totalEarned: number;
+  totalSpent: number;
+  openListings: number;
+  activeMissions: number;
+  completedMissions: number;
+  reviewsReceived: number;
+  averageRating: number;
+  milouEarnedThisMonth: number;
+  milouSpentThisMonth: number;
+}
+
+export interface PendingReviewMission {
+  missionId: string;
+  listingTitle: string;
+  toUserId: string;
+  toUserName: string;
+  role: 'client' | 'provider';
 }
 
 export interface ChatAttachment {
