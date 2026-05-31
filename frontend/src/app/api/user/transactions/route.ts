@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     }
 
     const transactions = await Promise.all(
-      [...map.values()]
+      Array.from(map.values())
         .sort(
           (a, b) =>
             new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime()
