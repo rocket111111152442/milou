@@ -10,6 +10,7 @@ export type NotificationType =
   | 'message'
   | 'premium_activated'
   | 'review_received'
+  | 'new_listing'
   | 'system';
 
 export async function createNotification(

@@ -49,6 +49,20 @@ export async function sendEmail({ to, subject, text }: EmailPayload): Promise<Se
       /* garder raw */
     }
     console.error(`[email] Resend error ${res.status} -> ${to}: ${detail}`);
+
+    if (
+      res.status === 403 &&
+      /only send testing emails to your own email/i.test(detail)
+    ) {
+      return {
+        ok: false,
+        reason:
+          'Resend est en mode test : les codes ne partent que vers l’e-mail du compte Resend. ' +
+          'Pour envoyer à tous les utilisateurs : resend.com/domains → ajoutez et vérifiez votre domaine, ' +
+          'puis sur Vercel mettez MILOU_EMAIL_FROM = MILOU <notifications@votredomaine.com> et Redeploy.',
+      };
+    }
+
     return {
       ok: false,
       reason: detail
