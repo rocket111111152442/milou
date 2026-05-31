@@ -15,9 +15,11 @@ export async function POST(req: NextRequest) {
     const toEmail = String(userSnap.data()?.email || email).toLowerCase();
 
     const result = await issueVerificationCode(db, uid, toEmail);
+
     return NextResponse.json({
-      message: 'Code envoyé par e-mail',
+      message: 'E-mail de vérification envoyé',
       expiresInMinutes: result.expiresInMinutes,
+      resendCodeDelivered: result.emailSent,
     });
   } catch (err) {
     return NextResponse.json(

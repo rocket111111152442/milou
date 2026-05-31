@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getFirebaseAuth } from '@/lib/firebase/client';
 import { sendVerificationCode } from '@/lib/client/verification';
+import { sendVerificationEmail } from '@/lib/firebase/email-verification';
 import { useAuth } from '@/context/AuthContext';
 import { formatAuthError } from '@/lib/firebase/errors';
 
@@ -38,6 +39,7 @@ export default function CompleteProfile() {
       if (current && !current.emailVerified) {
         try {
           await sendVerificationCode();
+          await sendVerificationEmail(current).catch(() => {});
         } catch {
           /* renvoi possible sur /verify-email */
         }

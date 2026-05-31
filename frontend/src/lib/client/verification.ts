@@ -17,7 +17,11 @@ async function authPost(path: string, body?: object) {
   return data;
 }
 
-export function sendVerificationCode() {
+export function sendVerificationCode(): Promise<{
+  message: string;
+  expiresInMinutes: number;
+  resendCodeDelivered?: boolean;
+}> {
   return authPost('/api/auth/verification/send');
 }
 

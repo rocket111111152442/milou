@@ -22,6 +22,14 @@ export async function issueVerificationCode(db: Firestore, uid: string, email: s
 
   const code = generateSixDigitCode();
 
+  await ref.set({
+    code,
+    email: email.toLowerCase(),
+    attempts: 0,
+    lastSentAt: FieldValue.serverTimestamp(),
+    expiresAt: Timestamp.fromDate(new Date(Date.now() + CODE_TTL_MS)),
+  });
+
   const sent = await sendEmail({
     to: email,
     subject: 'Votre code MILOU',
@@ -37,19 +45,10 @@ export async function issueVerificationCode(db: Firestore, uid: string, email: s
     ].join('\n'),
   });
 
-  if (!sent.ok) {
-    throw new Error(sent.reason);
-  }
-
-  await ref.set({
-    code,
-    email: email.toLowerCase(),
-    attempts: 0,
-    lastSentAt: FieldValue.serverTimestamp(),
-    expiresAt: Timestamp.fromDate(new Date(Date.now() + CODE_TTL_MS)),
-  });
-
-  return { expiresInMinutes: 15 };
+  return {
+    expiresInMinutes: 15,
+    emailSent: sent.ok,
+  };
 }
 
 export async function confirmVerificationCode(db: Firestore, uid: string, codeInput: string) {
@@ -57,7 +56,7 @@ export async function confirmVerificationCode(db: Firestore, uid: string, codeIn
   const snap = await ref.get();
 
   if (!snap.exists) {
-    throw new Error('Aucun code actif. Cliquez sur « Renvoyer le code ».');
+    throw new Error('Aucun code actif. Cliquez sur « Renvoyer ».');
   }
 
   const data = snap.data()!;

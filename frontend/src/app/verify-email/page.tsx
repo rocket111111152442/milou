@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import AuthLayout from '@/components/AuthLayout';
 import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client';
+import { sendVerificationEmail } from '@/lib/firebase/email-verification';
 import { sendVerificationCode, confirmVerificationCode } from '@/lib/client/verification';
 import { formatAuthError } from '@/lib/firebase/errors';
 
@@ -18,6 +19,37 @@ export default function VerifyEmailPage() {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const autoSent = useRef(false);
+
+  async function deliverVerificationEmails() {
+    const user = getFirebaseAuth().currentUser;
+    if (!user) return;
+
+    setSending(true);
+    setError('');
+    try {
+      const data = await sendVerificationCode();
+      await sendVerificationEmail(user).catch(() => {});
+
+      if (data.resendCodeDelivered) {
+        setMsg('Code envoyé par e-mail. Consultez votre boîte mail (et les spams).');
+      } else {
+        setMsg(
+          'Un e-mail avec un lien de confirmation a été envoyé. Ouvrez-le, cliquez sur le lien, puis sur « J’ai validé mon e-mail ». Vous pouvez aussi saisir le code si vous l’avez reçu.'
+        );
+      }
+    } catch (err) {
+      try {
+        await sendVerificationEmail(user);
+        setMsg(
+          'Un e-mail de vérification a été envoyé (lien Firebase). Cliquez sur le lien, puis sur « J’ai validé mon e-mail ».'
+        );
+      } catch (inner) {
+        setError(formatAuthError(inner));
+      }
+    } finally {
+      setSending(false);
+    }
+  }
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return;
@@ -34,27 +66,9 @@ export default function VerifyEmailPage() {
     }
     if (!autoSent.current) {
       autoSent.current = true;
-      setSending(true);
-      sendVerificationCode()
-        .then(() => setMsg('Code envoyé ! Regardez votre boîte mail (et les spams).'))
-        .catch((err) => setError(formatAuthError(err)))
-        .finally(() => setSending(false));
+      deliverVerificationEmails();
     }
   }, [router]);
-
-  async function handleResend() {
-    setError('');
-    setMsg('');
-    setSending(true);
-    try {
-      await sendVerificationCode();
-      setMsg('Nouveau code envoyé.');
-    } catch (err) {
-      setError(formatAuthError(err));
-    } finally {
-      setSending(false);
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,15 +86,35 @@ export default function VerifyEmailPage() {
     }
   }
 
+  async function handleValidatedLink() {
+    setError('');
+    setLoading(true);
+    try {
+      const auth = getFirebaseAuth();
+      const user = auth.currentUser;
+      if (!user) throw new Error('Session expirée.');
+      await user.reload();
+      if (auth.currentUser?.emailVerified) {
+        router.replace('/dashboard');
+      } else {
+        setError('Pas encore validé. Ouvrez l’e-mail Firebase et cliquez sur le lien, puis réessayez.');
+      }
+    } catch (err) {
+      setError(formatAuthError(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleLogout() {
     await signOut(getFirebaseAuth());
     router.push('/login');
   }
 
   return (
-    <AuthLayout title="Code de vérification" subtitle="Entrez le code reçu par e-mail">
+    <AuthLayout title="Vérifiez votre e-mail" subtitle="Code à 6 chiffres ou lien de confirmation">
       <p className="text-sm text-zinc-400 mb-4">
-        Code envoyé à <strong className="text-white">{email}</strong>
+        E-mail : <strong className="text-white">{email}</strong>
         {sending && <span className="text-indigo-400"> — envoi…</span>}
       </p>
 
@@ -96,7 +130,6 @@ export default function VerifyEmailPage() {
             autoComplete="one-time-code"
             maxLength={6}
             required
-            autoFocus
           />
         </div>
 
@@ -104,10 +137,18 @@ export default function VerifyEmailPage() {
         {error && <p className="text-red-400 text-sm whitespace-pre-line">{error}</p>}
 
         <button type="submit" className="btn-primary w-full py-3" disabled={loading || code.length !== 6}>
-          {loading ? 'Vérification…' : 'Accéder au site'}
+          {loading ? 'Vérification…' : 'Valider le code'}
         </button>
-        <button type="button" className="btn-secondary w-full py-3" onClick={handleResend} disabled={sending}>
-          {sending ? 'Envoi…' : 'Renvoyer le code'}
+        <button
+          type="button"
+          className="btn-secondary w-full py-3"
+          onClick={handleValidatedLink}
+          disabled={loading}
+        >
+          J&apos;ai validé mon e-mail (lien)
+        </button>
+        <button type="button" className="btn-secondary w-full py-3" onClick={deliverVerificationEmails} disabled={sending}>
+          {sending ? 'Envoi…' : 'Renvoyer'}
         </button>
       </form>
 
