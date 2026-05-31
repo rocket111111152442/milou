@@ -6,6 +6,7 @@ vercel-import.env
 frontend/vercel-import.env
 vercel-resend-import.env
 frontend/vercel-resend-import.env
+frontend/vercel-smtp-import.env
 dist/
 *.log
 .DS_Store

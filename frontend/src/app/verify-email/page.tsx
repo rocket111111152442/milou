@@ -6,16 +6,17 @@ import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import AuthLayout from '@/components/AuthLayout';
 import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client';
-import { sendVerificationEmail } from '@/lib/firebase/email-verification';
+import { sendVerificationCode, confirmVerificationCode } from '@/lib/client/verification';
 import { formatAuthError } from '@/lib/firebase/errors';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [checking, setChecking] = useState(false);
   const autoSent = useRef(false);
 
   useEffect(() => {
@@ -34,12 +35,8 @@ export default function VerifyEmailPage() {
     if (!autoSent.current) {
       autoSent.current = true;
       setSending(true);
-      sendVerificationEmail(user)
-        .then(() =>
-          setMsg(
-            'E-mail envoyé par Firebase. Ouvrez-le et cliquez sur le lien de vérification (vérifiez les spams).'
-          )
-        )
+      sendVerificationCode()
+        .then(() => setMsg('Code envoyé ! Regardez votre boîte mail (et les spams).'))
         .catch((err) => setError(formatAuthError(err)))
         .finally(() => setSending(false));
     }
@@ -50,10 +47,8 @@ export default function VerifyEmailPage() {
     setMsg('');
     setSending(true);
     try {
-      const user = getFirebaseAuth().currentUser;
-      if (!user) throw new Error('Session expirée. Reconnectez-vous.');
-      await sendVerificationEmail(user);
-      setMsg('Nouvel e-mail envoyé. Cliquez sur le lien dans le message.');
+      await sendVerificationCode();
+      setMsg('Nouveau code envoyé.');
     } catch (err) {
       setError(formatAuthError(err));
     } finally {
@@ -61,26 +56,19 @@ export default function VerifyEmailPage() {
     }
   }
 
-  async function handleChecked() {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setError('');
-    setChecking(true);
+    setLoading(true);
     try {
-      const auth = getFirebaseAuth();
-      const user = auth.currentUser;
-      if (!user) throw new Error('Session expirée. Reconnectez-vous.');
-      await user.reload();
-      if (auth.currentUser?.emailVerified) {
-        setMsg('E-mail vérifié ! Redirection…');
-        router.replace('/dashboard');
-      } else {
-        setError(
-          'Pas encore vérifié. Ouvrez l’e-mail Firebase (expéditeur noreply@…) et cliquez sur le lien, puis réessayez.'
-        );
-      }
+      await confirmVerificationCode(code);
+      const user = getFirebaseAuth().currentUser;
+      if (user) await user.reload();
+      router.replace('/dashboard');
     } catch (err) {
       setError(formatAuthError(err));
     } finally {
-      setChecking(false);
+      setLoading(false);
     }
   }
 
@@ -90,38 +78,46 @@ export default function VerifyEmailPage() {
   }
 
   return (
-    <AuthLayout
-      title="Vérifiez votre e-mail"
-      subtitle="Cliquez sur le lien reçu par e-mail — aucun domaine supplémentaire requis"
-    >
-      <div className="space-y-2 text-sm text-zinc-400">
-        <p>
-          Message envoyé à <strong className="text-white">{email || 'votre adresse'}</strong>
-          {sending && <span className="text-indigo-400"> — envoi…</span>}
-        </p>
-        <p className="text-xs text-zinc-500">
-          L’e-mail part de Firebase (noreply@…). Consultez aussi les courriers indésirables.
-        </p>
-      </div>
+    <AuthLayout title="Code de vérification" subtitle="Entrez le code reçu par e-mail">
+      <p className="text-sm text-zinc-400 mb-4">
+        Code envoyé à <strong className="text-white">{email}</strong>
+        {sending && <span className="text-indigo-400"> — envoi…</span>}
+      </p>
 
-      {msg && <p className="text-emerald-400 text-sm mt-4">{msg}</p>}
-      {error && <p className="text-red-400 text-sm mt-4 whitespace-pre-line">{error}</p>}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="label">Code à 6 chiffres</label>
+          <input
+            className="input text-center text-2xl tracking-[0.35em] font-mono"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="000000"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            required
+            autoFocus
+          />
+        </div>
 
-      <div className="flex flex-col gap-2 mt-6">
-        <button type="button" className="btn-primary w-full py-3" onClick={handleChecked} disabled={checking}>
-          {checking ? 'Vérification…' : 'J’ai cliqué sur le lien'}
+        {msg && <p className="text-emerald-400 text-sm">{msg}</p>}
+        {error && <p className="text-red-400 text-sm whitespace-pre-line">{error}</p>}
+
+        <button type="submit" className="btn-primary w-full py-3" disabled={loading || code.length !== 6}>
+          {loading ? 'Vérification…' : 'Accéder au site'}
         </button>
         <button type="button" className="btn-secondary w-full py-3" onClick={handleResend} disabled={sending}>
-          {sending ? 'Envoi…' : 'Renvoyer l’e-mail'}
+          {sending ? 'Envoi…' : 'Renvoyer le code'}
         </button>
-        <button type="button" className="text-zinc-500 text-sm hover:text-zinc-300 w-full" onClick={handleLogout}>
-          Utiliser un autre compte
-        </button>
-      </div>
+      </form>
+
+      <button type="button" className="text-zinc-500 text-sm hover:text-zinc-300 w-full mt-4" onClick={handleLogout}>
+        Changer d&apos;e-mail
+      </button>
 
       <p className="mt-6 text-sm text-zinc-500 text-center">
         <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-medium">
-          Retour connexion
+          Connexion
         </Link>
       </p>
     </AuthLayout>

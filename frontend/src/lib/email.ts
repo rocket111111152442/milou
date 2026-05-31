@@ -1,3 +1,5 @@
+import nodemailer from 'nodemailer';
+
 type EmailPayload = {
   to: string;
   subject: string;
@@ -6,24 +8,39 @@ type EmailPayload = {
 
 export type SendEmailResult = { ok: true } | { ok: false; reason: string };
 
-/** Expéditeur par défaut Resend (domaine de test, fonctionne sans domaine perso). */
 const DEFAULT_FROM = 'MILOU <onboarding@resend.dev>';
 
-function getFromEmail() {
-  const raw = process.env.MILOU_EMAIL_FROM?.trim();
-  return raw || DEFAULT_FROM;
+function getResendFrom() {
+  return process.env.MILOU_EMAIL_FROM?.trim() || DEFAULT_FROM;
 }
 
-export async function sendEmail({ to, subject, text }: EmailPayload): Promise<SendEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) {
-    console.warn('[email] RESEND_API_KEY absente');
-    return {
-      ok: false,
-      reason:
-        'RESEND_API_KEY manquante. Vercel → Settings → Environment Variables → ajoutez-la pour Production, puis Redeploy.',
-    };
+async function sendViaSmtp({ to, subject, text }: EmailPayload): Promise<SendEmailResult | null> {
+  const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASS?.trim();
+  if (!user || !pass) return null;
+
+  const transport = nodemailer.createTransport({
+    host: process.env.SMTP_HOST?.trim() || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false,
+    auth: { user, pass },
+  });
+
+  const from = process.env.EMAIL_FROM?.trim() || `MILOU <${user}>`;
+
+  try {
+    await transport.sendMail({ from, to, subject, text });
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erreur SMTP';
+    console.error('[email/smtp]', msg);
+    return { ok: false, reason: `Envoi e-mail impossible : ${msg}` };
   }
+}
+
+async function sendViaResend({ to, subject, text }: EmailPayload): Promise<SendEmailResult | null> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) return null;
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -32,7 +49,7 @@ export async function sendEmail({ to, subject, text }: EmailPayload): Promise<Se
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: getFromEmail(),
+      from: getResendFrom(),
       to: [to],
       subject,
       text,
@@ -46,32 +63,32 @@ export async function sendEmail({ to, subject, text }: EmailPayload): Promise<Se
       const parsed = JSON.parse(raw) as { message?: string };
       if (parsed.message) detail = parsed.message;
     } catch {
-      /* garder raw */
+      /* ignore */
     }
-    console.error(`[email] Resend error ${res.status} -> ${to}: ${detail}`);
-
-    if (
-      res.status === 403 &&
-      /only send testing emails to your own email/i.test(detail)
-    ) {
-      return {
-        ok: false,
-        reason:
-          'Resend est en mode test : les codes ne partent que vers l’e-mail du compte Resend. ' +
-          'Pour envoyer à tous les utilisateurs : resend.com/domains → ajoutez et vérifiez votre domaine, ' +
-          'puis sur Vercel mettez MILOU_EMAIL_FROM = MILOU <notifications@votredomaine.com> et Redeploy.',
-      };
+    if (res.status === 403 && /only send testing emails/i.test(detail)) {
+      return null;
     }
-
-    return {
-      ok: false,
-      reason: detail
-        ? `Resend (${res.status}) : ${detail}`
-        : `Resend a refusé l’envoi (HTTP ${res.status}). Vérifiez MILOU_EMAIL_FROM et votre domaine sur resend.com.`,
-    };
+    return { ok: false, reason: `Resend (${res.status}) : ${detail}` };
   }
 
   return { ok: true };
+}
+
+/** SMTP (Gmail) en priorité — envoie à n’importe quelle adresse sans domaine perso. */
+export async function sendEmail(payload: EmailPayload): Promise<SendEmailResult> {
+  const smtp = await sendViaSmtp(payload);
+  if (smtp?.ok) return smtp;
+  if (smtp && !smtp.ok) return smtp;
+
+  const resend = await sendViaResend(payload);
+  if (resend?.ok) return resend;
+  if (resend && !resend.ok) return resend;
+
+  return {
+    ok: false,
+    reason:
+      'Envoi d’e-mail non configuré. Sur Vercel, ajoutez SMTP_USER et SMTP_PASS (mot de passe d’application Gmail), puis Redeploy.',
+  };
 }
 
 export function normalizePostalCode(value: unknown) {
