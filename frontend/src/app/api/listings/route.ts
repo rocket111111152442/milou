@@ -9,8 +9,6 @@ import { jsonNoStore } from '@/lib/http';
 import { isListingPublic, isListingVisible } from '@/lib/listings';
 import { normalizePostalCode } from '@/lib/postal-code';
 import { notifyUsersOnNewListing } from '@/lib/listing-notifications';
-import { expireOldOpenListings } from '@/lib/listing-expiry';
-
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const runtime = 'nodejs';
@@ -27,8 +25,6 @@ export async function GET(req: NextRequest) {
     const viewerPostal = normalizePostalCode(searchParams.get('viewerPostal') || '');
 
     const db = getAdminDb();
-    await expireOldOpenListings(db).catch(() => {});
-
     const snap = await db.collection('listings').limit(150).get();
     const listings: Array<Record<string, unknown> & { _sort: number }> = [];
 

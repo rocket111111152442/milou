@@ -16,6 +16,8 @@ type ListingNotifyPayload = {
 };
 
 const USERS_PAGE_SIZE = 200;
+/** Limite pour ne pas saturer le quota Firestore gratuit (lectures + écritures notifs). */
+const MAX_NOTIFY_RECIPIENTS = 80;
 
 function listingEmailBody(payload: ListingNotifyPayload, firstname: string) {
   const typeLabel = payload.type === 'offer' ? 'Offre de service' : 'Demande d\'aide';
@@ -49,18 +51,23 @@ function listingEmailBody(payload: ListingNotifyPayload, firstname: string) {
 
 async function forEachUser(
   db: Firestore,
-  callback: (userId: string, data: DocumentData) => Promise<void>
+  callback: (userId: string, data: DocumentData) => Promise<void>,
+  maxRecipients = MAX_NOTIFY_RECIPIENTS
 ) {
   let lastId: string | undefined;
+  let notified = 0;
 
   for (;;) {
+    if (notified >= maxRecipients) break;
     let query = db.collection('users').orderBy(FieldPath.documentId()).limit(USERS_PAGE_SIZE);
     if (lastId) query = query.startAfter(lastId);
     const snap = await query.get();
     if (snap.empty) break;
 
     for (const doc of snap.docs) {
+      if (notified >= maxRecipients) return;
       await callback(doc.id, doc.data());
+      notified += 1;
     }
 
     lastId = snap.docs[snap.docs.length - 1].id;

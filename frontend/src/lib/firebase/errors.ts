@@ -29,6 +29,14 @@ export function formatAuthError(err: unknown): string {
     if (err.message.includes('DECODER') || err.message.includes('private key')) {
       return 'Clé privée Firebase invalide dans .env.local. Regénérez-la dans la console Firebase.';
     }
+    if (err.message.includes('RESOURCE_EXHAUSTED') || err.message.includes('Quota exceeded')) {
+      return (
+        'Quota Firebase dépassé (plan gratuit). Le site ne peut plus écrire en base pour l’instant.\n\n' +
+        '→ Firebase Console → votre projet → Firestore → Usage\n' +
+        '→ Passez au plan Blaze (souvent gratuit au début) ou attendez le reset quotidien (minuit heure US).\n' +
+        '→ Réduisez les tests répétés sur le marketplace en attendant.'
+      );
+    }
     return err.message;
   }
 
