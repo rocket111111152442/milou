@@ -169,12 +169,18 @@ begin
   end if;
 end $$;
 
--- Planning de démonstration sur 14 jours (uniquement si aucune séance n'existe).
+-- Planning de démonstration sur 14 jours : une seule fois dans la vie de la base
+-- (si la gérante supprime tout, il ne revient pas au déploiement suivant).
+create table if not exists bio_meta (key text primary key, created_at timestamptz not null default now());
+alter table bio_meta enable row level security;
+
 do $$
 declare
   d int;
   slot record;
 begin
+  if exists (select 1 from bio_meta where key = 'demo_seeded') then return; end if;
+  insert into bio_meta (key) values ('demo_seeded');
   if exists (select 1 from bio_sessions) then return; end if;
   for d in 0..13 loop
     if extract(isodow from (current_date + d)) = 7 then continue; end if;
