@@ -5,6 +5,7 @@ import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
 import { CLUBS } from "@/lib/site";
 import Photo from "../Photo";
+import { photo } from "@/lib/photos";
 
 function ClubCard({ id, index }: { id: keyof typeof CLUBS; index: number }) {
   const c = CLUBS[id];
@@ -25,7 +26,7 @@ function ClubCard({ id, index }: { id: keyof typeof CLUBS; index: number }) {
         className="group relative block aspect-[4/5] overflow-hidden rounded-3xl border border-line sm:aspect-[5/6]"
       >
         <motion.div style={{ y }} className="absolute -inset-y-[12%] inset-x-0">
-          <Photo src={c.image} alt={c.name} className="h-full w-full transition-transform duration-[1.2s] group-hover:scale-110" />
+          <Photo {...photo(c.image)} className="h-full w-full transition-transform duration-[1.2s] group-hover:scale-110" />
         </motion.div>
         <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent" />
         <div className="absolute inset-x-0 top-0 flex items-center justify-between p-6">

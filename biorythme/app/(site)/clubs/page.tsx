@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Photo from "@/components/Photo";
+import { photo } from "@/lib/photos";
 import { Reveal, SplitTitle } from "@/components/Reveal";
 import { CLUBS } from "@/lib/site";
 
@@ -21,7 +22,7 @@ export default function ClubsPage() {
           <div className={`grid gap-10 lg:grid-cols-2 lg:items-center ${i % 2 ? "lg:[&>*:first-child]:order-2" : ""}`}>
             <Reveal>
               <div className="relative">
-                <Photo src={c.image} alt={c.name} className="aspect-[4/3] rounded-3xl" />
+                <Photo {...photo(c.image)} className="aspect-[4/3] rounded-3xl" />
                 <span className="font-display absolute -bottom-6 right-6 rounded-2xl bg-volt px-5 py-3 text-4xl text-ink sm:text-5xl">
                   {c.surface}
                 </span>
@@ -57,18 +58,14 @@ export default function ClubsPage() {
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-muted">Horaires</p>
-                    {c.hours ? (
-                      <dl className="mt-2 grid gap-1 text-sm">
-                        {c.hours.map((h) => (
-                          <div key={h.days} className="flex justify-between gap-4">
-                            <dt className="text-bone/70">{h.days}</dt>
-                            <dd className="font-semibold">{h.time}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    ) : (
-                      <p className="mt-2 text-sm text-bone/70">Nous contacter par téléphone.</p>
-                    )}
+                    <dl className="mt-2 grid gap-1 text-sm">
+                      {c.hours.map((h) => (
+                        <div key={h.days} className="flex justify-between gap-4">
+                          <dt className="text-bone/70">{h.days}</dt>
+                          <dd className="font-semibold">{h.time}</dd>
+                        </div>
+                      ))}
+                    </dl>
                   </div>
                 </div>
                 <Link

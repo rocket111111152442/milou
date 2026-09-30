@@ -2,18 +2,31 @@
 
 import { useState } from "react";
 
-/** Image distante avec repli sur un dégradé si elle ne charge pas. */
-export default function Photo({ src, alt, className = "" }: { src: string; alt: string; className?: string }) {
+/** Image avec une source de secours, puis un motif si rien ne charge. */
+export default function Photo({
+  src,
+  fallback,
+  alt,
+  className = "",
+  eager = false,
+}: {
+  src: string;
+  fallback?: string;
+  alt: string;
+  className?: string;
+  eager?: boolean;
+}) {
+  const [current, setCurrent] = useState(src);
   const [failed, setFailed] = useState(false);
   return (
     <div className={`relative overflow-hidden bg-gradient-to-br from-surface-2 via-surface to-ink ${className}`}>
       {!failed && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          src={current}
           alt={alt}
-          loading="lazy"
-          onError={() => setFailed(true)}
+          loading={eager ? "eager" : "lazy"}
+          onError={() => (fallback && current !== fallback ? setCurrent(fallback) : setFailed(true))}
           className="absolute inset-0 h-full w-full object-cover"
         />
       )}

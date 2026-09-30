@@ -2,22 +2,27 @@
 
 import { motion } from "motion/react";
 import { useState } from "react";
+import Photo from "../Photo";
+import { photo, type PhotoKey } from "@/lib/photos";
 
 const STUDIOS = [
   {
     name: "Bike",
     color: "var(--color-blaze)",
-    text: "Le studio vélo : lumière tamisée, musique à fond et cadence qui monte.",
+    image: "cycling" as PhotoKey,
+    text: "Le studio vélo : RPM et cardio en musique.",
   },
   {
     name: "Pump & Boxe",
     color: "var(--color-volt)",
-    text: "Barres, poids, gants : renforcement musculaire et enchaînements de boxe.",
+    image: "studioSteps" as PhotoKey,
+    text: "Body Pump, Boxe, Body Step… renforcement musculaire et cardio.",
   },
   {
     name: "Zen & Freestyle",
     color: "var(--color-ice)",
-    text: "Pilates, yoga, stretching… un espace pour gainer, respirer et récupérer.",
+    image: "studioTapis" as PhotoKey,
+    text: "Pilates, Yoga Stretch, Body Balance, danse… étirements, postures et freestyle.",
   },
 ];
 
@@ -38,6 +43,10 @@ export default function Studios() {
             className="relative overflow-hidden rounded-3xl border border-line bg-surface p-6 text-left sm:p-8"
             style={{ flex: on ? 3 : 1 }}
           >
+            <motion.div className="absolute inset-0" animate={{ opacity: on ? 0.45 : 0.15, scale: on ? 1.05 : 1 }} transition={{ duration: 0.8 }}>
+              <Photo {...photo(s.image)} className="h-full w-full" />
+            </motion.div>
+            <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/60 to-transparent" />
             <motion.div
               className="absolute inset-0 opacity-0"
               animate={{ opacity: on ? 1 : 0 }}

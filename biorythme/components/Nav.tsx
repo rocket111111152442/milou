@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/", label: "Accueil" },
   { href: "/clubs", label: "Les clubs" },
   { href: "/planning", label: "Planning" },
+  { href: "/galerie", label: "Galerie" },
   { href: "/contact", label: "Contact" },
 ];
 

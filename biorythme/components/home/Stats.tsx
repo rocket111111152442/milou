@@ -24,7 +24,7 @@ const STATS = [
   { to: 2, suffix: "", label: "clubs dans le Var" },
   { to: 3000, suffix: " m²", label: "à Six-Fours" },
   { to: 3, suffix: "", label: "studios, 3 ambiances" },
-  { to: 60, suffix: "h", label: "de cours / semaine à Sanary" },
+  { to: 20, suffix: "", label: "cours collectifs différents" },
 ];
 
 export default function Stats() {

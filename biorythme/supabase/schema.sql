@@ -210,4 +210,47 @@ begin
   end loop;
 end $$;
 
+-- v2 : les vrais cours de l'ancien site (une seule fois). Les cours de démo sont
+-- renommés plutôt que supprimés pour garder les séances déjà planifiées.
+do $$
+begin
+  if exists (select 1 from bio_meta where key = 'courses_v2') then return; end if;
+  insert into bio_meta (key) values ('courses_v2');
+
+  update bio_courses set name = 'Boxe' where name = 'Boxe Fit';
+  update bio_courses set name = 'Yoga Stretch' where name = 'Yoga';
+
+  insert into bio_courses (name, description, intensity, duration_min, color)
+  select v.name, v.description, v.intensity, v.duration_min, v.color
+  from (values
+    -- Renforcement musculaire
+    ('Body Pump', 'Renforcement musculaire avec barre et poids, en musique.', 3, 55, '#d7ff3a'),
+    ('Cuisses Abdos Fessiers', 'Travail ciblé des cuisses, des abdos et des fessiers.', 2, 45, '#d7ff3a'),
+    ('Abdos Flash', 'Séance courte et intense dédiée à la sangle abdominale.', 2, 30, '#d7ff3a'),
+    ('CxWorx', 'Renforcement du tronc : abdos, dos et gainage.', 2, 30, '#d7ff3a'),
+    ('Tone', 'Renforcement musculaire et cardio pour tonifier tout le corps.', 2, 45, '#d7ff3a'),
+    -- Cardio-training
+    ('RPM', 'Vélo indoor en musique.', 3, 45, '#ff4d2e'),
+    ('Body Attack', 'Cardio sportif : courses, sauts et renforcement.', 3, 55, '#ff4d2e'),
+    ('Body Step', 'Cardio chorégraphié sur step.', 2, 55, '#ff4d2e'),
+    ('GRIT', 'Entraînement fractionné haute intensité.', 3, 30, '#ff4d2e'),
+    ('Boxe', 'Enchaînements de boxe pour se dépenser.', 3, 45, '#ff4d2e'),
+    -- Danse
+    ('Latino Cardio', 'Cardio sur des rythmes latinos.', 2, 45, '#c084fc'),
+    ('Salsa', 'Cours de salsa.', 1, 60, '#c084fc'),
+    ('Bachata', 'Cours de bachata.', 1, 60, '#c084fc'),
+    ('Reggaeton', 'Cours de reggaeton.', 2, 45, '#c084fc'),
+    ('Body Jam', 'Cardio dansé sur des sons actuels.', 2, 55, '#c084fc'),
+    ('Modern Jazz', 'Cours de danse modern jazz.', 1, 60, '#c084fc'),
+    -- Étirements & postures
+    ('Stretching', 'Étirements et récupération.', 1, 30, '#7cf5ff'),
+    ('Pilates', 'Gainage profond, posture et respiration.', 1, 45, '#7cf5ff'),
+    ('Yoga Stretch', 'Postures de yoga et étirements.', 1, 60, '#7cf5ff'),
+    ('Body Balance', 'Yoga, tai-chi et Pilates pour la souplesse et le calme.', 1, 55, '#7cf5ff')
+  ) as v(name, description, intensity, duration_min, color)
+  where not exists (select 1 from bio_courses c where c.name = v.name);
+
+  update bio_courses set color = '#c084fc' where name in ('Latino Cardio','Salsa','Bachata','Reggaeton','Body Jam','Modern Jazz');
+end $$;
+
 notify pgrst, 'reload schema';

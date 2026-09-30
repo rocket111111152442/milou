@@ -6,8 +6,11 @@ import Studios from "@/components/home/Studios";
 import Marquee from "@/components/Marquee";
 import { Reveal, SplitTitle } from "@/components/Reveal";
 import Photo from "@/components/Photo";
+import Families from "@/components/home/Families";
+import { photo } from "@/lib/photos";
+import { COURSE_FAMILIES } from "@/lib/site";
 
-const ACTIVITIES = ["RPM", "Body Pump", "Boxe", "Pilates", "Yoga", "Stretching", "Cuisses Abdos Fessiers", "Cardio", "Musculation"];
+const ACTIVITIES = COURSE_FAMILIES.flatMap((f) => f.courses);
 
 const STEPS = [
   { n: "01", title: "Choisis ton cours", text: "Filtre par club et par jour : tout le planning est au même endroit." },
@@ -27,12 +30,12 @@ export default function Home() {
       <section className="mx-auto max-w-7xl px-4 pt-28 sm:px-6">
         <div className="grid gap-10 md:grid-cols-2 md:items-end">
           <h2 className="font-display text-6xl sm:text-8xl">
-            <SplitTitle lines={["Sport,", <span key="b" className="text-volt">bien-être</span>, "& énergie"]} />
+            <SplitTitle lines={["Envie de vous", <span key="b" className="text-volt">dépenser&nbsp;?</span>]} />
           </h2>
           <Reveal>
             <p className="max-w-md text-lg text-bone/75">
-              Une équipe de coachs professionnels et qualifiés vous propose de nombreux cours collectifs de renforcement
-              musculaire, de musculation et de stretching, dans deux clubs à deux pas de la mer.
+              De perdre vos kilos en trop ? Fitness, musculation, cross training et plus de 20 cours collectifs, avec
+              une équipe de coachs professionnels et qualifiés, diplômés et expérimentés.
             </p>
           </Reveal>
         </div>
@@ -70,6 +73,20 @@ export default function Home() {
         <Studios />
       </section>
 
+      <section className="mx-auto max-w-7xl px-4 pt-32 sm:px-6">
+        <div className="mb-10 grid gap-6 md:grid-cols-2 md:items-end">
+          <h2 className="font-display text-6xl sm:text-8xl">
+            <SplitTitle lines={["Cours", <span key="c" className="text-volt">collectifs</span>]} />
+          </h2>
+          <Reveal>
+            <p className="max-w-md text-bone/75">
+              Renforcement musculaire, cardio-training, danse, étirements et postures : il y en a pour tous les goûts.
+            </p>
+          </Reveal>
+        </div>
+        <Families />
+      </section>
+
       <section className="relative mt-32 overflow-hidden border-y border-line py-6">
         <Marquee items={["Réserve", "Transpire", "Recommence"]} reverse duration={25} className="text-outline" />
       </section>
@@ -101,11 +118,7 @@ export default function Home() {
             </Reveal>
           </div>
           <Reveal className="relative hidden lg:block">
-            <Photo
-              src="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1200&q=70"
-              alt="Cours collectif"
-              className="h-full min-h-[36rem] rounded-3xl"
-            />
+            <Photo {...photo("coursRenfo")} className="h-full min-h-[36rem] rounded-3xl" />
             <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-line bg-ink/80 p-5 backdrop-blur-xl">
               <div className="flex items-center justify-between">
                 <div>

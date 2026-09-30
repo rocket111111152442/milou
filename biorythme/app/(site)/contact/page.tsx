@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Contact" };
 export default function ContactPage() {
   return (
     <section className="mx-auto max-w-7xl px-4 pt-36 sm:px-6">
-      <p className="text-xs uppercase tracking-[0.2em] text-volt">On vous attend</p>
+      <p className="text-xs uppercase tracking-[0.2em] text-volt">Contactez votre salle de sport</p>
       <h1 className="font-display mt-4 text-7xl sm:text-9xl">
         <SplitTitle lines={["Contact"]} />
       </h1>
@@ -31,6 +31,14 @@ export default function ContactPage() {
               <a href={`tel:${c.phoneHref}`} className="font-display mt-4 block text-4xl hover:text-volt">
                 {c.phone}
               </a>
+              <dl className="mt-6 grid gap-1 text-sm">
+                {c.hours.map((h) => (
+                  <div key={h.days} className="flex justify-between gap-4 border-b border-line/60 py-1.5">
+                    <dt className="text-bone/70">{h.days}</dt>
+                    <dd className="font-semibold">{h.time}</dd>
+                  </div>
+                ))}
+              </dl>
               <div className="mt-8 overflow-hidden rounded-2xl border border-line">
                 <iframe
                   title={`Plan d'accès ${c.name}`}
