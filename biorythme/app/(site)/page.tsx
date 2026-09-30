@@ -7,7 +7,6 @@ import Marquee from "@/components/Marquee";
 import { Reveal, SplitTitle } from "@/components/Reveal";
 import Photo from "@/components/Photo";
 import Families from "@/components/home/Families";
-import { photo } from "@/lib/photos";
 import { COURSE_FAMILIES } from "@/lib/site";
 
 const ACTIVITIES = COURSE_FAMILIES.flatMap((f) => f.courses);
@@ -118,7 +117,11 @@ export default function Home() {
             </Reveal>
           </div>
           <Reveal className="relative hidden lg:block">
-            <Photo {...photo("coursRenfo")} className="h-full min-h-[36rem] rounded-3xl" />
+            <Photo
+              src="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1200&q=70"
+              alt="Cours collectif"
+              className="h-full min-h-[36rem] rounded-3xl"
+            />
             <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-line bg-ink/80 p-5 backdrop-blur-xl">
               <div className="flex items-center justify-between">
                 <div>

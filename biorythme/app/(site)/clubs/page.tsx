@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Photo from "@/components/Photo";
-import { photo } from "@/lib/photos";
 import { Reveal, SplitTitle } from "@/components/Reveal";
 import { CLUBS } from "@/lib/site";
 
@@ -22,7 +21,7 @@ export default function ClubsPage() {
           <div className={`grid gap-10 lg:grid-cols-2 lg:items-center ${i % 2 ? "lg:[&>*:first-child]:order-2" : ""}`}>
             <Reveal>
               <div className="relative">
-                <Photo {...photo(c.image)} className="aspect-[4/3] rounded-3xl" />
+                <Photo src={c.image} alt={c.name} className="aspect-[4/3] rounded-3xl" />
                 <span className="font-display absolute -bottom-6 right-6 rounded-2xl bg-volt px-5 py-3 text-4xl text-ink sm:text-5xl">
                   {c.surface}
                 </span>

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
 import Photo from "../Photo";
-import { photo } from "@/lib/photos";
 
 const WORD = "BIORYTHME".split("");
 
@@ -18,7 +17,12 @@ export default function Hero() {
   return (
     <section ref={ref} className="relative flex min-h-[100svh] flex-col justify-end overflow-hidden pb-10 pt-32">
       <motion.div style={{ scale }} className="absolute inset-0">
-        <Photo {...photo("salleRouge")} eager className="h-full w-full" />
+        <Photo
+          src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=2000&q=70"
+          alt="Entraînement en salle"
+          eager
+          className="h-full w-full"
+        />
       </motion.div>
       <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/70 to-ink/30" />
       <motion.div

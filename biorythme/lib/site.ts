@@ -1,5 +1,3 @@
-import type { PhotoKey } from "./photos";
-
 export type ClubId = "six-fours" | "sanary";
 
 export const CONTACT_EMAIL = "biorythme.sylvie@gmail.com";
@@ -18,7 +16,7 @@ export type Club = {
   pitch: string;
   features: string[];
   hours: { days: string; time: string }[];
-  image: PhotoKey;
+  image: string;
   mapQuery: string;
 };
 
@@ -50,7 +48,7 @@ export const CLUBS: Record<ClubId, Club> = {
       { days: "Samedi", time: "9h – 13h" },
       { days: "Dimanche", time: "Fermé" },
     ],
-    image: "fonctionnel",
+    image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1600&q=70",
     mapQuery: "Biorythme, 429 Boulevard de Lery, 83140 Six-Fours-les-Plages",
   },
   sanary: {
@@ -71,7 +69,7 @@ export const CLUBS: Record<ClubId, Club> = {
       { days: "Samedi", time: "9h – 12h30" },
       { days: "Dimanche", time: "Fermé" },
     ],
-    image: "cardio",
+    image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=1600&q=70",
     mapQuery: "Biorythme, 6 Rue Giboin, 83110 Sanary-sur-Mer",
   },
 };
