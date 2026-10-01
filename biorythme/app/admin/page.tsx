@@ -44,14 +44,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const from = parisToIso(monday, "00:00");
   const to = parisToIso(addDays(monday, 7), "00:00");
 
-  const [rooms, coaches, courses, sessions] = await Promise.all([
+  const [rooms, coaches, courses, sessions, members, memberBookings] = await Promise.all([
     db.from("bio_rooms").select("*").order("club").order("position"),
     db.from("bio_coaches").select("*").order("name"),
     db.from("bio_courses").select("*").order("name"),
     db.from("bio_sessions").select(SESSION_SELECT).gte("starts_at", from).lt("starts_at", to).order("starts_at"),
+    db.from("bio_members").select("id, first_name, last_name, email, phone, created_at").order("created_at", { ascending: false }),
+    db.from("bio_bookings").select("member_id").eq("status", "confirmed").not("member_id", "is", null),
   ]);
 
-  const firstError = rooms.error || coaches.error || courses.error || sessions.error;
+  const firstError = rooms.error || coaches.error || courses.error || sessions.error || members.error;
   if (firstError) {
     return <Notice title="Erreur base de données" text={firstError.message} />;
   }
@@ -74,6 +76,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       courses={(courses.data ?? []) as Course[]}
       sessions={(sessions.data ?? []) as SessionFull[]}
       bookings={(bookings.data ?? []) as Booking[]}
+      members={(members.data ?? []).map((m) => ({
+        ...m,
+        bookings: (memberBookings.data ?? []).filter((b) => b.member_id === m.id).length,
+      }))}
     />
   );
 }

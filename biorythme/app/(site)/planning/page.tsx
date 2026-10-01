@@ -4,6 +4,7 @@ import { SplitTitle } from "@/components/Reveal";
 import { fetchPublicSessions } from "@/lib/queries";
 import { isSupabaseConfigured, publicClient } from "@/lib/supabase";
 import type { SessionFull } from "@/lib/types";
+import { myBookedSessionIds } from "@/app/actions";
 
 export const metadata: Metadata = { title: "Planning & réservation" };
 export const dynamic = "force-dynamic";
@@ -12,13 +13,17 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   const { club } = await searchParams;
   let sessions: SessionFull[] = [];
   let failed = false;
+  let booked: string[] = [];
   const client = publicClient();
   if (client) {
     const from = new Date();
     from.setHours(0, 0, 0, 0);
     const to = new Date(from.getTime() + 15 * 86_400_000);
     try {
-      sessions = await fetchPublicSessions(client, from.toISOString(), to.toISOString());
+      [sessions, booked] = await Promise.all([
+        fetchPublicSessions(client, from.toISOString(), to.toISOString()),
+        myBookedSessionIds(),
+      ]);
     } catch {
       failed = true;
     }
@@ -44,7 +49,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
             </p>
           </div>
         ) : (
-          <Planning initial={sessions} initialClub={club === "six-fours" || club === "sanary" ? club : "all"} />
+          <Planning initial={sessions} initialBooked={booked} initialClub={club === "six-fours" || club === "sanary" ? club : "all"} />
         )}
       </div>
     </section>

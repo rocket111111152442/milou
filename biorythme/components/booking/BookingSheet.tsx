@@ -1,14 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState, useTransition } from "react";
 import { bookSession } from "@/app/actions";
 import { fmtDayLong, fmtTime } from "@/lib/format";
 import { CLUBS } from "@/lib/site";
 import type { SessionFull } from "@/lib/types";
-import { readMyBookings, writeMyBookings } from "./myBookings";
-
-const PROFILE_KEY = "biorythme:profile";
+import AuthForm from "../account/AuthForm";
+import { useMember } from "../account/MemberProvider";
 
 export default function BookingSheet({
   session,
@@ -19,26 +19,15 @@ export default function BookingSheet({
   onClose: () => void;
   onBooked: (s: SessionFull) => void;
 }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const { member, setMember } = useMember();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pending, start] = useTransition();
 
   useEffect(() => {
-    if (!session) return;
     setError(null);
     setDone(false);
-    try {
-      const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}");
-      setName(p.name ?? "");
-      setEmail(p.email ?? "");
-      setPhone(p.phone ?? "");
-    } catch {
-      /* pas de profil mémorisé */
-    }
-  }, [session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.id]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -48,25 +37,16 @@ export default function BookingSheet({
 
   const left = session ? Math.max(0, session.capacity - session.booked_count) : 0;
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  function confirm() {
     if (!session) return;
     setError(null);
     start(async () => {
-      const res = await bookSession({ sessionId: session.id, name, email, phone });
+      const res = await bookSession(session.id);
       if (!res.ok) {
+        if (res.needLogin) setMember(null);
         setError(res.error);
         return;
       }
-      try {
-        localStorage.setItem(PROFILE_KEY, JSON.stringify({ name, email, phone }));
-      } catch {
-        /* ignore */
-      }
-      writeMyBookings([
-        ...readMyBookings(),
-        { sessionId: session.id, token: res.token, course: session.course.name, startsAt: session.starts_at, room: session.room.name },
-      ]);
       setDone(true);
       onBooked(session);
     });
@@ -100,6 +80,13 @@ export default function BookingSheet({
             </p>
             {session.course.description && <p className="mt-3 text-sm text-muted">{session.course.description}</p>}
 
+            <div className="mt-6 flex items-center justify-between rounded-2xl bg-ink px-4 py-3 text-sm">
+              <span className="text-muted">Places restantes</span>
+              <motion.span key={left} initial={{ scale: 1.3 }} animate={{ scale: 1 }} className={`font-display text-2xl ${left ? "text-volt" : "text-blaze"}`}>
+                {left}
+              </motion.span>
+            </div>
+
             <AnimatePresence mode="wait">
               {done ? (
                 <motion.div key="done" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mt-8 text-center">
@@ -112,70 +99,50 @@ export default function BookingSheet({
                     ✓
                   </motion.div>
                   <p className="font-display mt-6 text-4xl">C&apos;est réservé !</p>
-                  <p className="mt-2 text-muted">
-                    Votre place est bloquée. Un empêchement ? Annulez depuis « Mes réservations » pour libérer la place.
-                  </p>
-                  <button onClick={onClose} className="mt-6 w-full rounded-full bg-bone py-4 font-semibold text-ink hover:bg-volt">
-                    Parfait
-                  </button>
+                  <p className="mt-2 text-muted">Retrouvez et gérez vos réservations depuis votre compte, sur n&apos;importe quel appareil.</p>
+                  <div className="mt-6 grid gap-2">
+                    <button onClick={onClose} className="w-full rounded-full bg-bone py-4 font-semibold text-ink hover:bg-volt">
+                      Parfait
+                    </button>
+                    <Link href="/compte" className="text-sm text-muted underline underline-offset-4 hover:text-bone">
+                      Voir mes réservations
+                    </Link>
+                  </div>
+                </motion.div>
+              ) : !member ? (
+                <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-6">
+                  <AuthForm intro="Connectez-vous ou créez votre compte pour réserver. Vos infos seront remplies automatiquement la prochaine fois." />
                 </motion.div>
               ) : (
-                <motion.form key="form" onSubmit={submit} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-8 grid gap-3">
-                  <div className="flex items-center justify-between rounded-2xl bg-ink px-4 py-3 text-sm">
-                    <span className="text-muted">Places restantes</span>
-                    <motion.span key={left} initial={{ scale: 1.3 }} animate={{ scale: 1 }} className={`font-display text-2xl ${left ? "text-volt" : "text-blaze"}`}>
-                      {left}
-                    </motion.span>
+                <motion.div key="confirm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-6 grid gap-3">
+                  <div className="rounded-2xl border border-line bg-ink p-4">
+                    <p className="text-xs uppercase tracking-[0.15em] text-muted">Réservé au nom de</p>
+                    <p className="mt-1 text-lg font-semibold">
+                      {member.first_name} {member.last_name}
+                    </p>
+                    <p className="text-sm text-muted">
+                      {member.email}
+                      {member.phone && ` · ${member.phone}`}
+                    </p>
                   </div>
-                  <Field label="Nom et prénom" value={name} onChange={setName} autoComplete="name" required />
-                  <Field label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" required />
-                  <Field label="Téléphone (facultatif)" type="tel" value={phone} onChange={setPhone} autoComplete="tel" />
                   {error && (
                     <motion.p initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl bg-blaze/15 px-4 py-3 text-sm text-blaze">
                       {error}
                     </motion.p>
                   )}
                   <button
-                    type="submit"
+                    onClick={confirm}
                     disabled={pending || left === 0}
-                    className="mt-2 rounded-full bg-volt py-4 font-semibold text-ink transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+                    className="mt-1 rounded-full bg-volt py-4 font-semibold text-ink transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
                   >
                     {pending ? "Réservation…" : left === 0 ? "Complet" : "Confirmer ma place"}
                   </button>
-                </motion.form>
+                </motion.div>
               )}
             </AnimatePresence>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  ...rest
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  autoComplete?: string;
-  required?: boolean;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs uppercase tracking-[0.15em] text-muted">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-2xl border border-line bg-ink px-4 py-3.5 outline-none transition focus:border-volt"
-        {...rest}
-      />
-    </label>
   );
 }

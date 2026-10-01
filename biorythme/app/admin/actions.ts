@@ -146,3 +146,18 @@ export async function deleteItem(table: Table, id: string): Promise<ActionResult
   refresh();
   return fail(error);
 }
+
+/* ---------- Membres ---------- */
+
+/** Génère un mot de passe provisoire que la gérante communique au membre. */
+export async function resetMemberPassword(memberId: string): Promise<{ ok: true; password: string } | { ok: false; error: string }> {
+  await assertAdmin();
+  const { randomBytes } = await import("node:crypto");
+  const { hashPassword } = await import("@/lib/member-auth");
+  const password = `Bio-${randomBytes(6).toString("base64url")}`;
+  const { error } = await adminClient()
+    .from("bio_members")
+    .update({ password_hash: await hashPassword(password) })
+    .eq("id", memberId);
+  return error ? { ok: false, error: error.message } : { ok: true, password };
+}

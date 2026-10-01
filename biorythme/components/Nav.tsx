@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
 import { useState } from "react";
 import Logo from "./Logo";
+import { useMember } from "./account/MemberProvider";
 
 const LINKS = [
   { href: "/", label: "Accueil" },
@@ -19,6 +20,7 @@ export default function Nav() {
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const { member } = useMember();
   useMotionValueEvent(scrollY, "change", (y) => setScrolled(y > 40));
 
   return (
@@ -57,6 +59,17 @@ export default function Nav() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/compte"
+            className={`hidden items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition sm:inline-flex ${
+              pathname.startsWith("/compte") ? "border-volt text-volt" : "border-line hover:border-bone/40"
+            }`}
+          >
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-volt text-[10px] font-bold text-ink">
+              {member ? member.first_name.charAt(0).toUpperCase() : "•"}
+            </span>
+            {member ? member.first_name : "Mon compte"}
+          </Link>
           <Link
             href="/planning"
             className="group hidden items-center gap-2 rounded-full bg-bone px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-volt sm:inline-flex"
@@ -103,6 +116,13 @@ export default function Nav() {
                 </Link>
               </motion.div>
             ))}
+            <Link
+              href="/compte"
+              onClick={() => setOpen(false)}
+              className="font-display block py-2 text-6xl text-volt"
+            >
+              {member ? `Salut ${member.first_name}` : "Mon compte"}
+            </Link>
             <Link
               href="/planning"
               onClick={() => setOpen(false)}

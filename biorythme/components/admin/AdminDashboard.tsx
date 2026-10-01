@@ -9,6 +9,7 @@ import { CLUBS, type ClubId } from "@/lib/site";
 import type { Booking, Coach, Course, Room, SessionFull } from "@/lib/types";
 import PlanningBoard from "./PlanningBoard";
 import RefsEditor from "./RefsEditor";
+import MembersList, { type AdminMember } from "./MembersList";
 import RealtimeRefresh from "./RealtimeRefresh";
 import { Toast } from "./ui";
 
@@ -19,6 +20,7 @@ export type AdminData = {
   courses: Course[];
   sessions: SessionFull[];
   bookings: Booking[];
+  members: AdminMember[];
 };
 
 export type Notify = (message: string, tone?: "ok" | "error") => void;
@@ -28,6 +30,7 @@ const TABS = [
   { id: "rooms", label: "Salles" },
   { id: "courses", label: "Cours" },
   { id: "coaches", label: "Coachs" },
+  { id: "members", label: "Membres" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -95,6 +98,7 @@ export default function AdminDashboard(data: AdminData) {
         {tab === "rooms" && <RefsEditor kind="rooms" items={data.rooms} notify={notify} />}
         {tab === "courses" && <RefsEditor kind="courses" items={data.courses} notify={notify} />}
         {tab === "coaches" && <RefsEditor kind="coaches" items={data.coaches} notify={notify} />}
+        {tab === "members" && <MembersList members={data.members} notify={notify} />}
       </main>
 
       <Toast message={toast?.message ?? null} tone={toast?.tone ?? "ok"} />

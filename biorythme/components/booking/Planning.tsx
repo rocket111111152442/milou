@@ -7,9 +7,10 @@ import { fetchPublicSessions } from "@/lib/queries";
 import { CLUBS, type ClubId } from "@/lib/site";
 import type { SessionFull } from "@/lib/types";
 import { dayKey, fmtDayNum, fmtDayShort, fmtMonthShort, fmtTime, fmtDayLong } from "@/lib/format";
+import Link from "next/link";
+import { myBookedSessionIds } from "@/app/actions";
 import BookingSheet from "./BookingSheet";
-import MyBookingsPanel from "./MyBookingsPanel";
-import { readMyBookings, type MyBooking } from "./myBookings";
+import { useMember } from "../account/MemberProvider";
 
 type Filter = "all" | ClubId;
 
@@ -23,18 +24,37 @@ function rangeIso() {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
-export default function Planning({ initial, initialClub = "all" }: { initial: SessionFull[]; initialClub?: Filter }) {
+export default function Planning({
+  initial,
+  initialClub = "all",
+  initialBooked = [],
+}: {
+  initial: SessionFull[];
+  initialClub?: Filter;
+  initialBooked?: string[];
+}) {
+  const { member } = useMember();
   const [sessions, setSessions] = useState<SessionFull[]>(initial);
   const [club, setClub] = useState<Filter>(initialClub);
   const [selectedDay, setSelectedDay] = useState(() => dayKey(new Date()));
   const [booking, setBooking] = useState<SessionFull | null>(null);
-  const [mine, setMine] = useState<MyBooking[]>([]);
+  const [bookedIds, setBookedIds] = useState(() => new Set(initialBooked));
   const [live, setLive] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
 
-  useEffect(() => setMine(readMyBookings()), []);
+  // Connexion / déconnexion : on recharge les cours réservés par ce membre.
+  const memberId = member?.id ?? null;
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (!memberId) setBookedIds(new Set());
+    else myBookedSessionIds().then((ids) => setBookedIds(new Set(ids)));
+  }, [memberId]);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
@@ -108,11 +128,12 @@ export default function Planning({ initial, initialClub = "all" }: { initial: Se
   }, [visible, now]);
 
   const daySessions = visible.filter((s) => dayKey(s.starts_at) === selectedDay);
-  const bookedIds = new Set(mine.map((b) => b.sessionId));
-
+  const upcomingBooked = sessions.filter(
+    (s) => bookedIds.has(s.id) && !s.cancelled && new Date(s.starts_at).getTime() > now,
+  ).length;
   function onBooked(s: SessionFull) {
     setSessions((prev) => prev.map((x) => (x.id === s.id ? { ...x, booked_count: Math.min(x.capacity, x.booked_count + 1) } : x)));
-    setMine(readMyBookings());
+    setBookedIds((prev) => new Set(prev).add(s.id));
   }
 
   return (
@@ -143,7 +164,14 @@ export default function Planning({ initial, initialClub = "all" }: { initial: Se
             </span>
             {live ? "Places en direct" : "Connexion…"}
           </span>
-          <MyBookingsPanel bookings={mine} onChange={(l) => { setMine(l); refetch(); }} />
+          <Link href="/compte" className="relative rounded-full border border-line px-4 py-2 text-sm font-medium hover:border-bone/40">
+            Mes réservations
+            {upcomingBooked > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-volt px-1 text-[11px] font-bold text-ink">
+                {upcomingBooked}
+              </span>
+            )}
+          </Link>
         </div>
       </div>
 

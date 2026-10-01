@@ -132,8 +132,6 @@ $$;
 
 revoke all on function bio_book(uuid, text, text, text) from public;
 revoke all on function bio_cancel(uuid) from public;
-grant execute on function bio_book(uuid, text, text, text) to anon, authenticated;
-grant execute on function bio_cancel(uuid) to anon, authenticated;
 
 -- Temps réel : diffusion des changements de places.
 do $$
@@ -251,6 +249,69 @@ begin
   where not exists (select 1 from bio_courses c where c.name = v.name);
 
   update bio_courses set color = '#c084fc' where name in ('Latino Cardio','Salsa','Bachata','Reggaeton','Body Jam','Modern Jazz');
+end $$;
+
+-- Comptes membres (propres à Biorythme, indépendants de l'auth Supabase).
+create table if not exists bio_members (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  first_name text not null,
+  last_name text not null,
+  phone text not null default '',
+  password_hash text not null,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists bio_members_email_idx on bio_members (lower(email));
+alter table bio_members enable row level security;
+
+alter table bio_bookings add column if not exists member_id uuid references bio_members(id) on delete set null;
+create index if not exists bio_bookings_member_idx on bio_bookings (member_id);
+
+-- Réservation par un membre connecté (appelée uniquement côté serveur).
+create or replace function bio_book_member(p_session uuid, p_member uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  s bio_sessions%rowtype;
+  m bio_members%rowtype;
+  token uuid;
+begin
+  select * into m from bio_members where id = p_member;
+  if not found then raise exception 'INVALID_INPUT'; end if;
+
+  select * into s from bio_sessions where id = p_session for update;
+  if not found or not s.published then raise exception 'NOT_FOUND'; end if;
+  if s.cancelled then raise exception 'CANCELLED'; end if;
+  if s.starts_at <= now() then raise exception 'PAST'; end if;
+  if s.booked_count >= s.capacity then raise exception 'FULL'; end if;
+
+  begin
+    insert into bio_bookings (session_id, member_id, name, email, phone)
+    values (p_session, m.id, m.first_name || ' ' || m.last_name, lower(m.email), m.phone)
+    returning cancel_token into token;
+  exception when unique_violation then
+    raise exception 'ALREADY_BOOKED';
+  end;
+
+  update bio_sessions set booked_count = booked_count + 1 where id = p_session;
+  return token;
+end;
+$$;
+
+-- Plus de réservation anonyme : tout passe par le serveur (compte obligatoire).
+revoke all on function bio_book(uuid, text, text, text) from public, anon, authenticated;
+revoke all on function bio_cancel(uuid) from public, anon, authenticated;
+revoke all on function bio_book_member(uuid, uuid) from public, anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function bio_book(uuid, text, text, text) to service_role;
+    grant execute on function bio_cancel(uuid) to service_role;
+    grant execute on function bio_book_member(uuid, uuid) to service_role;
+  end if;
 end $$;
 
 notify pgrst, 'reload schema';
