@@ -17,7 +17,7 @@ function MenuCard({ item, index }: { item: MenuItem; index: number }) {
     <article className="group flex h-full flex-row overflow-hidden sm:flex-col rounded-3xl border-[3px] border-char bg-white shadow-sticker transition duration-300 hover:-translate-y-1.5 hover:shadow-sticker-lg">
       <div className="relative w-28 shrink-0 overflow-hidden border-r-[3px] border-char min-[400px]:w-32 sm:aspect-[4/3] sm:w-auto sm:border-b-[3px] sm:border-r-0">
         {item.image ? (
-          <Image src={item.image} alt={item.name} fill sizes="(min-width:1024px) 25vw, (min-width:640px) 50vw, 100vw" className="object-cover transition duration-500 group-hover:scale-105" />
+          <Image src={item.image} alt={item.name} fill sizes="(min-width:1024px) 25vw, (min-width:640px) 50vw, 128px" className="object-cover transition duration-500 group-hover:scale-105" style={item.imagePosition ? { objectPosition: item.imagePosition } : undefined} />
         ) : (
           <FoodArt art={item.art} variant={index} className="h-full w-full transition duration-500 group-hover:scale-105" />
         )}

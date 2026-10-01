@@ -9,7 +9,7 @@ export default function Hero() {
       {/* Background: official photo if provided, otherwise the split "two moods" artwork */}
       <div className="absolute inset-0">
         {brand.heroImage ? (
-          <Image src={brand.heroImage} alt="" fill priority sizes="100vw" className="object-cover" />
+          <Image src={brand.heroImage} alt="" fill priority sizes="100vw" className="object-cover object-[center_45%] lg:object-[center_55%]" />
         ) : (
           <>
             <SunsetScene id="hero-sun" className="absolute inset-0 h-full w-full" />

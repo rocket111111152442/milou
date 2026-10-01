@@ -54,6 +54,8 @@ export type MenuItem = {
   availableAt: "both" | "liwa" | "sbma";
   tag?: string;
   image: string;
+  /** Optional CSS object-position for the photo crop, e.g. "center 75%". */
+  imagePosition?: string;
   art: "taco" | "burrito" | "quesadilla" | "nachos" | "corn" | "sticks" | "fries" | "churro" | "drink";
 };
 
@@ -76,7 +78,7 @@ export const brand = {
   /** PLACEHOLDER — link to the full menu (Instagram highlight, PDF, etc.). */
   fullMenuUrl: "https://www.instagram.com/tacojointph/",
   /** Optional hero photo. Leave "" for the branded poster artwork. */
-  heroImage: "",
+  heroImage: "/images/food-spread.jpg",
   updatesNote: "Hours and menu availability may change — check Instagram for the latest updates.",
   timeZone: "Asia/Manila",
 };
@@ -105,7 +107,7 @@ export const locations: Location[] = [
       "https://www.google.com/maps/search/?api=1&query=Board+Culture+Liwa+San+Felipe+Zambales",
     orderUrl: "",
     reserveUrl: "",
-    image: "",
+    image: "/images/golden-hour.jpg",
     highlights: ["Beachfront", "Sunset sessions", "Surf-town crowd", "Open 10 AM Fri–Sun"],
     theme: "sun",
   },
@@ -157,7 +159,7 @@ export const menu: MenuCategory[] = [
     items: [
       { name: "Birria Burrito", description: "Birria wrapped up burrito-style.", price: "", availableAt: "both", tag: "Must-try", image: "", art: "burrito" },
       { name: "Burritos", description: "Ask the team for today's fillings.", price: "", availableAt: "both", image: "", art: "burrito" },
-      { name: "Quesadillas", description: "Toasted tortilla, melted cheese.", price: "", availableAt: "both", image: "", art: "quesadilla" },
+      { name: "Quesadillas", description: "Toasted tortilla, melted cheese.", price: "", availableAt: "both", image: "/images/food-spread.jpg", imagePosition: "center 80%", art: "quesadilla" },
     ],
   },
   {
@@ -166,7 +168,7 @@ export const menu: MenuCategory[] = [
     intro: "For the table. Or just for you.",
     items: [
       { name: "Nachos", description: "Made for sharing.", price: "", availableAt: "both", image: "", art: "nachos" },
-      { name: "Elotes", description: "Mexican-style street corn.", price: "", availableAt: "both", image: "", art: "corn" },
+      { name: "Elotes", description: "Mexican-style street corn.", price: "", availableAt: "both", image: "/images/elotes.jpg", art: "corn" },
       { name: "Jalapeño Cheese Sticks", description: "Crispy, cheesy, a little heat.", price: "", availableAt: "both", image: "", art: "sticks" },
       { name: "Loaded / Carne Fries", description: "Fries, loaded up.", price: "", availableAt: "both", tag: "Late-night pick", image: "", art: "fries" },
       { name: "Churros", description: "The sweet finish.", price: "", availableAt: "both", tag: "Sweet", image: "", art: "churro" },
@@ -189,10 +191,10 @@ export const menu: MenuCategory[] = [
  */
 
 export const instagramPosts: { image: string; alt: string; caption: string; href: string }[] = [
-  { image: "", alt: "Tacos on the table at Taco J", caption: "Taco night", href: "" },
-  { image: "", alt: "Sunset at Taco J Liwa", caption: "Liwa sunsets", href: "" },
+  { image: "/images/food-spread.jpg", alt: "Quesadillas, a burrito and chips on trays at Taco J", caption: "Table goals", href: "" },
+  { image: "/images/golden-hour.jpg", alt: "Squeezing lime over the food in golden-hour light", caption: "Golden hour", href: "" },
   { image: "", alt: "Cocktails at Taco J SBMA", caption: "SBMA after dark", href: "" },
-  { image: "", alt: "Birria with consommé", caption: "Dip it", href: "" },
+  { image: "/images/elotes.jpg", alt: "Elotes — street corn with chips", caption: "Elotes", href: "" },
   { image: "", alt: "Friends sharing food", caption: "Barkada table", href: "" },
   { image: "", alt: "Churros", caption: "Sweet finish", href: "" },
 ];
