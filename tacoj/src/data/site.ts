@@ -79,6 +79,8 @@ export const brand = {
   fullMenuUrl: "https://www.instagram.com/tacojointph/",
   /** Optional hero photo. Leave "" for the branded poster artwork. */
   heroImage: "/images/food-spread.jpg",
+  /** Photo shown in the brand story section. Leave "" to hide. */
+  storyImage: "/images/burritos.jpg",
   updatesNote: "Hours and menu availability may change — check Instagram for the latest updates.",
   timeZone: "Asia/Manila",
 };
@@ -158,7 +160,7 @@ export const menu: MenuCategory[] = [
     intro: "Big, wrapped and built for hungry nights.",
     items: [
       { name: "Birria Burrito", description: "Birria wrapped up burrito-style.", price: "", availableAt: "both", tag: "Must-try", image: "", art: "burrito" },
-      { name: "Burritos", description: "Ask the team for today's fillings.", price: "", availableAt: "both", image: "", art: "burrito" },
+      { name: "Burritos", description: "Ask the team for today's fillings.", price: "", availableAt: "both", image: "/images/burritos.jpg", imagePosition: "center 40%", art: "burrito" },
       { name: "Quesadillas", description: "Toasted tortilla, melted cheese.", price: "", availableAt: "both", image: "/images/food-spread.jpg", imagePosition: "center 80%", art: "quesadilla" },
     ],
   },
@@ -167,7 +169,7 @@ export const menu: MenuCategory[] = [
     label: "Sides",
     intro: "For the table. Or just for you.",
     items: [
-      { name: "Nachos", description: "Made for sharing.", price: "", availableAt: "both", image: "", art: "nachos" },
+      { name: "Nachos", description: "Made for sharing.", price: "", availableAt: "both", image: "/images/nachos.jpg", imagePosition: "center 60%", art: "nachos" },
       { name: "Elotes", description: "Mexican-style street corn.", price: "", availableAt: "both", image: "/images/elotes.jpg", art: "corn" },
       { name: "Jalapeño Cheese Sticks", description: "Crispy, cheesy, a little heat.", price: "", availableAt: "both", image: "", art: "sticks" },
       { name: "Loaded / Carne Fries", description: "Fries, loaded up.", price: "", availableAt: "both", tag: "Late-night pick", image: "", art: "fries" },
@@ -195,6 +197,6 @@ export const instagramPosts: { image: string; alt: string; caption: string; href
   { image: "/images/golden-hour.jpg", alt: "Squeezing lime over the food in golden-hour light", caption: "Golden hour", href: "" },
   { image: "", alt: "Cocktails at Taco J SBMA", caption: "SBMA after dark", href: "" },
   { image: "/images/elotes.jpg", alt: "Elotes — street corn with chips", caption: "Elotes", href: "" },
-  { image: "", alt: "Friends sharing food", caption: "Barkada table", href: "" },
-  { image: "", alt: "Churros", caption: "Sweet finish", href: "" },
+  { image: "/images/nachos.jpg", alt: "Two hands grabbing loaded nachos from a tray", caption: "Share the nachos", href: "" },
+  { image: "/images/burritos.jpg", alt: "Two burrito halves held up against a pop-art wall", caption: "Burrito o'clock", href: "" },
 ];

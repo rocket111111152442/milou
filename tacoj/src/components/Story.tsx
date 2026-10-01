@@ -1,3 +1,5 @@
+import Image from "next/image";
+import { brand } from "@/data/site";
 import Reveal from "./Reveal";
 
 const pillars = [
@@ -17,6 +19,12 @@ export default function Story() {
             <span className="block text-chili-light">good vibes,</span>
             <span className="block text-mango">no dress code.</span>
           </h2>
+          {brand.storyImage && (
+            <div className="relative mt-10 aspect-[4/5] w-full max-w-sm -rotate-2 overflow-hidden rounded-[28px] border-[3px] border-cream shadow-[10px_10px_0_0_#D42A1E] transition duration-500 hover:rotate-0">
+              <Image src={brand.storyImage} alt="Two Taco J burritos held up against a pop-art wall" fill sizes="(min-width:1024px) 384px, 90vw" className="object-cover" />
+              <span className="absolute bottom-4 left-4 rotate-[-4deg] rounded-full bg-mango px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-char shadow-sticker">Made to share</span>
+            </div>
+          )}
         </Reveal>
         <Reveal delay={120} className="flex flex-col justify-end">
           <p className="text-xl leading-relaxed text-cream/85 sm:text-2xl">
