@@ -1,0 +1,5 @@
+node_modules/
+.cache/
+out/*
+!out/hero-hors-champ.mp4
+!out/hero-hors-champ-poster.jpg

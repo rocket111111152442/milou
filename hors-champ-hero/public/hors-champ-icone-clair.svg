@@ -1,0 +1,13 @@
+<!-- PLACEHOLDER : remplacer par le vrai fichier hors-champ-icone-clair.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs><clipPath id="clip100"><circle cx="100" cy="100" r="92"/></clipPath></defs>
+  <circle cx="100" cy="100" r="92" fill="none" stroke="#ECE8E1" stroke-width="6.44"/>
+  <g clip-path="url(#clip100)" fill="none" stroke="#ECE8E1" stroke-width="4.14" stroke-linejoin="round">
+    <path d="M86.20,61.36L215.00,61.36L215.00,-30.64L86.20,-30.64Z"/>
+    <path d="M126.56,68.73L190.96,180.27L270.64,134.27L206.24,22.73Z"/>
+    <path d="M140.36,107.37L75.96,218.91L155.64,264.91L220.04,153.37Z"/>
+    <path d="M113.80,138.64L-15.00,138.64L-15.00,230.64L113.80,230.64Z"/>
+    <path d="M73.44,131.27L9.04,19.73L-70.64,65.73L-6.24,177.27Z"/>
+    <path d="M59.64,92.63L124.04,-18.91L44.36,-64.91L-20.04,46.63Z"/>
+  </g>
+</svg>
