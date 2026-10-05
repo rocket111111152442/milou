@@ -314,4 +314,45 @@ begin
   end if;
 end $$;
 
+-- Prolonge le planning de démonstration sur 4 semaines (une seule fois),
+-- uniquement les jours qui n'ont encore aucune séance.
+do $$
+declare
+  d int;
+  day date;
+  slot record;
+begin
+  if exists (select 1 from bio_meta where key = 'demo_extend_1') then return; end if;
+  insert into bio_meta (key) values ('demo_extend_1');
+
+  for d in 0..27 loop
+    day := current_date + d;
+    if extract(isodow from day) = 7 then continue; end if;
+    if exists (
+      select 1 from bio_sessions where (starts_at at time zone 'Europe/Paris')::date = day
+    ) then continue; end if;
+
+    for slot in
+      select * from (values
+        ('six-fours', 'Studio Bike', 'RPM', '09:15'),
+        ('six-fours', 'Studio Zen & Freestyle', 'Pilates', '10:30'),
+        ('six-fours', 'Studio Pump & Boxe', 'Body Pump', '12:15'),
+        ('six-fours', 'Studio Zen & Freestyle', 'Yoga Stretch', '18:00'),
+        ('six-fours', 'Studio Pump & Boxe', 'Boxe', '18:30'),
+        ('six-fours', 'Studio Bike', 'RPM', '19:15'),
+        ('sanary', 'Salle de cours', 'Cuisses Abdos Fessiers', '09:30'),
+        ('sanary', 'Salle de cours', 'Stretching', '12:30'),
+        ('sanary', 'Salle de cours', 'Body Pump', '18:30')
+      ) as t(club, room, course, hhmm)
+    loop
+      if extract(isodow from day) = 6 and slot.hhmm > '12:00' then continue; end if;
+      insert into bio_sessions (course_id, room_id, starts_at, duration_min, capacity)
+      select c.id, r.id, (day::text || ' ' || slot.hhmm)::timestamp at time zone 'Europe/Paris', c.duration_min, r.capacity
+      from bio_courses c, bio_rooms r
+      where c.name = slot.course and r.name = slot.room and r.club = slot.club
+      limit 1;
+    end loop;
+  end loop;
+end $$;
+
 notify pgrst, 'reload schema';
