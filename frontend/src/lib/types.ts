@@ -77,13 +77,30 @@ export interface AppNotification {
   createdAt: string;
 }
 
+export interface ReviewAuthor {
+  id: string;
+  firstname: string;
+  lastname: string;
+  avatarUrl?: string;
+  isPremium?: boolean;
+}
+
 export interface Review {
   _id: string;
   rating: number;
   comment?: string;
-  from?: Pick<User, 'id' | 'firstname' | 'lastname' | 'email'> | null;
+  listingTitle?: string;
+  from?: ReviewAuthor | null;
   createdAt: string;
   autoPenalty?: boolean;
+}
+
+export interface ReviewsResponse {
+  reviews: Review[];
+  /** Nombre d'avis analysés (100 max) */
+  total: number;
+  /** Index = note (0 à 5) */
+  distribution: number[];
 }
 
 export interface ReviewReport {

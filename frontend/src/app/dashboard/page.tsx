@@ -399,20 +399,48 @@ export default function DashboardPage() {
         {tab === 'active' && completedMissions.length > 0 && (
           <section className="card mb-8">
             <h2 className="text-lg font-semibold mb-4 text-white">Missions terminées — avis</h2>
-            <ul className="space-y-4">
-              {completedMissions.slice(0, 3).map((m) => (
-                <li key={m._id} className="p-3 rounded-xl bg-milou-surface/60 border border-white/[0.06]">
-                  <p className="font-medium text-sm">{m.listingId?.title || 'Mission'}</p>
-                  {m.completedReason === 'deadline_missed' && (
-                    <p className="text-xs text-red-400 mt-1">
-                      Clôturée automatiquement — délai non respecté
-                    </p>
-                  )}
-                  {m.completedReason !== 'deadline_missed' && (
-                    <MissionReviewForm missionId={m._id} onDone={() => loadDashboard()} />
-                  )}
-                </li>
-              ))}
+            <ul className="space-y-3">
+              {completedMissions.slice(0, 3).map((m) => {
+                const isClient = m.clientUid === user.id || m.clientId?.email === user.email;
+                const alreadyReviewed = isClient ? m.clientReviewed : m.providerReviewed;
+                return (
+                  <li key={m._id} className="p-4 rounded-xl bg-milou-surface/60 border border-white/[0.06]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm text-white truncate">{m.listingId?.title || 'Mission'}</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          {m.amount} M · avec {getOtherPartyName(m)}
+                        </p>
+                      </div>
+                      {m.completedReason === 'deadline_missed' ? (
+                        <span className="badge bg-red-500/10 text-red-400 border border-red-500/20 shrink-0">
+                          Délai dépassé
+                        </span>
+                      ) : alreadyReviewed ? (
+                        <span className="badge bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 shrink-0">
+                          ✓ Avis envoyé
+                        </span>
+                      ) : (
+                        <span className="badge bg-amber-500/10 text-amber-300 border border-amber-500/20 shrink-0">
+                          À noter
+                        </span>
+                      )}
+                    </div>
+                    {m.completedReason === 'deadline_missed' && (
+                      <p className="text-xs text-zinc-500 mt-2">
+                        Clôturée automatiquement — le délai annoncé n&apos;a pas été respecté.
+                      </p>
+                    )}
+                    {m.completedReason !== 'deadline_missed' && !alreadyReviewed && (
+                      <MissionReviewForm
+                        missionId={m._id}
+                        partnerName={getOtherPartyName(m)}
+                        onDone={() => setTimeout(() => loadDashboard(), 900)}
+                      />
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}

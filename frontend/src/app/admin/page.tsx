@@ -9,6 +9,7 @@ import AdminUserInspector from '@/components/admin/AdminUserInspector';
 import TransactionList from '@/components/TransactionList';
 import { useAuth } from '@/context/AuthContext';
 import { adminApi, chatApi } from '@/lib/api';
+import StarRating from '@/components/reviews/StarRating';
 import type {
   AdminAuditEntry,
   AdminStats,
@@ -608,11 +609,13 @@ export default function AdminPage() {
                     </p>
                     <p className="text-gray-300 bg-milou-bg p-2 rounded-lg">{rep.details}</p>
                     {snap && (
-                      <div className="border border-milou-border rounded-lg p-3 bg-milou-bg/50">
+                      <div className="border border-white/[0.06] rounded-xl p-3 bg-milou-surface/60">
                         <p className="text-amber-400 text-xs mb-1">Avis concerné</p>
-                        <p>
-                          {snap.rating === 0 ? '☆☆☆☆☆ (0/5)' : `${snap.rating}/5`} — par {snap.fromName}
-                          {snap.autoPenalty && ' (automatique)'}
+                        <p className="flex flex-wrap items-center gap-2">
+                          <StarRating value={snap.rating} />
+                          <span className="tabular-nums">{snap.rating}/5</span>
+                          <span className="text-zinc-500">— par {snap.fromName}</span>
+                          {snap.autoPenalty && <span className="text-red-400 text-xs">(automatique)</span>}
                         </p>
                         {snap.comment && <p className="text-gray-400 mt-1 italic">&quot;{snap.comment}&quot;</p>}
                         <p className="text-xs text-gray-600 mt-1">ID avis : {rep.reviewId}</p>

@@ -7,8 +7,10 @@ import Navbar from '@/components/Navbar';
 import AppShell from '@/components/AppShell';
 import ProfileBadges from '@/components/ProfileBadges';
 import PremiumBadge from '@/components/PremiumBadge';
-import { profileApi, reviewsApi } from '@/lib/api';
-import { PublicUserProfile, Review, Listing } from '@/lib/types';
+import { profileApi } from '@/lib/api';
+import { PublicUserProfile, Listing } from '@/lib/types';
+import ReviewsSection from '@/components/reviews/ReviewsSection';
+import StarRating from '@/components/reviews/StarRating';
 import { useAuth } from '@/context/AuthContext';
 
 export default function PublicProfilePage() {
@@ -16,7 +18,6 @@ export default function PublicProfilePage() {
   const { user: me } = useAuth();
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [listings, setListings] = useState<Partial<Listing>[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -28,7 +29,6 @@ export default function PublicProfilePage() {
         setListings(d.listings);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Erreur'));
-    reviewsApi.forUser(id).then((r) => setReviews(r.reviews)).catch(() => {});
   }, [id]);
 
   if (error) {
@@ -82,16 +82,21 @@ export default function PublicProfilePage() {
             </div>
           )}
 
-          <div className="grid sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
               { label: 'Réputation', value: profile.reputation },
-              { label: 'Note', value: profile.averageRating ? `${profile.averageRating}/5` : '—' },
+              {
+                label: 'Note',
+                value: profile.reviewCount && profile.averageRating ? `${profile.averageRating.toFixed(1)}/5` : '—',
+                stars: profile.reviewCount ? profile.averageRating : null,
+              },
               { label: 'Avis', value: profile.reviewCount },
               { label: 'Échanges', value: profile.transactionCount },
             ].map((s) => (
               <div key={s.label} className="card py-4 text-center">
-                <p className="text-2xl font-bold text-white">{s.value}</p>
-                <p className="text-xs text-zinc-500 mt-1">{s.label}</p>
+                <p className="text-2xl font-bold text-white tabular-nums">{s.value}</p>
+                {s.stars != null && <StarRating value={s.stars} size="xs" className="mt-1" />}
+                <p className="text-xs text-zinc-500 mt-1 uppercase tracking-wide">{s.label}</p>
               </div>
             ))}
           </div>
@@ -113,24 +118,12 @@ export default function PublicProfilePage() {
             </section>
           )}
 
-          <section className="card">
-            <h2 className="text-lg font-semibold text-white mb-4">Avis reçus</h2>
-            {reviews.length === 0 ? (
-              <p className="text-zinc-500 text-sm">Aucun avis pour le moment.</p>
-            ) : (
-              <ul className="space-y-3">
-                {reviews.map((r) => (
-                  <li key={r._id} className="p-3 rounded-xl bg-milou-surface/60 border border-white/[0.06]">
-                    <p className="text-amber-400 text-sm">{'★'.repeat(r.rating)}</p>
-                    {r.comment && <p className="text-zinc-400 text-sm mt-1">{r.comment}</p>}
-                    <p className="text-xs text-zinc-600 mt-1">
-                      {new Date(r.createdAt).toLocaleDateString('fr-FR')}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <ReviewsSection
+            userId={profile.id}
+            averageRating={profile.averageRating ?? 0}
+            reviewCount={profile.reviewCount ?? 0}
+            canReport={isMe}
+          />
         </div>
       </AppShell>
     </>

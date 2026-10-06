@@ -5,6 +5,7 @@ import { Listing } from '@/lib/types';
 import PremiumBadge from '@/components/PremiumBadge';
 import AdminBadge from '@/components/AdminBadge';
 import ReportListingButton from '@/components/ReportListingButton';
+import { IconStar } from '@/components/ui/Icons';
 import { getListingOwnerId, LISTING_STATUS_LABELS } from '@/lib/listing-utils';
 import { SERVICE_CATEGORIES } from '@/lib/premium/config';
 
@@ -117,8 +118,13 @@ export default function ListingCard({
               >
                 {author.firstname} {author.lastname}
                 {author.reputation != null && ` · ${author.reputation} rep.`}
-                {author.averageRating ? ` · ${author.averageRating}/5` : ''}
               </Link>
+              {author.averageRating ? (
+                <span className="inline-flex items-center gap-0.5 text-xs text-amber-300 tabular-nums">
+                  <IconStar className="w-3 h-3 text-amber-400" />
+                  {author.averageRating.toFixed(1)}
+                </span>
+              ) : null}
               {author.role === 'admin' && <AdminBadge />}
               {author.isPremium && <PremiumBadge />}
             </div>

@@ -12,22 +12,20 @@ import { useAuth } from '@/context/AuthContext';
 import ProfileEditor from '@/components/ProfileEditor';
 import ProfileBadges from '@/components/ProfileBadges';
 import { getUserBadges } from '@/lib/user-trust';
-import { reviewsApi, userApi } from '@/lib/api';
-import ReportReviewButton from '@/components/ReportReviewButton';
-import { Listing, Review } from '@/lib/types';
+import { userApi } from '@/lib/api';
+import ReviewsSection from '@/components/reviews/ReviewsSection';
+import { Listing } from '@/lib/types';
 import { IconArrowRight, IconStar } from '@/components/ui/Icons';
 
 export default function ProfilePage() {
   const { user, loading, setUser } = useAuth();
   const [listings, setListings] = useState<Listing[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     if (!user) return;
     userApi.dashboard().then((d) =>
       setListings((d.listings as Listing[]).filter((l) => l.status === 'open'))
     );
-    reviewsApi.forUser(user.id).then((r) => setReviews(r.reviews)).catch(() => {});
   }, [user]);
 
   if (loading || !user) {
@@ -121,36 +119,12 @@ export default function ProfilePage() {
             </dl>
           </div>
 
-          <div className="card">
-            <h2 className="font-semibold text-white mb-4">Avis reçus</h2>
-            {reviews.length === 0 ? (
-              <p className="text-zinc-500 text-sm">Aucun avis pour le moment.</p>
-            ) : (
-              <ul className="space-y-4">
-                {reviews.map((r) => (
-                  <li key={r._id} className="text-sm border-b border-white/[0.06] pb-4 last:border-0 last:pb-0">
-                    <p className={r.rating === 0 ? 'text-red-400' : 'text-amber-400 font-medium'}>
-                      {r.rating === 0 ? '0/5' : `${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}`}
-                    </p>
-                    {r.comment && <p className="text-zinc-300 mt-1.5">{r.comment}</p>}
-                    <p className="text-zinc-600 text-xs mt-2">
-                      {r.from ? `${r.from.firstname} ${r.from.lastname}` : 'Utilisateur'} ·{' '}
-                      {new Date(r.createdAt).toLocaleDateString('fr-FR')}
-                      {r.autoPenalty && ' · Automatique'}
-                    </p>
-                    {!r.autoPenalty && (
-                      <ReportReviewButton
-                        reviewId={r._id}
-                        onReported={() =>
-                          reviewsApi.forUser(user.id).then((res) => setReviews(res.reviews))
-                        }
-                      />
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <ReviewsSection
+            userId={user.id}
+            averageRating={user.averageRating ?? 0}
+            reviewCount={user.reviewCount ?? 0}
+            canReport
+          />
 
           <div className="card">
             <h2 className="font-semibold text-white mb-4">Annonces ouvertes</h2>

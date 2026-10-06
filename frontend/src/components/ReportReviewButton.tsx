@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { reviewsApi } from '@/lib/api';
 
 const REASONS = [
@@ -41,14 +42,14 @@ export default function ReportReviewButton({ reviewId, onReported }: Props) {
   }
 
   if (done) {
-    return <p className="text-xs text-emerald-400 mt-2">Signalement envoyé aux modérateurs.</p>;
+    return <p className="text-xs text-emerald-400">Signalé · en cours d&apos;examen</p>;
   }
 
   return (
     <>
       <button
         type="button"
-        className="text-xs text-amber-400/90 hover:text-amber-300 mt-2 underline"
+        className="text-xs text-zinc-500 hover:text-amber-300 transition"
         onClick={() => {
           setOpen(true);
           setError('');
@@ -57,20 +58,22 @@ export default function ReportReviewButton({ reviewId, onReported }: Props) {
         Signaler cet avis
       </button>
 
-      {open && (
+      {/* Portail : les ancêtres animés (transform) casseraient le positionnement fixed */}
+      {open &&
+        createPortal(
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <button
             type="button"
-            className="absolute inset-0 bg-black/70"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             aria-label="Fermer"
             onClick={() => setOpen(false)}
           />
           <form
             onSubmit={handleSubmit}
-            className="relative w-full max-w-md card border-amber-500/30 space-y-4"
+            className="relative w-full max-w-md card border-amber-500/30 space-y-4 animate-fade-up"
           >
             <h3 className="font-semibold text-amber-300">Signaler un avis</h3>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-zinc-400">
               Décrivez le problème. Un modérateur examinera votre signalement et pourra supprimer l&apos;avis.
             </p>
             <div>
@@ -95,7 +98,7 @@ export default function ReportReviewButton({ reviewId, onReported }: Props) {
                 maxLength={1000}
               />
             </div>
-            {error && <p className="text-milou-danger text-xs">{error}</p>}
+            {error && <p className="alert-error text-xs">{error}</p>}
             <div className="flex gap-2">
               <button type="button" className="btn-secondary flex-1 text-sm" onClick={() => setOpen(false)}>
                 Annuler
@@ -105,8 +108,9 @@ export default function ReportReviewButton({ reviewId, onReported }: Props) {
               </button>
             </div>
           </form>
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </>
   );
 }

@@ -202,7 +202,7 @@ export const reviewsApi = {
     api<{ message: string }>('/api/reviews', { method: 'POST', body: JSON.stringify(body) }),
   pending: () => api<{ pending: import('./types').PendingReviewMission[] }>('/api/reviews/pending'),
   forUser: (userId: string) =>
-    api<{ reviews: import('./types').Review[] }>(`/api/reviews?userId=${userId}`),
+    api<import('./types').ReviewsResponse>(`/api/reviews?userId=${encodeURIComponent(userId)}`),
   report: (reviewId: string, body: { reason: string; details: string }) =>
     api<{ message: string }>(`/api/reviews/${reviewId}/report`, {
       method: 'POST',
