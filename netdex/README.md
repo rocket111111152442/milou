@@ -21,27 +21,30 @@ Jeu de cartes à collectionner où chaque carte est un **vrai site web**. Plus u
 
 La 5ᵉ carte de chaque booster est au moins Rare. 2 % de chance d'HOLO (valeur ×5). Réglages dans `server/sites.js` et `server/game.js` (`CONFIG`).
 
+## Hébergement : Vercel + Postgres (Neon)
+
+- Le front (`public/`) est servi par le CDN de Vercel, l'API est une fonction Vercel (`api/index.js`, toutes les routes `/api/*`).
+- Les données sont dans **Postgres** (Neon, offre gratuite suffisante : la base pèse ~130 Mo).
+- Au build, `scripts/migrate.js` crée les tables et importe le classement Tranco si la base est vide (~15 s).
+
+Mise en place :
+1. Projet Vercel avec **Root Directory = `netdex`**.
+2. Onglet **Storage** du projet → **Create Database** → **Neon** (gratuit) → connecter au projet. Vercel ajoute `DATABASE_URL` tout seul.
+3. **Redéployer** : le build initialise la base.
+
+`/api/health` indique si la base est connectée.
+
 ## Lancer en local
 
-Node.js **22.13+** requis, **aucune dépendance** à installer (SQLite est intégré à Node).
-
 ```bash
-cd netdex
+cd netdex && npm install
+export DATABASE_URL=postgres://user:mdp@localhost/netdex
+npm run migrate    # tables + import Tranco
 npm start          # http://localhost:3000
-npm test           # tests de la logique de jeu
+TEST_DATABASE_URL=postgres://user:mdp@localhost/netdex_test npm test   # base de test vidée à chaque passage
 ```
 
-Le premier démarrage télécharge la liste Tranco (~10 Mo) et remplit la base `data/netdex.db` (~20 s). Hors ligne : `TRANCO_FILE=chemin/top-1m.csv.zip npm start`.
-
-## Mettre en ligne
-
-Il faut un hébergeur avec **disque persistant** (la base SQLite y vit) et **HTTPS** (obligatoire pour installer l'app sur téléphone).
-
-- **Docker** (VPS, Railway, Fly.io…) : `docker build -t netdex . && docker run -p 3000:3000 -v netdex-data:/data netdex`
-- Variables : `PORT` (défaut 3000), `DB_FILE` (défaut `data/netdex.db`).
-- Sauvegarde : copier le fichier `netdex.db` (sauvegarde à chaud possible avec `sqlite3 netdex.db ".backup save.db"`).
-
-Les offres gratuites sans disque persistant (Render free, Vercel) **ne conviennent pas** : les comptes seraient effacés à chaque redémarrage.
+Hors ligne : `TRANCO_FILE=chemin/top-1m.csv.zip npm run migrate`. Ailleurs que sur Vercel : `Dockerfile` fourni (il faut aussi un `DATABASE_URL`).
 
 ## Installer sur téléphone
 
@@ -50,7 +53,9 @@ Les offres gratuites sans disque persistant (Render free, Vercel) **ne convienne
 
 ## Architecture
 
-- `server/index.js` — serveur HTTP Node pur, sessions par cookie HttpOnly, mots de passe scrypt, fichiers statiques préchargés et précompressés (brotli/gzip).
-- `server/game.js` — règles : boosters, dex, échanges, enchères (anti-snipe, commission 5 %), amis.
-- `server/sites.js` — import Tranco, filtres, paliers de rareté.
+- `lib/api.js` — routes JSON, sessions par cookie HttpOnly, mots de passe scrypt.
+- `lib/game.js` — règles : boosters, dex, échanges, enchères (anti-snipe, commission 5 %), amis. Transactions Postgres avec verrous : pas de double ouverture ni de solde négatif en cas de requêtes simultanées.
+- `lib/sites.js` — import Tranco, filtres, paliers de rareté.
+- `lib/db.js` — schéma et accès Postgres.
+- `api/index.js` — fonction Vercel ; `server/dev.js` — serveur local / Docker.
 - `public/` — application monopage en JavaScript natif (aucun framework), service worker, manifest.

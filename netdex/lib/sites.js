@@ -78,26 +78,39 @@ export async function loadTrancoCsv(file) {
   return (file && file.endsWith('.csv') ? buf : unzipFirst(buf)).toString('utf8');
 }
 
-// Remplit la table sites. Les id sont les rangs filtrés (1 = le plus visité).
-export function importSites(db, csv) {
-  const insert = db.prepare('INSERT INTO sites (id, domain, rarity, family) VALUES (?, ?, ?, ?)');
+// Remplit la table sites (id = rang filtré, 1 = le plus visité) puis mémorise les paliers.
+export async function importSites(db, csv) {
+  const rows = [];
   const seen = new Set();
-  let rank = 0;
-  db.exec('BEGIN');
-  try {
-    for (const line of csv.split('\n')) {
-      const comma = line.indexOf(',');
-      if (comma < 0) continue;
-      const domain = line.slice(comma + 1).trim().toLowerCase().replace(/^www\./, '');
-      if (!keepDomain(domain) || seen.has(domain)) continue;
-      seen.add(domain);
-      rank++;
-      insert.run(rank, domain, rarityForRank(rank), familyOf(domain));
-    }
-    db.exec('COMMIT');
-  } catch (e) {
-    db.exec('ROLLBACK');
-    throw e;
+  for (const line of csv.split('\n')) {
+    const comma = line.indexOf(',');
+    if (comma < 0) continue;
+    const domain = line.slice(comma + 1).trim().toLowerCase().replace(/^www\./, '');
+    if (!keepDomain(domain) || seen.has(domain)) continue;
+    seen.add(domain);
+    rows.push(domain);
   }
-  return rank;
+  const BATCH = 20_000;
+  await db.tx(async (t) => {
+    await t.query('TRUNCATE sites');
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const ids = [], domains = [], rarities = [], families = [];
+      for (let j = i; j < Math.min(rows.length, i + BATCH); j++) {
+        const rank = j + 1;
+        ids.push(rank); domains.push(rows[j]); rarities.push(rarityForRank(rank)); families.push(familyOf(rows[j]));
+      }
+      await t.query('INSERT INTO sites (id, domain, rarity, family) SELECT * FROM unnest($1::int[], $2::text[], $3::smallint[], $4::text[])', [ids, domains, rarities, families]);
+    }
+    await t.query("INSERT INTO meta (key, value) VALUES ('tiers', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [JSON.stringify(computeTiers(rows.length))]);
+  });
+  return rows.length;
+}
+
+// Les id sont des rangs triés : chaque palier de rareté est une plage contiguë.
+export function computeTiers(total) {
+  return RARITIES.map((r) => {
+    const hi = Math.min(total, r.maxRank);
+    const lo = r.id === RARITIES.length - 1 ? 1 : Math.min(total, RARITIES[r.id + 1].maxRank) + 1;
+    return { id: r.id, lo, hi, total: Math.max(0, hi - lo + 1) };
+  });
 }

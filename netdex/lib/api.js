@@ -1,0 +1,356 @@
+// API JSON de Netdex. handleApi(req, res) fonctionne avec node:http et avec les fonctions Vercel.
+import { randomBytes, createHash, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
+import { gzipSync } from 'node:zlib';
+import { createDb } from './db.js';
+import { RARITIES } from './sites.js';
+import { createGame, CONFIG, GameError } from './game.js';
+
+const SESSION_DAYS = 60;
+const scrypt = promisify(scryptCb);
+const sha = (s) => createHash('sha256').update(s).digest('hex');
+
+// Initialisation paresseuse : une connexion et un état de jeu par instance (réutilisés entre requêtes).
+let ctx = null;
+export function getContext(db) {
+  if (!ctx) {
+    ctx = (async () => {
+      const d = db || createDb();
+      if (!d) throw new GameError('Base de données non configurée (DATABASE_URL manquant).', 503);
+      return { db: d, game: await createGame(d) };
+    })();
+    ctx.catch(() => { ctx = null; });
+  }
+  return ctx;
+}
+export function resetContext() { ctx = null; }
+
+// ---------- Comptes ----------
+async function hashPassword(pw) {
+  const salt = randomBytes(16);
+  const hash = await scrypt(pw, salt, 64);
+  return `s1$${salt.toString('hex')}$${hash.toString('hex')}`;
+}
+async function checkPassword(pw, stored) {
+  const [, salt, hash] = stored.split('$');
+  const got = await scrypt(pw, Buffer.from(salt, 'hex'), 64);
+  return timingSafeEqual(got, Buffer.from(hash, 'hex'));
+}
+const tokenFrom = (req) => /(?:^|;\s*)nd_sid=([A-Za-z0-9_-]+)/.exec(req.headers.cookie || '')?.[1];
+
+function setCookie(res, req, value, maxAge) {
+  const secure = req.headers['x-forwarded-proto'] === 'https' || process.env.VERCEL ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `nd_sid=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`);
+}
+async function createSession(db, res, req, userId) {
+  const token = randomBytes(32).toString('base64url');
+  await db.run('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [sha(token), userId, Date.now() + SESSION_DAYS * 86400e3]);
+  setCookie(res, req, token, SESSION_DAYS * 86400);
+}
+async function getUser(db, req) {
+  const token = tokenFrom(req);
+  if (!token) return null;
+  const u = await db.one('SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > $2', [sha(token), Date.now()]);
+  if (u && Date.now() - u.last_seen > 60_000) await db.run('UPDATE users SET last_seen = $1 WHERE id = $2', [Date.now(), u.id]);
+  return u || null;
+}
+
+// Limiteur par IP (par instance : protection de base contre le bourrage d'identifiants).
+const hits = new Map();
+function rateLimit(req, key, max, windowMs) {
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || '?';
+  const k = key + ip;
+  const now = Date.now();
+  if (hits.size > 10_000) for (const [kk, v] of hits) if (v.reset < now) hits.delete(kk);
+  const h = hits.get(k);
+  if (!h || h.reset < now) { hits.set(k, { n: 1, reset: now + windowMs }); return; }
+  if (++h.n > max) throw new GameError('Trop de tentatives, réessaie dans une minute.', 429);
+}
+
+// ---------- Vues ----------
+async function meView({ db, game }, u) {
+  const now = Date.now();
+  const c = await db.one(`SELECT
+      (SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND NOT read) notifications,
+      (SELECT COUNT(*) FROM trades WHERE to_id = $1 AND status = 'pending') trades,
+      (SELECT COUNT(*) FROM friends WHERE friend_id = $1 AND status = 'pending') friend_requests`, [u.id]);
+  return {
+    user: { id: u.id, username: u.username, bits: u.bits, dexCount: u.dex_count, dexScore: u.dex_score, packsOpened: u.packs_opened, avatarSite: u.avatar_site, createdAt: u.created_at },
+    packs: game.packState(u, now),
+    daily: game.dailyState(u, now),
+    counts: { notifications: c.notifications, trades: c.trades, friendRequests: c.friend_requests },
+    config: { premiumPrice: CONFIG.premiumPrice, holoMultiplier: CONFIG.holoMultiplier, auctionHours: CONFIG.auctionHours, auctionFee: CONFIG.auctionFee, maxTradeCards: CONFIG.maxTradeCards, totalSites: game.totalSites },
+    serverTime: now,
+  };
+}
+const reloadUser = (db, id) => db.one('SELECT * FROM users WHERE id = $1', [id]);
+
+const COLLECTION_SORT = {
+  rarity: 's.rarity DESC, s.id ASC',
+  recent: 'last DESC',
+  name: 's.domain ASC',
+  count: 'n DESC, s.rarity DESC',
+  rank: 's.id ASC',
+};
+const likeArg = (s) => '%' + String(s).toLowerCase().replace(/[%_\\]/g, '') + '%';
+
+async function collection(db, userId, query) {
+  const args = [userId];
+  const p = (v) => { args.push(v); return '$' + args.length; };
+  const where = ['c.user_id = $1'];
+  if (query.rarity !== undefined && query.rarity !== '') where.push(`s.rarity = ${p(Number(query.rarity))}`);
+  if (query.q) where.push(`s.domain LIKE ${p(likeArg(query.q))}`);
+  const having = query.dupes === '1' ? 'HAVING COUNT(*) > 1' : query.holo === '1' ? 'HAVING SUM(c.holo) > 0' : '';
+  const limit = Math.min(200, Number(query.limit) || 120);
+  const offset = Math.max(0, Number(query.offset) || 0);
+  const rows = await db.all(`SELECT s.id, s.domain, s.rarity, s.family, COUNT(*)::int n, SUM(c.holo)::int holo, MAX(c.obtained_at) last,
+      string_agg(CASE WHEN c.status = 'owned' THEN c.id::text || CASE WHEN c.holo = 1 THEN 'h' ELSE '' END END, ',') cards
+    FROM cards c JOIN sites s ON s.id = c.site_id WHERE ${where.join(' AND ')}
+    GROUP BY s.id ${having} ORDER BY ${COLLECTION_SORT[query.sort] || COLLECTION_SORT.rarity} LIMIT ${p(limit + 1)} OFFSET ${p(offset)}`, args);
+  return { items: rows.slice(0, limit), more: rows.length > limit };
+}
+
+async function stats({ db, game }, userId) {
+  const [owned, byRarity] = await Promise.all([
+    db.one('SELECT COUNT(*) n, COUNT(DISTINCT site_id) d FROM cards WHERE user_id = $1', [userId]),
+    db.all('SELECT s.rarity, COUNT(*) n FROM dex d JOIN sites s ON s.id = d.site_id WHERE d.user_id = $1 GROUP BY s.rarity', [userId]),
+  ]);
+  const found = Object.fromEntries(byRarity.map((r) => [r.rarity, r.n]));
+  return {
+    cards: owned.n, distinct: owned.d,
+    tiers: game.tiers.map((t) => ({ id: t.id, name: t.name, key: t.key, total: t.total, lo: t.lo, hi: t.hi, found: found[t.id] || 0, value: t.value, chance: t.weight / 100 })),
+  };
+}
+
+async function publicProfile(c, meId, name) {
+  const { db, game } = c;
+  const u = await db.one('SELECT u.*, s.domain avatar_domain FROM users u LEFT JOIN sites s ON s.id = u.avatar_site WHERE lower(u.username) = lower($1)', [name]);
+  if (!u) throw new GameError('Joueur introuvable.', 404);
+  const [best, rank, st, relation] = await Promise.all([
+    db.all(`SELECT s.id, s.domain, s.rarity, s.family, MAX(c.holo) holo, COUNT(*)::int n FROM cards c JOIN sites s ON s.id = c.site_id
+      WHERE c.user_id = $1 GROUP BY s.id ORDER BY s.rarity DESC, s.id ASC LIMIT 12`, [u.id]),
+    db.one('SELECT COUNT(*) + 1 r FROM users WHERE dex_score > $1', [u.dex_score]),
+    stats(c, u.id),
+    meId === u.id ? 'self' : game.relation(db, meId, u.id),
+  ]);
+  return {
+    id: u.id, username: u.username, createdAt: u.created_at, lastSeen: u.last_seen, dexCount: u.dex_count, dexScore: u.dex_score,
+    packsOpened: u.packs_opened, avatarSite: u.avatar_site, avatarDomain: u.avatar_domain, rank: rank.r, relation, best, stats: st,
+  };
+}
+
+async function siteInfo(db, meId, id) {
+  const site = await db.one('SELECT * FROM sites WHERE id = $1', [Number(id) || 0]);
+  if (!site) throw new GameError('Site inconnu.', 404);
+  const [circ, mine, owners, found] = await Promise.all([
+    db.one('SELECT COUNT(*) n, COALESCE(SUM(holo), 0) h, COUNT(DISTINCT user_id) owners FROM cards WHERE site_id = $1', [site.id]),
+    db.all('SELECT id, holo, status, obtained_at FROM cards WHERE site_id = $1 AND user_id = $2 ORDER BY holo DESC, id', [site.id, meId]),
+    db.all(`SELECT u.username, COUNT(*) n, SUM(c.holo) h FROM cards c JOIN users u ON u.id = c.user_id
+      WHERE c.site_id = $1 GROUP BY u.id ORDER BY n DESC LIMIT 15`, [site.id]),
+    db.one('SELECT found_at FROM dex WHERE user_id = $1 AND site_id = $2', [meId, site.id]),
+  ]);
+  return { site, circulation: circ.n, holos: circ.h, owners: circ.owners, ownerList: owners, mine, foundAt: found?.found_at || null, value: RARITIES[site.rarity].value };
+}
+
+// ---------- Routes ----------
+const routes = [];
+const route = (method, path, handler, opts = {}) => {
+  const keys = [];
+  const re = new RegExp('^' + path.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$');
+  routes.push({ method, re, keys, handler, auth: opts.auth !== false, db: opts.db !== false });
+};
+
+const USERNAME = /^[A-Za-z0-9_.-]{3,20}$/;
+
+route('POST', '/api/register', async ({ c, req, res, body }) => {
+  rateLimit(req, 'reg', 5, 60_000);
+  const { db, game } = c;
+  const username = String(body.username || '').trim();
+  const password = String(body.password || '');
+  if (!USERNAME.test(username)) throw new GameError('Pseudo : 3 à 20 caractères (lettres, chiffres, _ . -).');
+  if (password.length < 8 || password.length > 200) throw new GameError('Mot de passe : 8 caractères minimum.');
+  if (await db.one('SELECT 1 FROM users WHERE lower(username) = lower($1)', [username])) throw new GameError('Ce pseudo est déjà pris.', 409);
+  const hash = await hashPassword(password);
+  const now = Date.now();
+  let id;
+  try {
+    ({ id } = await db.one('INSERT INTO users (username, pass_hash, created_at, bits, pack_stock, pack_anchor, last_seen) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+      [username, hash, now, CONFIG.startBits, CONFIG.startPacks, now, now]));
+  } catch {
+    throw new GameError('Ce pseudo est déjà pris.', 409);
+  }
+  await game.notify(db, id, `Bienvenue sur Netdex, ${username} ! Tu as ${CONFIG.startPacks} boosters offerts.`, '#/');
+  await createSession(db, res, req, id);
+  return meView(c, await reloadUser(db, id));
+}, { auth: false });
+
+route('POST', '/api/login', async ({ c, req, res, body }) => {
+  rateLimit(req, 'login', 10, 60_000);
+  const u = await c.db.one('SELECT * FROM users WHERE lower(username) = lower($1)', [String(body.username || '').trim()]);
+  if (!u || !(await checkPassword(String(body.password || ''), u.pass_hash))) throw new GameError('Pseudo ou mot de passe incorrect.', 401);
+  await c.db.run('DELETE FROM sessions WHERE user_id = $1 AND expires_at < $2', [u.id, Date.now()]);
+  await createSession(c.db, res, req, u.id);
+  return meView(c, u);
+}, { auth: false });
+
+route('POST', '/api/logout', async ({ c, req, res }) => {
+  const token = tokenFrom(req);
+  if (token) await c.db.run('DELETE FROM sessions WHERE token_hash = $1', [sha(token)]);
+  setCookie(res, req, '', 0);
+  return { ok: true };
+}, { auth: false });
+
+route('POST', '/api/account/password', async ({ c, me, body }) => {
+  if (!(await checkPassword(String(body.current || ''), me.pass_hash))) throw new GameError('Mot de passe actuel incorrect.', 401);
+  const pw = String(body.password || '');
+  if (pw.length < 8 || pw.length > 200) throw new GameError('Mot de passe : 8 caractères minimum.');
+  await c.db.run('UPDATE users SET pass_hash = $1 WHERE id = $2', [await hashPassword(pw), me.id]);
+  return { ok: true };
+});
+
+route('POST', '/api/account/avatar', async ({ c, me, body }) => {
+  const siteId = Number(body.siteId) || 0;
+  if (!(await c.db.one('SELECT 1 FROM cards WHERE user_id = $1 AND site_id = $2', [me.id, siteId]))) throw new GameError('Tu dois posséder cette carte.');
+  await c.db.run('UPDATE users SET avatar_site = $1 WHERE id = $2', [siteId, me.id]);
+  return { ok: true };
+});
+
+route('GET', '/api/me', async ({ c, me }) => { await c.game.settleAuctions(); return meView(c, await reloadUser(c.db, me.id)); });
+route('POST', '/api/packs/open', async ({ c, me, body }) => {
+  const cards = await c.game.openPack(me.id, body.kind === 'premium' ? 'premium' : 'free');
+  return { cards, me: await meView(c, await reloadUser(c.db, me.id)) };
+});
+route('POST', '/api/daily', ({ c, me }) => c.game.claimDaily(me.id));
+
+route('GET', '/api/collection', async ({ c, me, query }) => {
+  const owner = query.user ? await c.db.one('SELECT id FROM users WHERE lower(username) = lower($1)', [query.user]) : me;
+  if (!owner) throw new GameError('Joueur introuvable.', 404);
+  return collection(c.db, owner.id, query);
+});
+route('GET', '/api/stats', ({ c, me }) => stats(c, me.id));
+route('POST', '/api/cards/recycle', ({ c, me, body }) => c.game.recycle(me.id, body.cardIds));
+route('POST', '/api/cards/recycle-duplicates', ({ c, me, body }) => c.game.recycleDuplicates(me.id, body.maxRarity));
+
+route('GET', '/api/dex', async ({ c, me, query }) => {
+  const t = c.game.tiers[Math.max(0, Math.min(5, Number(query.rarity) || 0))];
+  const offset = Math.max(0, Number(query.offset) || 0);
+  const rows = await c.db.all(`SELECT s.id, s.domain, s.rarity, s.family, d.found_at FROM sites s LEFT JOIN dex d ON d.site_id = s.id AND d.user_id = $1
+    WHERE s.id BETWEEN $2 AND $3 ${query.missing === '1' ? 'AND d.found_at IS NULL' : ''} ORDER BY s.id LIMIT 121 OFFSET $4`, [me.id, t.lo, t.hi, offset]);
+  return { items: rows.slice(0, 120), more: rows.length > 120 };
+});
+
+route('GET', '/api/sites/search', async ({ c, me, query }) => {
+  const q = String(query.q || '').toLowerCase().trim().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].replace(/[%_\\]/g, '');
+  if (q.length < 2) return { items: [] };
+  return { items: await c.db.all(`SELECT s.id, s.domain, s.rarity, s.family, d.found_at FROM sites s
+    LEFT JOIN dex d ON d.site_id = s.id AND d.user_id = $1 WHERE s.domain LIKE $2 ORDER BY s.id LIMIT 30`, [me.id, q + '%']) };
+});
+route('GET', '/api/sites/:id', ({ c, me, params }) => siteInfo(c.db, me.id, params.id));
+
+route('GET', '/api/users/search', async ({ c, me, query }) => {
+  const q = String(query.q || '').trim().replace(/[%_\\]/g, '');
+  if (q.length < 2) return { items: [] };
+  return { items: await c.db.all('SELECT id, username, dex_count, dex_score FROM users WHERE lower(username) LIKE lower($1) AND id != $2 ORDER BY dex_score DESC LIMIT 20', [q + '%', me.id]) };
+});
+route('GET', '/api/users/:name', ({ c, me, params }) => publicProfile(c, me.id, decodeURIComponent(params.name)));
+
+route('GET', '/api/leaderboard', async ({ c, me, query }) => {
+  const by = query.by === 'count' ? 'dex_count' : query.by === 'packs' ? 'packs_opened' : 'dex_score';
+  const friends = query.scope === 'friends';
+  const items = await c.db.all(`SELECT u.id, u.username, u.dex_score, u.dex_count, u.packs_opened, s.domain avatar_domain FROM users u
+    LEFT JOIN sites s ON s.id = u.avatar_site
+    ${friends ? "WHERE u.id = $1 OR u.id IN (SELECT friend_id FROM friends WHERE user_id = $1 AND status = 'accepted')" : ''}
+    ORDER BY u.${by} DESC, u.id ASC LIMIT 100`, friends ? [me.id] : []);
+  const myRank = (await c.db.one(`SELECT COUNT(*) + 1 r FROM users WHERE ${by} > $1`, [me[by]])).r;
+  return { items, myRank };
+});
+
+route('GET', '/api/friends', ({ c, me }) => c.game.listFriends(me.id));
+route('POST', '/api/friends/request', ({ c, me, body }) => c.game.requestFriend(me, body.username));
+route('POST', '/api/friends/respond', ({ c, me, body }) => c.game.respondFriend(me, body.userId, !!body.accept));
+route('POST', '/api/friends/remove', ({ c, me, body }) => c.game.removeFriend(me, body.userId));
+
+route('GET', '/api/trades', ({ c, me }) => c.game.listTrades(me.id));
+route('POST', '/api/trades', ({ c, me, body }) => c.game.createTrade(me, body));
+route('POST', '/api/trades/:id/:action', ({ c, me, params }) => {
+  if (!['accept', 'decline', 'cancel'].includes(params.action)) throw new GameError('Action inconnue.', 404);
+  return c.game.resolveTrade(me, params.id, params.action);
+});
+
+route('GET', '/api/auctions', async ({ c, me, query }) => ({ items: await c.game.listAuctions(me.id, query) }));
+route('POST', '/api/auctions', ({ c, me, body }) => c.game.createAuction(me, body));
+route('POST', '/api/auctions/:id/bid', ({ c, me, params, body }) => c.game.bid(me, params.id, body.amount));
+route('POST', '/api/auctions/:id/buyout', ({ c, me, params }) => c.game.bid(me, params.id, 0, true));
+route('POST', '/api/auctions/:id/cancel', ({ c, me, params }) => c.game.cancelAuction(me, params.id));
+
+route('GET', '/api/notifications', async ({ c, me }) => ({ items: await c.db.all('SELECT * FROM notifications WHERE user_id = $1 ORDER BY id DESC LIMIT 50', [me.id]) }));
+route('POST', '/api/notifications/read', async ({ c, me }) => { await c.db.run('UPDATE notifications SET read = true WHERE user_id = $1 AND NOT read', [me.id]); return { ok: true }; });
+
+route('GET', '/api/health', async () => {
+  try { await getContext(); return { ok: true, db: true }; } catch (e) { return { ok: true, db: false, error: e.message }; }
+}, { auth: false, db: false });
+
+// ---------- Transport ----------
+function readBody(req) {
+  // Vercel peut avoir déjà lu et parsé le corps.
+  if (req.body !== undefined) return Promise.resolve(typeof req.body === 'string' ? req.body : Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body));
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (ch) => { size += ch.length; if (size > 64 * 1024) { reject(new GameError('Requête trop grosse.', 413)); req.destroy(); } else chunks.push(ch); });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+function sendJson(req, res, status, data) {
+  let body = Buffer.from(JSON.stringify(data));
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (!process.env.VERCEL && body.length > 1024 && (req.headers['accept-encoding'] || '').includes('gzip')) {
+    body = gzipSync(body, { level: 4 });
+    res.setHeader('Content-Encoding', 'gzip');
+  }
+  res.statusCode = status;
+  res.setHeader('Content-Length', body.length);
+  res.end(body);
+}
+
+export async function handleApi(req, res, { db } = {}) {
+  const url = new URL(req.url, 'http://x');
+  // Vercel réécrit /api/... vers /api?path=... : on reconstitue le chemin d'origine.
+  const path = url.searchParams.get('__path') ? '/api/' + url.searchParams.get('__path') : url.pathname.replace(/\/$/, '');
+  url.searchParams.delete('__path');
+  try {
+    let match = null;
+    let allowed = false;
+    for (const r of routes) {
+      const m = r.re.exec(path);
+      if (!m) continue;
+      allowed = true;
+      if (r.method !== req.method) continue;
+      match = { r, params: Object.fromEntries(r.keys.map((k, i) => [k, m[i + 1]])) };
+      break;
+    }
+    if (!match) throw new GameError(allowed ? 'Méthode non autorisée.' : 'Route inconnue.', allowed ? 405 : 404);
+    let body = {};
+    if (req.method === 'POST') {
+      // Exiger du JSON bloque les formulaires cross-site (protection CSRF avec SameSite=Lax).
+      if (!(req.headers['content-type'] || '').startsWith('application/json')) throw new GameError('JSON attendu.', 415);
+      const raw = await readBody(req);
+      try { body = raw ? JSON.parse(raw) : {}; } catch { throw new GameError('JSON invalide.'); }
+      if (typeof body !== 'object' || body === null) body = {};
+    }
+    const c = match.r.db ? await getContext(db) : null;
+    const me = c ? await getUser(c.db, req) : null;
+    if (match.r.auth && !me) throw new GameError('Connecte-toi pour continuer.', 401);
+    const query = Object.fromEntries(url.searchParams);
+    const data = await match.r.handler({ c, req, res, me, body, query, params: match.params });
+    sendJson(req, res, 200, data);
+  } catch (e) {
+    if (!(e instanceof GameError)) console.error(e);
+    const status = e instanceof GameError ? e.status : e.code === '23514' ? 400 : 500;
+    sendJson(req, res, status, { error: e instanceof GameError ? e.message : status === 400 ? 'Pas assez de bits.' : 'Erreur serveur.' });
+  }
+}
