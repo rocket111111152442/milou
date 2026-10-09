@@ -127,7 +127,9 @@ CREATE INDEX IF NOT EXISTS auctions_card ON auctions (card_id);
 `;
 
 export function databaseUrl() {
-  return process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.NETDEX_DATABASE_URL || null;
+  // Ordre : variable dédiée, base Neon branchée depuis Vercel (préfixe « stockage_ »), puis noms standards.
+  const e = process.env;
+  return e.NETDEX_DATABASE_URL || e.stockage_DATABASE_URL || e.DATABASE_URL || e.POSTGRES_URL || null;
 }
 
 // Petite surcouche : db.one / db.all / db.run et db.tx(async (t) => ...) avec le même API dans la transaction.
