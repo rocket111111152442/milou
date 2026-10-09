@@ -2,7 +2,8 @@
 import { randomBytes, createHash, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { gzipSync } from 'node:zlib';
-import { createDb, ADMIN_USERNAMES } from './db.js';
+import { createDb, databaseUrl, ADMIN_USERNAMES } from './db.js';
+import { copyDatabase, scheduleCron } from './transfer.js';
 import { RARITIES } from './sites.js';
 import { createGame, CONFIG, GameError } from './game.js';
 import { setupDatabase } from './setup.js';
@@ -185,6 +186,7 @@ route('POST', '/api/register', async ({ c, req, res, body }) => {
     throw new GameError('Ce pseudo est déjà pris.', 409);
   }
   await game.notify(db, id, `Bienvenue sur Netdex, ${username} ! Tu as ${CONFIG.startPacks} boosters offerts.`, '#/');
+  await game.logEvent(db, 'join', id);
   await createSession(db, res, req, id);
   return meView(c, await reloadUser(db, id));
 }, { auth: false });
@@ -292,6 +294,19 @@ route('GET', '/api/notifications', async ({ c, me }) => ({ items: await c.db.all
 route('POST', '/api/notifications/read', async ({ c, me }) => { await c.db.run('UPDATE notifications SET read = true WHERE user_id = $1 AND NOT read', [me.id]); return { ok: true }; });
 
 
+// ---------- En direct ----------
+route('GET', '/api/feed', async ({ c }) => {
+  const now = Date.now();
+  const [stats, events] = await Promise.all([
+    c.db.one(`SELECT (SELECT COUNT(*) FROM users WHERE last_seen > $1) online, (SELECT COUNT(*) FROM auctions WHERE status = 'open') auctions,
+      (SELECT COUNT(*) FROM events WHERE at > $2) last_hour`, [now - 10 * 60_000, now - 3600_000]),
+    c.db.all(`SELECT e.id, e.at, e.kind, e.holo, e.amount, u.username who, o.username other, s.id site_id, s.domain, s.rarity
+      FROM events e LEFT JOIN users u ON u.id = e.user_id LEFT JOIN users o ON o.id = e.other_id LEFT JOIN sites s ON s.id = e.site_id
+      ORDER BY e.id DESC LIMIT 25`),
+  ]);
+  return { ...stats, events };
+});
+
 // ---------- Catalogue : toutes les cartes du jeu ----------
 route('GET', '/api/catalog', async ({ c, me, query }) => {
   const args = [me.id];
@@ -395,7 +410,8 @@ route('POST', '/api/admin/bots/delete', admin(async ({ c }) => { await deleteBot
 // Tâche planifiée quotidienne (Vercel Cron) : grosse passe de bots.
 route('GET', '/api/cron/bots', async ({ c, req }) => {
   if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) throw new GameError('Interdit.', 403);
-  return runBots(c.db, c.game, { budgetMs: 250_000, batch: 50, force: true });
+  const budget = Math.max(5, Math.min(250, Number(new URL(req.url, 'http://x').searchParams.get('budget')) || 250));
+  return runBots(c.db, c.game, { budgetMs: budget * 1000, batch: 40, force: true });
 }, { auth: false });
 
 route('GET', '/api/health', async () => {
@@ -405,10 +421,22 @@ route('GET', '/api/health', async () => {
 // Initialisation manuelle de la base (protégée par SETUP_KEY) : utile si l'import du build a échoué.
 route('POST', '/api/admin/setup', async ({ query }) => {
   if (!process.env.SETUP_KEY || query.key !== process.env.SETUP_KEY) throw new GameError('Interdit.', 403);
-  const db = createDb();
+  const db = createDb(databaseUrl(query.db || undefined));
   if (!db) throw new GameError('DATABASE_URL manquant.', 503);
   try {
-    let result = query.vacuum === '1' ? 'vacuum' : await setupDatabase(db, { force: query.force === '1' });
+    let result = '';
+    if (query.copy) {
+      // Copie intégrale d'une autre base branchée (ex. copy=neon) vers celle-ci.
+      const src = createDb(databaseUrl(query.copy));
+      try { result += 'copie : ' + JSON.stringify(await copyDatabase(src, db)) + ' · '; } finally { await src.close(); }
+    }
+    result += query.vacuum === '1' ? 'vacuum' : await setupDatabase(db, { force: query.force === '1' });
+    if (query.cron) result += ' · cron : ' + JSON.stringify(await scheduleCron(db, query.cron, process.env.CRON_SECRET, query.schedule || '* * * * *'));
+    if (query.pause !== undefined) {
+      await db.run("INSERT INTO meta (key, value) VALUES ('bots_paused', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [query.pause === '1' ? '1' : '0']);
+      result += ` · bots ${query.pause === '1' ? 'en pause' : 'actifs'}`;
+    }
+    result += ' · hôte ' + new URL(databaseUrl(query.db || undefined)).hostname;
     if (query.rebalance === '1') {
       // Retire aux bots les Mythiques de leur historique simulé (cartes et points).
       await db.run(`DELETE FROM cards c USING users u, sites s WHERE u.id = c.user_id AND u.is_bot AND s.id = c.site_id AND s.rarity = 5 AND c.status = 'owned'`);

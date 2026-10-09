@@ -140,9 +140,36 @@ function bindAuctionForm(root, close) {
 // ======================================================================
 // Accueil : boosters
 // ======================================================================
+// Fil « En direct » : ce qui se passe dans le jeu (rafraîchi toutes les 10 s tant que la page est ouverte).
+function liveFeed(box, on, { limit = 12 } = {}) {
+  const line = (e) => {
+    const who = `<a href="#/u/${encodeURIComponent(e.who || '')}">${esc(e.who || '?')}</a>`;
+    const other = `<a href="#/u/${encodeURIComponent(e.other || '')}">${esc(e.other || '?')}</a>`;
+    const card = e.domain ? `<a href="#" data-site-link="${e.site_id}" class="r-${e.rarity} rtext">${esc(e.domain)}</a>${e.holo ? ' <span class="tag accent">holo</span>' : ''}` : '';
+    const txt = {
+      pull: `${who} a tiré ${card} <span class="muted">· ${RARITY[e.rarity]?.name || ''}</span>`,
+      sold: `${who} a acheté ${card} à ${other} pour <b class="mono">${fmt(e.amount)}</b> bits`,
+      trade: `${who} et ${other} ont échangé ${e.amount} carte${e.amount > 1 ? 's' : ''}`,
+      join: `${who} a rejoint Netdex`,
+    }[e.kind] || '';
+    return `<div><span class="grow">${txt}</span><span class="muted small mono">${ago(e.at)}</span></div>`;
+  };
+  const load = async () => {
+    const d = await api('/feed');
+    box.innerHTML = `<div class="row" style="margin-bottom:6px"><b class="grow">En direct</b>
+        <span class="small"><span class="online"></span> <b class="mono">${fmt(d.online)}</b> en ligne · <b class="mono">${fmt(d.auctions)}</b> ventes · <b class="mono">${fmt(d.last_hour)}</b> événements/h</span></div>
+      <div class="list small">${d.events.slice(0, limit).map(line).join('') || '<div class="muted">Calme plat pour le moment.</div>'}</div>`;
+  };
+  box.addEventListener('click', (e) => { const a = e.target.closest('[data-site-link]'); if (a) { e.preventDefault(); openSite(a.dataset.siteLink); } });
+  load().catch(() => {});
+  const iv = setInterval(() => { if (document.visibilityState === 'visible') load().catch(() => {}); }, 10_000);
+  on('nd:leave', () => clearInterval(iv));
+}
+
 export async function viewHome(el, { on }) {
   el.innerHTML = `
     <section class="hero" data-hero></section>
+    <div class="panel" style="margin-top:12px" data-live></div>
     <div class="quick-grid" style="margin-top:12px" data-quick></div>
     <div class="grid-2" style="margin-top:12px">
       <div class="panel" data-daily></div>
@@ -186,6 +213,7 @@ export async function viewHome(el, { on }) {
   };
   renderHero();
   on('nd:me', renderHero);
+  liveFeed($('[data-live]', el), on, { limit: 8 });
 
   el.addEventListener('click', (e) => {
     if (e.target.closest('[data-open]') && state.me.packs.available) openPackFlow('free');
@@ -332,6 +360,7 @@ export async function viewMarket(el, { on, query }) {
   const f = { scope: query.scope || 'all', rarity: '', q: '', sort: 'ending' };
   el.innerHTML = `
     <div class="page-head"><h1>Marché</h1><div class="row"><button class="btn primary sm" data-sell>+ Vendre une carte</button></div></div>
+    <div class="panel" style="margin-bottom:14px" data-live></div>
     <div class="tabs" data-tabs><button data-scope="all">Toutes les ventes</button><button data-scope="mine">Mes ventes</button><button data-scope="bids">Mes enchères</button></div>
     <div class="row" style="margin-bottom:10px">
       <input type="search" placeholder="Rechercher…" data-q style="flex:1;min-width:150px">
@@ -342,6 +371,7 @@ export async function viewMarket(el, { on, query }) {
   const list = $('[data-list]', el);
   const setTabs = () => $$('[data-scope]', el).forEach((b) => b.classList.toggle('on', b.dataset.scope === f.scope));
   setTabs();
+  liveFeed($('[data-live]', el), on, { limit: 5 });
   let items = [];
   const load = async () => {
     const res = await api('/auctions?' + new URLSearchParams(f));

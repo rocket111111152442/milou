@@ -13,7 +13,7 @@ export const CONFIG = {
   premiumHoloChance: 300,      // 3 %
   holoMultiplier: 5,
   auctionFee: 0.05,
-  auctionHours: [1, 6, 24, 72],
+  auctionHours: [1, 3, 6, 12, 24, 72],
   maxOpenAuctions: 20,
   maxTradeCards: 10,
   maxPendingTrades: 20,
@@ -47,6 +47,10 @@ export async function createGame(db) {
     if (!(await q.run('UPDATE users SET bits = bits - $1 WHERE id = $2 AND bits >= $1', [amount, userId]))) throw new GameError(msg);
   }
   const credit = (q, userId, amount) => amount > 0 && q.run('UPDATE users SET bits = bits + $1 WHERE id = $2', [amount, userId]);
+
+  // Fil « En direct » : grosses ouvertures, ventes, échanges, arrivées.
+  const logEvent = (q, kind, userId, { other = null, siteId = null, holo = 0, amount = null } = {}) =>
+    q.run('INSERT INTO events (at, kind, user_id, other_id, site_id, holo, amount) VALUES ($1, $2, $3, $4, $5, $6, $7)', [Date.now(), kind, userId, other, siteId, holo ? 1 : 0, amount]);
 
   // Un bot sollicité par quelqu'un « passe voir » dans les minutes qui suivent, comme un vrai joueur.
   const wakeBot = (q, userId) => q.run('UPDATE users SET bot_next_at = LEAST(bot_next_at, $1) WHERE id = $2 AND is_bot',
@@ -106,6 +110,8 @@ export async function createGame(db) {
         isNew = await discover(q, userId, picks[i].siteId, now);
       }
       out.push({ cardId: ids[i].id, holo: picks[i].holo, isNew, site: byId.get(picks[i].siteId) });
+      const r = byId.get(picks[i].siteId).rarity;
+      if (r >= 3 || (r >= 2 && !isBot) || picks[i].holo) await logEvent(q, 'pull', userId, { siteId: picks[i].siteId, holo: picks[i].holo });
     }
     await q.run('UPDATE users SET packs_opened = packs_opened + 1 WHERE id = $1', [userId]);
     return out;
@@ -331,6 +337,7 @@ export async function createGame(db) {
       await q.run('UPDATE users SET bits = bits + $1 - $2 WHERE id = $3', [t.offer_bits, t.request_bits, t.to_id]);
       await q.run("UPDATE trades SET status = 'accepted', resolved_at = $1 WHERE id = $2", [now, t.id]);
       await notify(q, t.from_id, `${me.username} a accepté ton échange !`, '#/social?tab=trades');
+      await logEvent(q, 'trade', t.from_id, { other: t.to_id, amount: d2.offer.length + d2.request.length });
       return { status: 'accepted' };
     });
     if (res.error) throw new GameError(res.error, 409);
@@ -409,6 +416,7 @@ export async function createGame(db) {
       await q.run("UPDATE auctions SET status = 'sold', ends_at = LEAST(ends_at, $1) WHERE id = $2", [now, a.id]);
       await discover(q, a.bidder_id, a.site_id, now);
       await notify(q, a.seller_id, `${a.domain} vendu ${a.current_bid} bits (−${fee} de commission).`, '#/market?scope=mine');
+      await logEvent(q, 'sold', a.bidder_id, { other: a.seller_id, siteId: a.site_id, amount: a.current_bid });
       await notify(q, a.bidder_id, `Tu as remporté ${a.domain} pour ${a.current_bid} bits !`, '#/collection');
     } else {
       await q.run("UPDATE cards SET status = 'owned' WHERE id = $1", [a.card_id]);
@@ -449,7 +457,7 @@ export async function createGame(db) {
   }
 
   return {
-    db, minBid, drawCards, debit, credit, discover,
+    db, minBid, drawCards, debit, credit, discover, logEvent,
     tiers, totalSites, tierOf, value, notify, packState, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
     relation, requestFriend, respondFriend, removeFriend, listFriends,
     createTrade, listTrades, resolveTrade,

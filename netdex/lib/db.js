@@ -124,12 +124,37 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS bot JSONB;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bot_next_at BIGINT;
 CREATE INDEX IF NOT EXISTS users_bot_due ON users (bot_next_at) WHERE is_bot;
 CREATE INDEX IF NOT EXISTS auctions_card ON auctions (card_id);
+
+-- v3 : fil d'activité « En direct ».
+CREATE TABLE IF NOT EXISTS events (
+  id BIGSERIAL PRIMARY KEY,
+  at BIGINT NOT NULL,
+  kind TEXT NOT NULL,
+  user_id INTEGER,
+  other_id INTEGER,
+  site_id INTEGER,
+  holo SMALLINT NOT NULL DEFAULT 0,
+  amount INTEGER
+);
+CREATE INDEX IF NOT EXISTS users_seen ON users (last_seen DESC);
 `;
 
-export function databaseUrl() {
-  // Ordre : variable dédiée, base Neon branchée depuis Vercel (préfixe « stockage_ »), puis noms standards.
+// DB_SOURCE choisit la base parmi celles branchées sur Vercel : « supabase » (POSTGRES_URL) ou « neon » (stockage_DATABASE_URL).
+export function databaseUrl(source = process.env.DB_SOURCE) {
   const e = process.env;
-  return e.NETDEX_DATABASE_URL || e.stockage_DATABASE_URL || e.DATABASE_URL || e.POSTGRES_URL || null;
+  if (e.NETDEX_DATABASE_URL) return e.NETDEX_DATABASE_URL;
+  if (source === 'supabase') return e.POSTGRES_URL || null;
+  if (source === 'neon') return e.stockage_DATABASE_URL || null;
+  return e.stockage_DATABASE_URL || e.DATABASE_URL || e.POSTGRES_URL || null;
+}
+
+// Les paramètres sslmode/supa/pgbouncer des URL hébergées perturbent le pilote : le TLS est configuré à part.
+function cleanUrl(url) {
+  try {
+    const u = new URL(url);
+    for (const k of ['sslmode', 'supa', 'pgbouncer', 'channel_binding', 'sslrootcert']) u.searchParams.delete(k);
+    return u.toString();
+  } catch { return url; }
 }
 
 // Petite surcouche : db.one / db.all / db.run et db.tx(async (t) => ...) avec le même API dans la transaction.
@@ -147,7 +172,7 @@ export function createDb(url = databaseUrl()) {
   if (!url) return null;
   const local = /localhost|127\.0\.0\.1/.test(url);
   const pool = new pg.Pool({
-    connectionString: url,
+    connectionString: cleanUrl(url),
     max: Number(process.env.PG_POOL_MAX) || 5,
     idleTimeoutMillis: 10_000,
     ssl: local ? false : { rejectUnauthorized: false },

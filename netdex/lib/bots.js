@@ -42,12 +42,15 @@ function makeName() {
 // ---------- Personnalités ----------
 const TYPES = [
   // every : minutes entre deux sessions ; packs : part des boosters ouverts ; market/social : propension
-  { type: 'casual', p: 0.5, every: [180, 600], packs: 0.5, market: 0.08, social: 0.05, cap: 18 },
-  { type: 'regular', p: 0.28, every: [70, 200], packs: 0.8, market: 0.2, social: 0.1, cap: 24 },
-  { type: 'grinder', p: 0.08, every: [25, 60], packs: 1, market: 0.25, social: 0.06, cap: 30 },
-  { type: 'collector', p: 0.09, every: [60, 160], packs: 0.9, market: 0.35, social: 0.15, cap: 30 },
-  { type: 'trader', p: 0.05, every: [40, 120], packs: 0.7, market: 0.7, social: 0.25, cap: 26 },
+  { type: 'casual', p: 0.5, every: [120, 420], packs: 0.5, market: 0.3, social: 0.08, cap: 18, stall: 1 },
+  { type: 'regular', p: 0.28, every: [45, 150], packs: 0.8, market: 0.5, social: 0.12, cap: 24, stall: 2 },
+  { type: 'grinder', p: 0.08, every: [20, 50], packs: 1, market: 0.45, social: 0.08, cap: 30, stall: 2 },
+  { type: 'collector', p: 0.09, every: [40, 120], packs: 0.9, market: 0.7, social: 0.18, cap: 30, stall: 3 },
+  { type: 'trader', p: 0.05, every: [20, 60], packs: 0.7, market: 0.95, social: 0.3, cap: 26, stall: 6 },
 ];
+const TYPE_BY = Object.fromEntries(TYPES.map((t) => [t.type, t]));
+// Les réglages de comportement viennent du type (modifiables sans recréer les bots) ; le reste est propre à chaque bot.
+const traits = (p) => ({ ...p, ...TYPE_BY[p.type] && { every: TYPE_BY[p.type].every, market: TYPE_BY[p.type].market, social: TYPE_BY[p.type].social, stall: TYPE_BY[p.type].stall } });
 const FAMILIES = ['Commerce', 'Organisation', 'Réseau', 'Tech', 'Média', 'Gaming', 'Pays FR', 'Pays DE', 'Pays BR', 'Pays JP', 'État', 'Savoir', 'Startup'];
 
 function makePersona() {
@@ -174,7 +177,7 @@ function keptCards(game, stats, capN) {
 
 // ---------- Une session de jeu d'un bot ----------
 async function session(db, game, bot, opts) {
-  const p = bot.bot;
+  const p = traits(bot.bot);
   const now = Date.now();
   const me = { id: bot.id, username: bot.username };
   const log = [];
@@ -254,7 +257,7 @@ async function shop(db, game, bot, me, p, tryDo) {
   const owns = await ownedSites(db, bot.id, list.map((a) => a.site_id));
   let bids = 0;
   for (const a of list) {
-    if (bids >= 2) break;
+    if (bids >= 3) break;
     const v = valuation(p, a, owns.has(a.site_id));
     const min = game.minBid(a);
     if (min > v || min > bot.bits * 0.6) continue;
@@ -269,18 +272,33 @@ async function shop(db, game, bot, me, p, tryDo) {
   }
 }
 
-async function sell(db, game, bot, me, p, tryDo) {
+async function sell(db, game, bot, me, p, tryDo, force = false) {
   const { n: open } = await db.one("SELECT COUNT(*) n FROM auctions WHERE seller_id = $1 AND status = 'open'", [bot.id]);
-  if (open >= (p.type === 'trader' ? 4 : 1)) return;
-  // Un doublon d'au moins Peu commune, ou n'importe quelle carte pour un trader.
+  if (open >= (p.stall || 1)) return;
+  // De préférence un doublon ; sinon une carte qu'il est prêt à lâcher (jamais sa seule Légendaire/Mythique).
   const c = await db.one(`SELECT c.id, c.holo, s.rarity, s.family FROM cards c JOIN sites s ON s.id = c.site_id
-    WHERE c.user_id = $1 AND c.status = 'owned' AND s.rarity >= 1
-      AND ((SELECT COUNT(*) FROM cards d WHERE d.user_id = $1 AND d.site_id = c.site_id) > 1 OR $2)
-    ORDER BY random() LIMIT 1`, [bot.id, p.type === 'trader']);
+    WHERE c.user_id = $1 AND c.status = 'owned'
+      AND ((SELECT COUNT(*) FROM cards d WHERE d.user_id = $1 AND d.site_id = c.site_id) > 1 OR ($2 AND s.rarity <= 3))
+    ORDER BY (SELECT COUNT(*) FROM cards d WHERE d.user_id = $1 AND d.site_id = c.site_id) DESC, random() LIMIT 1`, [bot.id, force || p.type === 'trader' || rnd() < 0.5]);
   if (!c) return;
-  const price = Math.max(2, Math.round(valuation(p, c, true) * between(0.7, 1.3)));
-  const buyout = rnd() < 0.6 ? Math.round(price * between(1.6, 2.6)) : null;
-  await tryDo('vente', () => game.createAuction(me, { cardId: c.id, startPrice: price, buyout, hours: pick([6, 24, 24, 72]) }));
+  const price = Math.max(1, Math.round(valuation(p, c, true) * between(0.6, 1.25)));
+  const buyout = rnd() < 0.65 ? Math.max(price + 1, Math.round(price * between(1.4, 2.4))) : null;
+  return tryDo('vente', () => game.createAuction(me, { cardId: c.id, startPrice: price, buyout, hours: pick([1, 3, 3, 6, 6, 12, 24, 24, 72]) }));
+}
+
+// Teneur de marché : si l'hôtel des ventes se vide, des bots y mettent des cartes (comme le feraient des joueurs actifs).
+async function stockMarket(db, game, target) {
+  const { n } = await db.one("SELECT COUNT(*) n FROM auctions WHERE status = 'open'");
+  const missing = Math.min(30, target - n);
+  if (missing <= 0) return 0;
+  const sellers = await db.all('SELECT * FROM users WHERE is_bot ORDER BY random() LIMIT $1', [missing]);
+  let listed = 0;
+  for (const bot of sellers) {
+    const p = traits(bot.bot);
+    const ok = await sell(db, game, bot, { id: bot.id, username: bot.username }, { ...p, stall: Math.max(2, p.stall) }, async (_l, fn) => { try { return await fn(); } catch (e) { if (!(e instanceof GameError)) throw e; } }, true);
+    if (ok) listed++;
+  }
+  return listed;
 }
 
 async function socialize(db, game, bot, me, p, tryDo, opts) {
@@ -346,7 +364,7 @@ async function dbSizeMb(db, fresh = false) {
 }
 
 // Traite les bots en attente pendant au plus budgetMs. throttle : intervalle minimum global entre deux passages.
-export async function runBots(db, game, { budgetMs = 8000, batch = 25, throttleMs = 15_000, force = false } = {}) {
+export async function runBots(db, game, { budgetMs = 8000, batch = 25, throttleMs = 15_000, force = false, maxSessions = 2000 } = {}) {
   const now = Date.now();
   if (!force && now - lastLocalTick < throttleMs) return null;
   lastLocalTick = now;
@@ -366,17 +384,21 @@ export async function runBots(db, game, { budgetMs = 8000, batch = 25, throttleM
         SELECT id FROM users WHERE is_bot AND bot_next_at <= $2 ORDER BY bot_next_at LIMIT $3 FOR UPDATE SKIP LOCKED) RETURNING *`,
     [Date.now() + 15 * MIN, Date.now(), batch]);
     if (!bots.length) break;
-    for (const bot of bots) {
-      if (Date.now() >= deadline) break;
-      try {
-        const log = await session(db, game, bot, opts);
-        done.sessions++;
-        done.actions += log.length;
-      } catch (e) {
-        console.error('bot', bot.id, e.message);
-      }
+    // 4 bots en parallèle : assez pour suivre le rythme, sans saturer la base.
+    for (let i = 0; i < bots.length && Date.now() < deadline; i += 4) {
+      await Promise.all(bots.slice(i, i + 4).map(async (bot) => {
+        try {
+          const log = await session(db, game, bot, opts);
+          done.sessions++;
+          done.actions += log.length;
+        } catch (e) {
+          console.error('bot', bot.id, e.message);
+        }
+      }));
     }
+    if (done.sessions >= maxSessions) break;
   }
+  if (!opts.dbFull) done.listed = await stockMarket(db, game, Number(process.env.MARKET_TARGET) || 400).catch((e) => { console.error('market', e.message); return 0; });
   return done;
 }
 
@@ -388,6 +410,7 @@ async function cleanup(db) {
   await db.run("DELETE FROM trades t USING users u WHERE t.status = 'pending' AND t.created_at < $1 AND u.id = t.to_id AND u.is_bot", [Date.now() - 2 * 24 * HOUR]);
   await db.run("DELETE FROM auctions WHERE status != 'open' AND ends_at < $1", [old]);
   await db.run('DELETE FROM sessions WHERE expires_at < $1', [Date.now()]);
+  await db.run('DELETE FROM events WHERE id < (SELECT MAX(id) - 3000 FROM events)');
 }
 
 export async function deleteBots(db) {
