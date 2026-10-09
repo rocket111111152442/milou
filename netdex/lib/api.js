@@ -425,6 +425,15 @@ route('POST', '/api/admin/setup', async ({ query }) => {
   if (!db) throw new GameError('DATABASE_URL manquant.', 503);
   try {
     let result = '';
+    if (query.inspect === '1') {
+      // Inventaire lecture seule : tables par schéma, colonnes et nombre de lignes estimé.
+      const rows = await db.all(`SELECT n.nspname s, c.relname t, c.reltuples::bigint est,
+          (SELECT string_agg(a.attname, ',' ORDER BY a.attnum) FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped) cols
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_%'
+        ORDER BY 1, 2`);
+      return { ok: true, tables: rows };
+    }
     if (query.copy) {
       // Copie intégrale d'une autre base branchée (ex. copy=neon) vers celle-ci.
       const src = createDb(databaseUrl(query.copy));
