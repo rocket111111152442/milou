@@ -409,6 +409,12 @@ route('POST', '/api/admin/setup', async ({ query }) => {
   if (!db) throw new GameError('DATABASE_URL manquant.', 503);
   try {
     let result = query.vacuum === '1' ? 'vacuum' : await setupDatabase(db, { force: query.force === '1' });
+    if (query.rebalance === '1') {
+      // Retire aux bots les Mythiques de leur historique simulé (cartes et points).
+      await db.run(`DELETE FROM cards c USING users u, sites s WHERE u.id = c.user_id AND u.is_bot AND s.id = c.site_id AND s.rarity = 5 AND c.status = 'owned'`);
+      const r = await db.run(`UPDATE users SET dex_count = dex_count - dex_score / 40000, dex_score = dex_score % 40000 WHERE is_bot AND dex_score >= 40000`);
+      result += ` · ${r} bots rééquilibrés`;
+    }
     if (Number(query.bots) > 0) {
       const { game } = await getContext();
       const { n } = await db.one('SELECT COUNT(*) n FROM users WHERE is_bot');

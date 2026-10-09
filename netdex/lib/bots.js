@@ -144,7 +144,8 @@ function simulateHistory(game, packs) {
   let score = 0, count = 0;
   const got = game.tiers.map((t) => {
     const expected = (cards * t.weight) / total;
-    const n = poisson(expected);
+    // Historique de départ : pas de Mythique et au plus une Légendaire, pour que les vrais joueurs puissent rattraper les bots.
+    const n = t.id === 5 ? 0 : t.id === 4 ? Math.min(1, poisson(expected * 0.5)) : poisson(expected);
     const distinct = Math.min(n, Math.round(t.total * (1 - Math.exp(-n / Math.max(1, t.total)))));
     score += distinct * t.value;
     count += distinct;
