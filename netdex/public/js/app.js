@@ -6,7 +6,7 @@ window.ndApplyTheme = () => {
   const t = prefs.get('theme', 'dark');
   const light = t === 'light' || (t === 'system' && matchMedia('(prefers-color-scheme: light)').matches);
   document.documentElement.dataset.theme = light ? 'light' : 'dark';
-  $('meta[name=theme-color]').content = light ? '#eef2fb' : '#070a14';
+  $('meta[name=theme-color]').content = light ? '#f3f2ed' : '#111110';
 };
 window.ndApplyTheme();
 
@@ -33,8 +33,8 @@ const DEMO = [
 function showAuth(mode = 'login') {
   stopShell();
   app.innerHTML = `<div class="auth"><div class="auth-box">
-    <div class="auth-hero"><img src="/icons/icon-192.png" alt=""><h1>Net<b style="color:var(--accent)">dex</b></h1>
-      <p>Collectionne les sites d'internet. Plus un site est visité, plus sa carte est rare.</p></div>
+    <div class="auth-hero"><h1>netdex</h1>
+      <p>Chaque carte est un vrai site web. Plus il est visité dans le monde, plus elle est rare.</p></div>
     <div class="fan">${DEMO.map((s) => cardHtml(s)).join('')}</div>
     <div class="panel">
       <div class="tabs"><button data-mode="login">Connexion</button><button data-mode="register">Créer un compte</button></div>
@@ -70,16 +70,18 @@ function showAuth(mode = 'login') {
 // ---------- Coquille de l'app ----------
 const TABS = [
   { href: '#/', label: 'Boosters', icon: ICONS.pack, match: /^$|^\/$/ },
-  { href: '#/collection', label: 'Collection', icon: ICONS.cards, match: /^\/(collection|dex)/ },
+  { href: '#/collection', label: 'Collection', icon: ICONS.cards, match: /^\/(collection|dex|cards)/ },
   { href: '#/market', label: 'Marché', icon: ICONS.market, match: /^\/market/ },
   { href: '#/social', label: 'Social', icon: ICONS.social, match: /^\/(social|trade)/, badge: (c) => c.trades + c.friendRequests },
-  { href: '#/more', label: 'Plus', icon: ICONS.more, match: /^\/(more|top|search|settings|rules|u\/)/ },
+  { href: '#/more', label: 'Plus', icon: ICONS.more, match: /^\/(more|top|search|settings|rules|admin|u\/)/ },
 ];
 
 const ROUTES = [
   [/^\/?$/, V.viewHome],
   [/^\/collection$/, V.viewCollection],
   [/^\/dex$/, V.viewDex],
+  [/^\/cards$/, V.viewCatalog],
+  [/^\/admin$/, V.viewAdmin],
   [/^\/market$/, V.viewMarket],
   [/^\/(social|trades|friends)$/, V.viewSocial],
   [/^\/trade$/, V.viewTrade],
@@ -98,7 +100,7 @@ function startShell() {
     shellOn = true;
     app.innerHTML = `
       <header class="topbar">
-        <a class="logo" href="#/"><img src="/icons/icon-192.png" alt=""><span>Net<b>dex</b></span></a>
+        <a class="logo" href="#/"><img src="/icons/icon-192.png" alt=""><span>netdex</span></a>
         <div class="top-actions">
           <a class="pill" href="#/market" title="Bits"><i class="coin"></i><span data-bits></span></a>
           <button class="icon-btn" data-bell aria-label="Notifications">${ICONS.bell}<span data-bell-dot></span></button>

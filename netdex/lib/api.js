@@ -2,7 +2,7 @@
 import { randomBytes, createHash, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { gzipSync } from 'node:zlib';
-import { createDb } from './db.js';
+import { createDb, ADMIN_USERNAMES } from './db.js';
 import { RARITIES } from './sites.js';
 import { createGame, CONFIG, GameError } from './game.js';
 import { setupDatabase } from './setup.js';
@@ -179,8 +179,8 @@ route('POST', '/api/register', async ({ c, req, res, body }) => {
   const now = Date.now();
   let id;
   try {
-    ({ id } = await db.one('INSERT INTO users (username, pass_hash, created_at, bits, pack_stock, pack_anchor, last_seen) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-      [username, hash, now, CONFIG.startBits, CONFIG.startPacks, now, now]));
+    ({ id } = await db.one('INSERT INTO users (username, pass_hash, created_at, bits, pack_stock, pack_anchor, last_seen, is_admin) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
+      [username, hash, now, CONFIG.startBits, CONFIG.startPacks, now, now, ADMIN_USERNAMES.includes(username.toLowerCase())]));
   } catch {
     throw new GameError('Ce pseudo est déjà pris.', 409);
   }

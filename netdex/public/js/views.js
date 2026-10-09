@@ -152,8 +152,8 @@ export async function viewHome(el, { on }) {
       </div>
     </div>
     <div class="panel" style="margin-top:12px"><div class="row"><b class="grow">Progression du Netdex</b><a href="#/dex" class="small">Voir le dex →</a></div><div data-tiers><div class="spinner"></div></div></div>
-    ${state.me.user.isAdmin ? `<div class="panel" style="margin-top:10px"><div class="row"><div class="grow"><b>Admin</b><div class="muted small">Boosters illimités, sans toucher à ton stock</div></div>
-      <button class="btn primary" data-admin-open="free">Booster gratuit</button><button class="btn" data-admin-open="premium">Premium gratuit</button><a class="btn" href="#/admin">Panneau</a></div></div>` : ''}
+    ${state.me.user.isAdmin ? `<div class="panel" style="margin-top:10px"><b>Admin</b> <span class="muted small">boosters illimités, sans toucher à ton stock</span>
+      <div class="row" style="margin-top:10px"><button class="btn primary" data-admin-open="free">Booster gratuit</button><button class="btn" data-admin-open="premium">Premium gratuit</button><a class="btn" href="#/admin">Panneau admin</a></div></div>` : ''}
     <div data-install></div>`;
 
   const renderHero = () => {
@@ -221,10 +221,12 @@ export async function viewHome(el, { on }) {
 // ======================================================================
 // Collection
 // ======================================================================
+const collTabs = (on) => `<div class="tabs"><a href="#/collection"${on === 'mine' ? ' class="on"' : ''}>Ma collection</a><a href="#/cards"${on === 'all' ? ' class="on"' : ''}>Toutes les cartes</a><a href="#/dex"${on === 'dex' ? ' class="on"' : ''}>Netdex</a></div>`;
+
 export async function viewCollection(el, { on, query }) {
   const user = query.user && query.user.toLowerCase() !== state.me.user.username.toLowerCase() ? query.user : '';
   const f = { q: '', rarity: '', sort: prefs.get('sort', 'rarity'), dupes: false, holo: false };
-  el.innerHTML = `
+  el.innerHTML = `${user ? '' : collTabs('mine')}
     <div class="page-head"><h1>${user ? `Collection de ${esc(user)}` : 'Ma collection'}</h1>
       <div class="row">${user ? `<a class="btn sm" href="#/u/${encodeURIComponent(user)}">Profil</a>` : '<button class="btn sm" data-dupes-recycle>Recycler les doublons</button>'}</div></div>
     <div class="row" style="margin-bottom:10px">
@@ -296,7 +298,7 @@ function recycleDupesDialog(after) {
 export async function viewDex(el) {
   const st = await api('/stats');
   let rarity = 5, missing = false, offset = 0;
-  el.innerHTML = `<div class="page-head"><h1>Netdex</h1><div class="row"><button class="chip" data-missing>Seulement manquants</button></div></div>
+  el.innerHTML = `${collTabs('dex')}<div class="page-head"><h1>Netdex</h1><div class="row"><button class="chip" data-missing>Seulement manquants</button></div></div>
     <div class="chips" data-tiers>${st.tiers.slice().reverse().map((t) => `<button class="chip r-${t.id}${t.id === rarity ? ' on' : ''}" data-r="${t.id}">${t.name} · ${fmt(t.found)}/${fmt(t.total)}</button>`).join('')}</div>
     <p class="muted small" data-info></p>
     <div class="cards" data-grid></div><div class="center" style="margin-top:16px" data-more></div>`;
@@ -736,6 +738,8 @@ export async function viewMore(el) {
       <a href="#/search" style="color:var(--text)"><b class="grow">Rechercher un site</b><span class="muted">›</span></a>
       <a href="#/settings" style="color:var(--text)"><b class="grow">Réglages & installation</b><span class="muted">›</span></a>
       <a href="#/rules" style="color:var(--text)"><b class="grow">Règles & raretés</b><span class="muted">›</span></a>
+      <a href="#/cards" style="color:var(--text)"><b class="grow">Toutes les cartes du jeu</b><span class="muted">›</span></a>
+      ${u.isAdmin ? '<a href="#/admin" style="color:var(--text)"><b class="grow">Administration</b><span class="tag accent">admin</span></a>' : ''}
     </div>`;
 }
 
@@ -746,8 +750,9 @@ export async function viewRules(el) {
       <p>Chaque carte est un vrai site d'internet. Plus un site est visité dans le monde, plus sa carte est rare. Le classement vient de la liste <a href="https://tranco-list.eu" target="_blank" rel="noopener">Tranco</a> (top 1 million, agrégée depuis plusieurs mesures de trafic), filtrée des domaines techniques (CDN, DNS, publicité) et des sites adultes.</p>
       <ul>
         <li>1 booster gratuit toutes les <b>3 minutes</b>, même quand l'app est fermée (stock max ${state.me.packs.cap}).</li>
-        <li>5 cartes par booster, la 5ᵉ est au moins <b>Rare</b>.</li>
-        <li>2 % de chance qu'une carte soit <b>HOLO</b> (valeur ×${state.me.config.holoMultiplier}).</li>
+        <li>5 cartes par booster, la 5ᵉ est au moins <b>Peu commune</b>. Les Mythiques sortent environ une fois tous les 10 000 boosters.</li>
+        <li>1 % de chance qu'une carte soit <b>HOLO</b> (valeur ×${state.me.config.holoMultiplier}).</li>
+        <li>Netdex compte aussi des joueurs automatiques qui ouvrent des boosters, vendent, enchérissent et échangent, avec les mêmes règles que tout le monde.</li>
         <li>Recycle tes doublons en bits, utilise-les aux enchères ou pour des boosters Premium.</li>
         <li>Échanges uniquement entre amis. Enchères ouvertes à tous (commission ${state.me.config.auctionFee * 100} %).</li>
       </ul>
@@ -798,4 +803,139 @@ export function openNotifications() {
       : '<div class="empty"><b>Rien de neuf</b></div>');
     if (d.items.some((n) => !n.read)) api('/notifications/read', {}).then(refreshMe).catch(() => {});
   }).catch(toastErr);
+}
+
+// ======================================================================
+// Catalogue : toutes les cartes du jeu
+// ======================================================================
+export async function viewCatalog(el) {
+  const f = { rarity: '', q: '', filter: 'all' };
+  let offset = 0, seq = 0;
+  el.innerHTML = `${collTabs('all')}
+    <div class="page-head"><h1>Toutes les cartes</h1><div class="row"><span class="muted small mono" data-total></span></div></div>
+    <div class="row" style="margin-bottom:10px">
+      <input type="search" placeholder="Chercher un domaine (ex : twitch, .fr, news)…" data-q style="flex:1;min-width:180px">
+      <select data-filter style="width:auto"><option value="all">Toutes</option><option value="owned">Possédées</option><option value="missing">Manquantes</option></select>
+    </div>
+    <div class="chips" style="margin-bottom:12px">${rarityChips('')}</div>
+    <div class="cards" data-grid></div><div class="center" style="margin-top:16px" data-more></div>`;
+  const grid = $('[data-grid]', el);
+  const load = async (append) => {
+    const my = ++seq;
+    if (!append) { offset = 0; grid.innerHTML = '<div class="skeleton"></div>'.repeat(6); }
+    const res = await api('/catalog?' + new URLSearchParams({ ...f, offset }));
+    if (my !== seq) return;
+    $('[data-total]', el).textContent = `${fmt(res.total)} cartes au total`;
+    const html = res.items.map((s) => cardHtml(s, { count: s.n, missing: !s.n })).join('');
+    if (append) grid.insertAdjacentHTML('beforeend', html); else grid.innerHTML = html || '<div class="empty" style="grid-column:1/-1"><b>Aucune carte</b></div>';
+    offset += res.items.length;
+    $('[data-more]', el).innerHTML = res.more ? '<button class="btn" data-load-more>Charger plus</button>' : '';
+  };
+  let t;
+  $('[data-q]', el).addEventListener('input', (e) => { clearTimeout(t); t = setTimeout(() => { f.q = e.target.value.trim(); load().catch(toastErr); }, 250); });
+  $('[data-filter]', el).addEventListener('change', (e) => { f.filter = e.target.value; load().catch(toastErr); });
+  el.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-r]');
+    if (chip) { f.rarity = chip.dataset.r; $$('[data-r]', el).forEach((c) => c.classList.toggle('on', c === chip)); load().catch(toastErr); return; }
+    if (e.target.closest('[data-load-more]')) { load(true).catch(toastErr); return; }
+    const c = e.target.closest('.card');
+    if (c) openSite(c.dataset.site);
+  });
+  await load();
+}
+
+// ======================================================================
+// Administration
+// ======================================================================
+export async function viewAdmin(el) {
+  if (!state.me.user.isAdmin) { el.innerHTML = '<div class="empty"><b>Accès réservé</b></div>'; return; }
+  el.innerHTML = `<div class="page-head"><h1>Administration</h1><div class="row"><button class="btn primary sm" data-open-free>Booster gratuit</button><button class="btn sm" data-open-prem>Premium gratuit</button></div></div>
+    <div data-overview><div class="spinner"></div></div>
+    <h2>Offrir</h2>
+    <form class="panel" data-give>
+      <div class="grid-2">
+        <label class="field"><span>Joueur</span><input type="text" name="username" placeholder="pseudo" autocomplete="off" list="adm-users"></label>
+        <label class="field" style="display:flex;align-items:end;gap:8px"><input type="checkbox" name="everyone" style="width:18px;height:18px"> Tous les joueurs (humains)</label>
+        <label class="field"><span>Bits (négatif pour retirer)</span><input type="number" name="bits" value="0"></label>
+        <label class="field"><span>Boosters</span><input type="number" name="packs" value="0" min="0"></label>
+        <label class="field"><span>Carte (domaine)</span><input type="text" name="domain" placeholder="ex : google.com" autocomplete="off" list="adm-sites"></label>
+        <div class="row"><label class="field" style="flex:1"><span>Exemplaires</span><input type="number" name="count" value="1" min="1" max="100"></label>
+          <label class="row" style="margin-top:6px"><input type="checkbox" name="holo" style="width:18px;height:18px"> Holo</label></div>
+      </div>
+      <datalist id="adm-users"></datalist><datalist id="adm-sites"></datalist>
+      <button class="btn primary">Envoyer</button>
+    </form>
+    <h2>Joueurs</h2>
+    <div class="row" style="margin-bottom:10px"><input type="search" placeholder="Rechercher un pseudo…" data-uq style="flex:1">
+      <select data-kind style="width:auto"><option value="humans">Humains</option><option value="bots">Bots</option><option value="all">Tous</option></select></div>
+    <div class="panel" style="padding:0;overflow-x:auto"><table class="data" data-users></table></div>`;
+
+  const overview = async () => {
+    const d = await api('/admin/overview');
+    const b = d.bots;
+    $('[data-overview]', el).innerHTML = `
+      <div class="quick-grid">
+        <div class="quick"><b>${fmt(d.counts.humans)}</b><span>Joueurs humains</span></div>
+        <div class="quick"><b>${fmt(d.counts.bots)}</b><span>Bots (${fmt(b.active)} actifs/h)</span></div>
+        <div class="quick"><b>${fmt(d.counts.cards)}</b><span>Cartes en jeu</span></div>
+        <div class="quick"><b>${fmt(d.counts.auctions)}</b><span>Ventes ouvertes</span></div>
+        <div class="quick"><b>${b.dbMb} / ${d.dbLimitMb} Mo</b><span>Base de données</span></div>
+      </div>
+      <div class="panel" style="margin-top:10px"><div class="row">
+        <div class="grow"><b>Bots</b> <span class="tag ${b.paused ? 'warn' : 'good'}">${b.paused ? 'en pause' : 'actifs'}</span>
+          <div class="muted small">${fmt(b.due)} en attente · dernière passe ${b.lastTick ? ago(b.lastTick) : 'jamais'}${b.dbMb >= d.dbLimitMb ? ' · base presque pleine : ils n\'ouvrent plus de boosters' : ''}</div></div>
+        ${Number(d.counts.bots) ? '' : '<button class="btn primary sm" data-seed>Créer 10 000 bots</button>'}
+        <button class="btn sm" data-tick>Lancer une passe</button>
+        <button class="btn sm" data-pause="${b.paused ? 0 : 1}">${b.paused ? 'Reprendre' : 'Mettre en pause'}</button>
+        ${Number(d.counts.bots) ? '<button class="btn sm danger" data-del-bots>Supprimer les bots</button>' : ''}
+      </div></div>`;
+  };
+  const users = async () => {
+    const d = await api('/admin/users?' + new URLSearchParams({ q: $('[data-uq]', el).value.trim(), kind: $('[data-kind]', el).value }));
+    $('[data-users]', el).innerHTML = `<tr><th>Pseudo</th><th>Bits</th><th>Sites</th><th>Boosters</th><th>Vu</th><th></th></tr>` + d.items.map((u) => `<tr data-id="${u.id}" data-name="${esc(u.username)}">
+      <td><a href="#/u/${encodeURIComponent(u.username)}">${esc(u.username)}</a> ${u.is_bot ? '<span class="tag">bot</span>' : ''} ${u.is_admin ? '<span class="tag accent">admin</span>' : ''}</td>
+      <td class="num">${fmt(u.bits)}</td><td class="num">${fmt(u.dex_count)}</td><td class="num">${fmt(u.packs_opened)}</td><td class="muted small">${ago(u.last_seen)}</td>
+      <td style="white-space:nowrap"><button class="btn sm" data-pick>Choisir</button> <button class="btn sm" data-toggle-admin="${u.is_admin ? 0 : 1}">${u.is_admin ? '− admin' : '+ admin'}</button> <button class="btn sm danger" data-del>Supprimer</button></td></tr>`).join('');
+    $('#adm-users').innerHTML = d.items.map((u) => `<option value="${esc(u.username)}">`).join('');
+  };
+  await Promise.all([overview(), users()]).catch(toastErr);
+
+  let t;
+  $('[data-uq]', el).addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => users().catch(toastErr), 200); });
+  $('[data-kind]', el).addEventListener('change', () => users().catch(toastErr));
+  const form = $('[data-give]', el);
+  form.domain.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(async () => {
+      const r = await api('/sites/search?q=' + encodeURIComponent(form.domain.value)).catch(() => ({ items: [] }));
+      $('#adm-sites').innerHTML = r.items.map((s) => `<option value="${esc(s.domain)}">${RARITY[s.rarity].name} #${s.id}</option>`).join('');
+    }, 200);
+  });
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    busy($('button', form), async () => {
+      const body = { username: form.username.value.trim(), everyone: form.everyone.checked, bits: Number(form.bits.value), packs: Number(form.packs.value),
+        domain: form.domain.value.trim() || undefined, count: Number(form.count.value), holo: form.holo.checked };
+      const r = await api('/admin/give', body);
+      toast(`Envoyé à ${r.targets} joueur${r.targets > 1 ? 's' : ''}`, 'ok');
+      refreshMe(); overview();
+    });
+  });
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.matches('[data-open-free]')) return openPackFlow('free', true);
+    if (b.matches('[data-open-prem]')) return openPackFlow('premium', true);
+    if (b.matches('[data-seed]')) return busy(b, async () => { toast('Création des bots… (≈ 1 min)'); const r = await api('/admin/bots/seed', { count: 10000 }); toast(`${fmt(r.created)} bots créés`, 'ok'); overview(); });
+    if (b.matches('[data-tick]')) return busy(b, async () => { const r = await api('/admin/bots/tick', {}); toast(`${r ? r.sessions : 0} sessions de bots jouées`, 'ok'); overview(); });
+    if (b.matches('[data-pause]')) return busy(b, async () => { await api('/admin/bots/pause', { paused: b.dataset.pause === '1' }); overview(); });
+    if (b.matches('[data-del-bots]')) return busy(b, async () => { if (await confirmDialog('Supprimer les bots', 'Tous les bots et leurs cartes seront supprimés.', 'Supprimer', true)) { await api('/admin/bots/delete', {}); overview(); users(); } });
+    const row = b.closest('tr');
+    if (!row) return;
+    if (b.matches('[data-pick]')) { form.username.value = row.dataset.name; form.everyone.checked = false; form.scrollIntoView({ behavior: 'smooth' }); }
+    if (b.matches('[data-toggle-admin]')) busy(b, async () => { await api(`/admin/user/${row.dataset.id}/admin`, { value: b.dataset.toggleAdmin === '1' }); users(); });
+    if (b.matches('[data-del]')) busy(b, async () => {
+      if (await confirmDialog('Supprimer le compte', `Supprimer définitivement <b>${esc(row.dataset.name)}</b> et toutes ses cartes ?`, 'Supprimer', true)) { await api(`/admin/user/${row.dataset.id}/delete`, {}); users(); overview(); }
+    });
+  });
 }
