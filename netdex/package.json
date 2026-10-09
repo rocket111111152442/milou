@@ -1,0 +1,13 @@
+{
+  "name": "netdex",
+  "version": "1.0.0",
+  "description": "Collectionne les sites d'internet en cartes : boosters toutes les 3 minutes, échanges, enchères, amis.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  }
+}
