@@ -5,6 +5,7 @@ import { gzipSync } from 'node:zlib';
 import { createDb } from './db.js';
 import { RARITIES } from './sites.js';
 import { createGame, CONFIG, GameError } from './game.js';
+import { setupDatabase } from './setup.js';
 
 const SESSION_DAYS = 60;
 const scrypt = promisify(scryptCb);
@@ -287,7 +288,23 @@ route('GET', '/api/notifications', async ({ c, me }) => ({ items: await c.db.all
 route('POST', '/api/notifications/read', async ({ c, me }) => { await c.db.run('UPDATE notifications SET read = true WHERE user_id = $1 AND NOT read', [me.id]); return { ok: true }; });
 
 route('GET', '/api/health', async () => {
-  try { await getContext(); return { ok: true, db: true }; } catch (e) { return { ok: true, db: false, error: e.message }; }
+  try { await getContext(); return { ok: true, db: true }; } catch (e) { return { ok: true, db: false, error: e.message, code: e.code }; }
+}, { auth: false, db: false });
+
+// Initialisation manuelle de la base (protégée par SETUP_KEY) : utile si l'import du build a échoué.
+route('POST', '/api/admin/setup', async ({ query }) => {
+  if (!process.env.SETUP_KEY || query.key !== process.env.SETUP_KEY) throw new GameError('Interdit.', 403);
+  const db = createDb();
+  if (!db) throw new GameError('DATABASE_URL manquant.', 503);
+  try {
+    const result = await setupDatabase(db, { force: query.force === '1' });
+    resetContext();
+    return { ok: true, result };
+  } catch (e) {
+    return { ok: false, error: String(e?.stack || e) };
+  } finally {
+    await db.close();
+  }
 }, { auth: false, db: false });
 
 // ---------- Transport ----------
