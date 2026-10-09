@@ -22,6 +22,8 @@ export const CONFIG = {
   dailyMaxStreak: 7,
 };
 
+export const CUSTOM_BASE = 100_000_000;
+
 export class GameError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
 }
@@ -32,8 +34,19 @@ export async function createGame(db) {
   const row = await db.one("SELECT value FROM meta WHERE key = 'tiers'");
   if (!row) throw new GameError('Le classement des sites n\'est pas encore importé.', 503);
   const tiers = JSON.parse(row.value).map((t) => ({ ...RARITIES[t.id], ...t }));
-  const totalSites = tiers.reduce((a, t) => a + t.total, 0);
-  const tierOf = (siteId) => tiers.find((t) => siteId >= t.lo && siteId <= t.hi);
+  const rankedSites = tiers.reduce((a, t) => a + t.total, 0);
+
+  // Cartes spéciales (ajoutées par un admin, hors classement) : id ≥ CUSTOM_BASE, rareté choisie.
+  let custom = new Map(), customAt = 0;
+  async function loadCustom() {
+    const r = await db.one("SELECT value FROM meta WHERE key = 'custom'");
+    custom = new Map((r ? JSON.parse(r.value) : []).map((c) => [c.id, c.rarity]));
+    for (const t of tiers) t.extra = [...custom].filter(([, r]) => r === t.id).map(([id]) => id);
+    customAt = Date.now();
+  }
+  await loadCustom();
+  const refreshCustom = () => (Date.now() - customAt > 60_000 ? loadCustom() : null);
+  const tierOf = (siteId) => (custom.has(siteId) ? tiers[custom.get(siteId)] : tiers.find((t) => siteId >= t.lo && siteId <= t.hi));
   const tail = await getTail(db);
 
   // Garantit que les sites demandés existent dans `sites` (dépliage depuis la traîne si besoin). Renvoie Map id → site.
@@ -107,7 +120,7 @@ export async function createGame(db) {
       const last = i === CONFIG.packSize - 1;
       const tier = rollTier(premium ? (last ? 2 : 1) : (last ? 1 : 0)); // 5e carte Peu commune+ (Rare+ en premium)
       picks.push({
-        siteId: tier.lo + randomInt(tier.hi - tier.lo + 1),
+        siteId: (() => { const n = tier.hi - tier.lo + 1; const k = randomInt(n + tier.extra.length); return k < n ? tier.lo + k : tier.extra[k - n]; })(),
         holo: randomInt(10000) < (premium ? CONFIG.premiumHoloChance : CONFIG.holoChance) ? 1 : 0,
       });
     }
@@ -135,7 +148,8 @@ export async function createGame(db) {
     return out;
   }
 
-  function openPack(userId, kind, { free = false } = {}) {
+  async function openPack(userId, kind, { free = false } = {}) {
+    await refreshCustom();
     return db.tx(async (q) => {
       const u = await q.one('SELECT * FROM users WHERE id = $1 FOR UPDATE', [userId]);
       // Admin : boosters illimités, sans toucher au stock ni aux bits.
@@ -477,8 +491,10 @@ export async function createGame(db) {
   }
 
   return {
+    get totalSites() { return rankedSites + custom.size; },
+    isCustom: (id) => custom.has(id), loadCustom, refreshCustom,
     db, tail, ensureSites, minBid, drawCards, debit, credit, discover, logEvent,
-    tiers, totalSites, tierOf, value, notify, packState, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
+    tiers, tierOf, value, notify, packState, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
     relation, requestFriend, respondFriend, removeFriend, listFriends,
     createTrade, listTrades, resolveTrade,
     createAuction, bid, cancelAuction, settleAuctions, listAuctions,

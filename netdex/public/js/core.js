@@ -51,7 +51,11 @@ export function ago(t) {
 export const isOnline = (lastSeen) => now() - lastSeen < 5 * 60_000;
 
 // Puissance d'une carte : 1000 pour le n°1 mondial, ~0 pour le millionième.
-export const power = (rank) => Math.max(1, Math.round(1000 * (1 - Math.log10(rank) / 6)));
+// Cartes spéciales (ajoutées par l'admin) : id ≥ 100 000 000, hors classement.
+export const isSpecial = (id) => id >= 100_000_000;
+const SPECIAL_POWER = [60, 250, 500, 800, 950, 1000];
+export const power = (rank, rarity = 0) => (isSpecial(rank) ? SPECIAL_POWER[rarity] : Math.max(1, Math.round(1000 * (1 - Math.log10(rank) / 6))));
+export const rankLabel = (id) => (isSpecial(id) ? '★' : '#' + id);
 export const siteName = (domain) => domain.split('.')[0].replace(/-/g, ' ');
 export const favicon = (domain, size = 64) => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size}`;
 
@@ -60,11 +64,11 @@ export function cardHtml(site, opts = {}) {
   const { count = 0, holo = false, isNew = false, locked = false, selected = false, missing = false, attrs = '' } = opts;
   const r = site.rarity;
   return `<div class="card r-${r}${holo ? ' holo' : ''}${selected ? ' selected' : ''}${missing ? ' missing' : ''}" data-site="${site.id}" ${attrs}>
-    <div class="c-bar"><i></i><i></i><i></i><span class="rk">#${site.id}</span></div>
+    <div class="c-bar"><i></i><i></i><i></i><span class="rk">${rankLabel(site.id)}</span></div>
     <div class="c-url">${esc(site.domain)}</div>
     <div class="c-art"><img class="fav" src="${favicon(site.domain)}" alt="" loading="lazy" decoding="async" data-l="${esc(site.domain[0])}"></div>
     <div class="c-name">${esc(siteName(site.domain))}</div>
-    <div class="c-foot"><span class="rar">${RARITY[r].name}</span><span>${power(site.id)}</span></div>
+    <div class="c-foot"><span class="rar">${RARITY[r].name}</span><span>${power(site.id, r)}</span></div>
     ${count > 1 ? `<span class="count">×${count}</span>` : ''}
     ${isNew ? '<span class="badge-new">NEW</span>' : ''}
     ${locked ? '<span class="badge-lock">en vente</span>' : ''}

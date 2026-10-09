@@ -29,7 +29,7 @@ export async function sitePrices(db, game, siteIds) {
   const out = new Map();
   for (const id of ids) {
     const t = game.tierOf(id);
-    const pos = 1 - (id - t.lo) / Math.max(1, t.hi - t.lo + 1); // 1 en haut du palier, 0 en bas
+    const pos = game.isCustom(id) ? 1 : 1 - (id - t.lo) / Math.max(1, t.hi - t.lo + 1); // 1 en haut du palier, 0 en bas
     out.set(id, Math.max(1, Math.round(bySite.get(id) ?? rp[t.id] * (1 + 0.5 * pos))));
   }
   return out;

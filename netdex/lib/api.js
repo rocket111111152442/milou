@@ -6,7 +6,7 @@ import { createDb, databaseUrl, ADMIN_USERNAMES } from './db.js';
 import { copyDatabase, scheduleCron } from './transfer.js';
 import { RARITIES, tailDomains, searchTail, siteRow } from './sites.js';
 import { wallet, marketIndex, sitePrices, snapshotDue } from './market.js';
-import { createGame, CONFIG, GameError } from './game.js';
+import { createGame, CONFIG, GameError, CUSTOM_BASE } from './game.js';
 import { setupDatabase, setupTail } from './setup.js';
 import { runBots, seedBots, botStatus, deleteBots } from './bots.js';
 import { waitUntil } from '@vercel/functions';
@@ -125,7 +125,7 @@ async function stats({ db, game }, userId, isBot = false) {
   const found = Object.fromEntries(byRarity.map((r) => [r.rarity, r.n]));
   return {
     cards: owned.n, distinct: owned.d,
-    tiers: game.tiers.map((t) => ({ id: t.id, name: t.name, key: t.key, total: t.total, lo: t.lo, hi: t.hi, found: found[t.id] || 0, value: t.value, chance: t.weight / 10000 })),
+    tiers: game.tiers.map((t) => ({ id: t.id, name: t.name, key: t.key, total: t.total + (t.extra?.length || 0), lo: t.lo, hi: t.hi, found: found[t.id] || 0, value: t.value, chance: t.weight / 10000 })),
   };
 }
 
@@ -172,6 +172,13 @@ async function sitesByIds({ db, game }, ids) {
   return ids.map((id) => map.get(id)).filter(Boolean);
 }
 const PAGE = 96;
+// Une page d'id d'un palier : la plage du classement, puis les cartes spéciales de ce palier.
+function pageIds(lo, hi, extras, offset) {
+  const n = hi - lo + 1, ids = [];
+  for (let k = offset; k < n + extras.length && ids.length < PAGE; k++) ids.push(k < n ? lo + k : extras[k - n]);
+  return { ids, more: offset + PAGE < n + extras.length };
+}
+const allExtras = (game) => game.tiers.flatMap((t) => t.extra || []);
 
 // ---------- Routes ----------
 const routes = [];
@@ -256,20 +263,19 @@ route('POST', '/api/cards/recycle-duplicates', ({ c, me, body }) => c.game.recyc
 route('GET', '/api/dex', async ({ c, me, query }) => {
   const t = c.game.tiers[Math.max(0, Math.min(5, Number(query.rarity) || 0))];
   const offset = Math.max(0, Number(query.offset) || 0);
-  const found = await c.db.all('SELECT site_id, found_at FROM dex WHERE user_id = $1 AND site_id BETWEEN $2 AND $3', [me.id, t.lo, t.hi]);
+  const found = await c.db.all('SELECT site_id, found_at FROM dex WHERE user_id = $1 AND (site_id BETWEEN $2 AND $3 OR site_id = ANY($4::int[]))', [me.id, t.lo, t.hi, t.extra]);
   const f = new Map(found.map((r) => [r.site_id, r.found_at]));
   if (query.missing === '1') {
     // Les manquants : on saute les id déjà découverts.
-    const ids = [];
-    let id = t.lo + offset;
-    for (; id <= t.hi && ids.length < PAGE; id++) if (!f.has(id)) ids.push(id);
-    return { items: ids.map((x) => ({ id: x, rarity: t.id })), more: id <= t.hi, next: id - t.lo };
+    const n = t.hi - t.lo + 1, total = n + t.extra.length, ids = [];
+    let k = offset;
+    for (; k < total && ids.length < PAGE; k++) { const id = k < n ? t.lo + k : t.extra[k - n]; if (!f.has(id)) ids.push(id); }
+    return { items: ids.map((x) => ({ id: x, rarity: t.id })), more: k < total, next: k };
   }
-  const ids = [];
-  for (let id = t.lo + offset; id <= t.hi && ids.length < PAGE; id++) ids.push(id);
+  const { ids, more } = pageIds(t.lo, t.hi, t.extra, offset);
   const known = await sitesByIds(c, ids.filter((id) => f.has(id)));
   const byId = new Map(known.map((k) => [k.id, k]));
-  return { items: ids.map((id) => (byId.has(id) ? { ...byId.get(id), found_at: f.get(id) } : { id, rarity: t.id })), more: t.lo + offset + PAGE <= t.hi, next: offset + PAGE };
+  return { items: ids.map((id) => (byId.has(id) ? { ...byId.get(id), found_at: f.get(id) } : { id, rarity: t.id })), more, next: offset + PAGE };
 });
 
 route('GET', '/api/sites/search', async ({ c, me, query }) => {
@@ -341,18 +347,19 @@ route('GET', '/api/feed', async ({ c }) => {
 route('GET', '/api/catalog', async ({ c, me, query }) => {
   const offset = Math.max(0, Number(query.offset) || 0);
   const tier = query.rarity !== undefined && query.rarity !== '' ? c.game.tiers[Math.max(0, Math.min(5, Number(query.rarity) || 0))] : null;
-  const lo = tier ? tier.lo : 1, hi = tier ? tier.hi : c.game.totalSites;
+  const lo = tier ? tier.lo : 1, hi = tier ? tier.hi : Math.max(...c.game.tiers.map((t) => t.hi));
+  const extras = tier ? tier.extra : allExtras(c.game);
   const counts = async (ids) => new Map((await c.db.all('SELECT site_id, COUNT(*)::int n FROM cards WHERE user_id = $1 AND site_id = ANY($2::int[]) GROUP BY site_id', [me.id, ids])).map((r) => [r.site_id, r.n]));
   let items, more = false;
   if (query.filter === 'owned') {
     const rows = await c.db.all(`SELECT s.id, s.domain, s.rarity, s.family, COUNT(*)::int n FROM cards o JOIN sites s ON s.id = o.site_id
-      WHERE o.user_id = $1 AND s.id BETWEEN $2 AND $3 ${query.q ? 'AND s.domain LIKE $5' : ''} GROUP BY s.id ORDER BY s.id LIMIT ${PAGE + 1} OFFSET $4`,
-    query.q ? [me.id, lo, hi, offset, likeArg(query.q)] : [me.id, lo, hi, offset]);
+      WHERE o.user_id = $1 AND (s.id BETWEEN $2 AND $3 OR s.id = ANY($5::int[])) ${query.q ? 'AND s.domain LIKE $6' : ''} GROUP BY s.id ORDER BY s.id LIMIT ${PAGE + 1} OFFSET $4`,
+    query.q ? [me.id, lo, hi, offset, extras, likeArg(query.q)] : [me.id, lo, hi, offset, extras]);
     items = rows.slice(0, PAGE); more = rows.length > PAGE;
   } else if (query.q) {
     // Recherche : d'abord les sites de la table, puis la longue traîne.
     const q = String(query.q).toLowerCase().trim().replace(/[%_\\]/g, '');
-    const head = await c.db.all('SELECT id, domain, rarity, family FROM sites WHERE domain LIKE $1 AND id BETWEEN $2 AND $3 ORDER BY id LIMIT $4', [likeArg(q), lo, hi, PAGE]);
+    const head = await c.db.all('SELECT id, domain, rarity, family FROM sites WHERE domain LIKE $1 AND (id BETWEEN $2 AND $3 OR id = ANY($5::int[])) ORDER BY id LIMIT $4', [likeArg(q), lo, hi, PAGE, extras]);
     const seen = new Set(head.map((h) => h.id));
     const tail = head.length < PAGE && hi >= (c.game.tail?.start || Infinity)
       ? (await searchTail(c.db, c.game.tail, q, { mode: 'contains', limit: PAGE - head.length })).filter((t) => !seen.has(t.id) && t.id >= lo && t.id <= hi).map((t) => siteRow(t.id, t.domain)) : [];
@@ -361,12 +368,11 @@ route('GET', '/api/catalog', async ({ c, me, query }) => {
     items = items.map((i) => ({ ...i, n: n.get(i.id) || 0 }));
     if (query.filter === 'missing') items = items.filter((i) => !i.n);
   } else {
-    const ids = [];
-    for (let id = lo + offset; id <= hi && ids.length < PAGE; id++) ids.push(id);
-    const n = await counts(ids);
-    items = (await sitesByIds(c, ids)).map((i) => ({ ...i, n: n.get(i.id) || 0 }));
+    const page = pageIds(lo, hi, extras, offset);
+    const n = await counts(page.ids);
+    items = (await sitesByIds(c, page.ids)).map((i) => ({ ...i, n: n.get(i.id) || 0 }));
     if (query.filter === 'missing') items = items.filter((i) => !i.n);
-    more = lo + offset + PAGE <= hi;
+    more = page.more;
   }
   return { items, more, next: offset + (query.filter === 'owned' ? items.length : PAGE), total: c.game.totalSites };
 });
@@ -440,6 +446,39 @@ route('POST', '/api/admin/give', admin(async ({ c, body, me }) => {
   return { ok: true, targets: targets.length };
 }));
 
+// Cartes spéciales : un domaine ajouté hors classement avec la rareté choisie (il sort dans les boosters comme les autres).
+async function addCustomSite(c, rawDomain, rawRarity) {
+  const domain = String(rawDomain || '').toLowerCase().trim().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  const rarity = Math.trunc(Number(rawRarity));
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) throw new GameError('Domaine invalide.');
+  if (!(rarity >= 0 && rarity <= 5)) throw new GameError('Rareté invalide.');
+  const existing = await c.db.one('SELECT id FROM sites WHERE domain = $1', [domain]);
+  if (existing && !c.game.isCustom(existing.id)) throw new GameError(`${domain} est déjà dans le jeu (rang #${existing.id}).`);
+  const r = await c.db.tx(async (q) => {
+    const meta = await q.one("SELECT value FROM meta WHERE key = 'custom' FOR UPDATE");
+    const list = meta ? JSON.parse(meta.value) : [];
+    let id = existing?.id;
+    if (id) {
+      await q.run('UPDATE sites SET rarity = $1 WHERE id = $2', [rarity, id]);
+      list.find((x) => x.id === id).rarity = rarity;
+    } else {
+      id = Math.max(CUSTOM_BASE, ...list.map((x) => x.id)) + 1;
+      await q.run('INSERT INTO sites (id, domain, rarity, family) VALUES ($1, $2, $3, $4)', [id, domain, rarity, siteRow(id, domain).family]);
+      list.push({ id, domain, rarity });
+    }
+    await q.run("INSERT INTO meta (key, value) VALUES ('custom', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [JSON.stringify(list)]);
+    return { ok: true, id, domain, rarity };
+  });
+  await c.game.loadCustom();
+  return r;
+}
+// Cartes spéciales : un domaine ajouté hors classement avec la rareté choisie (il sort dans les boosters comme les autres).
+route('POST', '/api/admin/custom', admin(({ c, body }) => addCustomSite(c, body.domain, body.rarity)));
+route('GET', '/api/admin/custom', admin(async ({ c }) => {
+  const r = await c.db.one("SELECT value FROM meta WHERE key = 'custom'");
+  return { items: r ? JSON.parse(r.value) : [] };
+}));
+
 route('POST', '/api/admin/user/:id/:action', admin(async ({ c, me, params, body }) => {
   const id = Number(params.id);
   if (params.action === 'admin') { await c.db.run('UPDATE users SET is_admin = $1 WHERE id = $2', [!!body.value, id]); return { ok: true }; }
@@ -498,6 +537,14 @@ route('POST', '/api/admin/setup', async ({ query }) => {
     }
     result += query.vacuum === '1' ? 'vacuum' : await setupDatabase(db, { force: query.force === '1' });
     if (query.tail === '1') { result += ' · ' + await setupTail(db); resetContext(); }
+    if (query.custom) {
+      // custom=domaine:rareté,domaine:rareté
+      const ctx2 = await getContext();
+      for (const part of String(query.custom).split(',')) {
+        const [d, r] = part.split(':');
+        result += ' · ' + JSON.stringify(await addCustomSite(ctx2, d, r).catch((e) => ({ error: e.message })));
+      }
+    }
     if (query.cron) result += ' · cron : ' + JSON.stringify(await scheduleCron(db, query.cron, process.env.CRON_SECRET, query.schedule || '* * * * *'));
     if (query.pause !== undefined) {
       await db.run("INSERT INTO meta (key, value) VALUES ('bots_paused', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [query.pause === '1' ? '1' : '0']);

@@ -2,7 +2,7 @@
 import { lineChart } from './chart.js';
 import {
   api, state, refreshMe, setMe, esc, fmt, $, $$, h, duration, ago, isOnline, cardHtml, unknownCardHtml, toast, toastErr,
-  modal, confirmDialog, busy, prefs, RARITY, VALUES, ICONS, favicon, siteName, power, now,
+  modal, confirmDialog, busy, prefs, RARITY, VALUES, ICONS, favicon, siteName, power, now, isSpecial,
 } from './core.js';
 
 const rarityChips = (current, withAll = true) =>
@@ -70,10 +70,10 @@ export async function openSite(id) {
     <div class="site-hero">
       <div>${cardHtml(s, { holo: d.mine.some((c) => c.holo), count: d.mine.length })}</div>
       <dl class="kv">
-        <dt>Rang mondial</dt><dd>#${fmt(s.id)}</dd>
+        <dt>Rang mondial</dt><dd>${isSpecial(s.id) ? 'Carte spéciale ★' : '#' + fmt(s.id)}</dd>
         <dt>Rareté</dt><dd class="r-${s.rarity} rtext">${r.name}</dd>
         <dt>Famille</dt><dd>${esc(s.family)}</dd>
-        <dt>Puissance</dt><dd>${power(s.id)}</dd>
+        <dt>Puissance</dt><dd>${power(s.id, s.rarity)}</dd>
         <dt>Cote</dt><dd>${fmt(d.price)} bits</dd>
         <dt>Recyclage</dt><dd>${fmt(d.value)} bits</dd>
         <dt>En circulation</dt><dd>${fmt(d.circulation)}${d.holos ? ` (${d.holos} holo)` : ''}</dd>
@@ -916,6 +916,14 @@ export async function viewAdmin(el) {
       <datalist id="adm-users"></datalist><datalist id="adm-sites"></datalist>
       <button class="btn primary">Envoyer</button>
     </form>
+    <h2>Cartes spéciales</h2>
+    <form class="panel" data-custom>
+      <p class="muted small" style="margin-top:0">Ajoute un site hors classement avec la rareté de ton choix : il sortira dans les boosters comme les autres cartes de cette rareté.</p>
+      <div class="row"><input type="text" name="domain" placeholder="ex : monsite.com" style="flex:1;min-width:160px">
+        <select name="rarity" style="width:auto">${RARITY.slice().reverse().map((r) => `<option value="${r.id}">${r.name}</option>`).join('')}</select>
+        <button class="btn primary">Ajouter</button></div>
+      <div class="list small" data-custom-list style="margin-top:8px"></div>
+    </form>
     <h2>Joueurs</h2>
     <div class="row" style="margin-bottom:10px"><input type="search" placeholder="Rechercher un pseudo…" data-uq style="flex:1">
       <select data-kind style="width:auto"><option value="humans">Humains</option><option value="bots">Bots</option><option value="all">Tous</option></select></div>
@@ -949,7 +957,20 @@ export async function viewAdmin(el) {
       <td style="white-space:nowrap"><button class="btn sm" data-pick>Choisir</button> <button class="btn sm" data-toggle-admin="${u.is_admin ? 0 : 1}">${u.is_admin ? '− admin' : '+ admin'}</button> <button class="btn sm danger" data-del>Supprimer</button></td></tr>`).join('');
     $('#adm-users').innerHTML = d.items.map((u) => `<option value="${esc(u.username)}">`).join('');
   };
-  await Promise.all([overview(), users()]).catch(toastErr);
+  const customs = async () => {
+    const d = await api('/admin/custom');
+    $('[data-custom-list]', el).innerHTML = d.items.map((x) => `<a href="#" data-site-link="${x.id}"><span class="grow">${esc(x.domain)}</span><span class="r-${x.rarity} rtext">${RARITY[x.rarity].name}</span></a>`).join('');
+  };
+  await Promise.all([overview(), users(), customs()]).catch(toastErr);
+  const cf = $('[data-custom]', el);
+  cf.addEventListener('submit', (e) => {
+    e.preventDefault();
+    busy($('button', cf), async () => {
+      const r = await api('/admin/custom', { domain: cf.domain.value, rarity: Number(cf.rarity.value) });
+      toast(`${r.domain} ajouté en ${RARITY[r.rarity].name}`, 'ok'); cf.domain.value = ''; customs();
+    });
+  });
+  $('[data-custom-list]', el).addEventListener('click', (e) => { const a = e.target.closest('[data-site-link]'); if (a) { e.preventDefault(); openSite(a.dataset.siteLink); } });
 
   let t;
   $('[data-uq]', el).addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => users().catch(toastErr), 200); });

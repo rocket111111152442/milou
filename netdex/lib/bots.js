@@ -416,7 +416,7 @@ async function cleanup(db) {
   // Sites de la traîne dépliés mais plus utilisés par personne : on les replie (ils restent dans les blocs).
   const tail = await db.one("SELECT value FROM meta WHERE key = 'tail'");
   if (tail) {
-    await db.run(`DELETE FROM sites s WHERE s.id >= $1
+    await db.run(`DELETE FROM sites s WHERE s.id >= $1 AND s.id < 100000000
       AND NOT EXISTS (SELECT 1 FROM cards c WHERE c.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM dex d WHERE d.site_id = s.id)
       AND NOT EXISTS (SELECT 1 FROM auctions a WHERE a.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM events e WHERE e.site_id = s.id)
       AND NOT EXISTS (SELECT 1 FROM sales x WHERE x.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar_site = s.id)`, [JSON.parse(tail.value).start]);
