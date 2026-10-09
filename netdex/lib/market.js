@@ -10,8 +10,8 @@ const DAY = 24 * 3600 * 1000;
 const HOUR = 3600 * 1000;
 let cache = { at: 0, rarity: null };
 
-export async function rarityPrices(db) {
-  if (cache.rarity && Date.now() - cache.at < 5 * 60_000) return cache.rarity;
+export async function rarityPrices(db, fresh = false) {
+  if (!fresh && cache.rarity && Date.now() - cache.at < 5 * 60_000) return cache.rarity;
   const rows = await db.all(`SELECT rarity, percentile_cont(0.5) WITHIN GROUP (ORDER BY price) p, COUNT(*) n
     FROM sales WHERE at > $1 AND holo = 0 GROUP BY rarity`, [Date.now() - 7 * DAY]);
   const got = Object.fromEntries(rows.filter((r) => r.n >= 5).map((r) => [r.rarity, r.p]));
@@ -88,4 +88,43 @@ export async function marketIndex(db) {
   const rows = await db.all(`SELECT rarity, (at / ${DAY})::bigint * ${DAY} AS day, percentile_cont(0.5) WITHIN GROUP (ORDER BY price) p, COUNT(*) n
     FROM sales WHERE at > $1 AND holo = 0 GROUP BY 1, 2 ORDER BY 2`, [Date.now() - 30 * DAY]);
   return { current: await rarityPrices(db), days: rows.map((r) => ({ rarity: r.rarity, day: Number(r.day), price: Math.round(r.p), n: r.n })) };
+}
+
+// Photo horaire de la cote de chaque rareté : sert à tracer la valeur d'une carte dans le temps.
+export async function snapshotIndex(db) {
+  const b = bucket(Date.now());
+  if (await db.one('SELECT 1 FROM price_index WHERE at = $1 LIMIT 1', [b])) return 0;
+  const prices = await rarityPrices(db, true);
+  const counts = Object.fromEntries((await db.all('SELECT rarity, COUNT(*) n FROM sales WHERE at > $1 AND holo = 0 GROUP BY rarity', [Date.now() - 7 * DAY])).map((r) => [r.rarity, r.n]));
+  await db.run(`INSERT INTO price_index (at, rarity, price, n) SELECT $1, r, p, n FROM unnest($2::smallint[], $3::int[], $4::int[]) AS x(r, p, n) ON CONFLICT DO NOTHING`,
+    [b, prices.map((_, i) => i), prices, prices.map((_, i) => counts[i] || 0)]);
+  return 1;
+}
+
+const median = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2); };
+
+// Statistiques de vente d'une carte (30 jours, prix ramenés à la version normale) + cote dans le temps.
+export async function siteMarket(db, game, siteId) {
+  const t = game.tierOf(siteId);
+  const pos = game.isCustom(siteId) ? 1 : 1 - (siteId - t.lo) / Math.max(1, t.hi - t.lo + 1);
+  const factor = 1 + 0.5 * pos;
+  const [sales, index, price] = await Promise.all([
+    db.all('SELECT at, price, holo FROM sales WHERE site_id = $1 AND at > $2 ORDER BY at', [siteId, Date.now() - 60 * DAY]),
+    db.all('SELECT at, price FROM price_index WHERE rarity = $1 AND at > $2 ORDER BY at', [t.id, Date.now() - 30 * DAY]),
+    sitePrices(db, game, [siteId]).then((m) => m.get(siteId)),
+  ]);
+  const norm = sales.map((x) => ({ at: x.at, price: x.holo ? Math.round(x.price / CONFIG.holoMultiplier) : x.price, holo: x.holo }));
+  const recent = norm.filter((x) => x.at > Date.now() - 30 * DAY).map((x) => x.price);
+  const stats = recent.length ? {
+    count: recent.length, avg: Math.round(recent.reduce((a, b) => a + b, 0) / recent.length), median: median(recent),
+    min: Math.min(...recent), max: Math.max(...recent), last: norm.at(-1),
+  } : null;
+  // Courbe : à chaque heure, médiane de ses propres ventes des 30 jours précédents, sinon cote de sa rareté (ajustée au rang).
+  const points = index.map((i) => {
+    const own = norm.filter((x) => x.at <= i.at && x.at > i.at - 30 * DAY).map((x) => x.price);
+    return { at: i.at, price: own.length ? median(own) : Math.round(i.price * factor) };
+  });
+  points.push({ at: Date.now(), price });
+  const rp = await rarityPrices(db);
+  return { price, stats, history: points, rarity: { id: t.id, price: rp[t.id] }, sales: norm.slice(-60) };
 }

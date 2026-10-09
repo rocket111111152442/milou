@@ -5,7 +5,7 @@ import { gzipSync } from 'node:zlib';
 import { createDb, databaseUrl, ADMIN_USERNAMES } from './db.js';
 import { copyDatabase, scheduleCron } from './transfer.js';
 import { RARITIES, tailDomains, searchTail, siteRow } from './sites.js';
-import { wallet, marketIndex, sitePrices, snapshotDue } from './market.js';
+import { wallet, marketIndex, sitePrices, snapshotDue, snapshotIndex, siteMarket } from './market.js';
 import { createGame, CONFIG, GameError, CUSTOM_BASE } from './game.js';
 import { setupDatabase, setupTail } from './setup.js';
 import { runBots, seedBots, botStatus, deleteBots } from './bots.js';
@@ -149,17 +149,16 @@ async function publicProfile(c, meId, name) {
 async function siteInfo({ db, game }, meId, id) {
   const site = (await game.ensureSites(db, [Number(id) || 0])).get(Number(id) || 0);
   if (!site) throw new GameError('Site inconnu.', 404);
-  const [circ, mine, owners, found, history, prices] = await Promise.all([
+  const [circ, mine, owners, found, market] = await Promise.all([
     db.one('SELECT COUNT(*) n, COALESCE(SUM(holo), 0) h, COUNT(DISTINCT user_id) owners FROM cards WHERE site_id = $1', [site.id]),
     db.all('SELECT id, holo, status, obtained_at FROM cards WHERE site_id = $1 AND user_id = $2 ORDER BY holo DESC, id', [site.id, meId]),
     db.all(`SELECT u.username, COUNT(*) n, SUM(c.holo) h FROM cards c JOIN users u ON u.id = c.user_id
       WHERE c.site_id = $1 GROUP BY u.id ORDER BY n DESC LIMIT 15`, [site.id]),
     db.one('SELECT found_at FROM dex WHERE user_id = $1 AND site_id = $2', [meId, site.id]),
-    db.all('SELECT at, price, holo FROM sales WHERE site_id = $1 ORDER BY at DESC LIMIT 60', [site.id]),
-    sitePrices(db, game, [site.id]),
+    siteMarket(db, game, site.id),
   ]);
   return { site, circulation: circ.n, holos: circ.h, owners: circ.owners, ownerList: owners, mine, foundAt: found?.found_at || null,
-    value: RARITIES[site.rarity].value, price: prices.get(site.id), sales: history.reverse() };
+    value: RARITIES[site.rarity].value, ...market };
 }
 
 // Sites pour une liste d'id : ceux de la table, et ceux de la longue traîne lus dans les blocs (sans les déplier).
@@ -289,6 +288,10 @@ route('GET', '/api/sites/search', async ({ c, me, query }) => {
   return { items: items.map((i) => ({ ...i, found_at: found.get(i.id) || null })) };
 });
 route('GET', '/api/sites/:id', ({ c, me, params }) => siteInfo(c, me.id, params.id));
+route('GET', '/api/sites/:id/price', async ({ c, params }) => {
+  const m = await siteMarket(c.db, c.game, Number(params.id) || 0);
+  return { price: m.price, stats: m.stats, rarity: m.rarity };
+});
 
 route('GET', '/api/users/search', async ({ c, me, query }) => {
   const q = String(query.q || '').trim().replace(/[%_\\]/g, '');
@@ -505,6 +508,7 @@ route('POST', '/api/admin/bots/delete', admin(async ({ c }) => { await deleteBot
 route('GET', '/api/cron/bots', async ({ c, req }) => {
   if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) throw new GameError('Interdit.', 403);
   const budget = Math.max(5, Math.min(250, Number(new URL(req.url, 'http://x').searchParams.get('budget')) || 250));
+  await snapshotIndex(c.db).catch((e) => console.error('index', e.message));
   const snaps = await snapshotDue(c.db, c.game).catch((e) => { console.error('snapshots', e.message); return 0; });
   const r = await runBots(c.db, c.game, { budgetMs: budget * 1000, batch: 40, force: true });
   return { ...r, snapshots: snaps };

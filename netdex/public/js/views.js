@@ -89,16 +89,19 @@ export async function openSite(id) {
         <button class="btn sm ghost" data-avatar>Mettre en avatar</button>` : ''}
     </div>
     <div data-form></div>
-    <h2>Historique des ventes</h2>
-    ${d.sales.length >= 2 ? '<div class="chart" data-price-chart></div>' : `<p class="muted small">${d.sales.length ? `Une seule vente : ${fmt(d.sales[0].price)} bits.` : 'Pas encore vendue aux enchères.'} La cote vient alors de la médiane de sa rareté.</p>`}
+    <h2>Valeur dans le temps</h2>
+    <div class="chart" data-price-chart></div>
+    <p class="muted small">${d.stats
+      ? `${d.stats.count} vente${d.stats.count > 1 ? 's' : ''} en 30 jours · moyenne <b class="mono">${fmt(d.stats.avg)}</b> · médiane <b class="mono">${fmt(d.stats.median)}</b> · de ${fmt(d.stats.min)} à ${fmt(d.stats.max)} bits · dernière ${ago(d.stats.last.at)}`
+      : `Jamais vendue ces 30 derniers jours : sa valeur suit la cote des cartes ${RARITY[s.rarity].name.toLowerCase()}s (${fmt(d.rarity.price)} bits).`}</p>
     ${d.ownerList.length ? `<h2>Qui la possède ?</h2><div class="list">${d.ownerList.map((o) =>
       `<a href="#/u/${encodeURIComponent(o.username)}" data-close><div class="grow">${esc(o.username)}</div><span class="muted">×${o.n}${o.h ? ' ✦' : ''}</span></a>`).join('')}</div>` : ''}
   `, {
     onMount(body, close) {
       const pc = $('[data-price-chart]', body);
       if (pc) {
-        const pts = d.sales.map((x) => ({ x: x.at, y: x.holo ? Math.round(x.price / state.me.config.holoMultiplier) : x.price }));
-        requestAnimationFrame(() => lineChart(pc, pts, { format: (v) => fmt(Math.round(v)), dateFormat: dateFmt(pts.at(-1).x - pts[0].x), height: 150, label: 'Prix de vente' }));
+        const pts = d.history.map((x) => ({ x: x.at, y: x.price }));
+        requestAnimationFrame(() => lineChart(pc, pts, { format: (v) => fmt(Math.round(v)), dateFormat: dateFmt(pts.at(-1).x - pts[0].x), height: 160, label: 'Valeur de la carte' }));
       }
       $('[data-recycle]', body)?.addEventListener('click', (e) => busy(e.target, async () => {
         const c = owned.find((x) => !x.holo) || owned[0];
@@ -121,7 +124,8 @@ export async function openSite(id) {
 
 function auctionForm(owned, s) {
   const suggested = Math.max(1, VALUES[s.rarity] * 2);
-  return `<form class="panel" style="margin-top:14px" data-auction>
+  return `<form class="panel" style="margin-top:14px" data-auction data-site-id="${s.id}">
+    <div class="small" data-price-info style="margin-bottom:12px"><span class="muted">Recherche des prix de vente…</span></div>
     ${owned.length > 1 ? `<label class="field"><span>Exemplaire</span><select name="cardId">${owned.map((c) => `<option value="${c.id}">${c.holo ? 'HOLO ✦' : 'Normal'} #${c.id}</option>`).join('')}</select></label>`
       : `<input type="hidden" name="cardId" value="${owned[0].id}">`}
     <div class="grid-2">
@@ -135,6 +139,24 @@ function auctionForm(owned, s) {
 }
 function bindAuctionForm(root, close) {
   const f = $('[data-auction]', root);
+  // Prix constatés pour cette carte : aide à fixer le prix de départ.
+  let edited = false;
+  f.startPrice.addEventListener('input', () => { edited = true; });
+  const holoOf = () => (f.cardId.tagName === 'SELECT' ? /HOLO/.test(f.cardId.selectedOptions[0].textContent) : false);
+  api(`/sites/${f.dataset.siteId}/price`).then((p) => {
+    const mult = () => (holoOf() ? state.me.config.holoMultiplier : 1);
+    const render = () => {
+      const m = mult();
+      $('[data-price-info]', f).innerHTML = p.stats
+        ? `<b>Elle part en moyenne à <span class="mono">${fmt(p.stats.avg * m)}</span> bits</b>
+           <div class="muted">${p.stats.count} vente${p.stats.count > 1 ? 's' : ''} sur 30 jours · médiane ${fmt(p.stats.median * m)} · de ${fmt(p.stats.min * m)} à ${fmt(p.stats.max * m)} · dernière : ${fmt(p.stats.last.price * m)} bits ${ago(p.stats.last.at)}</div>`
+        : `<b>Pas encore vendue : cote estimée <span class="mono">${fmt(p.price * m)}</span> bits</b>
+           <div class="muted">Les cartes de cette rareté partent autour de ${fmt(p.rarity.price * m)} bits (médiane des 7 derniers jours).</div>`;
+      if (!edited) f.startPrice.value = Math.max(1, Math.round((p.stats ? p.stats.median : p.price) * m * 0.9));
+    };
+    render();
+    if (f.cardId.tagName === 'SELECT') f.cardId.addEventListener('change', render);
+  }).catch(() => { $('[data-price-info]', f).innerHTML = ''; });
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(f);
@@ -149,36 +171,9 @@ function bindAuctionForm(root, close) {
 // ======================================================================
 // Accueil : boosters
 // ======================================================================
-// Fil « En direct » : ce qui se passe dans le jeu (rafraîchi toutes les 10 s tant que la page est ouverte).
-function liveFeed(box, on, { limit = 12 } = {}) {
-  const line = (e) => {
-    const who = `<a href="#/u/${encodeURIComponent(e.who || '')}">${esc(e.who || '?')}</a>`;
-    const other = `<a href="#/u/${encodeURIComponent(e.other || '')}">${esc(e.other || '?')}</a>`;
-    const card = e.domain ? `<a href="#" data-site-link="${e.site_id}" class="r-${e.rarity} rtext">${esc(e.domain)}</a>${e.holo ? ' <span class="tag accent">holo</span>' : ''}` : '';
-    const txt = {
-      pull: `${who} a tiré ${card} <span class="muted">· ${RARITY[e.rarity]?.name || ''}</span>`,
-      sold: `${who} a acheté ${card} à ${other} pour <b class="mono">${fmt(e.amount)}</b> bits`,
-      trade: `${who} et ${other} ont échangé ${e.amount} carte${e.amount > 1 ? 's' : ''}`,
-      join: `${who} a rejoint Netdex`,
-    }[e.kind] || '';
-    return `<div><span class="grow">${txt}</span><span class="muted small mono">${ago(e.at)}</span></div>`;
-  };
-  const load = async () => {
-    const d = await api('/feed');
-    box.innerHTML = `<div class="row" style="margin-bottom:6px"><b class="grow">En direct</b>
-        <span class="small"><span class="online"></span> <b class="mono">${fmt(d.online)}</b> en ligne · <b class="mono">${fmt(d.auctions)}</b> ventes · <b class="mono">${fmt(d.last_hour)}</b> événements/h</span></div>
-      <div class="list small">${d.events.slice(0, limit).map(line).join('') || '<div class="muted">Calme plat pour le moment.</div>'}</div>`;
-  };
-  box.addEventListener('click', (e) => { const a = e.target.closest('[data-site-link]'); if (a) { e.preventDefault(); openSite(a.dataset.siteLink); } });
-  load().catch(() => {});
-  const iv = setInterval(() => { if (document.visibilityState === 'visible') load().catch(() => {}); }, 10_000);
-  on('nd:leave', () => clearInterval(iv));
-}
-
 export async function viewHome(el, { on }) {
   el.innerHTML = `
     <section class="hero" data-hero></section>
-    <div class="panel" style="margin-top:12px" data-live></div>
     <div class="quick-grid" style="margin-top:12px" data-quick></div>
     <div class="grid-2" style="margin-top:12px">
       <div class="panel" data-daily></div>
@@ -222,7 +217,6 @@ export async function viewHome(el, { on }) {
   };
   renderHero();
   on('nd:me', renderHero);
-  liveFeed($('[data-live]', el), on, { limit: 8 });
 
   el.addEventListener('click', (e) => {
     if (e.target.closest('[data-open]') && state.me.packs.available) openPackFlow('free');
@@ -369,7 +363,6 @@ export async function viewMarket(el, { on, query }) {
   const f = { scope: query.scope || 'all', rarity: '', q: '', sort: 'ending' };
   el.innerHTML = `
     <div class="page-head"><h1>Marché</h1><div class="row"><button class="btn primary sm" data-sell>+ Vendre une carte</button></div></div>
-    <div class="panel" style="margin-bottom:14px" data-live></div>
     <details class="panel" style="margin-bottom:14px" data-index><summary><b>Cours du marché</b> <span class="muted small">médiane des ventes, 7 jours</span></summary><div data-index-body class="small" style="margin-top:10px"></div></details>
     <div class="tabs" data-tabs><button data-scope="all">Toutes les ventes</button><button data-scope="mine">Mes ventes</button><button data-scope="bids">Mes enchères</button></div>
     <div class="row" style="margin-bottom:10px">
@@ -381,7 +374,6 @@ export async function viewMarket(el, { on, query }) {
   const list = $('[data-list]', el);
   const setTabs = () => $$('[data-scope]', el).forEach((b) => b.classList.toggle('on', b.dataset.scope === f.scope));
   setTabs();
-  liveFeed($('[data-live]', el), on, { limit: 5 });
   $('[data-index]', el).addEventListener('toggle', async (e) => {
     if (!e.target.open || e.target.dataset.loaded) return;
     e.target.dataset.loaded = 1;

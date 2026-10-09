@@ -150,6 +150,13 @@ CREATE TABLE IF NOT EXISTS sales (
 );
 CREATE INDEX IF NOT EXISTS sales_site ON sales (site_id, at);
 CREATE INDEX IF NOT EXISTS sales_at ON sales (at);
+CREATE TABLE IF NOT EXISTS price_index (
+  at BIGINT NOT NULL,
+  rarity SMALLINT NOT NULL,
+  price INTEGER NOT NULL,
+  n INTEGER NOT NULL,
+  PRIMARY KEY (at, rarity)
+);
 CREATE TABLE IF NOT EXISTS value_history (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   at BIGINT NOT NULL,
