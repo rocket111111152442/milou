@@ -408,7 +408,12 @@ route('POST', '/api/admin/setup', async ({ query }) => {
   const db = createDb();
   if (!db) throw new GameError('DATABASE_URL manquant.', 503);
   try {
-    const result = query.vacuum === '1' ? 'vacuum' : await setupDatabase(db, { force: query.force === '1' });
+    let result = query.vacuum === '1' ? 'vacuum' : await setupDatabase(db, { force: query.force === '1' });
+    if (Number(query.bots) > 0) {
+      const { game } = await getContext();
+      const { n } = await db.one('SELECT COUNT(*) n FROM users WHERE is_bot');
+      result += n ? ` · ${n} bots déjà présents` : ` · ${(await seedBots(db, game, Number(query.bots))).created} bots créés`;
+    }
     // VACUUM FULL rend au disque la place des lignes mortes (ex. import interrompu) : utile sous un quota de stockage.
     if (query.vacuum === '1') for (const t of ['sites', 'cards', 'dex', 'notifications', 'trades', 'trade_items', 'auctions', 'sessions', 'users', 'friends']) await db.query(`VACUUM FULL ${t}`);
     const size = await db.one('SELECT pg_database_size(current_database()) b');
