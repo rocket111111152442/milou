@@ -116,6 +116,14 @@ CREATE TABLE IF NOT EXISTS notifications (
   read BOOLEAN NOT NULL DEFAULT false
 );
 CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, id DESC);
+
+-- v2 : administrateurs et joueurs automatiques.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bot JSONB;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bot_next_at BIGINT;
+CREATE INDEX IF NOT EXISTS users_bot_due ON users (bot_next_at) WHERE is_bot;
+CREATE INDEX IF NOT EXISTS auctions_card ON auctions (card_id);
 `;
 
 export function databaseUrl() {
@@ -162,6 +170,9 @@ export function createDb(url = databaseUrl()) {
   return db;
 }
 
+export const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || 'Ismaelleboulit').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
 export async function migrate(db) {
   await db.query(SCHEMA);
+  await db.query('UPDATE users SET is_admin = true WHERE lower(username) = ANY($1::text[]) AND NOT is_admin', [ADMIN_USERNAMES]);
 }

@@ -4,7 +4,9 @@
   "description": "Collectionne les sites d'internet en cartes : boosters toutes les 3 minutes, échanges, enchères, amis.",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "migrate": "node scripts/migrate.js",
     "start": "node server/dev.js",
@@ -12,6 +14,7 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
+    "@vercel/functions": "^3.9.11",
     "pg": "^8.23.1"
   }
 }

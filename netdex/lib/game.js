@@ -9,8 +9,8 @@ export const CONFIG = {
   startBits: 150,
   startPacks: 3,
   premiumPrice: 300,
-  holoChance: 200,             // sur 10 000 (2 %)
-  premiumHoloChance: 600,      // 6 %
+  holoChance: 100,             // sur 10 000 (1 %)
+  premiumHoloChance: 300,      // 3 %
   holoMultiplier: 5,
   auctionFee: 0.05,
   auctionHours: [1, 6, 24, 72],
@@ -37,8 +37,9 @@ export async function createGame(db) {
 
   const value = (rarity, holo) => RARITIES[rarity].value * (holo ? CONFIG.holoMultiplier : 1);
 
+  // Les bots ne reçoivent pas de notifications (économie de stockage).
   const notify = (q, userId, text, link = null) =>
-    q.run('INSERT INTO notifications (user_id, text, link, created_at) VALUES ($1, $2, $3, $4)', [userId, text, link, Date.now()]);
+    q.run('INSERT INTO notifications (user_id, text, link, created_at) SELECT $1, $2, $3, $4 FROM users WHERE id = $1 AND NOT is_bot', [userId, text, link, Date.now()]);
 
   // Débit conditionnel : impossible de passer en négatif même avec des requêtes simultanées.
   async function debit(q, userId, amount, msg = 'Pas assez de bits.') {
@@ -47,8 +48,13 @@ export async function createGame(db) {
   }
   const credit = (q, userId, amount) => amount > 0 && q.run('UPDATE users SET bits = bits + $1 WHERE id = $2', [amount, userId]);
 
+  // Un bot sollicité par quelqu'un « passe voir » dans les minutes qui suivent, comme un vrai joueur.
+  const wakeBot = (q, userId) => q.run('UPDATE users SET bot_next_at = LEAST(bot_next_at, $1) WHERE id = $2 AND is_bot',
+    [Date.now() + (1 + randomInt(9)) * 60_000, userId]);
+
   async function discover(q, userId, siteId, now = Date.now()) {
-    const r = await q.run('INSERT INTO dex (user_id, site_id, found_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [userId, siteId, now]);
+    // Pas de pokédex détaillé pour les bots : seuls leurs compteurs bougent (voir drawCards).
+    const r = await q.run('INSERT INTO dex (user_id, site_id, found_at) SELECT $1, $2, $3 FROM users WHERE id = $1 AND NOT is_bot ON CONFLICT DO NOTHING', [userId, siteId, now]);
     if (!r) return false;
     await q.run('UPDATE users SET dex_score = dex_score + $1, dex_count = dex_count + 1 WHERE id = $2', [tierOf(siteId).value, userId]);
     return true;
@@ -57,7 +63,8 @@ export async function createGame(db) {
   // ---------- Boosters (chrono calculé côté serveur : tourne même app fermée) ----------
   function packState(u, now = Date.now()) {
     const gained = Math.floor((now - u.pack_anchor) / CONFIG.packInterval);
-    const available = Math.min(CONFIG.packCap, u.pack_stock + gained);
+    // Les boosters offerts par un admin peuvent dépasser le plafond.
+    const available = Math.max(u.pack_stock, Math.min(CONFIG.packCap, u.pack_stock + gained));
     const nextAt = available >= CONFIG.packCap ? null : u.pack_anchor + (gained + 1) * CONFIG.packInterval;
     return { available, cap: CONFIG.packCap, interval: CONFIG.packInterval, nextAt, gained };
   }
@@ -70,12 +77,12 @@ export async function createGame(db) {
     return pool[0];
   }
 
-  async function drawCards(q, userId, premium) {
+  async function drawCards(q, userId, premium, isBot = false) {
     const now = Date.now();
     const picks = [];
     for (let i = 0; i < CONFIG.packSize; i++) {
       const last = i === CONFIG.packSize - 1;
-      const tier = rollTier(premium ? (last ? 3 : 1) : (last ? 2 : 0)); // 5e carte Rare+ (Épique+ en premium)
+      const tier = rollTier(premium ? (last ? 2 : 1) : (last ? 1 : 0)); // 5e carte Peu commune+ (Rare+ en premium)
       picks.push({
         siteId: tier.lo + randomInt(tier.hi - tier.lo + 1),
         holo: randomInt(10000) < (premium ? CONFIG.premiumHoloChance : CONFIG.holoChance) ? 1 : 0,
@@ -83,22 +90,35 @@ export async function createGame(db) {
     }
     const sites = await q.all('SELECT id, domain, rarity, family FROM sites WHERE id = ANY($1::int[])', [picks.map((p) => p.siteId)]);
     const byId = new Map(sites.map((s) => [s.id, s]));
+    const ownedBefore = isBot
+      ? new Set((await q.all('SELECT DISTINCT site_id FROM cards WHERE user_id = $1 AND site_id = ANY($2::int[])', [userId, picks.map((p) => p.siteId)])).map((r) => r.site_id))
+      : null;
     const ids = await q.all(`INSERT INTO cards (user_id, site_id, holo, obtained_at)
       SELECT $1, s, h, $4 FROM unnest($2::int[], $3::smallint[]) AS x(s, h) RETURNING id`, [userId, picks.map((p) => p.siteId), picks.map((p) => p.holo), now]);
     const out = [];
     for (let i = 0; i < picks.length; i++) {
-      out.push({ cardId: ids[i].id, holo: picks[i].holo, isNew: await discover(q, userId, picks[i].siteId, now), site: byId.get(picks[i].siteId) });
+      let isNew;
+      if (isBot) {
+        isNew = !ownedBefore.has(picks[i].siteId);
+        ownedBefore.add(picks[i].siteId);
+        if (isNew) await q.run('UPDATE users SET dex_score = dex_score + $1, dex_count = dex_count + 1 WHERE id = $2', [tierOf(picks[i].siteId).value, userId]);
+      } else {
+        isNew = await discover(q, userId, picks[i].siteId, now);
+      }
+      out.push({ cardId: ids[i].id, holo: picks[i].holo, isNew, site: byId.get(picks[i].siteId) });
     }
     await q.run('UPDATE users SET packs_opened = packs_opened + 1 WHERE id = $1', [userId]);
     return out;
   }
 
-  function openPack(userId, kind) {
+  function openPack(userId, kind, { free = false } = {}) {
     return db.tx(async (q) => {
       const u = await q.one('SELECT * FROM users WHERE id = $1 FOR UPDATE', [userId]);
+      // Admin : boosters illimités, sans toucher au stock ni aux bits.
+      if (free && u.is_admin) return drawCards(q, userId, kind === 'premium', false);
       if (kind === 'premium') {
         await debit(q, userId, CONFIG.premiumPrice, `Il te faut ${CONFIG.premiumPrice} bits.`);
-        return drawCards(q, userId, true);
+        return drawCards(q, userId, true, u.is_bot);
       }
       const now = Date.now();
       const st = packState(u, now);
@@ -106,7 +126,7 @@ export async function createGame(db) {
       const full = u.pack_stock + st.gained >= CONFIG.packCap;
       const anchor = full ? now : u.pack_anchor + st.gained * CONFIG.packInterval;
       await q.run('UPDATE users SET pack_stock = $1, pack_anchor = $2 WHERE id = $3', [st.available - 1, anchor, userId]);
-      return drawCards(q, userId, false);
+      return drawCards(q, userId, false, u.is_bot);
     });
   }
 
@@ -177,6 +197,7 @@ export async function createGame(db) {
       if (rel === 'sent') throw new GameError('Demande déjà envoyée.');
       if (rel === 'received') return acceptFriendTx(q, me, target.id);
       await q.run("INSERT INTO friends (user_id, friend_id, status, created_at) VALUES ($1, $2, 'pending', $3) ON CONFLICT DO NOTHING", [me.id, target.id, Date.now()]);
+      await wakeBot(q, target.id);
       await notify(q, target.id, `${me.username} veut devenir ton ami.`, '#/social');
       return { status: 'sent' };
     });
@@ -240,6 +261,7 @@ export async function createGame(db) {
       const items = [...offer.map((c) => [c, 'offer']), ...request.map((c) => [c, 'request'])];
       if (items.length) await q.run('INSERT INTO trade_items (trade_id, card_id, side) SELECT $1, c, s FROM unnest($2::int[], $3::text[]) AS x(c, s)', [id, items.map((i) => i[0]), items.map((i) => i[1])]);
       await notify(q, toId, `${me.username} te propose un échange.`, '#/social?tab=trades');
+      await wakeBot(q, toId);
       return { id };
     });
   }
@@ -427,6 +449,7 @@ export async function createGame(db) {
   }
 
   return {
+    db, minBid, drawCards, debit, credit, discover,
     tiers, totalSites, tierOf, value, notify, packState, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
     relation, requestFriend, respondFriend, removeFriend, listFriends,
     createTrade, listTrades, resolveTrade,

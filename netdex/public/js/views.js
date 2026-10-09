@@ -16,15 +16,15 @@ const parseCards = (s) => (s ? String(s).split(',').map((x) => ({ id: parseInt(x
 // ======================================================================
 // Ouverture de booster
 // ======================================================================
-export async function openPackFlow(kind = 'free') {
+export async function openPackFlow(kind = 'free', free = false) {
   let res;
-  try { res = await api('/packs/open', { kind }); } catch (e) { toastErr(e); return; }
+  try { res = await api('/packs/open', { kind, free }); } catch (e) { toastErr(e); return; }
   setMe(res.me);
   const cards = res.cards;
   const fast = prefs.get('fast', false);
   const ov = h(`<div class="overlay">
     <div class="reveal">${cards.map((c, i) => `<div class="flip" data-i="${i}">
-        <div class="back r-${c.site.rarity}${c.site.rarity >= 3 ? ' hint' : ''}">${ICONS.logo}</div>
+        <div class="back r-${c.site.rarity}${c.site.rarity >= 3 ? ' hint' : ''}"></div>
         ${cardHtml(c.site, { holo: c.holo, isNew: c.isNew })}
       </div>`).join('')}</div>
     <div class="reveal-summary"><p class="muted">Touche les cartes pour les retourner</p>
@@ -37,11 +37,11 @@ export async function openPackFlow(kind = 'free') {
     const news = cards.filter((c) => c.isNew).length;
     const val = cards.reduce((a, c) => a + VALUES[c.site.rarity] * (c.holo ? 5 : 1), 0);
     const best = cards.reduce((a, c) => (c.site.rarity > a.site.rarity ? c : a));
-    const left = state.me.packs.available;
+    const left = free ? Infinity : state.me.packs.available;
     $('.reveal-summary', ov).innerHTML = `
       <div><b>${news}</b> nouveau${news > 1 ? 'x' : ''} site${news > 1 ? 's' : ''} · valeur <b>${fmt(val)}</b> bits · meilleure : <span class="r-${best.site.rarity} rtext">${RARITY[best.site.rarity].name}</span></div>
       <div class="row">
-        ${left > 0 ? `<button class="btn primary big" data-next>Booster suivant (${left})</button>` : ''}
+        ${left > 0 ? `<button class="btn primary big" data-next>Booster suivant${left === Infinity ? '' : ` (${left})`}</button>` : ''}
         <button class="btn${left > 0 ? '' : ' primary big'}" data-close>Fermer</button>
       </div>`;
   };
@@ -50,7 +50,7 @@ export async function openPackFlow(kind = 'free') {
     const f = e.target.closest('.flip');
     if (f) { if (f.classList.contains('open')) openSite(f.querySelector('.card').dataset.site); else flip(f); return; }
     if (e.target.closest('[data-all]')) flips.forEach((x, i) => setTimeout(() => flip(x), i * 90));
-    if (e.target.closest('[data-next]')) { ov.remove(); openPackFlow('free'); }
+    if (e.target.closest('[data-next]')) { ov.remove(); openPackFlow(kind === 'premium' && free ? 'premium' : 'free', free); }
     if (e.target.closest('[data-close]')) { ov.remove(); document.dispatchEvent(new CustomEvent('nd:cards')); }
   });
   if (fast) flips.forEach((x, i) => setTimeout(() => flip(x), 150 + i * 70));
@@ -72,7 +72,7 @@ export async function openSite(id) {
         <dt>Rang mondial</dt><dd>#${fmt(s.id)}</dd>
         <dt>Rareté</dt><dd class="r-${s.rarity} rtext">${r.name}</dd>
         <dt>Famille</dt><dd>${esc(s.family)}</dd>
-        <dt>Puissance</dt><dd>⚡${power(s.id)}</dd>
+        <dt>Puissance</dt><dd>${power(s.id)}</dd>
         <dt>Valeur</dt><dd>${fmt(d.value)} bits</dd>
         <dt>En circulation</dt><dd>${fmt(d.circulation)}${d.holos ? ` (${d.holos} holo)` : ''}</dd>
         <dt>Joueurs</dt><dd>${fmt(d.owners)}</dd>
@@ -147,27 +147,32 @@ export async function viewHome(el, { on }) {
     <div class="grid-2" style="margin-top:12px">
       <div class="panel" data-daily></div>
       <div class="panel">
-        <div class="row"><div class="grow"><b>Booster Premium</b><div class="muted small">5 cartes Peu commune+, dernière Épique+, 3× plus de holo</div></div>
+        <div class="row"><div class="grow"><b>Booster Premium</b><div class="muted small">5 cartes Peu commune+, dernière Rare+, 3× plus de holo</div></div>
         <button class="btn violet" data-premium>${fmt(state.me.config.premiumPrice)} bits</button></div>
       </div>
     </div>
     <div class="panel" style="margin-top:12px"><div class="row"><b class="grow">Progression du Netdex</b><a href="#/dex" class="small">Voir le dex →</a></div><div data-tiers><div class="spinner"></div></div></div>
+    ${state.me.user.isAdmin ? `<div class="panel" style="margin-top:10px"><div class="row"><div class="grow"><b>Admin</b><div class="muted small">Boosters illimités, sans toucher à ton stock</div></div>
+      <button class="btn primary" data-admin-open="free">Booster gratuit</button><button class="btn" data-admin-open="premium">Premium gratuit</button><a class="btn" href="#/admin">Panneau</a></div></div>` : ''}
     <div data-install></div>`;
 
   const renderHero = () => {
     const p = state.me.packs;
     $('[data-hero]', el).innerHTML = `
       <div class="pack-visual${p.available ? '' : ' empty'}" data-open>
-        <div class="pv-logo">${ICONS.logo}</div><div class="pv-label">5 SITES</div>
+        <div class="pv-top">BOOSTER</div>
+        <div><div class="pv-logo">netdex_</div><div class="pv-label">5 sites du web<br>classement mondial</div></div>
         ${p.available ? `<div class="pv-count">${p.available}</div>` : ''}
       </div>
-      <div class="stock-bar">${Array.from({ length: p.cap }, (_, i) => `<i class="${i < p.available ? 'on' : ''}"></i>`).join('')}</div>
-      ${p.nextAt ? `<div class="muted small">Prochain booster dans</div><div class="timer" data-until="${p.nextAt}" data-refresh>${duration(p.nextAt - now())}</div>`
-        : '<div class="muted small">Stock plein — ouvre-les pour relancer le chrono</div><div class="timer">MAX</div>'}
-      <div class="row" style="justify-content:center;margin-top:14px">
-        <button class="btn primary big" data-open ${p.available ? '' : 'disabled'}>Ouvrir un booster</button>
-      </div>
-      <p class="muted small" style="margin:12px 0 0">1 booster toutes les 3 min, même app fermée · stock max ${p.cap}</p>`;
+      <div>
+        <div class="muted small">${p.nextAt ? 'Prochain booster dans' : 'Stock plein'}</div>
+        ${p.nextAt ? `<div class="timer" data-until="${p.nextAt}" data-refresh>${duration(p.nextAt - now())}</div>` : '<div class="timer">MAX</div>'}
+        <div class="stock-bar">${Array.from({ length: Math.max(p.cap, p.available) }, (_, i) => `<i class="${i < p.available ? 'on' : ''}"></i>`).join('')}</div>
+        <div class="row hero-actions" style="justify-content:center">
+          <button class="btn primary big" data-open ${p.available ? '' : 'disabled'}>Ouvrir un booster${p.available > 1 ? ` (${p.available})` : ''}</button>
+        </div>
+        <p class="muted small" style="margin:12px 0 0">Un booster toutes les 3 min, même app fermée. Stock max ${p.cap}.</p>
+      </div>`;
     const d = state.me.daily;
     $('[data-daily]', el).innerHTML = `<div class="row"><div class="grow"><b>Bonus quotidien</b>
       <div class="muted small">${d.available ? `+${d.reward} bits · jour ${Math.min(7, d.streak + 1)}/7 de ta série` : `Prochain dans <span data-until="${d.nextAt}">${duration(d.nextAt - now())}</span>`}</div></div>
@@ -184,6 +189,8 @@ export async function viewHome(el, { on }) {
 
   el.addEventListener('click', (e) => {
     if (e.target.closest('[data-open]') && state.me.packs.available) openPackFlow('free');
+    const adm = e.target.closest('[data-admin-open]');
+    if (adm) openPackFlow(adm.dataset.adminOpen, true);
     const prem = e.target.closest('[data-premium]');
     if (prem) busy(prem, async () => {
       if (await confirmDialog('Booster Premium', `Acheter un booster Premium pour <b>${fmt(state.me.config.premiumPrice)}</b> bits ?`, 'Acheter')) await openPackFlow('premium');
@@ -684,9 +691,8 @@ export async function viewTop(el) {
     $$('[data-scope]', el).forEach((b) => b.classList.toggle('on', b.dataset.scope === scope));
     const d = await api(`/leaderboard?by=${by}&scope=${scope}`);
     const key = { score: 'dex_score', count: 'dex_count', packs: 'packs_opened' }[by];
-    const medal = ['🥇', '🥈', '🥉'];
     $('[data-list]', el).innerHTML = d.items.map((u, i) => `<a href="#/u/${encodeURIComponent(u.username)}" style="color:var(--text)${u.id === state.me.user.id ? ';background:color-mix(in srgb,var(--accent) 10%,transparent);margin:0 -16px;padding:11px 16px' : ''}">
-      <b style="width:32px;text-align:center">${medal[i] || i + 1}</b>${avatarHtml(u.avatar_domain, u.username)}<b class="grow">${esc(u.username)}</b><b>${fmt(u[key])}</b></a>`).join('') +
+      <b class="mono" style="width:32px;text-align:right;color:${i < 3 ? 'var(--accent)' : 'var(--muted)'}">${i + 1}</b>${avatarHtml(u.avatar_domain, u.username)}<b class="grow">${esc(u.username)}</b><b class="mono">${fmt(u[key])}</b></a>`).join('') +
       (scope === 'all' ? `<div class="muted small">Ta position : #${fmt(d.myRank)}</div>` : '');
   };
   el.addEventListener('click', (e) => {

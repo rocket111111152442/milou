@@ -57,23 +57,24 @@ export const favicon = (domain, size = 64) => `https://www.google.com/s2/favicon
 
 // ---------- rendu des cartes ----------
 export function cardHtml(site, opts = {}) {
-  const { count = 0, holo = false, isNew = false, locked = false, selected = false, attrs = '' } = opts;
+  const { count = 0, holo = false, isNew = false, locked = false, selected = false, missing = false, attrs = '' } = opts;
   const r = site.rarity;
-  return `<div class="card r-${r}${holo ? ' holo' : ''}${selected ? ' selected' : ''}" data-site="${site.id}" ${attrs}>
-    <div class="c-top"><span class="rk">#${fmt(site.id)}</span><span class="fam">${esc(site.family || '')}</span></div>
+  return `<div class="card r-${r}${holo ? ' holo' : ''}${selected ? ' selected' : ''}${missing ? ' missing' : ''}" data-site="${site.id}" ${attrs}>
+    <div class="c-bar"><i></i><i></i><i></i><span class="rk">#${site.id}</span></div>
+    <div class="c-url">${esc(site.domain)}</div>
     <div class="c-art"><img class="fav" src="${favicon(site.domain)}" alt="" loading="lazy" decoding="async" data-l="${esc(site.domain[0])}"></div>
     <div class="c-name">${esc(siteName(site.domain))}</div>
-    <div class="c-dom">${esc(site.domain)}</div>
-    <div class="c-foot"><span class="rar">${RARITY[r].name}</span><span>⚡${power(site.id)}</span></div>
+    <div class="c-foot"><span class="rar">${RARITY[r].name}</span><span>${power(site.id)}</span></div>
     ${count > 1 ? `<span class="count">×${count}</span>` : ''}
-    ${isNew ? '<span class="badge-new">NOUVEAU</span>' : ''}
-    ${locked ? '<span class="badge-lock">🔒</span>' : ''}
+    ${isNew ? '<span class="badge-new">NEW</span>' : ''}
+    ${locked ? '<span class="badge-lock">en vente</span>' : ''}
   </div>`;
 }
 export function unknownCardHtml(site) {
   return `<div class="card unknown" data-site="${site.id}">
-    <div class="c-top"><span class="rk">#${fmt(site.id)}</span></div>
-    <div class="c-art">?</div><div class="c-name">???</div><div class="c-dom">Non découvert</div>
+    <div class="c-bar"><i></i><i></i><i></i><span class="rk">#${site.id}</span></div>
+    <div class="c-url">???</div>
+    <div class="c-art">?</div><div class="c-name">Non découvert</div><div class="c-foot"><span></span><span></span></div>
   </div>`;
 }
 

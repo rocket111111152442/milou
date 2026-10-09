@@ -7,13 +7,14 @@ import { readFileSync } from 'node:fs';
 export const TRANCO_URL = 'https://tranco-list.eu/top-1m.csv.zip';
 
 // Paliers de rareté sur le rang (après filtrage). Index = id de rareté.
+// weight : chance par carte sur 1 000 000 (Mythique = 0,002 % → environ 1 booster sur 10 000).
 export const RARITIES = [
-  { id: 0, key: 'common',    name: 'Commune',     maxRank: Infinity, weight: 6000, value: 1 },
-  { id: 1, key: 'uncommon',  name: 'Peu commune', maxRank: 150000,   weight: 2500, value: 3 },
-  { id: 2, key: 'rare',      name: 'Rare',        maxRank: 25000,    weight: 1050, value: 10 },
-  { id: 3, key: 'epic',      name: 'Épique',      maxRank: 2500,     weight: 360,  value: 40 },
-  { id: 4, key: 'legendary', name: 'Légendaire',  maxRank: 250,      weight: 80,   value: 200 },
-  { id: 5, key: 'mythic',    name: 'Mythique',    maxRank: 25,       weight: 10,   value: 1500 },
+  { id: 0, key: 'common',    name: 'Commune',     maxRank: Infinity, weight: 700000, value: 1 },
+  { id: 1, key: 'uncommon',  name: 'Peu commune', maxRank: 150000,   weight: 240000, value: 3 },
+  { id: 2, key: 'rare',      name: 'Rare',        maxRank: 25000,    weight: 50000, value: 12 },
+  { id: 3, key: 'epic',      name: 'Épique',      maxRank: 2500,     weight: 9000,  value: 100 },
+  { id: 4, key: 'legendary', name: 'Légendaire',  maxRank: 250,      weight: 980,   value: 1500 },
+  { id: 5, key: 'mythic',    name: 'Mythique',    maxRank: 25,       weight: 20,   value: 40000 },
 ];
 
 export function rarityForRank(rank) {

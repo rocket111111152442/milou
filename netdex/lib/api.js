@@ -6,6 +6,8 @@ import { createDb } from './db.js';
 import { RARITIES } from './sites.js';
 import { createGame, CONFIG, GameError } from './game.js';
 import { setupDatabase } from './setup.js';
+import { runBots, seedBots, botStatus, deleteBots } from './bots.js';
+import { waitUntil } from '@vercel/functions';
 
 const SESSION_DAYS = 60;
 const scrypt = promisify(scryptCb);
@@ -76,7 +78,7 @@ async function meView({ db, game }, u) {
       (SELECT COUNT(*) FROM trades WHERE to_id = $1 AND status = 'pending') trades,
       (SELECT COUNT(*) FROM friends WHERE friend_id = $1 AND status = 'pending') friend_requests`, [u.id]);
   return {
-    user: { id: u.id, username: u.username, bits: u.bits, dexCount: u.dex_count, dexScore: u.dex_score, packsOpened: u.packs_opened, avatarSite: u.avatar_site, createdAt: u.created_at },
+    user: { id: u.id, username: u.username, isAdmin: u.is_admin, bits: u.bits, dexCount: u.dex_count, dexScore: u.dex_score, packsOpened: u.packs_opened, avatarSite: u.avatar_site, createdAt: u.created_at },
     packs: game.packState(u, now),
     daily: game.dailyState(u, now),
     counts: { notifications: c.notifications, trades: c.trades, friendRequests: c.friend_requests },
@@ -111,15 +113,17 @@ async function collection(db, userId, query) {
   return { items: rows.slice(0, limit), more: rows.length > limit };
 }
 
-async function stats({ db, game }, userId) {
+async function stats({ db, game }, userId, isBot = false) {
   const [owned, byRarity] = await Promise.all([
     db.one('SELECT COUNT(*) n, COUNT(DISTINCT site_id) d FROM cards WHERE user_id = $1', [userId]),
-    db.all('SELECT s.rarity, COUNT(*) n FROM dex d JOIN sites s ON s.id = d.site_id WHERE d.user_id = $1 GROUP BY s.rarity', [userId]),
+    isBot
+      ? db.all('SELECT s.rarity, COUNT(DISTINCT s.id) n FROM cards c JOIN sites s ON s.id = c.site_id WHERE c.user_id = $1 GROUP BY s.rarity', [userId])
+      : db.all('SELECT s.rarity, COUNT(*) n FROM dex d JOIN sites s ON s.id = d.site_id WHERE d.user_id = $1 GROUP BY s.rarity', [userId]),
   ]);
   const found = Object.fromEntries(byRarity.map((r) => [r.rarity, r.n]));
   return {
     cards: owned.n, distinct: owned.d,
-    tiers: game.tiers.map((t) => ({ id: t.id, name: t.name, key: t.key, total: t.total, lo: t.lo, hi: t.hi, found: found[t.id] || 0, value: t.value, chance: t.weight / 100 })),
+    tiers: game.tiers.map((t) => ({ id: t.id, name: t.name, key: t.key, total: t.total, lo: t.lo, hi: t.hi, found: found[t.id] || 0, value: t.value, chance: t.weight / 10000 })),
   };
 }
 
@@ -131,7 +135,7 @@ async function publicProfile(c, meId, name) {
     db.all(`SELECT s.id, s.domain, s.rarity, s.family, MAX(c.holo) holo, COUNT(*)::int n FROM cards c JOIN sites s ON s.id = c.site_id
       WHERE c.user_id = $1 GROUP BY s.id ORDER BY s.rarity DESC, s.id ASC LIMIT 12`, [u.id]),
     db.one('SELECT COUNT(*) + 1 r FROM users WHERE dex_score > $1', [u.dex_score]),
-    stats(c, u.id),
+    stats(c, u.id, u.is_bot),
     meId === u.id ? 'self' : game.relation(db, meId, u.id),
   ]);
   return {
@@ -218,7 +222,7 @@ route('POST', '/api/account/avatar', async ({ c, me, body }) => {
 
 route('GET', '/api/me', async ({ c, me }) => { await c.game.settleAuctions(); return meView(c, await reloadUser(c.db, me.id)); });
 route('POST', '/api/packs/open', async ({ c, me, body }) => {
-  const cards = await c.game.openPack(me.id, body.kind === 'premium' ? 'premium' : 'free');
+  const cards = await c.game.openPack(me.id, body.kind === 'premium' ? 'premium' : 'free', { free: !!body.free });
   return { cards, me: await meView(c, await reloadUser(c.db, me.id)) };
 });
 route('POST', '/api/daily', ({ c, me }) => c.game.claimDaily(me.id));
@@ -287,6 +291,113 @@ route('POST', '/api/auctions/:id/cancel', ({ c, me, params }) => c.game.cancelAu
 route('GET', '/api/notifications', async ({ c, me }) => ({ items: await c.db.all('SELECT * FROM notifications WHERE user_id = $1 ORDER BY id DESC LIMIT 50', [me.id]) }));
 route('POST', '/api/notifications/read', async ({ c, me }) => { await c.db.run('UPDATE notifications SET read = true WHERE user_id = $1 AND NOT read', [me.id]); return { ok: true }; });
 
+
+// ---------- Catalogue : toutes les cartes du jeu ----------
+route('GET', '/api/catalog', async ({ c, me, query }) => {
+  const args = [me.id];
+  const p = (v) => { args.push(v); return '$' + args.length; };
+  const where = [];
+  if (query.rarity !== undefined && query.rarity !== '') {
+    const t = c.game.tiers[Math.max(0, Math.min(5, Number(query.rarity) || 0))];
+    where.push(`s.id BETWEEN ${p(t.lo)} AND ${p(t.hi)}`);
+  }
+  if (query.q) where.push(`s.domain LIKE ${p(likeArg(query.q))}`);
+  if (query.filter === 'owned') where.push('EXISTS (SELECT 1 FROM cards o WHERE o.user_id = $1 AND o.site_id = s.id)');
+  if (query.filter === 'missing') where.push('NOT EXISTS (SELECT 1 FROM cards o WHERE o.user_id = $1 AND o.site_id = s.id)');
+  const offset = Math.max(0, Number(query.offset) || 0);
+  const rows = await c.db.all(`SELECT s.id, s.domain, s.rarity, s.family,
+      (SELECT COUNT(*)::int FROM cards o WHERE o.user_id = $1 AND o.site_id = s.id) n
+    FROM sites s ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY s.id LIMIT 97 OFFSET ${p(offset)}`, args);
+  return { items: rows.slice(0, 96), more: rows.length > 96, total: c.game.totalSites };
+});
+
+// ---------- Administration ----------
+const admin = (fn) => async (ctx) => {
+  if (!ctx.me.is_admin) throw new GameError('Réservé aux administrateurs.', 403);
+  return fn(ctx);
+};
+async function findUser(db, body) {
+  const u = body.userId ? await db.one('SELECT * FROM users WHERE id = $1', [Number(body.userId)])
+    : await db.one('SELECT * FROM users WHERE lower(username) = lower($1)', [String(body.username || '').trim()]);
+  if (!u) throw new GameError('Joueur introuvable.', 404);
+  return u;
+}
+
+route('GET', '/api/admin/overview', admin(async ({ c }) => {
+  const [counts, bots] = await Promise.all([
+    c.db.one(`SELECT (SELECT COUNT(*) FROM users WHERE NOT is_bot) humans, (SELECT COUNT(*) FROM users WHERE is_bot) bots,
+      (SELECT COUNT(*) FROM cards) cards, (SELECT COUNT(*) FROM auctions WHERE status = 'open') auctions,
+      (SELECT COUNT(*) FROM trades WHERE status = 'pending') trades, (SELECT COUNT(*) FROM sites) sites`),
+    botStatus(c.db),
+  ]);
+  return { counts, bots, dbLimitMb: Number(process.env.BOT_DB_MAX_MB) || 90 };
+}));
+
+route('GET', '/api/admin/users', admin(async ({ c, query }) => {
+  const q = String(query.q || '').trim().replace(/[%_\\]/g, '');
+  const kind = query.kind === 'bots' ? 'AND is_bot' : query.kind === 'all' ? '' : 'AND NOT is_bot';
+  return { items: await c.db.all(`SELECT id, username, bits, dex_count, dex_score, packs_opened, is_bot, is_admin, last_seen, created_at, pack_stock
+    FROM users WHERE lower(username) LIKE lower($1) ${kind} ORDER BY last_seen DESC LIMIT 50`, [q + '%']) };
+}));
+
+// Offrir : bits (positif ou négatif), boosters, cartes. Cible : un joueur ou tous les humains.
+route('POST', '/api/admin/give', admin(async ({ c, body, me }) => {
+  const bits = Math.trunc(Number(body.bits) || 0);
+  const packs = Math.max(0, Math.min(1000, Math.trunc(Number(body.packs) || 0)));
+  const count = Math.max(1, Math.min(100, Math.trunc(Number(body.count) || 1)));
+  let site = null;
+  if (body.siteId || body.domain) {
+    site = body.siteId ? await c.db.one('SELECT * FROM sites WHERE id = $1', [Number(body.siteId)])
+      : await c.db.one('SELECT * FROM sites WHERE domain = $1', [String(body.domain).toLowerCase().trim().replace(/^www\./, '')]);
+    if (!site) throw new GameError('Site introuvable dans le jeu.', 404);
+  }
+  if (!bits && !packs && !site) throw new GameError('Rien à offrir.');
+  const targets = body.everyone ? await c.db.all('SELECT * FROM users WHERE NOT is_bot') : [await findUser(c.db, body)];
+  const now = Date.now();
+  await c.db.tx(async (q) => {
+    const ids = targets.map((t) => t.id);
+    if (bits) await q.run('UPDATE users SET bits = GREATEST(0, bits + $1) WHERE id = ANY($2::int[])', [bits, ids]);
+    if (packs) await q.run('UPDATE users SET pack_stock = pack_stock + $1 WHERE id = ANY($2::int[])', [packs, ids]);
+    for (const t of targets) {
+      if (site) {
+        await q.run('INSERT INTO cards (user_id, site_id, holo, obtained_at) SELECT $1, $2, $3, $4 FROM generate_series(1, $5)', [t.id, site.id, body.holo ? 1 : 0, now, count]);
+        await c.game.discover(q, t.id, site.id, now);
+      }
+      const parts = [bits > 0 && `${bits} bits`, packs && `${packs} booster${packs > 1 ? 's' : ''}`, site && `${count > 1 ? count + ' × ' : ''}${site.domain}${body.holo ? ' HOLO' : ''}`].filter(Boolean);
+      if (parts.length && t.id !== me.id) await c.game.notify(q, t.id, `Cadeau de l'équipe Netdex : ${parts.join(', ')} !`, '#/');
+    }
+  });
+  return { ok: true, targets: targets.length };
+}));
+
+route('POST', '/api/admin/user/:id/:action', admin(async ({ c, me, params, body }) => {
+  const id = Number(params.id);
+  if (params.action === 'admin') { await c.db.run('UPDATE users SET is_admin = $1 WHERE id = $2', [!!body.value, id]); return { ok: true }; }
+  if (params.action === 'delete') {
+    if (id === me.id) throw new GameError('Tu ne peux pas supprimer ton propre compte ici.');
+    await c.db.run("UPDATE cards c SET status = 'owned' FROM auctions a WHERE a.bidder_id = $1 AND a.status = 'open' AND c.id = a.card_id", [id]);
+    await c.db.run("DELETE FROM auctions WHERE (seller_id = $1 OR bidder_id = $1) AND status = 'open'", [id]);
+    await c.db.run('DELETE FROM users WHERE id = $1', [id]);
+    return { ok: true };
+  }
+  if (params.action === 'reset-packs') { await c.db.run('UPDATE users SET pack_stock = $1, pack_anchor = $2 WHERE id = $3', [CONFIG.packCap, Date.now(), id]); return { ok: true }; }
+  throw new GameError('Action inconnue.', 404);
+}));
+
+route('POST', '/api/admin/bots/seed', admin(async ({ c, body }) => seedBots(c.db, c.game, Number(body.count) || 10_000)));
+route('POST', '/api/admin/bots/tick', admin(async ({ c }) => runBots(c.db, c.game, { budgetMs: 20_000, force: true })));
+route('POST', '/api/admin/bots/pause', admin(async ({ c, body }) => {
+  await c.db.run("INSERT INTO meta (key, value) VALUES ('bots_paused', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [body.paused ? '1' : '0']);
+  return { ok: true };
+}));
+route('POST', '/api/admin/bots/delete', admin(async ({ c }) => { await deleteBots(c.db); return { ok: true }; }));
+
+// Tâche planifiée quotidienne (Vercel Cron) : grosse passe de bots.
+route('GET', '/api/cron/bots', async ({ c, req }) => {
+  if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) throw new GameError('Interdit.', 403);
+  return runBots(c.db, c.game, { budgetMs: 250_000, batch: 50, force: true });
+}, { auth: false });
+
 route('GET', '/api/health', async () => {
   try { await getContext(); return { ok: true, db: true }; } catch (e) { return { ok: true, db: false, error: e.message, code: e.code }; }
 }, { auth: false, db: false });
@@ -297,9 +408,13 @@ route('POST', '/api/admin/setup', async ({ query }) => {
   const db = createDb();
   if (!db) throw new GameError('DATABASE_URL manquant.', 503);
   try {
-    const result = await setupDatabase(db, { force: query.force === '1' });
+    const result = query.vacuum === '1' ? 'vacuum' : await setupDatabase(db, { force: query.force === '1' });
+    // VACUUM FULL rend au disque la place des lignes mortes (ex. import interrompu) : utile sous un quota de stockage.
+    if (query.vacuum === '1') for (const t of ['sites', 'cards', 'dex', 'notifications', 'trades', 'trade_items', 'auctions', 'sessions', 'users', 'friends']) await db.query(`VACUUM FULL ${t}`);
+    const size = await db.one('SELECT pg_database_size(current_database()) b');
+    const tables = await db.all("SELECT relname t, pg_total_relation_size(relid) b FROM pg_catalog.pg_statio_user_tables ORDER BY 2 DESC LIMIT 8");
     resetContext();
-    return { ok: true, result };
+    return { ok: true, result, dbMb: Math.round(size.b / 1048576), tables: tables.map((r) => `${r.t}:${Math.round(r.b / 1048576)}MB`) };
   } catch (e) {
     return { ok: false, error: String(e?.stack || e) };
   } finally {
@@ -365,9 +480,17 @@ export async function handleApi(req, res, { db } = {}) {
     const query = Object.fromEntries(url.searchParams);
     const data = await match.r.handler({ c, req, res, me, body, query, params: match.params });
     sendJson(req, res, 200, data);
+    // Les bots avancent pendant que de vrais joueurs sont connectés (après la réponse, sans la ralentir).
+    if (me && c && !me.is_bot) {
+      const work = runBots(c.db, c.game).catch((e) => console.error('bots', e.message));
+      if (process.env.VERCEL) waitUntil(work);
+    }
   } catch (e) {
     if (!(e instanceof GameError)) console.error(e);
     const status = e instanceof GameError ? e.status : e.code === '23514' ? 400 : 500;
-    sendJson(req, res, status, { error: e instanceof GameError ? e.message : status === 400 ? 'Pas assez de bits.' : 'Erreur serveur.' });
+    sendJson(req, res, status, {
+      error: e instanceof GameError ? e.message : status === 400 ? 'Pas assez de bits.' : e.code === '53100' ? 'Base de données pleine : contacte l\'admin.' : 'Erreur serveur.',
+      ...(status >= 500 && !(e instanceof GameError) ? { detail: String(e.message || e).slice(0, 300), code: e.code } : {}),
+    });
   }
 }
