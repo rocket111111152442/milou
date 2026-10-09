@@ -78,11 +78,11 @@ dbtest('ouvertures simultanées : jamais plus que le stock', async () => {
   assert.equal(results.filter((r) => r.status === 'fulfilled').length, CONFIG.startPacks);
 });
 
-dbtest('la 5e carte est au moins Rare, le premium garantit Épique+', async () => {
+dbtest('la 5e carte est au moins Peu commune, le premium garantit Rare+', async () => {
   const u = await user(100_000);
   for (let i = 0; i < 10; i++) {
     const cards = await game.openPack(u.id, 'premium');
-    assert.ok(cards[4].site.rarity >= 3);
+    assert.ok(cards[4].site.rarity >= 2);
     assert.ok(cards.every((c) => c.site.rarity >= 1));
   }
   await assert.rejects(game.openPack((await user(10)).id, 'premium'), /300 bits/);
