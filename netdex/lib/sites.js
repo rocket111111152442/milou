@@ -79,31 +79,36 @@ export async function loadTrancoCsv(file) {
 }
 
 // Remplit la table sites (id = rang filtré, 1 = le plus visité) puis mémorise les paliers.
-export async function importSites(db, csv) {
+// limit : nombre max de sites en base. Si des sites existent déjà, on ne fait qu'ajouter les nouveaux domaines
+// à la suite (les id existants ne bougent jamais : les cartes des joueurs restent valides).
+export async function importSites(db, csv, { limit = Infinity } = {}) {
+  const existing = new Set((await db.all('SELECT domain FROM sites')).map((r) => r.domain));
+  let next = existing.size + 1;
   const rows = [];
   const seen = new Set();
   for (const line of csv.split('\n')) {
+    if (existing.size + rows.length >= limit) break;
     const comma = line.indexOf(',');
     if (comma < 0) continue;
     const domain = line.slice(comma + 1).trim().toLowerCase().replace(/^www\./, '');
     if (!keepDomain(domain) || seen.has(domain)) continue;
     seen.add(domain);
-    rows.push(domain);
+    if (!existing.has(domain)) rows.push(domain);
   }
   const BATCH = 20_000;
   await db.tx(async (t) => {
-    await t.query('TRUNCATE sites');
     for (let i = 0; i < rows.length; i += BATCH) {
       const ids = [], domains = [], rarities = [], families = [];
       for (let j = i; j < Math.min(rows.length, i + BATCH); j++) {
-        const rank = j + 1;
+        const rank = next++;
         ids.push(rank); domains.push(rows[j]); rarities.push(rarityForRank(rank)); families.push(familyOf(rows[j]));
       }
       await t.query('INSERT INTO sites (id, domain, rarity, family) SELECT * FROM unnest($1::int[], $2::text[], $3::smallint[], $4::text[])', [ids, domains, rarities, families]);
     }
-    await t.query("INSERT INTO meta (key, value) VALUES ('tiers', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [JSON.stringify(computeTiers(rows.length))]);
+    const total = existing.size + rows.length;
+    await t.query("INSERT INTO meta (key, value) VALUES ('tiers', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [JSON.stringify(computeTiers(total))]);
   });
-  return rows.length;
+  return { added: rows.length, total: existing.size + rows.length };
 }
 
 // Les id sont des rangs triés : chaque palier de rareté est une plage contiguë.

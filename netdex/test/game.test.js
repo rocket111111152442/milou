@@ -28,6 +28,21 @@ const user = async (bits = 1000) => {
 const reload = (u) => db.one('SELECT * FROM users WHERE id = $1', [u.id]);
 const dbtest = (name, fn) => test(name, { skip: !URL && 'TEST_DATABASE_URL absent' }, fn);
 
+dbtest('import en plusieurs fois : les id existants ne bougent pas', async () => {
+  const d = createDb(URL);
+  await d.query('DROP SCHEMA IF EXISTS imp CASCADE; CREATE SCHEMA imp; SET search_path TO imp');
+  const d2 = createDb(URL + (URL.includes('?') ? '&' : '?') + 'options=-c%20search_path%3Dimp');
+  await migrate(d2);
+  const csv = ['1,a.com', '2,b.com', '3,c.com', '4,akamaiedge.net', '5,d.com'].join('\n');
+  assert.deepEqual(await importSites(d2, csv, { limit: 2 }), { added: 2, total: 2 });
+  const shuffled = ['1,c.com', '2,a.com', '3,e.com', '4,b.com', '5,d.com'].join('\n');
+  assert.deepEqual(await importSites(d2, shuffled), { added: 3, total: 5 });
+  const rows = await d2.all('SELECT id, domain FROM sites ORDER BY id');
+  assert.deepEqual(rows.map((r) => r.domain), ['a.com', 'b.com', 'c.com', 'e.com', 'd.com']);
+  await d.query('DROP SCHEMA imp CASCADE');
+  await d.close(); await d2.close();
+});
+
 test('filtres et raretés', () => {
   assert.equal(keepDomain('youtube.com'), true);
   assert.equal(keepDomain('akamaiedge.net'), false);
