@@ -2,8 +2,8 @@
 import { migrate } from './db.js';
 
 // Ordre compatible avec les clés étrangères.
-const TABLES = ['meta', 'sites', 'site_blocks', 'users', 'sessions', 'cards', 'dex', 'friends', 'trades', 'trade_items', 'auctions', 'notifications', 'events', 'sales', 'price_index', 'value_history'];
-const SERIAL = ['users', 'cards', 'trades', 'auctions', 'notifications', 'events', 'sales'];
+const TABLES = ['meta', 'sites', 'site_blocks', 'users', 'sessions', 'cards', 'dex', 'friends', 'trades', 'trade_items', 'auctions', 'notifications', 'events', 'sales', 'price_index', 'value_history', 'favorites', 'wishlist', 'messages', 'promo_codes', 'promo_uses'];
+const SERIAL = ['users', 'cards', 'trades', 'auctions', 'notifications', 'events', 'sales', 'messages'];
 
 export async function copyDatabase(src, dst, { chunk = 20_000 } = {}) {
   const t0 = Date.now();

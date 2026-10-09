@@ -165,6 +165,56 @@ CREATE TABLE IF NOT EXISTS value_history (
   cards INTEGER NOT NULL,
   PRIMARY KEY (user_id, at)
 );
+
+-- v5 : progression (XP, succès, quêtes), mini-jeux, social, favoris, souhaits, codes promo.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS stats JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS fun JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pity INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS week_id INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS week_score INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS users_week ON users (week_id, week_score DESC);
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS seller_id INTEGER;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS buyer_id INTEGER;
+CREATE INDEX IF NOT EXISTS sales_seller ON sales (seller_id, at) WHERE seller_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS sales_buyer ON sales (buyer_id, at) WHERE buyer_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS favorites (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  site_id INTEGER NOT NULL,
+  PRIMARY KEY (user_id, site_id)
+);
+CREATE TABLE IF NOT EXISTS wishlist (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  site_id INTEGER NOT NULL,
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, site_id)
+);
+CREATE INDEX IF NOT EXISTS wishlist_site ON wishlist (site_id);
+CREATE TABLE IF NOT EXISTS messages (
+  id BIGSERIAL PRIMARY KEY,
+  from_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  text TEXT NOT NULL,
+  at BIGINT NOT NULL,
+  read BOOLEAN NOT NULL DEFAULT false
+);
+CREATE INDEX IF NOT EXISTS messages_pair ON messages (LEAST(from_id, to_id), GREATEST(from_id, to_id), id DESC);
+CREATE INDEX IF NOT EXISTS messages_unread ON messages (to_id) WHERE NOT read;
+CREATE TABLE IF NOT EXISTS promo_codes (
+  code TEXT PRIMARY KEY,
+  bits INTEGER NOT NULL DEFAULT 0,
+  packs INTEGER NOT NULL DEFAULT 0,
+  max_uses INTEGER NOT NULL DEFAULT 0,
+  uses INTEGER NOT NULL DEFAULT 0,
+  expires_at BIGINT,
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS promo_uses (
+  code TEXT NOT NULL REFERENCES promo_codes(code) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  at BIGINT NOT NULL,
+  PRIMARY KEY (code, user_id)
+);
 `;
 
 // DB_SOURCE choisit la base parmi celles branchées sur Vercel : « supabase » (POSTGRES_URL) ou « neon » (stockage_DATABASE_URL).

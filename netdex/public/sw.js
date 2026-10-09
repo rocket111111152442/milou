@@ -1,6 +1,6 @@
 // Service worker : l'interface se charge instantanément (cache), les données passent toujours par le réseau.
-const VERSION = 'netdex-v6';
-const SHELL = ['/', '/app.css', '/js/app.js', '/js/core.js', '/js/views.js', '/js/chart.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon.svg'];
+const VERSION = 'netdex-v7';
+const SHELL = ['/', '/app.css', '/js/app.js', '/js/core.js', '/js/views.js', '/js/chart.js', '/js/fun.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

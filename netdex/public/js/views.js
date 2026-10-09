@@ -2,8 +2,9 @@
 import { lineChart } from './chart.js';
 import {
   api, state, refreshMe, setMe, esc, fmt, $, $$, h, duration, ago, isOnline, cardHtml, unknownCardHtml, toast, toastErr,
-  modal, confirmDialog, busy, prefs, RARITY, VALUES, ICONS, favicon, siteName, power, now, isSpecial,
+  modal, confirmDialog, busy, prefs, RARITY, VALUES, ICONS, favicon, siteName, power, now, isSpecial, sfx,
 } from './core.js';
+import { revealFx, inspectCard, shareSite, giftDialog, profileEditor, ACCENTS, PACK_BACKS, applyStyle, shortcutsHelp } from './fun.js';
 
 const rarityChips = (current, withAll = true) =>
   (withAll ? `<button class="chip${current === '' ? ' on' : ''}" data-r="">Toutes</button>` : '') +
@@ -23,7 +24,9 @@ export async function openPackFlow(kind = 'free', free = false) {
   setMe(res.me);
   const cards = res.cards;
   const fast = prefs.get('fast', false);
+  sfx('pop');
   const ov = h(`<div class="overlay">
+    ${cards.pity ? '<div class="pity-note">Compteur de pitié plein : Épique ou mieux garantie !</div>' : ''}
     <div class="reveal">${cards.map((c, i) => `<div class="flip" data-i="${i}">
         <div class="back r-${c.site.rarity}${c.site.rarity >= 3 ? ' hint' : ''}"></div>
         ${cardHtml(c.site, { holo: c.holo, isNew: c.isNew })}
@@ -43,18 +46,44 @@ export async function openPackFlow(kind = 'free', free = false) {
       <div><b>${news}</b> nouveau${news > 1 ? 'x' : ''} site${news > 1 ? 's' : ''} · valeur <b>${fmt(val)}</b> bits · meilleure : <span class="r-${best.site.rarity} rtext">${RARITY[best.site.rarity].name}</span></div>
       <div class="row">
         ${left > 0 ? `<button class="btn primary big" data-next>Booster suivant${left === Infinity ? '' : ` (${left})`}</button>` : ''}
+        ${left > 1 && left !== Infinity ? '<button class="btn" data-next-all>Tout ouvrir</button>' : ''}
         <button class="btn${left > 0 ? '' : ' primary big'}" data-close>Fermer</button>
       </div>`;
   };
-  const flip = (f) => { if (!f.classList.contains('open')) { f.classList.add('open'); navigator.vibrate?.(cards[f.dataset.i].site.rarity >= 3 ? 40 : 8); done(); } };
+  const flip = (f) => { if (!f.classList.contains('open')) { f.classList.add('open'); navigator.vibrate?.(cards[f.dataset.i].site.rarity >= 3 ? 40 : 8); revealFx(cards[f.dataset.i]); done(); } };
   ov.addEventListener('click', (e) => {
     const f = e.target.closest('.flip');
     if (f) { if (f.classList.contains('open')) openSite(f.querySelector('.card').dataset.site); else flip(f); return; }
     if (e.target.closest('[data-all]')) flips.forEach((x, i) => setTimeout(() => flip(x), i * 90));
     if (e.target.closest('[data-next]')) { ov.remove(); openPackFlow(kind === 'premium' && free ? 'premium' : 'free', free); }
+    if (e.target.closest('[data-next-all]')) { ov.remove(); openAllFlow(); }
     if (e.target.closest('[data-close]')) { ov.remove(); document.dispatchEvent(new CustomEvent('nd:cards')); }
   });
   if (fast) flips.forEach((x, i) => setTimeout(() => flip(x), 150 + i * 70));
+}
+
+// Ouvre tout le stock (10 max) et révèle les cartes d'un coup, les plus rares en premier.
+export async function openAllFlow() {
+  let res;
+  try { res = await api('/packs/open-all', {}); } catch (e) { toastErr(e); return; }
+  setMe(res.me);
+  const cards = res.packs.flat().sort((a, b) => b.site.rarity - a.site.rarity || b.holo - a.holo);
+  const news = cards.filter((c) => c.isNew).length;
+  const val = cards.reduce((a, c) => a + VALUES[c.site.rarity] * (c.holo ? 5 : 1), 0);
+  sfx('pop');
+  const ov = h(`<div class="overlay" style="justify-content:flex-start;overflow:auto">
+    <div class="reveal-summary" style="margin:0 0 14px;min-height:0"><b>${res.packs.length} boosters · ${cards.length} cartes</b> · ${news} nouveaux sites · valeur ${fmt(val)} bits
+      <div class="row"><button class="btn primary" data-close>Fermer</button></div></div>
+    <div class="cards all-reveal" style="width:100%;max-width:900px">${cards.map((c, i) => `<div class="pop-in" style="animation-delay:${Math.min(i, 30) * 40}ms">${cardHtml(c.site, { holo: c.holo, isNew: c.isNew })}</div>`).join('')}</div>
+  </div>`);
+  document.body.append(ov);
+  const best = cards[0];
+  if (best && (best.site.rarity >= 2 || best.holo)) setTimeout(() => revealFx(best), 300);
+  ov.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close]')) { ov.remove(); document.dispatchEvent(new CustomEvent('nd:cards')); return; }
+    const c = e.target.closest('.card');
+    if (c) openSite(c.dataset.site);
+  });
 }
 
 // ======================================================================
@@ -83,10 +112,15 @@ export async function openSite(id) {
       </dl>
     </div>
     <div class="row" style="margin-top:14px">
+      <button class="btn sm${d.favorite ? ' on-fav' : ''}" data-fav title="Favori : protégé du recyclage des doublons et de la forge">${d.favorite ? '★ Favori' : '☆ Favori'}</button>
+      <button class="btn sm${d.wished ? ' on-fav' : ''}" data-wish title="Liste de souhaits : alerte quand elle est mise en vente">${d.wished ? '♥ Souhaitée' : '♡ Souhait'}</button>
+      <button class="btn sm" data-inspect>Inspecter</button>
+      <button class="btn sm" data-share>Partager</button>
       <a class="btn sm" href="https://${esc(s.domain)}" target="_blank" rel="noopener noreferrer">Visiter ↗</a>
       ${owned.length ? `<button class="btn sm" data-sell>Vendre aux enchères</button>
         <button class="btn sm" data-recycle>Recycler 1 (+${fmt(d.value * (owned.every((c) => c.holo) ? 5 : 1))})</button>
-        <button class="btn sm ghost" data-avatar>Mettre en avatar</button>` : ''}
+        <button class="btn sm ghost" data-avatar>Mettre en avatar</button>
+        ${owned.some((c) => !c.holo) ? `<button class="btn sm ghost" data-holofy title="25 % de chances de rendre la carte holo">Holo-iser (${fmt(d.holofyCost)} bits, 25 %)</button>` : ''}` : ''}
     </div>
     <div data-form></div>
     <h2>Valeur dans le temps</h2>
@@ -111,6 +145,23 @@ export async function openSite(id) {
         toast(`+${fmt(res.gained)} bits`, 'ok');
         close(); refreshMe(); document.dispatchEvent(new CustomEvent('nd:cards'));
       }));
+      const toggleBtn = (sel, path, key, onTxt, offTxt) => $(sel, body).addEventListener('click', (e) => busy(e.target, async () => {
+        d[key] = !d[key];
+        await api(path, { siteId: s.id, on: d[key] });
+        e.target.textContent = d[key] ? onTxt : offTxt; e.target.classList.toggle('on-fav', d[key]); sfx('pop');
+        document.dispatchEvent(new CustomEvent('nd:cards'));
+      }));
+      toggleBtn('[data-fav]', '/fun/favorite', 'favorite', '★ Favori', '☆ Favori');
+      toggleBtn('[data-wish]', '/fun/wish', 'wished', '♥ Souhaitée', '♡ Souhait');
+      $('[data-inspect]', body).addEventListener('click', () => inspectCard(s, d.mine.some((c) => c.holo)));
+      $('[data-share]', body).addEventListener('click', () => shareSite(s));
+      $('[data-holofy]', body)?.addEventListener('click', (e) => busy(e.target, async () => {
+        const c = owned.find((x) => !x.holo);
+        if (!(await confirmDialog('Holo-isation', `Payer <b>${fmt(d.holofyCost)}</b> bits pour tenter de rendre <b>${esc(s.domain)}</b> holo ? (25 % de réussite, la carte est gardée en cas d'échec)`, 'Tenter'))) return;
+        const r = await api('/fun/holofy', { cardId: c.id });
+        if (r.success) { revealFx({ site: s, holo: 1 }); toast('Réussi ! La carte est maintenant HOLO ✦', 'ok'); close(); openSite(s.id); } else { sfx('lose'); toast(`Raté… −${fmt(r.cost)} bits`, 'err'); }
+        refreshMe(); document.dispatchEvent(new CustomEvent('nd:cards'));
+      }));
       $('[data-avatar]', body)?.addEventListener('click', (e) => busy(e.target, async () => {
         await api('/account/avatar', { siteId: s.id }); toast('Avatar mis à jour', 'ok'); refreshMe();
       }));
@@ -134,7 +185,7 @@ function auctionForm(owned, s) {
     </div>
     <label class="field"><span>Durée</span><select name="hours">${state.me.config.auctionHours.map((x) => `<option value="${x}"${x === 24 ? ' selected' : ''}>${x} h</option>`).join('')}</select></label>
     <p class="muted small">Commission de ${state.me.config.auctionFee * 100} % prélevée à la vente. Annulable tant que personne n'a enchéri.</p>
-    <button class="btn primary">Mettre en vente</button>
+    <div class="row"><button class="btn primary">Mettre en vente</button><button class="btn" type="button" data-quick-sell title="24 h, départ à 90 % de la cote, achat immédiat à 130 %">Vente express au prix du marché</button></div>
   </form>`;
 }
 function bindAuctionForm(root, close) {
@@ -153,10 +204,17 @@ function bindAuctionForm(root, close) {
         : `<b>Pas encore vendue : cote estimée <span class="mono">${fmt(p.price * m)}</span> bits</b>
            <div class="muted">Les cartes de cette rareté partent autour de ${fmt(p.rarity.price * m)} bits (médiane des 7 derniers jours).</div>`;
       if (!edited) f.startPrice.value = Math.max(1, Math.round((p.stats ? p.stats.median : p.price) * m * 0.9));
+      f.dataset.market = Math.max(1, Math.round((p.stats ? p.stats.median : p.price) * m));
     };
     render();
     if (f.cardId.tagName === 'SELECT') f.cardId.addEventListener('change', render);
   }).catch(() => { $('[data-price-info]', f).innerHTML = ''; });
+  $('[data-quick-sell]', f).addEventListener('click', (e) => busy(e.target, async () => {
+    const m = Number(f.dataset.market) || Number(f.startPrice.value) || 1;
+    await api('/auctions', { cardId: Number(new FormData(f).get('cardId')), startPrice: Math.max(1, Math.round(m * 0.9)), buyout: Math.max(2, Math.round(m * 1.3)), hours: 24 });
+    toast('Carte mise en vente au prix du marché !', 'ok');
+    close?.(); document.dispatchEvent(new CustomEvent('nd:cards')); location.hash = '#/market?scope=mine';
+  }));
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(f);
@@ -173,6 +231,8 @@ function bindAuctionForm(root, close) {
 // ======================================================================
 export async function viewHome(el, { on }) {
   el.innerHTML = `
+    <div data-event></div>
+    <a class="level-strip" href="#/play" data-level></a>
     <section class="hero" data-hero></section>
     <div class="quick-grid" style="margin-top:12px" data-quick></div>
     <div class="grid-2" style="margin-top:12px">
@@ -201,13 +261,23 @@ export async function viewHome(el, { on }) {
         <div class="stock-bar">${Array.from({ length: Math.max(p.cap, p.available) }, (_, i) => `<i class="${i < p.available ? 'on' : ''}"></i>`).join('')}</div>
         <div class="row hero-actions" style="justify-content:center">
           <button class="btn primary big" data-open ${p.available ? '' : 'disabled'}>Ouvrir un booster${p.available > 1 ? ` (${p.available})` : ''}</button>
+          ${p.available > 1 ? `<button class="btn big" data-open-all>Tout ouvrir</button>` : ''}
         </div>
         <p class="muted small" style="margin:12px 0 0">Un booster toutes les 3 min, même app fermée. Stock max ${p.cap}.</p>
+        <div class="pity" title="Après ${state.me.config.pityAfter} boosters sans Épique, le suivant en garantit une"><span>Pitié</span>
+          <div class="progress"><i style="width:${Math.min(100, (state.me.user.pity / state.me.config.pityAfter) * 100)}%"></i></div><span class="mono">${state.me.user.pity}/${state.me.config.pityAfter}</span></div>
       </div>`;
     const d = state.me.daily;
+    const dayNow = d.available ? Math.min(7, d.streak + 1) : d.streak;
     $('[data-daily]', el).innerHTML = `<div class="row"><div class="grow"><b>Bonus quotidien</b>
-      <div class="muted small">${d.available ? `+${d.reward} bits · jour ${Math.min(7, d.streak + 1)}/7 de ta série` : `Prochain dans <span data-until="${d.nextAt}">${duration(d.nextAt - now())}</span>`}</div></div>
-      <button class="btn${d.available ? ' primary' : ''}" data-daily-btn ${d.available ? '' : 'disabled'}>${d.available ? 'Récupérer' : 'Récupéré'}</button></div>`;
+      <div class="muted small">${d.available ? `+${d.reward} bits${d.pack ? ' + 1 booster' : ''} · jour ${Math.min(7, d.streak + 1)}/7 de ta série` : `Prochain dans <span data-until="${d.nextAt}">${duration(d.nextAt - now())}</span>`}</div></div>
+      <button class="btn${d.available ? ' primary' : ''}" data-daily-btn ${d.available ? '' : 'disabled'}>${d.available ? 'Récupérer' : 'Récupéré'}</button></div>
+      <div class="cal">${[1, 2, 3, 4, 5, 6, 7].map((n) => `<div class="${n < dayNow || (!d.available && n === dayNow) ? 'got' : n === dayNow && d.available ? 'today' : ''}"><b>J${n}</b><span>${n === 7 ? '+1 bst' : 30 + 10 * (n - 1)}</span></div>`).join('')}</div>`;
+    const ev = state.me.event;
+    $('[data-event]', el).innerHTML = ev ? `<div class="event-banner"><b>${esc(ev.name)}</b> ${esc(ev.desc)} · encore <span data-until="${ev.until}">${duration(ev.until - now())}</span></div>` : '';
+    const lv = state.me.user;
+    $('[data-level]', el).innerHTML = `<span class="lvl-badge sm">${lv.level}</span><span class="grow"><b>Niveau ${lv.level}</b> <span class="muted small">· ${fmt(lv.xp)} XP</span></span>
+      ${lv.levelUp ? '<span class="tag accent">récompense dispo</span>' : ''}<span class="muted small">Jeux, quêtes & succès ›</span>`;
     const u = state.me.user;
     $('[data-quick]', el).innerHTML = `
       <a class="quick" href="#/collection"><b>${fmt(u.dexCount)}</b><span>Sites découverts</span></a>
@@ -219,6 +289,7 @@ export async function viewHome(el, { on }) {
   on('nd:me', renderHero);
 
   el.addEventListener('click', (e) => {
+    if (e.target.closest('[data-open-all]')) { openAllFlow(); return; }
     if (e.target.closest('[data-open]') && state.me.packs.available) openPackFlow('free');
     const adm = e.target.closest('[data-admin-open]');
     if (adm) openPackFlow(adm.dataset.adminOpen, true);
@@ -227,7 +298,7 @@ export async function viewHome(el, { on }) {
       if (await confirmDialog('Booster Premium', `Acheter un booster Premium pour <b>${fmt(state.me.config.premiumPrice)}</b> bits ?`, 'Acheter')) await openPackFlow('premium');
     });
     const daily = e.target.closest('[data-daily-btn]');
-    if (daily) busy(daily, async () => { const r = await api('/daily', {}); toast(`+${r.reward} bits · série ${r.streak}`, 'ok'); await refreshMe(); });
+    if (daily) busy(daily, async () => { const r = await api('/daily', {}); sfx('coin'); toast(`+${r.reward} bits${r.pack ? ' + 1 booster' : ''} · série ${r.streak}`, 'ok'); await refreshMe(); });
   });
 
   const loadTiers = async () => {
@@ -256,19 +327,25 @@ const collTabs = (on) => `<div class="tabs"><a href="#/collection"${on === 'mine
 
 export async function viewCollection(el, { on, query }) {
   const user = query.user && query.user.toLowerCase() !== state.me.user.username.toLowerCase() ? query.user : '';
-  const f = { q: '', rarity: '', sort: prefs.get('sort', 'rarity'), dupes: false, holo: false };
+  const f = { q: '', rarity: '', sort: prefs.get('sort', 'rarity'), dupes: false, holo: false, fav: false, family: query.family || '' };
+  // Badge « NEW » : cartes obtenues depuis la dernière visite de la collection.
+  const seenKey = 'collSeen.' + state.me.user.id;
+  const lastSeen = user ? Infinity : prefs.get(seenKey, Date.now());
+  if (!user) prefs.set(seenKey, Date.now());
   el.innerHTML = `${user ? '' : collTabs('mine')}
     <div class="page-head"><h1>${user ? `Collection de ${esc(user)}` : 'Ma collection'}</h1>
-      <div class="row">${user ? `<a class="btn sm" href="#/u/${encodeURIComponent(user)}">Profil</a>` : '<button class="btn sm" data-dupes-recycle>Recycler les doublons</button>'}</div></div>
+      <div class="row">${user ? `<a class="btn sm" href="#/u/${encodeURIComponent(user)}">Profil</a>` : '<a class="btn sm" href="#/forge">Forge</a><a class="btn sm" href="#/albums">Albums</a><button class="btn sm" data-dupes-recycle>Recycler les doublons</button>'}
+        <button class="btn sm ghost" data-gridsize title="Taille des cartes">▦</button></div></div>
     <div class="row" style="margin-bottom:10px">
       <input type="search" class="grow" placeholder="Rechercher un site…" data-q style="flex:1;min-width:160px">
       <select data-sort style="width:auto">
-        <option value="rarity">Rareté</option><option value="recent">Récentes</option><option value="rank">Rang</option>
+        <option value="rarity">Rareté</option><option value="value">Cote ↓</option><option value="recent">Récentes</option><option value="rank">Rang</option>
         <option value="name">A → Z</option><option value="count">Quantité</option>
       </select>
+      ${user ? '' : '<select data-family style="width:auto"><option value="">Toutes familles</option></select>'}
     </div>
     <div class="chips" data-chips>${rarityChips('')}
-      <button class="chip" data-toggle="dupes">Doublons</button><button class="chip" data-toggle="holo">✦ Holo</button></div>
+      <button class="chip" data-toggle="dupes">Doublons</button><button class="chip" data-toggle="holo">✦ Holo</button>${user ? '' : '<button class="chip" data-toggle="fav">★ Favoris</button>'}</div>
     <div class="cards" style="margin-top:12px" data-grid></div>
     <div class="center" style="margin-top:16px" data-more></div>`;
   $('[data-sort]', el).value = f.sort;
@@ -278,11 +355,11 @@ export async function viewCollection(el, { on, query }) {
   const load = async (append = false) => {
     const my = ++seq;
     if (!append) { offset = 0; grid.innerHTML = '<div class="skeleton"></div>'.repeat(6); }
-    const qs = new URLSearchParams({ q: f.q, rarity: f.rarity, sort: f.sort, offset, limit: 120, dupes: f.dupes ? 1 : '', holo: f.holo ? 1 : '' });
+    const qs = new URLSearchParams({ q: f.q, rarity: f.rarity, sort: f.sort, offset, limit: 120, dupes: f.dupes ? 1 : '', holo: f.holo ? 1 : '', fav: f.fav ? 1 : '', family: f.family });
     if (user) qs.set('user', user);
     const res = await api('/collection?' + qs);
     if (my !== seq) return;
-    const html = res.items.map((s) => cardHtml(s, { count: s.n, holo: s.holo > 0, locked: !s.cards })).join('');
+    const html = res.items.map((s) => cardHtml(s, { count: s.n, holo: s.holo > 0, locked: !s.cards, fav: s.fav, price: s.price, isNew: s.last > lastSeen })).join('');
     if (append) grid.insertAdjacentHTML('beforeend', html); else grid.innerHTML = html;
     offset += res.items.length;
     if (!append && !res.items.length) {
@@ -298,13 +375,29 @@ export async function viewCollection(el, { on, query }) {
     const chip = e.target.closest('[data-r]');
     if (chip) { f.rarity = chip.dataset.r; $$('[data-r]', el).forEach((c) => c.classList.toggle('on', c === chip)); load().catch(toastErr); return; }
     const tog = e.target.closest('[data-toggle]');
-    if (tog) { const k = tog.dataset.toggle; f[k] = !f[k]; tog.classList.toggle('on', f[k]); if (f[k]) { const o = k === 'dupes' ? 'holo' : 'dupes'; f[o] = false; $(`[data-toggle=${o}]`, el).classList.remove('on'); } load().catch(toastErr); return; }
+    if (tog) {
+      const k = tog.dataset.toggle; f[k] = !f[k]; tog.classList.toggle('on', f[k]);
+      if (f[k] && k !== 'fav') { const o = k === 'dupes' ? 'holo' : 'dupes'; f[o] = false; $(`[data-toggle=${o}]`, el).classList.remove('on'); }
+      load().catch(toastErr); return;
+    }
+    if (e.target.closest('[data-gridsize]')) {
+      const order = ['normal', 'small', 'large'];
+      prefs.set('gridSize', order[(order.indexOf(prefs.get('gridSize', 'normal')) + 1) % 3]); applyStyle();
+      toast({ normal: 'Cartes normales', small: 'Cartes compactes', large: 'Grandes cartes' }[prefs.get('gridSize')]); return;
+    }
     if (e.target.closest('[data-load-more]')) { load(true).catch(toastErr); return; }
     const card = e.target.closest('.card');
     if (card) { openSite(card.dataset.site); return; }
     if (e.target.closest('[data-dupes-recycle]')) recycleDupesDialog(() => load().catch(toastErr));
   });
   on('nd:cards', () => load().catch(() => {}));
+  const fam = $('[data-family]', el);
+  if (fam) {
+    fam.addEventListener('change', (e) => { f.family = e.target.value; load().catch(toastErr); });
+    api('/fun/albums').then((a) => {
+      fam.innerHTML = '<option value="">Toutes familles</option>' + a.items.map((x) => `<option${x.family === f.family ? ' selected' : ''}>${esc(x.family)}</option>`).join('');
+    }).catch(() => {});
+  }
   await load();
 }
 
@@ -360,17 +453,18 @@ export async function viewDex(el) {
 // Marché aux enchères
 // ======================================================================
 export async function viewMarket(el, { on, query }) {
-  const f = { scope: query.scope || 'all', rarity: '', q: '', sort: 'ending' };
+  const f = { scope: query.scope || 'all', rarity: '', q: query.q || '', sort: 'ending', wish: query.wish === '1' ? '1' : '', missing: '' };
   el.innerHTML = `
-    <div class="page-head"><h1>Marché</h1><div class="row"><button class="btn primary sm" data-sell>+ Vendre une carte</button></div></div>
+    <div class="page-head"><h1>Marché</h1><div class="row"><a class="btn sm" href="#/history">Historique</a><a class="btn sm" href="#/wishlist">♡ Souhaits</a><button class="btn primary sm" data-sell>+ Vendre une carte</button></div></div>
     <details class="panel" style="margin-bottom:14px" data-index><summary><b>Cours du marché</b> <span class="muted small">médiane des ventes, 7 jours</span></summary><div data-index-body class="small" style="margin-top:10px"></div></details>
     <div class="tabs" data-tabs><button data-scope="all">Toutes les ventes</button><button data-scope="mine">Mes ventes</button><button data-scope="bids">Mes enchères</button></div>
     <div class="row" style="margin-bottom:10px">
       <input type="search" placeholder="Rechercher…" data-q style="flex:1;min-width:150px">
       <select data-sort style="width:auto"><option value="ending">Fin proche</option><option value="new">Récentes</option><option value="price">Prix ↑</option><option value="rarity">Rareté</option></select>
     </div>
-    <div class="chips" style="margin-bottom:12px">${rarityChips('')}</div>
+    <div class="chips" style="margin-bottom:12px">${rarityChips('')}<button class="chip${f.wish ? ' on' : ''}" data-mf="wish">♡ Ma liste</button><button class="chip" data-mf="missing">Je ne l'ai pas</button></div>
     <div class="auctions" data-list></div>`;
+  $('[data-q]', el).value = f.q;
   const list = $('[data-list]', el);
   const setTabs = () => $$('[data-scope]', el).forEach((b) => b.classList.toggle('on', b.dataset.scope === f.scope));
   setTabs();
@@ -420,6 +514,8 @@ export async function viewMarket(el, { on, query }) {
     const chip = e.target.closest('[data-r]');
     if (chip) { f.rarity = chip.dataset.r; $$('[data-r]', el).forEach((c) => c.classList.toggle('on', c === chip)); load().catch(toastErr); return; }
     if (e.target.closest('[data-sell]')) { sellPicker(); return; }
+    const mf = e.target.closest('[data-mf]');
+    if (mf) { const k = mf.dataset.mf; f[k] = f[k] ? '' : '1'; mf.classList.toggle('on', !!f[k]); load().catch(toastErr); return; }
     const row = e.target.closest('.auction');
     if (!row) return;
     const a = items.find((x) => x.id === Number(row.dataset.id));
@@ -486,10 +582,10 @@ function sellPicker() {
 export async function viewSocial(el, { on, query }) {
   let tab = query.tab || 'friends';
   el.innerHTML = `<div class="page-head"><h1>Social</h1></div>
-    <div class="tabs"><button data-tab="friends">Amis <span data-c="friendRequests"></span></button><button data-tab="trades">Échanges <span data-c="trades"></span></button></div>
+    <div class="tabs"><button data-tab="friends">Amis <span data-c="friendRequests"></span></button><button data-tab="trades">Échanges <span data-c="trades"></span></button><a href="#/messages">Messages <span data-c="messages"></span></a></div>
     <div data-body></div>`;
   const counts = () => {
-    for (const k of ['friendRequests', 'trades']) {
+    for (const k of ['friendRequests', 'trades', 'messages']) {
       const n = state.me.counts[k];
       $(`[data-c=${k}]`, el).innerHTML = n ? `<span class="dot">${n}</span>` : '';
     }
@@ -523,7 +619,7 @@ async function friendsTab(body) {
       <div class="list" data-sugg></div></form>
     ${d.incoming.length ? `<h2>Demandes reçues</h2><div class="panel list">${d.incoming.map((u) => person(u, `<button class="btn primary sm" data-accept="${u.id}">Accepter</button><button class="btn sm ghost" data-decline="${u.id}">✕</button>`)).join('')}</div>` : ''}
     <h2>Mes amis (${d.friends.length})</h2>
-    ${d.friends.length ? `<div class="panel list">${d.friends.map((u) => person(u, `<a class="btn sm" href="#/trade?to=${encodeURIComponent(u.username)}">${ICONS.swap.replace('<svg', '<svg width="16" height="16"')} Échanger</a><button class="btn sm ghost" data-remove="${u.id}" data-name="${esc(u.username)}">✕</button>`)).join('')}</div>`
+    ${d.friends.length ? `<div class="panel list">${d.friends.map((u) => person(u, `<a class="btn sm" href="#/messages/${u.id}" title="Messages">✉</a><button class="btn sm" data-gift="${u.id}" data-name="${esc(u.username)}" title="Offrir">Offrir</button><a class="btn sm" href="#/trade?to=${encodeURIComponent(u.username)}">${ICONS.swap.replace('<svg', '<svg width="16" height="16"')} Échanger</a><button class="btn sm ghost" data-remove="${u.id}" data-name="${esc(u.username)}">✕</button>`)).join('')}</div>`
       : '<div class="panel empty"><b>Pas encore d\'amis</b>Ajoute des joueurs avec leur pseudo pour échanger des cartes.</div>'}
     ${d.outgoing.length ? `<h2>Demandes envoyées</h2><div class="panel list">${d.outgoing.map((u) => person(u, `<button class="btn sm ghost" data-remove="${u.id}">Annuler</button>`)).join('')}</div>` : ''}`;
   const form = $('[data-add]', body);
@@ -549,6 +645,7 @@ async function friendsTab(body) {
     if (pick) { e.preventDefault(); form.u.value = pick.dataset.pick; $('[data-sugg]', body).innerHTML = ''; return; }
     const btn = e.target.closest('button');
     if (!btn) return;
+    if (btn.dataset.gift) { giftDialog({ id: Number(btn.dataset.gift), username: btn.dataset.name }); return; }
     if (btn.dataset.accept) busy(btn, async () => { await api('/friends/respond', { userId: btn.dataset.accept, accept: true }); toast('Ami ajouté !', 'ok'); refreshMe(); document.dispatchEvent(new CustomEvent('nd:social')); });
     if (btn.dataset.decline) busy(btn, async () => { await api('/friends/respond', { userId: btn.dataset.decline, accept: false }); refreshMe(); document.dispatchEvent(new CustomEvent('nd:social')); });
     if (btn.dataset.remove) busy(btn, async () => {
@@ -693,13 +790,24 @@ export async function viewProfile(el, { params }) {
     received: `<button class="btn primary sm" data-accept>Accepter en ami</button>`,
     none: '<button class="btn primary sm" data-add>Ajouter en ami</button>',
   }[p.relation];
+  const self = p.relation === 'self';
+  // Badges de rareté : selon le nombre de sites trouvés dans chaque rareté.
+  const badges = p.stats.tiers.filter((t) => t.found > 0 && t.id >= 2).map((t) => {
+    const lvl = t.found >= 100 ? 'III' : t.found >= 10 ? 'II' : 'I';
+    return `<span class="rbadge r-${t.id}" title="${fmt(t.found)} ${t.name}">${t.name} ${lvl}</span>`;
+  }).join('');
   el.innerHTML = `
-    <div class="panel"><div class="row" style="gap:16px">
+    <div class="panel profile-card" style="${p.color ? `--pc:${p.color}` : ''}"><div class="row" style="gap:16px">
       ${avatarHtml(p.avatarDomain, p.username, 'lg')}
       <div class="grow" style="min-width:0"><h1 style="margin:0">${esc(p.username)} ${isOnline(p.lastSeen) ? '<span class="online"></span>' : ''}</h1>
-        <div class="muted small">#${fmt(p.rank)} au classement · inscrit ${ago(p.createdAt)}</div>
-        <div class="row" style="margin-top:8px">${rel}<a class="btn sm" href="#/collection?user=${encodeURIComponent(p.username)}">Collection</a><a class="btn sm" href="#/wallet?user=${encodeURIComponent(p.username)}">Valeur</a></div></div>
-    </div></div>
+        ${p.title ? `<div class="ptitle">${esc(p.title)}</div>` : ''}
+        <div class="muted small">Niveau ${p.level} · #${fmt(p.rank)} au classement · inscrit ${ago(p.createdAt)}${p.achievements != null ? ` · ${p.achievements}/${p.achievementsTotal} succès` : ''}</div>
+        ${p.bio ? `<p class="pbio">${esc(p.bio)}</p>` : ''}
+        <div class="row" style="margin-top:8px">${rel}<a class="btn sm" href="#/collection?user=${encodeURIComponent(p.username)}">Collection</a><a class="btn sm" href="#/wallet?user=${encodeURIComponent(p.username)}">Valeur</a>
+          ${self ? '<button class="btn sm" data-edit>Personnaliser</button>' : `<a class="btn sm" href="#/compare/${encodeURIComponent(p.username)}">Comparer</a>`}
+          ${p.relation === 'friends' ? `<a class="btn sm" href="#/messages/${p.id}">Message</a><button class="btn sm" data-gift>Offrir</button>` : ''}</div></div>
+    </div>${badges ? `<div class="row" style="margin-top:12px;gap:6px">${badges}</div>` : ''}</div>
+    ${p.showcase.length ? `<h2>Vitrine</h2><div class="cards showcase">${p.showcase.map((s) => cardHtml(s)).join('')}</div>` : ''}
     <div class="quick-grid" style="margin-top:12px">
       <div class="quick"><b>${fmt(p.dexScore)}</b><span>Score</span></div>
       <div class="quick"><b>${fmt(p.dexCount)}</b><span>Sites découverts</span></div>
@@ -714,6 +822,8 @@ export async function viewProfile(el, { params }) {
     const b = e.target.closest('button');
     if (b?.matches('[data-add]')) busy(b, async () => { await api('/friends/request', { username: p.username }); toast('Demande envoyée', 'ok'); route(); });
     if (b?.matches('[data-accept]')) busy(b, async () => { await api('/friends/respond', { userId: p.id, accept: true }); toast('Ami ajouté !', 'ok'); refreshMe(); route(); });
+    if (b?.matches('[data-edit]')) profileEditor(route);
+    if (b?.matches('[data-gift]')) giftDialog({ id: p.id, username: p.username });
     const c = e.target.closest('.card');
     if (c) openSite(c.dataset.site);
   });
@@ -724,19 +834,19 @@ export async function viewProfile(el, { params }) {
 // Classement
 // ======================================================================
 export async function viewTop(el) {
-  let by = 'score', scope = 'all';
+  let by = 'week', scope = 'all';
   el.innerHTML = `<div class="page-head"><h1>Classement</h1></div>
-    <div class="tabs"><button data-by="score">Score</button><button data-by="count">Sites</button><button data-by="packs">Boosters</button></div>
+    <div class="tabs"><button data-by="week">Cette semaine</button><button data-by="score">Score</button><button data-by="count">Sites</button><button data-by="packs">Boosters</button></div>
     <div class="chips" style="margin-bottom:12px"><button class="chip" data-scope="all">Mondial</button><button class="chip" data-scope="friends">Amis</button></div>
     <div class="panel list" data-list></div>`;
   const load = async () => {
     $$('[data-by]', el).forEach((b) => b.classList.toggle('on', b.dataset.by === by));
     $$('[data-scope]', el).forEach((b) => b.classList.toggle('on', b.dataset.scope === scope));
     const d = await api(`/leaderboard?by=${by}&scope=${scope}`);
-    const key = { score: 'dex_score', count: 'dex_count', packs: 'packs_opened' }[by];
+    const key = { week: 'week_score', score: 'dex_score', count: 'dex_count', packs: 'packs_opened' }[by];
     $('[data-list]', el).innerHTML = d.items.map((u, i) => `<a href="#/u/${encodeURIComponent(u.username)}" style="color:var(--text)${u.id === state.me.user.id ? ';background:color-mix(in srgb,var(--accent) 10%,transparent);margin:0 -16px;padding:11px 16px' : ''}">
       <b class="mono" style="width:32px;text-align:right;color:${i < 3 ? 'var(--accent)' : 'var(--muted)'}">${i + 1}</b>${avatarHtml(u.avatar_domain, u.username)}<b class="grow">${esc(u.username)}</b><b class="mono">${fmt(u[key])}</b></a>`).join('') +
-      (scope === 'all' ? `<div class="muted small">Ta position : #${fmt(d.myRank)}</div>` : '');
+      (scope === 'all' ? `<div class="muted small">Ta position : #${fmt(d.myRank)}${by === 'week' ? ' · points des nouveaux sites découverts depuis lundi' : ''}</div>` : '');
   };
   el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-by]'); if (b) { by = b.dataset.by; load().catch(toastErr); }
@@ -775,6 +885,13 @@ export async function viewMore(el) {
     <div class="panel list">
       <a href="#/u/${encodeURIComponent(u.username)}" style="color:var(--text)"><b class="grow">Mon profil</b><span class="muted">${esc(u.username)} ›</span></a>
       <a href="#/wallet" style="color:var(--text)"><b class="grow">Mon portefeuille</b><span class="muted">valeur & graphiques ›</span></a>
+      <a href="#/play" style="color:var(--text)"><b class="grow">Jeux & récompenses du jour</b><span class="muted">niveau ${u.level} ›</span></a>
+      <a href="#/progress" style="color:var(--text)"><b class="grow">Succès & statistiques</b><span class="muted">${(u.achievements || []).length} débloqués ›</span></a>
+      <a href="#/messages" style="color:var(--text)"><b class="grow">Messages</b>${state.me.counts.messages ? `<span class="tag accent">${state.me.counts.messages}</span>` : '<span class="muted">›</span>'}</a>
+      <a href="#/forge" style="color:var(--text)"><b class="grow">Forge</b><span class="muted">fusionner des doublons ›</span></a>
+      <a href="#/wishlist" style="color:var(--text)"><b class="grow">Liste de souhaits</b><span class="muted">›</span></a>
+      <a href="#/history" style="color:var(--text)"><b class="grow">Mes transactions</b><span class="muted">›</span></a>
+      <a href="#/albums" style="color:var(--text)"><b class="grow">Albums par famille</b><span class="muted">›</span></a>
       <a href="#/dex" style="color:var(--text)"><b class="grow">Netdex</b><span class="muted">${fmt(u.dexCount)} sites ›</span></a>
       <a href="#/top" style="color:var(--text)"><b class="grow">Classement</b><span class="muted">›</span></a>
       <a href="#/search" style="color:var(--text)"><b class="grow">Rechercher un site</b><span class="muted">›</span></a>
@@ -798,6 +915,9 @@ export async function viewRules(el) {
         <li>Netdex compte aussi des joueurs automatiques qui ouvrent des boosters, vendent, enchérissent et échangent, avec les mêmes règles que tout le monde.</li>
         <li>Recycle tes doublons en bits, utilise-les aux enchères ou pour des boosters Premium.</li>
         <li>Échanges uniquement entre amis. Enchères ouvertes à tous (commission ${state.me.config.auctionFee * 100} %).</li>
+        <li><b>Compteur de pitié</b> : après ${state.me.config.pityAfter} boosters sans Épique, le suivant en contient une à coup sûr.</li>
+        <li><b>Forge</b> : 5 doublons d'une rareté (10 Épiques, 25 Légendaires) = 1 carte de la rareté au-dessus.</li>
+        <li><b>Jeux</b> : coffre, roue et ticket chaque jour, 3 quêtes quotidiennes, mini-jeux (200 bits max par jour), niveaux et succès.</li>
       </ul>
     </div>
     <div class="panel" style="margin-top:12px"><table style="width:100%;border-collapse:collapse;font-size:14px">
@@ -821,7 +941,16 @@ export async function viewSettings(el, { logout }) {
       <b>Affichage</b>
       <div class="row" style="margin-top:10px"><span class="grow">Thème</span><select data-theme-pick style="width:auto"><option value="dark">Sombre</option><option value="light">Clair</option><option value="system">Système</option></select></div>
       <div class="row" style="margin-top:10px"><span class="grow">Ouverture rapide des boosters</span><input type="checkbox" data-fast ${prefs.get('fast', false) ? 'checked' : ''} style="width:22px;height:22px"></div>
+      <div class="row" style="margin-top:10px"><span class="grow">Couleur d'accent</span><div class="row" data-accents>${Object.entries(ACCENTS).map(([k, c]) => `<button class="swatch${prefs.get('accent', 'orange') === k ? ' on' : ''}" data-accent="${k}" style="background:${c}" title="${k}" aria-label="${k}"></button>`).join('')}</div></div>
+      <div class="row" style="margin-top:10px"><span class="grow">Dos des boosters</span><select data-packback style="width:auto">${Object.entries(PACK_BACKS).map(([k, v]) => `<option value="${k}"${prefs.get('packBack', 'classique') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div class="row" style="margin-top:10px"><span class="grow">Taille des cartes</span><select data-gridpick style="width:auto"><option value="small">Compactes</option><option value="normal">Normales</option><option value="large">Grandes</option></select></div>
+      <div class="row" style="margin-top:10px"><span class="grow">Mode rétro (écran cathodique)</span><input type="checkbox" data-crt ${prefs.get('crt', false) ? 'checked' : ''} style="width:22px;height:22px"></div>
+      <div class="row" style="margin-top:10px"><span class="grow">Sons</span><input type="checkbox" data-sound ${prefs.get('sound', true) ? 'checked' : ''} style="width:22px;height:22px"></div>
+      <div class="row" style="margin-top:10px"><span class="grow">Afficher la cote sur les cartes</span><input type="checkbox" data-showprice ${prefs.get('showPrice', true) ? 'checked' : ''} style="width:22px;height:22px"></div>
+      <div class="row" style="margin-top:10px"><span class="grow">Raccourcis clavier</span><button class="btn sm" data-keys>Voir</button></div>
     </div>
+    <form class="panel" data-promo><b>Code promo</b>
+      <div class="row" style="margin-top:10px"><input type="text" name="code" placeholder="ex : BIENVENUE" autocapitalize="characters" style="flex:1"><button class="btn primary">Utiliser</button></div></form>
     <form class="panel" data-pw><b>Changer de mot de passe</b>
       <label class="field" style="margin-top:10px"><span>Actuel</span><input type="password" name="current" autocomplete="current-password" required></label>
       <label class="field"><span>Nouveau (8 caractères min.)</span><input type="password" name="password" autocomplete="new-password" minlength="8" required></label>
@@ -830,6 +959,23 @@ export async function viewSettings(el, { logout }) {
   $('[data-theme-pick]', el).value = theme;
   $('[data-theme-pick]', el).addEventListener('change', (e) => { prefs.set('theme', e.target.value); window.ndApplyTheme(); });
   $('[data-fast]', el).addEventListener('change', (e) => prefs.set('fast', e.target.checked));
+  $('[data-accents]', el).addEventListener('click', (e) => { const b = e.target.closest('[data-accent]'); if (!b) return; prefs.set('accent', b.dataset.accent); applyStyle(); $$('[data-accent]', el).forEach((x) => x.classList.toggle('on', x === b)); });
+  $('[data-packback]', el).addEventListener('change', (e) => { prefs.set('packBack', e.target.value); applyStyle(); });
+  $('[data-gridpick]', el).value = prefs.get('gridSize', 'normal');
+  $('[data-gridpick]', el).addEventListener('change', (e) => { prefs.set('gridSize', e.target.value); applyStyle(); });
+  $('[data-crt]', el).addEventListener('change', (e) => { prefs.set('crt', e.target.checked); applyStyle(); });
+  $('[data-sound]', el).addEventListener('change', (e) => { prefs.set('sound', e.target.checked); if (e.target.checked) sfx('coin'); });
+  $('[data-showprice]', el).addEventListener('change', (e) => prefs.set('showPrice', e.target.checked));
+  $('[data-keys]', el).addEventListener('click', shortcutsHelp);
+  const pf = $('[data-promo]', el);
+  pf.addEventListener('submit', (e) => {
+    e.preventDefault();
+    busy($('button', pf), async () => {
+      const r = await api('/fun/redeem', { code: pf.code.value });
+      sfx('coin'); toast(`Code accepté : ${[r.bits && `+${fmt(r.bits)} bits`, r.packs && `+${r.packs} boosters`].filter(Boolean).join(' · ')}`, 'ok');
+      pf.reset(); refreshMe();
+    });
+  });
   $('[data-inst]', el)?.addEventListener('click', () => window.ndInstall.prompt());
   $('[data-logout]', el).addEventListener('click', logout);
   const f = $('[data-pw]', el);
@@ -916,6 +1062,25 @@ export async function viewAdmin(el) {
         <button class="btn primary">Ajouter</button></div>
       <div class="list small" data-custom-list style="margin-top:8px"></div>
     </form>
+    <h2>Événements</h2>
+    <form class="panel" data-event>
+      <p class="muted small" style="margin-top:0" data-event-cur></p>
+      <div class="row"><select name="type" style="flex:1;min-width:160px"><option value="holo">Heure holo (holo ×5)</option><option value="luck">Pluie de raretés (Rare+ ×3)</option><option value="bits">Bits en folie (bonus & roue ×2)</option></select>
+        <select name="hours" style="width:auto"><option value="1">1 h</option><option value="3">3 h</option><option value="12">12 h</option><option value="24">24 h</option><option value="72">3 jours</option></select>
+        <button class="btn primary">Lancer</button><button class="btn danger" type="button" data-event-stop>Arrêter</button></div>
+    </form>
+    <h2>Codes promo</h2>
+    <form class="panel" data-promo>
+      <div class="grid-2">
+        <label class="field"><span>Code</span><input type="text" name="code" placeholder="BIENVENUE" autocapitalize="characters"></label>
+        <label class="field"><span>Utilisations max (0 = illimité)</span><input type="number" name="maxUses" value="0" min="0"></label>
+        <label class="field"><span>Bits</span><input type="number" name="bits" value="100" min="0"></label>
+        <label class="field"><span>Boosters</span><input type="number" name="packs" value="0" min="0"></label>
+        <label class="field"><span>Expire dans (jours, 0 = jamais)</span><input type="number" name="days" value="0" min="0"></label>
+      </div>
+      <button class="btn primary">Créer le code</button>
+      <div class="list small" data-promo-list style="margin-top:8px"></div>
+    </form>
     <h2>Joueurs</h2>
     <div class="row" style="margin-bottom:10px"><input type="search" placeholder="Rechercher un pseudo…" data-uq style="flex:1">
       <select data-kind style="width:auto"><option value="humans">Humains</option><option value="bots">Bots</option><option value="all">Tous</option></select></div>
@@ -953,7 +1118,28 @@ export async function viewAdmin(el) {
     const d = await api('/admin/custom');
     $('[data-custom-list]', el).innerHTML = d.items.map((x) => `<a href="#" data-site-link="${x.id}"><span class="grow">${esc(x.domain)}</span><span class="r-${x.rarity} rtext">${RARITY[x.rarity].name}</span></a>`).join('');
   };
-  await Promise.all([overview(), users(), customs()]).catch(toastErr);
+  const events = async () => {
+    const d = await api('/admin/events');
+    $('[data-event-cur]', el).innerHTML = d.current ? `En cours : <b>${esc(d.current.name)}</b> jusqu'à ${new Date(d.current.until).toLocaleString('fr-FR')}` : 'Aucun événement en cours.';
+  };
+  const promos = async () => {
+    const d = await api('/admin/promo');
+    $('[data-promo-list]', el).innerHTML = d.items.map((x) => `<div><b class="mono grow">${esc(x.code)}</b><span class="muted">${[x.bits && x.bits + ' bits', x.packs && x.packs + ' boosters'].filter(Boolean).join(' + ')} · ${x.uses}${x.max_uses ? '/' + x.max_uses : ''} utilisations${x.expires_at ? ' · expire ' + new Date(x.expires_at).toLocaleDateString('fr-FR') : ''}</span>
+      <button class="btn sm danger" type="button" data-promo-del="${esc(x.code)}">✕</button></div>`).join('');
+  };
+  await Promise.all([overview(), users(), customs(), events(), promos()]).catch(toastErr);
+  const evf = $('[data-event]', el);
+  evf.addEventListener('submit', (e) => { e.preventDefault(); busy($('button', evf), async () => { await api('/admin/event', { type: evf.type.value, hours: Number(evf.hours.value) }); toast('Événement lancé', 'ok'); events(); refreshMe(); }); });
+  $('[data-event-stop]', el).addEventListener('click', (e) => busy(e.target, async () => { await api('/admin/event', { type: null }); toast('Événement arrêté'); events(); refreshMe(); }));
+  const prf = $('[data-promo]', el);
+  prf.addEventListener('submit', (e) => {
+    e.preventDefault();
+    busy($('button', prf), async () => {
+      const r = await api('/admin/promo', { code: prf.code.value, bits: Number(prf.bits.value), packs: Number(prf.packs.value), maxUses: Number(prf.maxUses.value), days: Number(prf.days.value) });
+      toast(`Code ${r.code} créé`, 'ok'); prf.code.value = ''; promos();
+    });
+  });
+  $('[data-promo-list]', el).addEventListener('click', (e) => { const b = e.target.closest('[data-promo-del]'); if (b) busy(b, async () => { await api('/admin/promo', { code: b.dataset.promoDel, delete: true }); promos(); }); });
   const cf = $('[data-custom]', el);
   cf.addEventListener('submit', (e) => {
     e.preventDefault();

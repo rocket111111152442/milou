@@ -6,7 +6,8 @@ import { createDb, databaseUrl, ADMIN_USERNAMES } from './db.js';
 import { copyDatabase, scheduleCron } from './transfer.js';
 import { RARITIES, tailDomains, searchTail, siteRow } from './sites.js';
 import { wallet, marketIndex, sitePrices, snapshotDue, snapshotIndex, siteMarket } from './market.js';
-import { createGame, CONFIG, GameError, CUSTOM_BASE } from './game.js';
+import { createGame, CONFIG, GameError, CUSTOM_BASE, EVENTS, weekId } from './game.js';
+import { createFun, progression, ACHIEVEMENTS, PROFILE_COLORS } from './fun.js';
 import { setupDatabase, setupTail } from './setup.js';
 import { runBots, seedBots, botStatus, deleteBots } from './bots.js';
 import { waitUntil } from '@vercel/functions';
@@ -22,7 +23,8 @@ export function getContext(db) {
     ctx = (async () => {
       const d = db || createDb();
       if (!d) throw new GameError('Base de données non configurée (DATABASE_URL manquant).', 503);
-      return { db: d, game: await createGame(d) };
+      const game = await createGame(d);
+      return { db: d, game, fun: createFun(d, game) };
     })();
     ctx.catch(() => { ctx = null; });
   }
@@ -78,13 +80,19 @@ async function meView({ db, game }, u) {
   const c = await db.one(`SELECT
       (SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND NOT read) notifications,
       (SELECT COUNT(*) FROM trades WHERE to_id = $1 AND status = 'pending') trades,
-      (SELECT COUNT(*) FROM friends WHERE friend_id = $1 AND status = 'pending') friend_requests`, [u.id]);
+      (SELECT COUNT(*) FROM friends WHERE friend_id = $1 AND status = 'pending') friend_requests,
+      (SELECT COUNT(*) FROM messages WHERE to_id = $1 AND NOT read) messages`, [u.id]);
+  await game.refreshCustom();
+  const prog = progression(u);
   return {
-    user: { id: u.id, username: u.username, isAdmin: u.is_admin, bits: u.bits, dexCount: u.dex_count, dexScore: u.dex_score, packsOpened: u.packs_opened, avatarSite: u.avatar_site, createdAt: u.created_at },
+    user: { id: u.id, username: u.username, isAdmin: u.is_admin, bits: u.bits, dexCount: u.dex_count, dexScore: u.dex_score, packsOpened: u.packs_opened, avatarSite: u.avatar_site, createdAt: u.created_at,
+      level: prog.level, xp: prog.xp, levelUp: prog.level > prog.claimedLevel, achievements: prog.unlocked, pity: u.pity, profile: u.profile },
+    event: game.activeEvent(),
     packs: game.packState(u, now),
     daily: game.dailyState(u, now),
-    counts: { notifications: c.notifications, trades: c.trades, friendRequests: c.friend_requests },
-    config: { premiumPrice: CONFIG.premiumPrice, holoMultiplier: CONFIG.holoMultiplier, auctionHours: CONFIG.auctionHours, auctionFee: CONFIG.auctionFee, maxTradeCards: CONFIG.maxTradeCards, totalSites: game.totalSites },
+    counts: { notifications: c.notifications, trades: c.trades, friendRequests: c.friend_requests, messages: c.messages },
+    config: { premiumPrice: CONFIG.premiumPrice, holoMultiplier: CONFIG.holoMultiplier, auctionHours: CONFIG.auctionHours, auctionFee: CONFIG.auctionFee, maxTradeCards: CONFIG.maxTradeCards, totalSites: game.totalSites,
+      pityAfter: CONFIG.pityAfter, colors: PROFILE_COLORS },
     serverTime: now,
   };
 }
@@ -99,19 +107,31 @@ const COLLECTION_SORT = {
 };
 const likeArg = (s) => '%' + String(s).toLowerCase().replace(/[%_\\]/g, '') + '%';
 
-async function collection(db, userId, query) {
+async function collection({ db, game }, userId, query) {
   const args = [userId];
   const p = (v) => { args.push(v); return '$' + args.length; };
   const where = ['c.user_id = $1'];
   if (query.rarity !== undefined && query.rarity !== '') where.push(`s.rarity = ${p(Number(query.rarity))}`);
   if (query.q) where.push(`s.domain LIKE ${p(likeArg(query.q))}`);
+  if (query.family) where.push(`s.family = ${p(String(query.family))}`);
+  if (query.fav === '1') where.push('EXISTS (SELECT 1 FROM favorites f WHERE f.user_id = c.user_id AND f.site_id = s.id)');
   const having = query.dupes === '1' ? 'HAVING COUNT(*) > 1' : query.holo === '1' ? 'HAVING SUM(c.holo) > 0' : '';
   const limit = Math.min(200, Number(query.limit) || 120);
   const offset = Math.max(0, Number(query.offset) || 0);
+  const byValue = query.sort === 'value';
+  // Tri par cote : calculé sur toute la collection (bornée à 5 000 sites), puis paginé.
   const rows = await db.all(`SELECT s.id, s.domain, s.rarity, s.family, COUNT(*)::int n, SUM(c.holo)::int holo, MAX(c.obtained_at) last,
-      string_agg(CASE WHEN c.status = 'owned' THEN c.id::text || CASE WHEN c.holo = 1 THEN 'h' ELSE '' END END, ',') cards
+      string_agg(CASE WHEN c.status = 'owned' THEN c.id::text || CASE WHEN c.holo = 1 THEN 'h' ELSE '' END END, ',') cards,
+      EXISTS (SELECT 1 FROM favorites f WHERE f.user_id = $1 AND f.site_id = s.id) fav
     FROM cards c JOIN sites s ON s.id = c.site_id WHERE ${where.join(' AND ')}
-    GROUP BY s.id ${having} ORDER BY ${COLLECTION_SORT[query.sort] || COLLECTION_SORT.rarity} LIMIT ${p(limit + 1)} OFFSET ${p(offset)}`, args);
+    GROUP BY s.id ${having} ORDER BY ${COLLECTION_SORT[query.sort] || COLLECTION_SORT.rarity}
+    ${byValue ? 'LIMIT 5000' : `LIMIT ${p(limit + 1)} OFFSET ${p(offset)}`}`, args);
+  const prices = await sitePrices(db, game, byValue ? rows.map((r) => r.id) : rows.slice(0, limit).map((r) => r.id));
+  for (const r of rows) r.price = (prices.get(r.id) || 0) * (r.holo > 0 ? CONFIG.holoMultiplier : 1);
+  if (byValue) {
+    rows.sort((a, b) => b.price - a.price);
+    return { items: rows.slice(offset, offset + limit), more: rows.length > offset + limit };
+  }
   return { items: rows.slice(0, limit), more: rows.length > limit };
 }
 
@@ -140,25 +160,33 @@ async function publicProfile(c, meId, name) {
     stats(c, u.id, u.is_bot),
     meId === u.id ? 'self' : game.relation(db, meId, u.id),
   ]);
+  const prof = u.profile || {};
+  const showcase = prof.showcase?.length ? await sitesByIds(c, prof.showcase) : [];
+  const prog = u.is_bot ? null : progression(u);
   return {
     id: u.id, username: u.username, createdAt: u.created_at, lastSeen: u.last_seen, dexCount: u.dex_count, dexScore: u.dex_score,
     packsOpened: u.packs_opened, avatarSite: u.avatar_site, avatarDomain: u.avatar_domain, rank: rank.r, relation, best, stats: st,
+    bio: prof.bio || '', title: prof.title || '', color: prof.color || null, showcase,
+    level: prog?.level ?? Math.max(1, Math.floor(Math.sqrt((u.packs_opened * 10 + u.dex_count * 2) / 40)) + 1),
+    achievements: prog ? prog.unlocked.length : null, achievementsTotal: ACHIEVEMENTS.length,
   };
 }
 
 async function siteInfo({ db, game }, meId, id) {
   const site = (await game.ensureSites(db, [Number(id) || 0])).get(Number(id) || 0);
   if (!site) throw new GameError('Site inconnu.', 404);
-  const [circ, mine, owners, found, market] = await Promise.all([
+  const [circ, mine, owners, found, market, flags] = await Promise.all([
     db.one('SELECT COUNT(*) n, COALESCE(SUM(holo), 0) h, COUNT(DISTINCT user_id) owners FROM cards WHERE site_id = $1', [site.id]),
     db.all('SELECT id, holo, status, obtained_at FROM cards WHERE site_id = $1 AND user_id = $2 ORDER BY holo DESC, id', [site.id, meId]),
     db.all(`SELECT u.username, COUNT(*) n, SUM(c.holo) h FROM cards c JOIN users u ON u.id = c.user_id
       WHERE c.site_id = $1 GROUP BY u.id ORDER BY n DESC LIMIT 15`, [site.id]),
     db.one('SELECT found_at FROM dex WHERE user_id = $1 AND site_id = $2', [meId, site.id]),
     siteMarket(db, game, site.id),
+    db.one(`SELECT EXISTS (SELECT 1 FROM favorites WHERE user_id = $1 AND site_id = $2) fav,
+      EXISTS (SELECT 1 FROM wishlist WHERE user_id = $1 AND site_id = $2) wish`, [meId, site.id]),
   ]);
   return { site, circulation: circ.n, holos: circ.h, owners: circ.owners, ownerList: owners, mine, foundAt: found?.found_at || null,
-    value: RARITIES[site.rarity].value, ...market };
+    value: RARITIES[site.rarity].value, favorite: flags.fav, wished: flags.wish, holofyCost: Math.max(20, RARITIES[site.rarity].value * 4), ...market };
 }
 
 // Sites pour une liste d'id : ceux de la table, et ceux de la longue traîne lus dans les blocs (sans les déplier).
@@ -243,17 +271,25 @@ route('POST', '/api/account/avatar', async ({ c, me, body }) => {
   return { ok: true };
 });
 
-route('GET', '/api/me', async ({ c, me }) => { await c.game.settleAuctions(); return meView(c, await reloadUser(c.db, me.id)); });
+route('GET', '/api/me', async ({ c, me }) => { await c.game.settleAuctions(); await c.fun.touch(me.id); return meView(c, await reloadUser(c.db, me.id)); });
 route('POST', '/api/packs/open', async ({ c, me, body }) => {
   const cards = await c.game.openPack(me.id, body.kind === 'premium' ? 'premium' : 'free', { free: !!body.free });
   return { cards, me: await meView(c, await reloadUser(c.db, me.id)) };
+});
+// Ouvrir tout le stock d'un coup (10 boosters max par appel).
+route('POST', '/api/packs/open-all', async ({ c, me }) => {
+  const n = Math.min(10, c.game.packState(await reloadUser(c.db, me.id)).available);
+  if (!n) throw new GameError('Aucun booster disponible, patiente encore un peu.');
+  const packs = [];
+  for (let i = 0; i < n; i++) packs.push(await c.game.openPack(me.id, 'free'));
+  return { packs, me: await meView(c, await reloadUser(c.db, me.id)) };
 });
 route('POST', '/api/daily', ({ c, me }) => c.game.claimDaily(me.id));
 
 route('GET', '/api/collection', async ({ c, me, query }) => {
   const owner = query.user ? await c.db.one('SELECT id FROM users WHERE lower(username) = lower($1)', [query.user]) : me;
   if (!owner) throw new GameError('Joueur introuvable.', 404);
-  return collection(c.db, owner.id, query);
+  return collection(c, owner.id, query);
 });
 route('GET', '/api/stats', ({ c, me }) => stats(c, me.id));
 route('POST', '/api/cards/recycle', ({ c, me, body }) => c.game.recycle(me.id, body.cardIds));
@@ -301,13 +337,17 @@ route('GET', '/api/users/search', async ({ c, me, query }) => {
 route('GET', '/api/users/:name', ({ c, me, params }) => publicProfile(c, me.id, decodeURIComponent(params.name)));
 
 route('GET', '/api/leaderboard', async ({ c, me, query }) => {
-  const by = query.by === 'count' ? 'dex_count' : query.by === 'packs' ? 'packs_opened' : 'dex_score';
+  const by = query.by === 'count' ? 'dex_count' : query.by === 'packs' ? 'packs_opened' : query.by === 'week' ? 'week_score' : 'dex_score';
   const friends = query.scope === 'friends';
-  const items = await c.db.all(`SELECT u.id, u.username, u.dex_score, u.dex_count, u.packs_opened, s.domain avatar_domain FROM users u
-    LEFT JOIN sites s ON s.id = u.avatar_site
-    ${friends ? "WHERE u.id = $1 OR u.id IN (SELECT friend_id FROM friends WHERE user_id = $1 AND status = 'accepted')" : ''}
+  // Classement de la semaine : seuls comptent les points gagnés depuis lundi.
+  const wk = weekId();
+  const cond = [friends ? "(u.id = $1 OR u.id IN (SELECT friend_id FROM friends WHERE user_id = $1 AND status = 'accepted'))" : null,
+    by === 'week_score' ? `u.week_id = ${wk}` : null].filter(Boolean);
+  const items = await c.db.all(`SELECT u.id, u.username, u.dex_score, u.dex_count, u.packs_opened, u.week_score, s.domain avatar_domain FROM users u
+    LEFT JOIN sites s ON s.id = u.avatar_site ${cond.length ? 'WHERE ' + cond.join(' AND ') : ''}
     ORDER BY u.${by} DESC, u.id ASC LIMIT 100`, friends ? [me.id] : []);
-  const myRank = (await c.db.one(`SELECT COUNT(*) + 1 r FROM users WHERE ${by} > $1`, [me[by]])).r;
+  const mine = by === 'week_score' && me.week_id !== wk ? 0 : me[by];
+  const myRank = (await c.db.one(`SELECT COUNT(*) + 1 r FROM users WHERE ${by} > $1 ${by === 'week_score' ? `AND week_id = ${wk}` : ''}`, [mine])).r;
   return { items, myRank };
 });
 
@@ -388,11 +428,48 @@ route('GET', '/api/wallet', async ({ c, me, query }) => {
 });
 route('GET', '/api/market/index', ({ c }) => marketIndex(c.db));
 
+// ---------- Progression, récompenses, mini-jeux, social ----------
+route('GET', '/api/fun', ({ c, me }) => c.fun.hub(me.id));
+route('POST', '/api/fun/quest/:id', ({ c, me, params }) => c.fun.claimQuest(me.id, params.id));
+route('POST', '/api/fun/level', ({ c, me }) => c.fun.claimLevel(me.id));
+route('POST', '/api/fun/chest', ({ c, me }) => c.fun.openChest(me.id));
+route('POST', '/api/fun/wheel', ({ c, me }) => c.fun.spinWheel(me.id));
+route('POST', '/api/fun/scratch', ({ c, me }) => c.fun.scratch(me.id));
+route('POST', '/api/fun/cotd', ({ c, me }) => c.fun.claimCotd(me.id));
+route('POST', '/api/fun/community', ({ c, me }) => c.fun.claimCommunity(me.id));
+route('POST', '/api/fun/konami', ({ c, me }) => c.fun.konami(me.id));
+route('GET', '/api/fun/hl', ({ c, me }) => c.fun.higherLower(me.id));
+route('POST', '/api/fun/hl', ({ c, me, body }) => c.fun.higherLowerAnswer(me.id, body.pick === 'a' ? 'a' : 'b'));
+route('POST', '/api/fun/guess/new', ({ c, me }) => c.fun.guessRound(me.id));
+route('GET', '/api/fun/guess/img', ({ c, me }) => c.fun.guessImage(me.id));
+route('POST', '/api/fun/guess', ({ c, me, body }) => c.fun.guessAnswer(me.id, body.domain));
+route('POST', '/api/fun/duel', ({ c, me, body }) => c.fun.duel(me.id, body.cardIds));
+route('GET', '/api/fun/forge', ({ c, me }) => c.fun.forgeInfo(me.id));
+route('POST', '/api/fun/forge', ({ c, me, body }) => c.fun.forge(me.id, body.rarity));
+route('POST', '/api/fun/holofy', ({ c, me, body }) => c.fun.holofy(me.id, body.cardId));
+route('POST', '/api/fun/favorite', ({ c, me, body }) => c.fun.toggle('favorites', me.id, body.siteId, !!body.on));
+route('POST', '/api/fun/wish', ({ c, me, body }) => c.fun.toggle('wishlist', me.id, body.siteId, !!body.on));
+route('GET', '/api/fun/wishlist', ({ c, me }) => c.fun.wishlist(me.id));
+route('GET', '/api/fun/history', ({ c, me }) => c.fun.history(me.id));
+route('GET', '/api/fun/messages', ({ c, me }) => c.fun.conversations(me.id));
+route('GET', '/api/fun/messages/:id', ({ c, me, params }) => c.fun.thread(me.id, params.id));
+route('POST', '/api/fun/messages/:id', ({ c, me, params, body }) => c.fun.sendMessage(me, params.id, body.text));
+route('POST', '/api/fun/gift', ({ c, me, body }) => c.fun.gift(me, body));
+route('POST', '/api/fun/profile', ({ c, me, body }) => c.fun.saveProfile(me.id, body));
+route('GET', '/api/fun/compare/:name', ({ c, me, params }) => c.fun.compare(me.id, decodeURIComponent(params.name)));
+route('GET', '/api/fun/albums', ({ c, me }) => c.fun.albums(me.id));
+route('GET', '/api/fun/stats', ({ c, me }) => c.fun.detailedStats(me.id));
+route('POST', '/api/fun/redeem', ({ c, me, body }) => c.fun.redeem(me.id, body.code));
+
 // ---------- Administration ----------
 const admin = (fn) => async (ctx) => {
   if (!ctx.me.is_admin) throw new GameError('Réservé aux administrateurs.', 403);
   return fn(ctx);
 };
+route('POST', '/api/admin/event', admin(({ c, body }) => c.fun.setEvent(body.type || null, body.hours)));
+route('GET', '/api/admin/events', admin(({ c }) => ({ types: EVENTS, current: c.game.activeEvent() })));
+route('GET', '/api/admin/promo', admin(({ c }) => c.fun.listPromos()));
+route('POST', '/api/admin/promo', admin(({ c, body }) => (body.delete ? c.fun.deletePromo(body.code) : c.fun.createPromo(body))));
 async function findUser(db, body) {
   const u = body.userId ? await db.one('SELECT * FROM users WHERE id = $1', [Number(body.userId)])
     : await db.one('SELECT * FROM users WHERE lower(username) = lower($1)', [String(body.username || '').trim()]);
@@ -636,7 +713,13 @@ export async function handleApi(req, res, { db } = {}) {
     if (match.r.auth && !me) throw new GameError('Connecte-toi pour continuer.', 401);
     const query = Object.fromEntries(url.searchParams);
     const data = await match.r.handler({ c, req, res, me, body, query, params: match.params });
-    sendJson(req, res, 200, data);
+    if (data?.__raw) {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', data.type);
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Content-Length', data.__raw.length);
+      res.end(data.__raw);
+    } else sendJson(req, res, 200, data);
     // Les bots avancent pendant que de vrais joueurs sont connectés (après la réponse, sans la ralentir).
     if (me && c && !me.is_bot) {
       const work = runBots(c.db, c.game).catch((e) => console.error('bots', e.message));

@@ -3,7 +3,7 @@ export const RARITY = [
   { id: 0, name: 'Commune' }, { id: 1, name: 'Peu commune' }, { id: 2, name: 'Rare' },
   { id: 3, name: 'Épique' }, { id: 4, name: 'Légendaire' }, { id: 5, name: 'Mythique' },
 ];
-export const VALUES = [1, 3, 10, 40, 200, 1500];
+export const VALUES = [1, 3, 12, 100, 1500, 40000]; // valeur de recyclage (identique au serveur)
 
 export const state = { me: null, clockOffset: 0 };
 export const now = () => Date.now() + state.clockOffset;
@@ -29,6 +29,7 @@ export async function refreshMe() { setMe(await api('/me')); return state.me; }
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
 export const fmt = (n) => Number(n || 0).toLocaleString('fr-FR');
+export const fmtShort = (n) => (n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : fmt(n));
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 export function h(html) { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; }
@@ -61,7 +62,7 @@ export const favicon = (domain, size = 64) => `https://www.google.com/s2/favicon
 
 // ---------- rendu des cartes ----------
 export function cardHtml(site, opts = {}) {
-  const { count = 0, holo = false, isNew = false, locked = false, selected = false, missing = false, attrs = '' } = opts;
+  const { count = 0, holo = false, isNew = false, locked = false, selected = false, missing = false, attrs = '', fav = false, price = null } = opts;
   const r = site.rarity;
   return `<div class="card r-${r}${holo ? ' holo' : ''}${selected ? ' selected' : ''}${missing ? ' missing' : ''}" data-site="${site.id}" ${attrs}>
     <div class="c-bar"><i></i><i></i><i></i><span class="rk">${rankLabel(site.id)}</span></div>
@@ -71,6 +72,8 @@ export function cardHtml(site, opts = {}) {
     <div class="c-foot"><span class="rar">${RARITY[r].name}</span><span>${power(site.id, r)}</span></div>
     ${count > 1 ? `<span class="count">×${count}</span>` : ''}
     ${isNew ? '<span class="badge-new">NEW</span>' : ''}
+    ${fav ? '<span class="badge-fav" title="Favori">★</span>' : ''}
+    ${price != null && prefs.get('showPrice', true) ? `<span class="badge-price">${fmtShort(price)}</span>` : ''}
     ${locked ? '<span class="badge-lock">en vente</span>' : ''}
   </div>`;
 }
@@ -138,7 +141,33 @@ export const prefs = {
   set(k, v) { try { localStorage.setItem('nd.' + k, JSON.stringify(v)); } catch { /* stockage indisponible */ } },
 };
 
+// ---------- Sons (synthétisés, aucun fichier) ----------
+let audio = null;
+export function sfx(kind) {
+  if (!prefs.get('sound', true)) return;
+  try {
+    audio ||= new (window.AudioContext || window.webkitAudioContext)();
+    const notes = {
+      flip: [[520, 0.04]], pop: [[660, 0.05], [880, 0.06]], coin: [[988, 0.06], [1319, 0.12]],
+      rare: [[523, 0.08], [659, 0.08], [784, 0.14]], epic: [[392, 0.08], [523, 0.08], [659, 0.08], [1047, 0.2]],
+      legend: [[262, 0.1], [392, 0.1], [523, 0.1], [784, 0.1], [1047, 0.32]], lose: [[330, 0.12], [247, 0.22]], tick: [[1400, 0.015]],
+    }[kind] || [[440, 0.05]];
+    let t = audio.currentTime;
+    for (const [f, d] of notes) {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = kind === 'tick' || kind === 'flip' ? 'triangle' : 'square';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.06, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(audio.destination);
+      o.start(t); o.stop(t + d + 0.02);
+      t += d * 0.9;
+    }
+  } catch { /* audio indisponible */ }
+}
+
 export const ICONS = {
+  play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 12h4M8 10v4"/><circle cx="15.5" cy="11" r=".8" fill="currentColor"/><circle cx="18" cy="13.5" r=".8" fill="currentColor"/></svg>',
   logo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
   pack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6"/><path d="m12 15 1 2h-2z"/></svg>',
   cards: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="12" height="15" rx="2"/><path d="M8 3h11a2 2 0 0 1 2 2v13"/></svg>',

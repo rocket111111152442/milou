@@ -1,5 +1,6 @@
 import { api, state, setMe, refreshMe, $, $$, h, esc, fmt, duration, now, cardHtml, toastErr, busy, prefs, ICONS } from './core.js';
 import * as V from './views.js';
+import * as F from './fun.js';
 
 // ---------- Thème ----------
 window.ndApplyTheme = () => {
@@ -9,6 +10,7 @@ window.ndApplyTheme = () => {
   $('meta[name=theme-color]').content = light ? '#f3f2ed' : '#111110';
 };
 window.ndApplyTheme();
+F.applyStyle();
 
 // ---------- Installation PWA ----------
 let installEvent = null;
@@ -70,9 +72,10 @@ function showAuth(mode = 'login') {
 // ---------- Coquille de l'app ----------
 const TABS = [
   { href: '#/', label: 'Boosters', icon: ICONS.pack, match: /^$|^\/$/ },
-  { href: '#/collection', label: 'Collection', icon: ICONS.cards, match: /^\/(collection|dex|cards)/ },
-  { href: '#/market', label: 'Marché', icon: ICONS.market, match: /^\/market/ },
-  { href: '#/social', label: 'Social', icon: ICONS.social, match: /^\/(social|trade)/, badge: (c) => c.trades + c.friendRequests },
+  { href: '#/collection', label: 'Collection', icon: ICONS.cards, match: /^\/(collection|dex|cards|forge|albums)/ },
+  { href: '#/play', label: 'Jeux', icon: ICONS.play, match: /^\/(play|progress)/, badge: (c, me) => (me.user.levelUp ? 1 : 0) },
+  { href: '#/market', label: 'Marché', icon: ICONS.market, match: /^\/(market|wishlist|history)/ },
+  { href: '#/social', label: 'Social', icon: ICONS.social, match: /^\/(social|trade|messages|compare)/, badge: (c) => c.trades + c.friendRequests + c.messages },
   { href: '#/more', label: 'Plus', icon: ICONS.more, match: /^\/(more|top|search|settings|rules|admin|wallet|u\/)/ },
 ];
 
@@ -92,6 +95,17 @@ const ROUTES = [
   [/^\/more$/, V.viewMore],
   [/^\/rules$/, V.viewRules],
   [/^\/settings$/, V.viewSettings],
+  [/^\/play$/, F.viewPlay],
+  [/^\/progress$/, F.viewProgress],
+  [/^\/messages$/, F.viewMessages],
+  [/^\/messages\/(\d+)$/, F.viewMessages, ['id']],
+  [/^\/forge$/, F.viewForge],
+  [/^\/wishlist$/, F.viewWishlist],
+  [/^\/history$/, F.viewHistory],
+  [/^\/albums$/, F.viewAlbums],
+  [/^\/compare\/([^/]+)$/, F.viewCompare, ['name']],
+  // Lien partagé vers une carte : accueil + fiche du site.
+  [/^\/site\/(\d+)$/, async (el, ctx) => { await V.viewHome(el, ctx); V.openSite(ctx.params.id); }, ['id']],
 ];
 
 let shellOn = false, timers = [], leave = [];
@@ -130,7 +144,7 @@ function renderShell() {
   $('[data-bell-dot]').innerHTML = me.counts.notifications ? `<span class="dot">${me.counts.notifications}</span>` : '';
   $$('.tabbar a').forEach((a) => {
     const t = TABS[a.dataset.tab];
-    let n = t.badge ? t.badge(me.counts) : 0;
+    let n = t.badge ? t.badge(me.counts, me) : 0;
     if (t.href === '#/') n = me.packs.available;
     $('[data-badge]', a).innerHTML = n ? `<span class="dot">${n}</span>` : '';
   });
@@ -139,6 +153,16 @@ function renderShell() {
   document.title = me.packs.available ? `(${me.packs.available}) Netdex` : 'Netdex';
 }
 document.addEventListener('nd:me', renderShell);
+document.addEventListener('nd:me', () => { if (state.me) F.checkAchievements(); });
+
+// Raccourcis clavier (et code secret).
+F.initKeys({
+  o: () => { if (state.me?.packs.available) V.openPackFlow('free'); },
+  a: () => { if (state.me?.packs.available) V.openAllFlow(); },
+  b: () => { location.hash = '#/'; }, c: () => { location.hash = '#/collection'; }, j: () => { location.hash = '#/play'; },
+  m: () => { location.hash = '#/market'; }, s: () => { location.hash = '#/social'; }, t: () => { location.hash = '#/top'; },
+  '/': () => { location.hash = '#/search'; }, '?': F.shortcutsHelp,
+});
 
 // Comptes à rebours partagés : tout élément [data-until] est mis à jour chaque seconde.
 let refreshing = false;

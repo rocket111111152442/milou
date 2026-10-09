@@ -20,7 +20,17 @@ export const CONFIG = {
   dailyBase: 30,
   dailyStep: 10,
   dailyMaxStreak: 7,
+  pityAfter: 40,               // 40 boosters d'affilée sans Épique+ : le suivant en garantit une
 };
+
+// Événements lancés par l'admin (bannière + effet sur les tirages).
+export const EVENTS = {
+  holo: { name: 'Heure holo', desc: 'Holo ×5 plus fréquentes' },
+  luck: { name: 'Pluie de raretés', desc: 'Rare et plus ×3 plus fréquentes' },
+  bits: { name: 'Bits en folie', desc: 'Bonus quotidien et roue de la fortune ×2' },
+};
+const WEEK = 7 * 24 * 3600 * 1000;
+export const weekId = (t = Date.now()) => Math.floor((t - 4 * 24 * 3600 * 1000) / WEEK); // semaines du lundi au dimanche
 
 export const CUSTOM_BASE = 100_000_000;
 
@@ -38,9 +48,11 @@ export async function createGame(db) {
 
   // Cartes spéciales (ajoutées par un admin, hors classement) : id ≥ CUSTOM_BASE, rareté choisie.
   let custom = new Map(), customAt = 0;
+  let event = null;
   async function loadCustom() {
-    const r = await db.one("SELECT value FROM meta WHERE key = 'custom'");
+    const [r, ev] = await Promise.all([db.one("SELECT value FROM meta WHERE key = 'custom'"), db.one("SELECT value FROM meta WHERE key = 'event'")]);
     custom = new Map((r ? JSON.parse(r.value) : []).map((c) => [c.id, c.rarity]));
+    event = ev ? JSON.parse(ev.value) : null;
     for (const t of tiers) t.extra = [...custom].filter(([, r]) => r === t.id).map(([id]) => id);
     customAt = Date.now();
   }
@@ -48,6 +60,19 @@ export async function createGame(db) {
   const refreshCustom = () => (Date.now() - customAt > 60_000 ? loadCustom() : null);
   const tierOf = (siteId) => (custom.has(siteId) ? tiers[custom.get(siteId)] : tiers.find((t) => siteId >= t.lo && siteId <= t.hi));
   const tail = await getTail(db);
+  const activeEvent = (now = Date.now()) => (event && event.until > now && EVENTS[event.type] ? { ...event, ...EVENTS[event.type] } : null);
+  const eventIs = (type) => activeEvent()?.type === type;
+
+  // Compteurs de progression (succès, quêtes, XP) : humains seulement.
+  async function bump(q, userId, inc) {
+    const keys = Object.keys(inc).filter((k) => inc[k]);
+    if (!keys.length) return;
+    await q.run(`UPDATE users u SET stats = u.stats || (SELECT jsonb_object_agg(k, COALESCE((u.stats->>k)::int, 0) + v)
+      FROM unnest($2::text[], $3::int[]) AS x(k, v)) WHERE id = $1 AND NOT is_bot`, [userId, keys, keys.map((k) => inc[k])]);
+  }
+  // Score de la semaine (classement hebdo) : remis à zéro au changement de semaine.
+  const addWeek = (q, userId, pts) => q.run(`UPDATE users SET week_score = CASE WHEN week_id = $1 THEN week_score ELSE 0 END + $2, week_id = $1 WHERE id = $3`,
+    [weekId(), pts, userId]);
 
   // Garantit que les sites demandés existent dans `sites` (dépliage depuis la traîne si besoin). Renvoie Map id → site.
   async function ensureSites(q, ids) {
@@ -93,6 +118,7 @@ export async function createGame(db) {
     const r = await q.run('INSERT INTO dex (user_id, site_id, found_at) SELECT $1, $2, $3 FROM users WHERE id = $1 AND NOT is_bot ON CONFLICT DO NOTHING', [userId, siteId, now]);
     if (!r) return false;
     await q.run('UPDATE users SET dex_score = dex_score + $1, dex_count = dex_count + 1 WHERE id = $2', [tierOf(siteId).value, userId]);
+    await addWeek(q, userId, tierOf(siteId).value);
     return true;
   }
 
@@ -106,23 +132,49 @@ export async function createGame(db) {
   }
 
   function rollTier(minRarity) {
-    const pool = tiers.filter((t) => t.id >= minRarity && t.total > 0);
-    const sum = pool.reduce((a, t) => a + t.weight, 0);
+    const luck = eventIs('luck');
+    const pool = tiers.filter((t) => t.id >= minRarity && (t.total > 0 || t.extra?.length));
+    const w = (t) => t.weight * (luck && t.id >= 2 ? 3 : 1);
+    const sum = pool.reduce((a, t) => a + w(t), 0);
     let x = randomInt(sum);
-    for (const t of pool) { if ((x -= t.weight) < 0) return t; }
+    for (const t of pool) { if ((x -= w(t)) < 0) return t; }
     return pool[0];
   }
+  const pickIn = (tier) => { const n = tier.total > 0 ? tier.hi - tier.lo + 1 : 0; const k = randomInt(n + tier.extra.length); return k < n ? tier.lo + k : tier.extra[k - n]; };
+  const holoRoll = (premium) => (randomInt(10000) < (premium ? CONFIG.premiumHoloChance : CONFIG.holoChance) * (eventIs('holo') ? 5 : 1) ? 1 : 0);
 
-  async function drawCards(q, userId, premium, isBot = false) {
+  // Crée des cartes pour un joueur (coffre, forge, cadeaux...) et met à jour son dex.
+  async function grantCards(q, userId, picks) {
+    const now = Date.now();
+    const byId = await ensureSites(q, picks.map((p) => p.siteId));
+    const ids = await q.all(`INSERT INTO cards (user_id, site_id, holo, obtained_at)
+      SELECT $1, s, h, $4 FROM unnest($2::int[], $3::smallint[]) AS x(s, h) RETURNING id`, [userId, picks.map((p) => p.siteId), picks.map((p) => p.holo), now]);
+    const out = [];
+    for (let i = 0; i < picks.length; i++) {
+      const isNew = await discover(q, userId, picks[i].siteId, now);
+      out.push({ cardId: ids[i].id, holo: picks[i].holo, isNew, site: byId.get(picks[i].siteId) });
+    }
+    await bump(q, userId, pullStats(out));
+    return out;
+  }
+  const pullStats = (out) => ({
+    cards: out.length,
+    rare: out.filter((c) => c.site.rarity >= 2).length,
+    epic: out.filter((c) => c.site.rarity >= 3).length,
+    legendary: out.filter((c) => c.site.rarity >= 4).length,
+    mythic: out.filter((c) => c.site.rarity >= 5).length,
+    holo: out.filter((c) => c.holo).length,
+  });
+
+  async function drawCards(q, userId, premium, isBot = false, { pity = 0 } = {}) {
     const now = Date.now();
     const picks = [];
+    const pityHit = !isBot && pity >= CONFIG.pityAfter;
     for (let i = 0; i < CONFIG.packSize; i++) {
       const last = i === CONFIG.packSize - 1;
-      const tier = rollTier(premium ? (last ? 2 : 1) : (last ? 1 : 0)); // 5e carte Peu commune+ (Rare+ en premium)
-      picks.push({
-        siteId: (() => { const n = tier.hi - tier.lo + 1; const k = randomInt(n + tier.extra.length); return k < n ? tier.lo + k : tier.extra[k - n]; })(),
-        holo: randomInt(10000) < (premium ? CONFIG.premiumHoloChance : CONFIG.holoChance) ? 1 : 0,
-      });
+      // 5e carte Peu commune+ (Rare+ en premium, Épique+ quand le compteur de pitié est plein)
+      const tier = rollTier(last && pityHit ? 3 : premium ? (last ? 2 : 1) : (last ? 1 : 0));
+      picks.push({ siteId: pickIn(tier), holo: holoRoll(premium) });
     }
     const byId = await ensureSites(q, picks.map((p) => p.siteId));
     const ownedBefore = isBot
@@ -136,7 +188,10 @@ export async function createGame(db) {
       if (isBot) {
         isNew = !ownedBefore.has(picks[i].siteId);
         ownedBefore.add(picks[i].siteId);
-        if (isNew) await q.run('UPDATE users SET dex_score = dex_score + $1, dex_count = dex_count + 1 WHERE id = $2', [tierOf(picks[i].siteId).value, userId]);
+        if (isNew) {
+          await q.run('UPDATE users SET dex_score = dex_score + $1, dex_count = dex_count + 1 WHERE id = $2', [tierOf(picks[i].siteId).value, userId]);
+          await addWeek(q, userId, tierOf(picks[i].siteId).value);
+        }
       } else {
         isNew = await discover(q, userId, picks[i].siteId, now);
       }
@@ -145,6 +200,12 @@ export async function createGame(db) {
       if (r >= 3 || (r >= 2 && !isBot) || picks[i].holo) await logEvent(q, 'pull', userId, { siteId: picks[i].siteId, holo: picks[i].holo });
     }
     await q.run('UPDATE users SET packs_opened = packs_opened + 1 WHERE id = $1', [userId]);
+    if (!isBot) {
+      const gotEpic = out.some((c) => c.site.rarity >= 3);
+      await q.run('UPDATE users SET pity = $1 WHERE id = $2', [gotEpic ? 0 : pity + 1, userId]);
+      await bump(q, userId, { packs: 1, ...pullStats(out) });
+      if (pityHit) out.pity = true;
+    }
     return out;
   }
 
@@ -153,10 +214,11 @@ export async function createGame(db) {
     return db.tx(async (q) => {
       const u = await q.one('SELECT * FROM users WHERE id = $1 FOR UPDATE', [userId]);
       // Admin : boosters illimités, sans toucher au stock ni aux bits.
-      if (free && u.is_admin) return drawCards(q, userId, kind === 'premium', false);
+      const opts = { pity: u.pity };
+      if (free && u.is_admin) return drawCards(q, userId, kind === 'premium', false, opts);
       if (kind === 'premium') {
         await debit(q, userId, CONFIG.premiumPrice, `Il te faut ${CONFIG.premiumPrice} bits.`);
-        return drawCards(q, userId, true, u.is_bot);
+        return drawCards(q, userId, true, u.is_bot, opts);
       }
       const now = Date.now();
       const st = packState(u, now);
@@ -164,7 +226,7 @@ export async function createGame(db) {
       const full = u.pack_stock + st.gained >= CONFIG.packCap;
       const anchor = full ? now : u.pack_anchor + st.gained * CONFIG.packInterval;
       await q.run('UPDATE users SET pack_stock = $1, pack_anchor = $2 WHERE id = $3', [st.available - 1, anchor, userId]);
-      return drawCards(q, userId, false, u.is_bot);
+      return drawCards(q, userId, false, u.is_bot, opts);
     });
   }
 
@@ -173,7 +235,8 @@ export async function createGame(db) {
     const nextAt = u.daily_at + 20 * 3600 * 1000;
     const streak = now - u.daily_at < 2 * DAY ? u.daily_streak : 0;
     const nextStreak = Math.min(CONFIG.dailyMaxStreak, streak + 1);
-    return { available: now >= nextAt, nextAt, streak, reward: CONFIG.dailyBase + CONFIG.dailyStep * (nextStreak - 1) };
+    const base = CONFIG.dailyBase + CONFIG.dailyStep * (nextStreak - 1);
+    return { available: now >= nextAt, nextAt, streak, reward: base * (eventIs('bits') ? 2 : 1), pack: nextStreak === CONFIG.dailyMaxStreak };
   }
 
   function claimDaily(userId) {
@@ -182,8 +245,10 @@ export async function createGame(db) {
       const st = dailyState(u);
       if (!st.available) throw new GameError('Bonus déjà récupéré, reviens plus tard.');
       const streak = Math.min(CONFIG.dailyMaxStreak, st.streak + 1);
-      await q.run('UPDATE users SET bits = bits + $1, daily_at = $2, daily_streak = $3 WHERE id = $4', [st.reward, Date.now(), streak, userId]);
-      return { reward: st.reward, streak };
+      // 7e jour de série : un booster en plus des bits.
+      await q.run('UPDATE users SET bits = bits + $1, daily_at = $2, daily_streak = $3, pack_stock = pack_stock + $5 WHERE id = $4',
+        [st.reward, Date.now(), streak, userId, st.pack ? 1 : 0]);
+      return { reward: st.reward, streak, pack: st.pack };
     });
   }
 
@@ -197,6 +262,7 @@ export async function createGame(db) {
       if (!gone.length) throw new GameError('Aucune carte recyclable.');
       const gained = gone.reduce((a, c) => a + value(c.rarity, c.holo), 0);
       await credit(q, userId, gained);
+      await bump(q, userId, { recycled: gone.length });
       return { gained, count: gone.length };
     });
   }
@@ -206,8 +272,9 @@ export async function createGame(db) {
     const max = Math.max(0, Math.min(5, Number(maxRarity) || 0));
     const rows = await db.all(`SELECT c.site_id, array_agg(c.id ORDER BY c.id) ids,
         EXISTS (SELECT 1 FROM cards h WHERE h.user_id = c.user_id AND h.site_id = c.site_id AND h.holo = 1) has_holo
-      FROM cards c WHERE c.user_id = $1 AND c.status = 'owned' AND c.holo = 0 AND c.site_id >= $2
-      GROUP BY c.user_id, c.site_id`, [userId, tiers[max].lo]);
+      FROM cards c WHERE c.user_id = $1 AND c.status = 'owned' AND c.holo = 0 AND (c.site_id >= $2 OR c.site_id >= $3)
+        AND NOT EXISTS (SELECT 1 FROM favorites f WHERE f.user_id = c.user_id AND f.site_id = c.site_id)
+      GROUP BY c.user_id, c.site_id`, [userId, tiers[max].lo, CUSTOM_BASE]);
     const ids = [];
     for (const r of rows) ids.push(...(r.has_holo ? r.ids : r.ids.slice(1)));
     if (!ids.length) throw new GameError('Aucun doublon à recycler.');
@@ -369,6 +436,8 @@ export async function createGame(db) {
       await q.run('UPDATE users SET bits = bits + $1 - $2 WHERE id = $3', [t.offer_bits, t.request_bits, t.to_id]);
       await q.run("UPDATE trades SET status = 'accepted', resolved_at = $1 WHERE id = $2", [now, t.id]);
       await notify(q, t.from_id, `${me.username} a accepté ton échange !`, '#/social?tab=trades');
+      await bump(q, t.from_id, { traded: 1 });
+      await bump(q, t.to_id, { traded: 1 });
       await logEvent(q, 'trade', t.from_id, { other: t.to_id, amount: d2.offer.length + d2.request.length });
       return { status: 'accepted' };
     });
@@ -393,8 +462,14 @@ export async function createGame(db) {
       const c = await q.one("UPDATE cards SET status = 'auction' WHERE id = $1 AND user_id = $2 AND status = 'owned' RETURNING id, site_id", [cardId, me.id]);
       if (!c) throw new GameError('Carte indisponible.');
       const now = Date.now();
-      return q.one('INSERT INTO auctions (seller_id, card_id, site_id, start_price, buyout, ends_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+      const r = await q.one('INSERT INTO auctions (seller_id, card_id, site_id, start_price, buyout, ends_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
         [me.id, c.id, c.site_id, start, buyout, now + hours * 3600e3, now]);
+      // Alerte aux joueurs qui ont cette carte dans leur liste de souhaits.
+      const s = await q.one('SELECT domain FROM sites WHERE id = $1', [c.site_id]);
+      await q.run(`INSERT INTO notifications (user_id, text, link, created_at)
+        SELECT w.user_id, $2, $3, $4 FROM wishlist w WHERE w.site_id = $1 AND w.user_id != $5`,
+      [c.site_id, `★ ${s?.domain} (dans ta liste de souhaits) vient d'être mis en vente à ${start} bits !`, '#/market?wish=1', now, me.id]);
+      return r;
     });
   }
 
@@ -450,7 +525,10 @@ export async function createGame(db) {
       await notify(q, a.seller_id, `${a.domain} vendu ${a.current_bid} bits (−${fee} de commission).`, '#/market?scope=mine');
       await logEvent(q, 'sold', a.bidder_id, { other: a.seller_id, siteId: a.site_id, amount: a.current_bid });
       const card = await q.one('SELECT holo FROM cards WHERE id = $1', [a.card_id]);
-      await q.run('INSERT INTO sales (at, site_id, rarity, holo, price) VALUES ($1, $2, $3, $4, $5)', [now, a.site_id, tierOf(a.site_id).id, card?.holo || 0, a.current_bid]);
+      await q.run('INSERT INTO sales (at, site_id, rarity, holo, price, seller_id, buyer_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [now, a.site_id, tierOf(a.site_id).id, card?.holo || 0, a.current_bid, a.seller_id, a.bidder_id]);
+      await bump(q, a.seller_id, { sold: 1 });
+      await bump(q, a.bidder_id, { bought: 1 });
       await notify(q, a.bidder_id, `Tu as remporté ${a.domain} pour ${a.current_bid} bits !`, '#/collection');
     } else {
       await q.run("UPDATE cards SET status = 'owned' WHERE id = $1", [a.card_id]);
@@ -471,7 +549,7 @@ export async function createGame(db) {
     });
   }
 
-  async function listAuctions(meId, { scope = 'all', rarity, q: search, sort = 'ending' } = {}) {
+  async function listAuctions(meId, { scope = 'all', rarity, q: search, sort = 'ending', wish, missing } = {}) {
     await settleAuctions();
     const where = [];
     const args = [];
@@ -481,6 +559,8 @@ export async function createGame(db) {
     else where.push("a.status = 'open'");
     if (rarity !== undefined && rarity !== '') where.push(`s.rarity = ${p(Number(rarity))}`);
     if (search) where.push(`s.domain LIKE ${p('%' + String(search).toLowerCase().replace(/[%_\\]/g, '') + '%')}`);
+    if (wish === '1') where.push(`a.site_id IN (SELECT site_id FROM wishlist WHERE user_id = ${p(meId)})`);
+    if (missing === '1') where.push(`NOT EXISTS (SELECT 1 FROM dex d WHERE d.user_id = ${p(meId)} AND d.site_id = a.site_id)`);
     const order = { ending: "a.status = 'open' DESC, a.ends_at ASC", new: 'a.id DESC', price: 'COALESCE(a.current_bid, a.start_price) ASC', rarity: 's.rarity DESC, a.ends_at ASC' }[sort] || 'a.ends_at ASC';
     const rows = await db.all(`SELECT a.id, a.card_id, a.start_price, a.buyout, a.current_bid, a.bid_count, a.ends_at, a.status, a.seller_id, a.bidder_id,
         c.holo, s.id site_id, s.domain, s.rarity, s.family, us.username seller, ub.username bidder
@@ -494,7 +574,7 @@ export async function createGame(db) {
     get totalSites() { return rankedSites + custom.size; },
     isCustom: (id) => custom.has(id), loadCustom, refreshCustom,
     db, tail, ensureSites, minBid, drawCards, debit, credit, discover, logEvent,
-    tiers, tierOf, value, notify, packState, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
+    tiers, tierOf, value, notify, packState, bump, addWeek, rollTier, pickIn, holoRoll, grantCards, activeEvent, eventIs, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
     relation, requestFriend, respondFriend, removeFriend, listFriends,
     createTrade, listTrades, resolveTrade,
     createAuction, bid, cancelAuction, settleAuctions, listAuctions,

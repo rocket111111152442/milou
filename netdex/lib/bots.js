@@ -194,6 +194,7 @@ async function session(db, game, bot, opts) {
   // 1. Il regarde ses demandes d'amis et ses échanges reçus.
   const reqs = await db.all("SELECT user_id FROM friends WHERE friend_id = $1 AND status = 'pending' LIMIT 5", [bot.id]);
   for (const r of reqs) await tryDo('ami', () => game.respondFriend(me, r.user_id, rnd() < 0.92));
+  await answerMessages(db, bot, p, now);
   const trades = await db.all("SELECT id FROM trades WHERE to_id = $1 AND status = 'pending' ORDER BY id LIMIT 5", [bot.id]);
   for (const t of trades) await considerTrade(db, game, bot, me, t.id, tryDo);
 
@@ -229,6 +230,28 @@ async function session(db, game, bot, opts) {
 
   await db.run('UPDATE users SET bot_next_at = $1, last_seen = $2 WHERE id = $3', [nextSession(p, now), now, bot.id]);
   return log;
+}
+
+// Réponses courtes de bot aux messages privés, selon ce qu'on lui écrit.
+const REPLIES = [
+  [/\b(salut|slt|yo|coucou|bonjour|bonsoir|hello|cc|wesh)\b/i, ['salut !', 'yo', 'coucou :)', 'hey, ça va ?', 'salut, bien ou quoi ?']],
+  [/\b(ça va|ca va|cv|la forme)\b/i, ['ça va et toi ?', 'tranquille, j\'ouvre des boosters', 'bien, je viens de choper une rare', 'ça va, un peu fatigué']],
+  [/(échange|echange|trade|troc)/i, ['envoie une proposition, je regarde', 'ok fais une offre', 'ça dépend de ce que tu proposes', 'propose, je verrai ce soir']],
+  [/(vend|achète|achete|prix|combien|bits)/i, ['regarde au marché, j\'ai mis des trucs en vente', 'je vends pas en dessous de la cote', 'trop cher pour moi là', 'je garde mes bits pour les enchères']],
+  [/(mythique|légendaire|legendaire|holo|épique|epique)/i, ['j\'en rêve', 'jamais eu de mythique moi', 'gg si t\'en as une', 'les holo c\'est la vie']],
+  [/\?$/, ['bonne question', 'aucune idée', 'je sais pas trop', 'peut-être, pourquoi ?']],
+];
+const FALLBACK = ['ok', 'mdr', 'ah ouais ?', 'grave', 'je vois', 'trop bien', 'pas faux', 'haha', 'bon jeu !'];
+function botReply(text) {
+  for (const [re, list] of REPLIES) if (re.test(text)) return pick(list);
+  return pick(FALLBACK);
+}
+async function answerMessages(db, bot, p, now) {
+  const msgs = await db.all('SELECT DISTINCT ON (from_id) from_id, text FROM messages WHERE to_id = $1 AND NOT read ORDER BY from_id, id DESC LIMIT 3', [bot.id]);
+  for (const m of msgs) {
+    await db.run('UPDATE messages SET read = true WHERE to_id = $1 AND from_id = $2 AND NOT read', [bot.id, m.from_id]);
+    if (rnd() < 0.85) await db.run('INSERT INTO messages (from_id, to_id, text, at) VALUES ($1, $2, $3, $4)', [bot.id, m.from_id, botReply(m.text), now]);
+  }
 }
 
 async function ownedSites(db, botId, siteIds) {
@@ -413,13 +436,15 @@ async function cleanup(db) {
   await db.run('DELETE FROM sessions WHERE expires_at < $1', [Date.now()]);
   await db.run('DELETE FROM events WHERE id < (SELECT MAX(id) - 3000 FROM events)');
   await db.run('DELETE FROM sales WHERE at < $1', [Date.now() - 90 * 24 * HOUR]);
+  await db.run('DELETE FROM messages WHERE at < $1', [Date.now() - 60 * 24 * HOUR]);
   // Sites de la traîne dépliés mais plus utilisés par personne : on les replie (ils restent dans les blocs).
   const tail = await db.one("SELECT value FROM meta WHERE key = 'tail'");
   if (tail) {
     await db.run(`DELETE FROM sites s WHERE s.id >= $1 AND s.id < 100000000
       AND NOT EXISTS (SELECT 1 FROM cards c WHERE c.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM dex d WHERE d.site_id = s.id)
       AND NOT EXISTS (SELECT 1 FROM auctions a WHERE a.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM events e WHERE e.site_id = s.id)
-      AND NOT EXISTS (SELECT 1 FROM sales x WHERE x.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar_site = s.id)`, [JSON.parse(tail.value).start]);
+      AND NOT EXISTS (SELECT 1 FROM sales x WHERE x.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar_site = s.id)
+      AND NOT EXISTS (SELECT 1 FROM wishlist w WHERE w.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM favorites f WHERE f.site_id = s.id)`, [JSON.parse(tail.value).start]);
   }
 }
 
