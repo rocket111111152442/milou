@@ -137,6 +137,27 @@ CREATE TABLE IF NOT EXISTS events (
   amount INTEGER
 );
 CREATE INDEX IF NOT EXISTS users_seen ON users (last_seen DESC);
+
+-- v4 : longue traîne des sites, historique des ventes et de la valeur des collections.
+CREATE TABLE IF NOT EXISTS site_blocks (block INTEGER PRIMARY KEY, domains TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS sales (
+  id BIGSERIAL PRIMARY KEY,
+  at BIGINT NOT NULL,
+  site_id INTEGER NOT NULL,
+  rarity SMALLINT NOT NULL,
+  holo SMALLINT NOT NULL DEFAULT 0,
+  price INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sales_site ON sales (site_id, at);
+CREATE INDEX IF NOT EXISTS sales_at ON sales (at);
+CREATE TABLE IF NOT EXISTS value_history (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  at BIGINT NOT NULL,
+  value INTEGER NOT NULL,
+  bits INTEGER NOT NULL,
+  cards INTEGER NOT NULL,
+  PRIMARY KEY (user_id, at)
+);
 `;
 
 // DB_SOURCE choisit la base parmi celles branchées sur Vercel : « supabase » (POSTGRES_URL) ou « neon » (stockage_DATABASE_URL).

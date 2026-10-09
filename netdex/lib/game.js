@@ -1,12 +1,12 @@
 // Règles du jeu : boosters, cartes, dex, échanges, enchères, amis (Postgres, sûr en concurrence).
 import { randomInt } from 'node:crypto';
-import { RARITIES } from './sites.js';
+import { RARITIES, getTail, tailDomains, siteRow } from './sites.js';
 
 export const CONFIG = {
   packInterval: 3 * 60 * 1000, // un booster toutes les 3 minutes
   packCap: 10,                 // stock max accumulé hors ligne
   packSize: 5,
-  startBits: 150,
+  startBits: 0,                // les nouveaux joueurs démarrent sans bits
   startPacks: 3,
   premiumPrice: 300,
   holoChance: 100,             // sur 10 000 (1 %)
@@ -34,6 +34,25 @@ export async function createGame(db) {
   const tiers = JSON.parse(row.value).map((t) => ({ ...RARITIES[t.id], ...t }));
   const totalSites = tiers.reduce((a, t) => a + t.total, 0);
   const tierOf = (siteId) => tiers.find((t) => siteId >= t.lo && siteId <= t.hi);
+  const tail = await getTail(db);
+
+  // Garantit que les sites demandés existent dans `sites` (dépliage depuis la traîne si besoin). Renvoie Map id → site.
+  async function ensureSites(q, ids) {
+    const uniq = [...new Set(ids.map(Number))];
+    const rows = await q.all('SELECT id, domain, rarity, family FROM sites WHERE id = ANY($1::int[])', [uniq]);
+    const map = new Map(rows.map((r) => [r.id, r]));
+    const missing = uniq.filter((id) => !map.has(id));
+    if (missing.length && tail) {
+      const doms = await tailDomains(q, tail, missing);
+      const add = [...doms].map(([id, d]) => siteRow(id, d));
+      if (add.length) {
+        await q.run('INSERT INTO sites (id, domain, rarity, family) SELECT * FROM unnest($1::int[], $2::text[], $3::smallint[], $4::text[]) ON CONFLICT DO NOTHING',
+          [add.map((a) => a.id), add.map((a) => a.domain), add.map((a) => a.rarity), add.map((a) => a.family)]);
+        for (const a of add) map.set(a.id, a);
+      }
+    }
+    return map;
+  }
 
   const value = (rarity, holo) => RARITIES[rarity].value * (holo ? CONFIG.holoMultiplier : 1);
 
@@ -92,8 +111,7 @@ export async function createGame(db) {
         holo: randomInt(10000) < (premium ? CONFIG.premiumHoloChance : CONFIG.holoChance) ? 1 : 0,
       });
     }
-    const sites = await q.all('SELECT id, domain, rarity, family FROM sites WHERE id = ANY($1::int[])', [picks.map((p) => p.siteId)]);
-    const byId = new Map(sites.map((s) => [s.id, s]));
+    const byId = await ensureSites(q, picks.map((p) => p.siteId));
     const ownedBefore = isBot
       ? new Set((await q.all('SELECT DISTINCT site_id FROM cards WHERE user_id = $1 AND site_id = ANY($2::int[])', [userId, picks.map((p) => p.siteId)])).map((r) => r.site_id))
       : null;
@@ -417,6 +435,8 @@ export async function createGame(db) {
       await discover(q, a.bidder_id, a.site_id, now);
       await notify(q, a.seller_id, `${a.domain} vendu ${a.current_bid} bits (−${fee} de commission).`, '#/market?scope=mine');
       await logEvent(q, 'sold', a.bidder_id, { other: a.seller_id, siteId: a.site_id, amount: a.current_bid });
+      const card = await q.one('SELECT holo FROM cards WHERE id = $1', [a.card_id]);
+      await q.run('INSERT INTO sales (at, site_id, rarity, holo, price) VALUES ($1, $2, $3, $4, $5)', [now, a.site_id, tierOf(a.site_id).id, card?.holo || 0, a.current_bid]);
       await notify(q, a.bidder_id, `Tu as remporté ${a.domain} pour ${a.current_bid} bits !`, '#/collection');
     } else {
       await q.run("UPDATE cards SET status = 'owned' WHERE id = $1", [a.card_id]);
@@ -457,7 +477,7 @@ export async function createGame(db) {
   }
 
   return {
-    db, minBid, drawCards, debit, credit, discover, logEvent,
+    db, tail, ensureSites, minBid, drawCards, debit, credit, discover, logEvent,
     tiers, totalSites, tierOf, value, notify, packState, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
     relation, requestFriend, respondFriend, removeFriend, listFriends,
     createTrade, listTrades, resolveTrade,

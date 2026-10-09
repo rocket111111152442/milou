@@ -122,6 +122,7 @@ export async function seedBots(db, game, count = 10_000) {
     rows.forEach((r, k) => {
       for (const c of keptCards(game, stats[k], users[i + k].p.cap)) { cu.push(r.id); cs.push(c.siteId); ch.push(c.holo); }
     });
+    await game.ensureSites(db, cs); // certains sites tirés viennent de la longue traîne
     for (let j = 0; j < cu.length; j += 20_000) {
       await db.run(`INSERT INTO cards (user_id, site_id, holo, obtained_at) SELECT u, s, h, $4 FROM unnest($1::int[], $2::int[], $3::smallint[]) AS x(u, s, h)`,
         [cu.slice(j, j + 20_000), cs.slice(j, j + 20_000), ch.slice(j, j + 20_000), now - randomInt(1, 72) * HOUR]);
@@ -411,6 +412,15 @@ async function cleanup(db) {
   await db.run("DELETE FROM auctions WHERE status != 'open' AND ends_at < $1", [old]);
   await db.run('DELETE FROM sessions WHERE expires_at < $1', [Date.now()]);
   await db.run('DELETE FROM events WHERE id < (SELECT MAX(id) - 3000 FROM events)');
+  await db.run('DELETE FROM sales WHERE at < $1', [Date.now() - 90 * 24 * HOUR]);
+  // Sites de la traîne dépliés mais plus utilisés par personne : on les replie (ils restent dans les blocs).
+  const tail = await db.one("SELECT value FROM meta WHERE key = 'tail'");
+  if (tail) {
+    await db.run(`DELETE FROM sites s WHERE s.id >= $1
+      AND NOT EXISTS (SELECT 1 FROM cards c WHERE c.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM dex d WHERE d.site_id = s.id)
+      AND NOT EXISTS (SELECT 1 FROM auctions a WHERE a.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM events e WHERE e.site_id = s.id)
+      AND NOT EXISTS (SELECT 1 FROM sales x WHERE x.site_id = s.id) AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar_site = s.id)`, [JSON.parse(tail.value).start]);
+  }
 }
 
 export async function deleteBots(db) {

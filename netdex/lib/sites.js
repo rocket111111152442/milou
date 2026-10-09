@@ -120,3 +120,78 @@ export function computeTiers(total) {
     return { id: r.id, lo, hi, total: Math.max(0, hi - lo + 1) };
   });
 }
+
+// ---------- Longue traîne : des millions de sites rangés en blocs compressés ----------
+// Les sites au-delà du premier import ne sont pas des lignes de la table `sites` (trop lourd pour une base gratuite) :
+// ils sont stockés par blocs de 1000 domaines (texte compressé automatiquement par Postgres).
+// Un site de la traîne n'est « déplié » dans `sites` que lorsqu'une carte en a besoin (tirage, fiche, cadeau).
+export const BLOCK = 1000;
+
+export async function getTail(db) {
+  const r = await db.one("SELECT value FROM meta WHERE key = 'tail'");
+  return r ? JSON.parse(r.value) : null;
+}
+
+// Ajoute à la suite tous les domaines de la liste complète qui ne sont pas encore dans le jeu.
+export async function importTail(db, csv) {
+  if (await getTail(db)) return { added: 0, skipped: 'déjà importée' };
+  const existing = new Set((await db.all('SELECT domain FROM sites')).map((r) => r.domain));
+  const { m } = await db.one('SELECT COALESCE(MAX(id), 0) m FROM sites');
+  const start = m + 1;
+  const list = [];
+  for (const line of csv.split('\n')) {
+    const comma = line.indexOf(',');
+    if (comma < 0) continue;
+    const domain = line.slice(comma + 1).trim().toLowerCase().replace(/^www\./, '');
+    if (!keepDomain(domain) || existing.has(domain)) continue;
+    existing.add(domain);
+    list.push(domain);
+  }
+  await db.tx(async (t) => {
+    await t.query('DELETE FROM site_blocks');
+    for (let b = 0; b * BLOCK < list.length; b += 200) {
+      const blocks = [], texts = [];
+      for (let k = b; k < b + 200 && k * BLOCK < list.length; k++) { blocks.push(k); texts.push(list.slice(k * BLOCK, (k + 1) * BLOCK).join('\n')); }
+      await t.query('INSERT INTO site_blocks (block, domains) SELECT * FROM unnest($1::int[], $2::text[])', [blocks, texts]);
+    }
+    const total = start - 1 + list.length;
+    await t.query("INSERT INTO meta (key, value) VALUES ('tail', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [JSON.stringify({ start, count: list.length })]);
+    await t.query("INSERT INTO meta (key, value) VALUES ('tiers', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [JSON.stringify(computeTiers(total))]);
+  });
+  return { added: list.length, start };
+}
+
+// Domaines de la traîne pour une liste d'id.
+export async function tailDomains(db, tail, ids) {
+  const want = ids.filter((id) => tail && id >= tail.start && id < tail.start + tail.count);
+  if (!want.length) return new Map();
+  const blocks = [...new Set(want.map((id) => Math.floor((id - tail.start) / BLOCK)))];
+  const rows = await db.all('SELECT block, domains FROM site_blocks WHERE block = ANY($1::int[])', [blocks]);
+  const byBlock = new Map(rows.map((r) => [r.block, r.domains.split('\n')]));
+  const out = new Map();
+  for (const id of want) {
+    const k = id - tail.start;
+    const d = byBlock.get(Math.floor(k / BLOCK))?.[k % BLOCK];
+    if (d) out.set(id, d);
+  }
+  return out;
+}
+
+// Recherche dans la traîne. mode 'prefix' (début du domaine) ou 'contains'. Renvoie [{ id, domain }] triés par rang.
+export async function searchTail(db, tail, q, { mode = 'prefix', limit = 30, exact = false } = {}) {
+  if (!tail || !q) return [];
+  const rows = await db.all('SELECT block, domains FROM site_blocks WHERE domains LIKE $1 ORDER BY block LIMIT 400',
+    ['%' + q.replace(/[%_\\]/g, '') + '%']);
+  const out = [];
+  for (const r of rows) {
+    const lines = r.domains.split('\n');
+    for (let i = 0; i < lines.length && out.length < limit; i++) {
+      const d = lines[i];
+      if (exact ? d === q : mode === 'prefix' ? d.startsWith(q) : d.includes(q)) out.push({ id: tail.start + r.block * BLOCK + i, domain: d });
+    }
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+export const siteRow = (id, domain) => ({ id, domain, rarity: rarityForRank(id), family: familyOf(domain) });

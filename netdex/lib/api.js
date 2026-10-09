@@ -4,9 +4,10 @@ import { promisify } from 'node:util';
 import { gzipSync } from 'node:zlib';
 import { createDb, databaseUrl, ADMIN_USERNAMES } from './db.js';
 import { copyDatabase, scheduleCron } from './transfer.js';
-import { RARITIES } from './sites.js';
+import { RARITIES, tailDomains, searchTail, siteRow } from './sites.js';
+import { wallet, marketIndex, sitePrices, snapshotDue } from './market.js';
 import { createGame, CONFIG, GameError } from './game.js';
-import { setupDatabase } from './setup.js';
+import { setupDatabase, setupTail } from './setup.js';
 import { runBots, seedBots, botStatus, deleteBots } from './bots.js';
 import { waitUntil } from '@vercel/functions';
 
@@ -145,18 +146,32 @@ async function publicProfile(c, meId, name) {
   };
 }
 
-async function siteInfo(db, meId, id) {
-  const site = await db.one('SELECT * FROM sites WHERE id = $1', [Number(id) || 0]);
+async function siteInfo({ db, game }, meId, id) {
+  const site = (await game.ensureSites(db, [Number(id) || 0])).get(Number(id) || 0);
   if (!site) throw new GameError('Site inconnu.', 404);
-  const [circ, mine, owners, found] = await Promise.all([
+  const [circ, mine, owners, found, history, prices] = await Promise.all([
     db.one('SELECT COUNT(*) n, COALESCE(SUM(holo), 0) h, COUNT(DISTINCT user_id) owners FROM cards WHERE site_id = $1', [site.id]),
     db.all('SELECT id, holo, status, obtained_at FROM cards WHERE site_id = $1 AND user_id = $2 ORDER BY holo DESC, id', [site.id, meId]),
     db.all(`SELECT u.username, COUNT(*) n, SUM(c.holo) h FROM cards c JOIN users u ON u.id = c.user_id
       WHERE c.site_id = $1 GROUP BY u.id ORDER BY n DESC LIMIT 15`, [site.id]),
     db.one('SELECT found_at FROM dex WHERE user_id = $1 AND site_id = $2', [meId, site.id]),
+    db.all('SELECT at, price, holo FROM sales WHERE site_id = $1 ORDER BY at DESC LIMIT 60', [site.id]),
+    sitePrices(db, game, [site.id]),
   ]);
-  return { site, circulation: circ.n, holos: circ.h, owners: circ.owners, ownerList: owners, mine, foundAt: found?.found_at || null, value: RARITIES[site.rarity].value };
+  return { site, circulation: circ.n, holos: circ.h, owners: circ.owners, ownerList: owners, mine, foundAt: found?.found_at || null,
+    value: RARITIES[site.rarity].value, price: prices.get(site.id), sales: history.reverse() };
 }
+
+// Sites pour une liste d'id : ceux de la table, et ceux de la longue traîne lus dans les blocs (sans les déplier).
+async function sitesByIds({ db, game }, ids) {
+  if (!ids.length) return [];
+  const rows = await db.all('SELECT id, domain, rarity, family FROM sites WHERE id = ANY($1::int[])', [ids]);
+  const map = new Map(rows.map((r) => [r.id, r]));
+  const missing = ids.filter((id) => !map.has(id));
+  if (missing.length) for (const [id, d] of await tailDomains(db, game.tail, missing)) map.set(id, siteRow(id, d));
+  return ids.map((id) => map.get(id)).filter(Boolean);
+}
+const PAGE = 96;
 
 // ---------- Routes ----------
 const routes = [];
@@ -241,18 +256,33 @@ route('POST', '/api/cards/recycle-duplicates', ({ c, me, body }) => c.game.recyc
 route('GET', '/api/dex', async ({ c, me, query }) => {
   const t = c.game.tiers[Math.max(0, Math.min(5, Number(query.rarity) || 0))];
   const offset = Math.max(0, Number(query.offset) || 0);
-  const rows = await c.db.all(`SELECT s.id, s.domain, s.rarity, s.family, d.found_at FROM sites s LEFT JOIN dex d ON d.site_id = s.id AND d.user_id = $1
-    WHERE s.id BETWEEN $2 AND $3 ${query.missing === '1' ? 'AND d.found_at IS NULL' : ''} ORDER BY s.id LIMIT 121 OFFSET $4`, [me.id, t.lo, t.hi, offset]);
-  return { items: rows.slice(0, 120), more: rows.length > 120 };
+  const found = await c.db.all('SELECT site_id, found_at FROM dex WHERE user_id = $1 AND site_id BETWEEN $2 AND $3', [me.id, t.lo, t.hi]);
+  const f = new Map(found.map((r) => [r.site_id, r.found_at]));
+  if (query.missing === '1') {
+    // Les manquants : on saute les id déjà découverts.
+    const ids = [];
+    let id = t.lo + offset;
+    for (; id <= t.hi && ids.length < PAGE; id++) if (!f.has(id)) ids.push(id);
+    return { items: ids.map((x) => ({ id: x, rarity: t.id })), more: id <= t.hi, next: id - t.lo };
+  }
+  const ids = [];
+  for (let id = t.lo + offset; id <= t.hi && ids.length < PAGE; id++) ids.push(id);
+  const known = await sitesByIds(c, ids.filter((id) => f.has(id)));
+  const byId = new Map(known.map((k) => [k.id, k]));
+  return { items: ids.map((id) => (byId.has(id) ? { ...byId.get(id), found_at: f.get(id) } : { id, rarity: t.id })), more: t.lo + offset + PAGE <= t.hi, next: offset + PAGE };
 });
 
 route('GET', '/api/sites/search', async ({ c, me, query }) => {
   const q = String(query.q || '').toLowerCase().trim().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].replace(/[%_\\]/g, '');
   if (q.length < 2) return { items: [] };
-  return { items: await c.db.all(`SELECT s.id, s.domain, s.rarity, s.family, d.found_at FROM sites s
-    LEFT JOIN dex d ON d.site_id = s.id AND d.user_id = $1 WHERE s.domain LIKE $2 ORDER BY s.id LIMIT 30`, [me.id, q + '%']) };
+  const head = await c.db.all(`SELECT s.id, s.domain, s.rarity, s.family FROM sites s WHERE s.domain LIKE $1 ORDER BY s.id LIMIT 30`, [q + '%']);
+  const seen = new Set(head.map((h) => h.id));
+  const tail = head.length < 30 ? (await searchTail(c.db, c.game.tail, q, { limit: 30 - head.length })).filter((t) => !seen.has(t.id)).map((t) => siteRow(t.id, t.domain)) : [];
+  const items = [...head, ...tail];
+  const found = new Map((await c.db.all('SELECT site_id, found_at FROM dex WHERE user_id = $1 AND site_id = ANY($2::int[])', [me.id, items.map((i) => i.id)])).map((r) => [r.site_id, r.found_at]));
+  return { items: items.map((i) => ({ ...i, found_at: found.get(i.id) || null })) };
 });
-route('GET', '/api/sites/:id', ({ c, me, params }) => siteInfo(c.db, me.id, params.id));
+route('GET', '/api/sites/:id', ({ c, me, params }) => siteInfo(c, me.id, params.id));
 
 route('GET', '/api/users/search', async ({ c, me, query }) => {
   const q = String(query.q || '').trim().replace(/[%_\\]/g, '');
@@ -309,22 +339,45 @@ route('GET', '/api/feed', async ({ c }) => {
 
 // ---------- Catalogue : toutes les cartes du jeu ----------
 route('GET', '/api/catalog', async ({ c, me, query }) => {
-  const args = [me.id];
-  const p = (v) => { args.push(v); return '$' + args.length; };
-  const where = [];
-  if (query.rarity !== undefined && query.rarity !== '') {
-    const t = c.game.tiers[Math.max(0, Math.min(5, Number(query.rarity) || 0))];
-    where.push(`s.id BETWEEN ${p(t.lo)} AND ${p(t.hi)}`);
-  }
-  if (query.q) where.push(`s.domain LIKE ${p(likeArg(query.q))}`);
-  if (query.filter === 'owned') where.push('EXISTS (SELECT 1 FROM cards o WHERE o.user_id = $1 AND o.site_id = s.id)');
-  if (query.filter === 'missing') where.push('NOT EXISTS (SELECT 1 FROM cards o WHERE o.user_id = $1 AND o.site_id = s.id)');
   const offset = Math.max(0, Number(query.offset) || 0);
-  const rows = await c.db.all(`SELECT s.id, s.domain, s.rarity, s.family,
-      (SELECT COUNT(*)::int FROM cards o WHERE o.user_id = $1 AND o.site_id = s.id) n
-    FROM sites s ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY s.id LIMIT 97 OFFSET ${p(offset)}`, args);
-  return { items: rows.slice(0, 96), more: rows.length > 96, total: c.game.totalSites };
+  const tier = query.rarity !== undefined && query.rarity !== '' ? c.game.tiers[Math.max(0, Math.min(5, Number(query.rarity) || 0))] : null;
+  const lo = tier ? tier.lo : 1, hi = tier ? tier.hi : c.game.totalSites;
+  const counts = async (ids) => new Map((await c.db.all('SELECT site_id, COUNT(*)::int n FROM cards WHERE user_id = $1 AND site_id = ANY($2::int[]) GROUP BY site_id', [me.id, ids])).map((r) => [r.site_id, r.n]));
+  let items, more = false;
+  if (query.filter === 'owned') {
+    const rows = await c.db.all(`SELECT s.id, s.domain, s.rarity, s.family, COUNT(*)::int n FROM cards o JOIN sites s ON s.id = o.site_id
+      WHERE o.user_id = $1 AND s.id BETWEEN $2 AND $3 ${query.q ? 'AND s.domain LIKE $5' : ''} GROUP BY s.id ORDER BY s.id LIMIT ${PAGE + 1} OFFSET $4`,
+    query.q ? [me.id, lo, hi, offset, likeArg(query.q)] : [me.id, lo, hi, offset]);
+    items = rows.slice(0, PAGE); more = rows.length > PAGE;
+  } else if (query.q) {
+    // Recherche : d'abord les sites de la table, puis la longue traîne.
+    const q = String(query.q).toLowerCase().trim().replace(/[%_\\]/g, '');
+    const head = await c.db.all('SELECT id, domain, rarity, family FROM sites WHERE domain LIKE $1 AND id BETWEEN $2 AND $3 ORDER BY id LIMIT $4', [likeArg(q), lo, hi, PAGE]);
+    const seen = new Set(head.map((h) => h.id));
+    const tail = head.length < PAGE && hi >= (c.game.tail?.start || Infinity)
+      ? (await searchTail(c.db, c.game.tail, q, { mode: 'contains', limit: PAGE - head.length })).filter((t) => !seen.has(t.id) && t.id >= lo && t.id <= hi).map((t) => siteRow(t.id, t.domain)) : [];
+    items = [...head, ...tail];
+    const n = await counts(items.map((i) => i.id));
+    items = items.map((i) => ({ ...i, n: n.get(i.id) || 0 }));
+    if (query.filter === 'missing') items = items.filter((i) => !i.n);
+  } else {
+    const ids = [];
+    for (let id = lo + offset; id <= hi && ids.length < PAGE; id++) ids.push(id);
+    const n = await counts(ids);
+    items = (await sitesByIds(c, ids)).map((i) => ({ ...i, n: n.get(i.id) || 0 }));
+    if (query.filter === 'missing') items = items.filter((i) => !i.n);
+    more = lo + offset + PAGE <= hi;
+  }
+  return { items, more, next: offset + (query.filter === 'owned' ? items.length : PAGE), total: c.game.totalSites };
 });
+
+// ---------- Valeur des collections & cours du marché ----------
+route('GET', '/api/wallet', async ({ c, me, query }) => {
+  const u = query.user ? await c.db.one('SELECT id, is_bot FROM users WHERE lower(username) = lower($1)', [query.user]) : me;
+  if (!u) throw new GameError('Joueur introuvable.', 404);
+  return wallet(c.db, c.game, u.id);
+});
+route('GET', '/api/market/index', ({ c }) => marketIndex(c.db));
 
 // ---------- Administration ----------
 const admin = (fn) => async (ctx) => {
@@ -362,8 +415,10 @@ route('POST', '/api/admin/give', admin(async ({ c, body, me }) => {
   const count = Math.max(1, Math.min(100, Math.trunc(Number(body.count) || 1)));
   let site = null;
   if (body.siteId || body.domain) {
-    site = body.siteId ? await c.db.one('SELECT * FROM sites WHERE id = $1', [Number(body.siteId)])
-      : await c.db.one('SELECT * FROM sites WHERE domain = $1', [String(body.domain).toLowerCase().trim().replace(/^www\./, '')]);
+    const dom = String(body.domain || '').toLowerCase().trim().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    let id = Number(body.siteId) || (await c.db.one('SELECT id FROM sites WHERE domain = $1', [dom]))?.id;
+    if (!id && dom) id = (await searchTail(c.db, c.game.tail, dom, { exact: true, limit: 1 }))[0]?.id;
+    site = id ? (await c.game.ensureSites(c.db, [id])).get(id) : null;
     if (!site) throw new GameError('Site introuvable dans le jeu.', 404);
   }
   if (!bits && !packs && !site) throw new GameError('Rien à offrir.');
@@ -411,7 +466,9 @@ route('POST', '/api/admin/bots/delete', admin(async ({ c }) => { await deleteBot
 route('GET', '/api/cron/bots', async ({ c, req }) => {
   if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) throw new GameError('Interdit.', 403);
   const budget = Math.max(5, Math.min(250, Number(new URL(req.url, 'http://x').searchParams.get('budget')) || 250));
-  return runBots(c.db, c.game, { budgetMs: budget * 1000, batch: 40, force: true });
+  const snaps = await snapshotDue(c.db, c.game).catch((e) => { console.error('snapshots', e.message); return 0; });
+  const r = await runBots(c.db, c.game, { budgetMs: budget * 1000, batch: 40, force: true });
+  return { ...r, snapshots: snaps };
 }, { auth: false });
 
 route('GET', '/api/health', async () => {
@@ -440,6 +497,7 @@ route('POST', '/api/admin/setup', async ({ query }) => {
       try { result += 'copie : ' + JSON.stringify(await copyDatabase(src, db)) + ' · '; } finally { await src.close(); }
     }
     result += query.vacuum === '1' ? 'vacuum' : await setupDatabase(db, { force: query.force === '1' });
+    if (query.tail === '1') { result += ' · ' + await setupTail(db); resetContext(); }
     if (query.cron) result += ' · cron : ' + JSON.stringify(await scheduleCron(db, query.cron, process.env.CRON_SECRET, query.schedule || '* * * * *'));
     if (query.pause !== undefined) {
       await db.run("INSERT INTO meta (key, value) VALUES ('bots_paused', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [query.pause === '1' ? '1' : '0']);

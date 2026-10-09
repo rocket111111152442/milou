@@ -2,8 +2,8 @@
 import { migrate } from './db.js';
 
 // Ordre compatible avec les clés étrangères.
-const TABLES = ['meta', 'sites', 'users', 'sessions', 'cards', 'dex', 'friends', 'trades', 'trade_items', 'auctions', 'notifications', 'events'];
-const SERIAL = ['users', 'cards', 'trades', 'auctions', 'notifications', 'events'];
+const TABLES = ['meta', 'sites', 'site_blocks', 'users', 'sessions', 'cards', 'dex', 'friends', 'trades', 'trade_items', 'auctions', 'notifications', 'events', 'sales', 'value_history'];
+const SERIAL = ['users', 'cards', 'trades', 'auctions', 'notifications', 'events', 'sales'];
 
 export async function copyDatabase(src, dst, { chunk = 20_000 } = {}) {
   const t0 = Date.now();
@@ -13,15 +13,16 @@ export async function copyDatabase(src, dst, { chunk = 20_000 } = {}) {
   for (const t of TABLES) {
     const hasId = (await src.one("SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = 'id'", [t])) != null;
     let n = 0, lastId = -1, offset = 0;
+    const size = t === 'site_blocks' ? 100 : chunk; // les blocs pèsent ~15 Ko chacun
     for (;;) {
       const rows = hasId
-        ? await src.all(`SELECT * FROM ${t} WHERE id > $1 ORDER BY id LIMIT $2`, [lastId, chunk])
-        : await src.all(`SELECT * FROM ${t} ORDER BY 1, 2 LIMIT $1 OFFSET $2`, [chunk, offset]);
+        ? await src.all(`SELECT * FROM ${t} WHERE id > $1 ORDER BY id LIMIT $2`, [lastId, size])
+        : await src.all(`SELECT * FROM ${t} ORDER BY 1, 2 LIMIT $1 OFFSET $2`, [size, offset]);
       if (!rows.length) break;
       await dst.query(`INSERT INTO ${t} SELECT * FROM json_populate_recordset(NULL::${t}, $1::json)`, [JSON.stringify(rows)]);
       n += rows.length;
       if (hasId) lastId = rows[rows.length - 1].id; else offset += rows.length;
-      if (rows.length < chunk) break;
+      if (rows.length < size) break;
     }
     counts[t] = n;
   }

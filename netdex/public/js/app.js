@@ -73,7 +73,7 @@ const TABS = [
   { href: '#/collection', label: 'Collection', icon: ICONS.cards, match: /^\/(collection|dex|cards)/ },
   { href: '#/market', label: 'Marché', icon: ICONS.market, match: /^\/market/ },
   { href: '#/social', label: 'Social', icon: ICONS.social, match: /^\/(social|trade)/, badge: (c) => c.trades + c.friendRequests },
-  { href: '#/more', label: 'Plus', icon: ICONS.more, match: /^\/(more|top|search|settings|rules|admin|u\/)/ },
+  { href: '#/more', label: 'Plus', icon: ICONS.more, match: /^\/(more|top|search|settings|rules|admin|wallet|u\/)/ },
 ];
 
 const ROUTES = [
@@ -82,6 +82,7 @@ const ROUTES = [
   [/^\/dex$/, V.viewDex],
   [/^\/cards$/, V.viewCatalog],
   [/^\/admin$/, V.viewAdmin],
+  [/^\/wallet$/, V.viewWallet],
   [/^\/market$/, V.viewMarket],
   [/^\/(social|trades|friends)$/, V.viewSocial],
   [/^\/trade$/, V.viewTrade],

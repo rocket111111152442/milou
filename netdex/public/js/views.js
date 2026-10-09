@@ -1,4 +1,5 @@
 // Écrans de l'application.
+import { lineChart } from './chart.js';
 import {
   api, state, refreshMe, setMe, esc, fmt, $, $$, h, duration, ago, isOnline, cardHtml, unknownCardHtml, toast, toastErr,
   modal, confirmDialog, busy, prefs, RARITY, VALUES, ICONS, favicon, siteName, power, now,
@@ -73,7 +74,8 @@ export async function openSite(id) {
         <dt>Rareté</dt><dd class="r-${s.rarity} rtext">${r.name}</dd>
         <dt>Famille</dt><dd>${esc(s.family)}</dd>
         <dt>Puissance</dt><dd>${power(s.id)}</dd>
-        <dt>Valeur</dt><dd>${fmt(d.value)} bits</dd>
+        <dt>Cote</dt><dd>${fmt(d.price)} bits</dd>
+        <dt>Recyclage</dt><dd>${fmt(d.value)} bits</dd>
         <dt>En circulation</dt><dd>${fmt(d.circulation)}${d.holos ? ` (${d.holos} holo)` : ''}</dd>
         <dt>Joueurs</dt><dd>${fmt(d.owners)}</dd>
         <dt>Tu en as</dt><dd>${d.mine.length}${d.mine.length - owned.length ? ` (${d.mine.length - owned.length} en vente)` : ''}</dd>
@@ -87,10 +89,17 @@ export async function openSite(id) {
         <button class="btn sm ghost" data-avatar>Mettre en avatar</button>` : ''}
     </div>
     <div data-form></div>
+    <h2>Historique des ventes</h2>
+    ${d.sales.length >= 2 ? '<div class="chart" data-price-chart></div>' : `<p class="muted small">${d.sales.length ? `Une seule vente : ${fmt(d.sales[0].price)} bits.` : 'Pas encore vendue aux enchères.'} La cote vient alors de la médiane de sa rareté.</p>`}
     ${d.ownerList.length ? `<h2>Qui la possède ?</h2><div class="list">${d.ownerList.map((o) =>
       `<a href="#/u/${encodeURIComponent(o.username)}" data-close><div class="grow">${esc(o.username)}</div><span class="muted">×${o.n}${o.h ? ' ✦' : ''}</span></a>`).join('')}</div>` : ''}
   `, {
     onMount(body, close) {
+      const pc = $('[data-price-chart]', body);
+      if (pc) {
+        const pts = d.sales.map((x) => ({ x: x.at, y: x.holo ? Math.round(x.price / state.me.config.holoMultiplier) : x.price }));
+        requestAnimationFrame(() => lineChart(pc, pts, { format: (v) => fmt(Math.round(v)), dateFormat: dateFmt(pts.at(-1).x - pts[0].x), height: 150, label: 'Prix de vente' }));
+      }
       $('[data-recycle]', body)?.addEventListener('click', (e) => busy(e.target, async () => {
         const c = owned.find((x) => !x.holo) || owned[0];
         const ok = await confirmDialog('Recycler', `Recycler 1 exemplaire de <b>${esc(s.domain)}</b>${c.holo ? ' (HOLO)' : ''} ?`, 'Recycler', true);
@@ -207,7 +216,7 @@ export async function viewHome(el, { on }) {
     const u = state.me.user;
     $('[data-quick]', el).innerHTML = `
       <a class="quick" href="#/collection"><b>${fmt(u.dexCount)}</b><span>Sites découverts</span></a>
-      <a class="quick" href="#/top"><b>${fmt(u.dexScore)}</b><span>Score Netdex</span></a>
+      <a class="quick" href="#/wallet"><b>Voir →</b><span>Valeur de ma collection</span></a>
       <div class="quick"><b>${fmt(u.packsOpened)}</b><span>Boosters ouverts</span></div>
       <a class="quick" href="#/market"><b>${fmt(u.bits)}</b><span>Bits</span></a>`;
   };
@@ -338,7 +347,7 @@ export async function viewDex(el) {
     const res = await api(`/dex?rarity=${rarity}&offset=${offset}${missing ? '&missing=1' : ''}`);
     const html = res.items.map((s) => (s.found_at ? cardHtml(s) : unknownCardHtml(s))).join('');
     if (append) grid.insertAdjacentHTML('beforeend', html); else grid.innerHTML = html || '<div class="empty" style="grid-column:1/-1"><b>Tout découvert !</b></div>';
-    offset += res.items.length;
+    offset = res.next ?? offset + res.items.length;
     $('[data-more]', el).innerHTML = res.more ? '<button class="btn" data-load-more>Charger plus</button>' : '';
   };
   el.addEventListener('click', (e) => {
@@ -361,6 +370,7 @@ export async function viewMarket(el, { on, query }) {
   el.innerHTML = `
     <div class="page-head"><h1>Marché</h1><div class="row"><button class="btn primary sm" data-sell>+ Vendre une carte</button></div></div>
     <div class="panel" style="margin-bottom:14px" data-live></div>
+    <details class="panel" style="margin-bottom:14px" data-index><summary><b>Cours du marché</b> <span class="muted small">médiane des ventes, 7 jours</span></summary><div data-index-body class="small" style="margin-top:10px"></div></details>
     <div class="tabs" data-tabs><button data-scope="all">Toutes les ventes</button><button data-scope="mine">Mes ventes</button><button data-scope="bids">Mes enchères</button></div>
     <div class="row" style="margin-bottom:10px">
       <input type="search" placeholder="Rechercher…" data-q style="flex:1;min-width:150px">
@@ -372,6 +382,15 @@ export async function viewMarket(el, { on, query }) {
   const setTabs = () => $$('[data-scope]', el).forEach((b) => b.classList.toggle('on', b.dataset.scope === f.scope));
   setTabs();
   liveFeed($('[data-live]', el), on, { limit: 5 });
+  $('[data-index]', el).addEventListener('toggle', async (e) => {
+    if (!e.target.open || e.target.dataset.loaded) return;
+    e.target.dataset.loaded = 1;
+    const ix = await api('/market/index').catch(() => null);
+    if (!ix) return;
+    $('[data-index-body]', el).innerHTML = `<table class="data"><tr><th>Rareté</th><th style="text-align:right">Cote</th><th style="text-align:right">Ventes 30 j</th></tr>
+      ${RARITY.slice().reverse().map((r) => `<tr class="r-${r.id}"><td class="rtext">${r.name}</td><td class="num">${fmt(ix.current[r.id])}</td>
+        <td class="num">${fmt(ix.days.filter((x) => x.rarity === r.id).reduce((a, x) => a + x.n, 0))}</td></tr>`).join('')}</table>`;
+  });
   let items = [];
   const load = async () => {
     const res = await api('/auctions?' + new URLSearchParams(f));
@@ -687,7 +706,7 @@ export async function viewProfile(el, { params }) {
       ${avatarHtml(p.avatarDomain, p.username, 'lg')}
       <div class="grow" style="min-width:0"><h1 style="margin:0">${esc(p.username)} ${isOnline(p.lastSeen) ? '<span class="online"></span>' : ''}</h1>
         <div class="muted small">#${fmt(p.rank)} au classement · inscrit ${ago(p.createdAt)}</div>
-        <div class="row" style="margin-top:8px">${rel}<a class="btn sm" href="#/collection?user=${encodeURIComponent(p.username)}">Collection</a></div></div>
+        <div class="row" style="margin-top:8px">${rel}<a class="btn sm" href="#/collection?user=${encodeURIComponent(p.username)}">Collection</a><a class="btn sm" href="#/wallet?user=${encodeURIComponent(p.username)}">Valeur</a></div></div>
     </div></div>
     <div class="quick-grid" style="margin-top:12px">
       <div class="quick"><b>${fmt(p.dexScore)}</b><span>Score</span></div>
@@ -763,6 +782,7 @@ export async function viewMore(el) {
   el.innerHTML = `<h1>Plus</h1>
     <div class="panel list">
       <a href="#/u/${encodeURIComponent(u.username)}" style="color:var(--text)"><b class="grow">Mon profil</b><span class="muted">${esc(u.username)} ›</span></a>
+      <a href="#/wallet" style="color:var(--text)"><b class="grow">Mon portefeuille</b><span class="muted">valeur & graphiques ›</span></a>
       <a href="#/dex" style="color:var(--text)"><b class="grow">Netdex</b><span class="muted">${fmt(u.dexCount)} sites ›</span></a>
       <a href="#/top" style="color:var(--text)"><b class="grow">Classement</b><span class="muted">›</span></a>
       <a href="#/search" style="color:var(--text)"><b class="grow">Rechercher un site</b><span class="muted">›</span></a>
@@ -780,6 +800,7 @@ export async function viewRules(el) {
       <p>Chaque carte est un vrai site d'internet. Plus un site est visité dans le monde, plus sa carte est rare. Le classement vient de la liste <a href="https://tranco-list.eu" target="_blank" rel="noopener">Tranco</a> (top 1 million, agrégée depuis plusieurs mesures de trafic), filtrée des domaines techniques (CDN, DNS, publicité) et des sites adultes.</p>
       <ul>
         <li>1 booster gratuit toutes les <b>3 minutes</b>, même quand l'app est fermée (stock max ${state.me.packs.cap}).</li>
+        <li>Les nouveaux joueurs démarrent avec <b>0 bit</b> : on en gagne en recyclant, avec le bonus quotidien et en vendant.</li>
         <li>5 cartes par booster, la 5ᵉ est au moins <b>Peu commune</b>. Les Mythiques sortent environ une fois tous les 10 000 boosters.</li>
         <li>1 % de chance qu'une carte soit <b>HOLO</b> (valeur ×${state.me.config.holoMultiplier}).</li>
         <li>Netdex compte aussi des joueurs automatiques qui ouvrent des boosters, vendent, enchérissent et échangent, avec les mêmes règles que tout le monde.</li>
@@ -858,7 +879,7 @@ export async function viewCatalog(el) {
     $('[data-total]', el).textContent = `${fmt(res.total)} cartes au total`;
     const html = res.items.map((s) => cardHtml(s, { count: s.n, missing: !s.n })).join('');
     if (append) grid.insertAdjacentHTML('beforeend', html); else grid.innerHTML = html || '<div class="empty" style="grid-column:1/-1"><b>Aucune carte</b></div>';
-    offset += res.items.length;
+    offset = res.next ?? offset + res.items.length;
     $('[data-more]', el).innerHTML = res.more ? '<button class="btn" data-load-more>Charger plus</button>' : '';
   };
   let t;
@@ -968,4 +989,60 @@ export async function viewAdmin(el) {
       if (await confirmDialog('Supprimer le compte', `Supprimer définitivement <b>${esc(row.dataset.name)}</b> et toutes ses cartes ?`, 'Supprimer', true)) { await api(`/admin/user/${row.dataset.id}/delete`, {}); users(); overview(); }
     });
   });
+}
+
+// ======================================================================
+// Portefeuille : valeur de la collection dans le temps
+// ======================================================================
+const fmtBits = (v) => `${fmt(Math.round(v))}`;
+const dateFmt = (span) => (t, long) => {
+  const d = new Date(t);
+  if (long) return d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return span <= 36 * 3600e3 ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+};
+const deltaHtml = (c, label) => (c && c.pct != null
+  ? `<span class="delta ${c.pct >= 0 ? 'up' : 'down'}">${c.pct >= 0 ? '+' : ''}${c.pct} % ${label}</span>` : `<span class="delta muted">— ${label}</span>`);
+
+export async function viewWallet(el, { query }) {
+  const user = query.user || state.me.user.username;
+  const self = user.toLowerCase() === state.me.user.username.toLowerCase();
+  const d = await api('/wallet' + (self ? '' : '?user=' + encodeURIComponent(user)));
+  let range = '7d';
+  el.innerHTML = `<div class="page-head"><h1>${self ? 'Mon portefeuille' : `Portefeuille de ${esc(user)}`}</h1>
+      ${self ? '' : `<div class="row"><a class="btn sm" href="#/u/${encodeURIComponent(user)}">Profil</a></div>`}</div>
+    <div class="panel">
+      <div class="muted small">Valeur estimée de la collection</div>
+      <div class="row" style="align-items:baseline;gap:12px"><span class="big-value">${fmtBits(d.value)}</span><span class="muted">bits</span>
+        ${deltaHtml(d.change24h, '24 h')} ${deltaHtml(d.change7d, '7 j')}</div>
+      <div class="muted small" style="margin-top:4px">${fmt(d.cards)} cartes · solde ${fmt(d.history.at(-1)?.bits ?? 0)} bits</div>
+      <div class="tabs" style="margin:14px 0 8px" data-ranges>
+        <button data-r="24h">24 h</button><button data-r="7d">7 jours</button><button data-r="30d">30 jours</button><button data-r="all">Tout</button></div>
+      <div class="chart" data-chart-value></div>
+    </div>
+    <div class="panel"><b>Solde en bits</b><div class="chart" style="margin-top:8px" data-chart-bits></div></div>
+    <div class="grid-2" style="margin-top:10px">
+      <div class="panel"><b>Répartition par rareté</b><div style="margin-top:8px" data-bars></div></div>
+      <div class="panel"><b>Cartes les plus précieuses</b><div class="list small" style="margin-top:4px" data-top></div></div>
+    </div>
+    <p class="muted small">La cote d'une carte = la médiane de ses ventes aux enchères sur 30 jours ; sans vente, la médiane des ventes de sa rareté sur 7 jours (le haut du classement vaut plus). Holo × 5. Une photo de la valeur est prise chaque heure.</p>`;
+
+  const draw = () => {
+    $$('[data-r]', el).forEach((b) => b.classList.toggle('on', b.dataset.r === range));
+    const ms = { '24h': 864e5, '7d': 7 * 864e5, '30d': 30 * 864e5, all: Infinity }[range];
+    const pts = d.history.filter((h) => Date.now() - h.at <= ms);
+    const span = pts.length ? pts.at(-1).at - pts[0].at : 0;
+    lineChart($('[data-chart-value]', el), pts.map((h) => ({ x: h.at, y: h.value })), { format: fmtBits, dateFormat: dateFmt(span), label: 'Valeur de la collection' });
+    lineChart($('[data-chart-bits]', el), pts.map((h) => ({ x: h.at, y: h.bits })), { format: fmtBits, dateFormat: dateFmt(span), height: 140, label: 'Solde en bits' });
+  };
+  draw();
+  $('[data-ranges]', el).addEventListener('click', (e) => { const b = e.target.closest('[data-r]'); if (b) { range = b.dataset.r; draw(); } });
+
+  const max = Math.max(1, ...d.byRarity.map((r) => r.value));
+  $('[data-bars]', el).innerHTML = d.byRarity.slice().reverse().map((r) => `<div class="bar-row r-${r.rarity}">
+      <span>${r.name}</span><div class="track"><i style="width:${(r.value / max) * 100}%"></i></div>
+      <span class="num">${fmt(r.value)} · ${fmt(r.count)} c.</span></div>`).join('');
+  $('[data-top]', el).innerHTML = d.top.map((t) => `<a href="#" data-site-link="${t.site_id}">
+      <span class="grow"><span class="r-${t.site?.rarity ?? 0} rtext">${esc(t.site?.domain || '#' + t.site_id)}</span>${t.holo ? ' <span class="tag accent">holo</span>' : ''}</span>
+      <b class="mono">${fmt(t.price)}</b></a>`).join('') || '<div class="muted">Aucune carte</div>';
+  el.addEventListener('click', (e) => { const a = e.target.closest('[data-site-link]'); if (a) { e.preventDefault(); openSite(a.dataset.siteLink); } });
 }
