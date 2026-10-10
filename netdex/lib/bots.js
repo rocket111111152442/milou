@@ -354,13 +354,14 @@ async function socialize(db, game, bot, me, p, tryDo, opts) {
     await tryDo('proposition', () => game.createTrade(me, { toUserId: friend.id, offerCards: [mine.id], requestCards: [theirs.id], offerBits: bits }));
   } else {
     // Nouvelle rencontre : le plus souvent un autre bot, parfois un humain actif récemment (avec retenue).
-    const human = rnd() < 0.15 && !opts.noHumans;
+    // Rare : un bot n'aborde un humain qu'exceptionnellement (au plus une demande de bot par humain et par semaine).
+    const human = rnd() < 0.02 && !opts.noHumans;
     let target;
     if (human) {
       target = await db.one(`SELECT u.username FROM users u WHERE NOT u.is_bot AND u.last_seen > $1
         AND NOT EXISTS (SELECT 1 FROM friends f WHERE (f.user_id = $2 AND f.friend_id = u.id) OR (f.user_id = u.id AND f.friend_id = $2))
         AND NOT EXISTS (SELECT 1 FROM friends f JOIN users b ON b.id = f.user_id WHERE f.friend_id = u.id AND b.is_bot AND f.created_at > $3)
-        ORDER BY random() LIMIT 1`, [now - 3 * 24 * HOUR, bot.id, now - 24 * HOUR]);
+        ORDER BY random() LIMIT 1`, [now - 3 * 24 * HOUR, bot.id, now - 7 * 24 * HOUR]);
     } else {
       target = await db.one('SELECT username FROM users WHERE is_bot AND id != $1 OFFSET floor(random() * 500) LIMIT 1', [bot.id]);
     }
