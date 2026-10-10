@@ -162,13 +162,29 @@ async function publicProfile(c, meId, name) {
   ]);
   const prof = u.profile || {};
   const showcase = prof.showcase?.length ? await sitesByIds(c, prof.showcase) : [];
-  const prog = u.is_bot ? null : progression(u);
+  // Comptes d'animation : leurs compteurs sont reconstitués à partir de leur activité réelle (ventes, cartes, ancienneté).
+  let pstats = u.stats;
+  if (u.is_bot) {
+    const h = (k) => parseInt(sha(k + u.id).slice(0, 8), 16);
+    const days = Math.max(1, (Date.now() - u.created_at) / 864e5);
+    const found = (r) => st.tiers.filter((t) => t.id >= r).reduce((a, t) => a + t.found, 0);
+    const x = await db.one(`SELECT (SELECT COUNT(*) FROM sales WHERE seller_id = $1) sold, (SELECT COUNT(*) FROM sales WHERE buyer_id = $1) bought,
+      (SELECT COALESCE(SUM(holo), 0) FROM cards WHERE user_id = $1) holo`, [u.id]);
+    pstats = { packs: u.packs_opened, cards: u.packs_opened * 5, rare: found(2), epic: found(3), legendary: found(4), mythic: found(5), holo: x.holo,
+      sold: x.sold, bought: x.bought, traded: Math.floor(u.packs_opened / (25 + h('t') % 40)), forged: h('f') % 3 ? 0 : Math.floor(days / 4),
+      games: Math.floor(days * (h('g') % 4)), wins: Math.floor(days * (h('w') % 2)), quests: Math.floor(days * (h('q') % 3) * 0.7),
+      gifts: h('d') % 5 === 0 ? 1 + h('d2') % 6 : 0, konami: 0 };
+  }
+  const prog = progression({ ...u, stats: pstats });
+  if (u.is_bot && !prof.title && prog.unlocked.length && parseInt(sha('title' + u.id).slice(0, 4), 16) % 3 === 0) {
+    const ids = prog.unlocked;
+    prof.title = ACHIEVEMENTS.find((a) => a.id === ids[parseInt(sha('tt' + u.id).slice(0, 4), 16) % ids.length]).name;
+  }
   return {
     id: u.id, username: u.username, createdAt: u.created_at, lastSeen: u.last_seen, dexCount: u.dex_count, dexScore: u.dex_score,
     packsOpened: u.packs_opened, avatarSite: u.avatar_site, avatarDomain: u.avatar_domain, rank: rank.r, relation, best, stats: st,
     bio: prof.bio || '', title: prof.title || '', color: prof.color || null, showcase,
-    level: prog?.level ?? Math.max(1, Math.floor(Math.sqrt((u.packs_opened * 10 + u.dex_count * 2) / 40)) + 1),
-    achievements: prog ? prog.unlocked.length : null, achievementsTotal: ACHIEVEMENTS.length,
+    level: prog.level, achievements: prog.unlocked.length, achievementsTotal: ACHIEVEMENTS.length,
   };
 }
 
@@ -478,19 +494,19 @@ async function findUser(db, body) {
 }
 
 route('GET', '/api/admin/overview', admin(async ({ c }) => {
-  const [counts, bots] = await Promise.all([
-    c.db.one(`SELECT (SELECT COUNT(*) FROM users WHERE NOT is_bot) humans, (SELECT COUNT(*) FROM users WHERE is_bot) bots,
+  const [counts, anim] = await Promise.all([
+    c.db.one(`SELECT (SELECT COUNT(*) FROM users WHERE NOT is_bot) humans, (SELECT COUNT(*) FROM users WHERE is_bot) anim,
       (SELECT COUNT(*) FROM cards) cards, (SELECT COUNT(*) FROM auctions WHERE status = 'open') auctions,
       (SELECT COUNT(*) FROM trades WHERE status = 'pending') trades, (SELECT COUNT(*) FROM sites) sites`),
     botStatus(c.db),
   ]);
-  return { counts, bots, dbLimitMb: Number(process.env.BOT_DB_MAX_MB) || 90 };
+  return { counts, anim, dbLimitMb: Number(process.env.BOT_DB_MAX_MB) || 90 };
 }));
 
 route('GET', '/api/admin/users', admin(async ({ c, query }) => {
   const q = String(query.q || '').trim().replace(/[%_\\]/g, '');
-  const kind = query.kind === 'bots' ? 'AND is_bot' : query.kind === 'all' ? '' : 'AND NOT is_bot';
-  return { items: await c.db.all(`SELECT id, username, bits, dex_count, dex_score, packs_opened, is_bot, is_admin, last_seen, created_at, pack_stock
+  const kind = query.kind === 'anim' ? 'AND is_bot' : query.kind === 'all' ? '' : 'AND NOT is_bot';
+  return { items: await c.db.all(`SELECT id, username, bits, dex_count, dex_score, packs_opened, is_bot AS anim, is_admin, last_seen, created_at, pack_stock
     FROM users WHERE lower(username) LIKE lower($1) ${kind} ORDER BY last_seen DESC LIMIT 50`, [q + '%']) };
 }));
 
@@ -573,16 +589,16 @@ route('POST', '/api/admin/user/:id/:action', admin(async ({ c, me, params, body 
   throw new GameError('Action inconnue.', 404);
 }));
 
-route('POST', '/api/admin/bots/seed', admin(async ({ c, body }) => seedBots(c.db, c.game, Number(body.count) || 10_000)));
-route('POST', '/api/admin/bots/tick', admin(async ({ c }) => runBots(c.db, c.game, { budgetMs: 20_000, force: true })));
-route('POST', '/api/admin/bots/pause', admin(async ({ c, body }) => {
+route('POST', '/api/admin/anim/seed', admin(async ({ c, body }) => seedBots(c.db, c.game, Number(body.count) || 10_000)));
+route('POST', '/api/admin/anim/tick', admin(async ({ c }) => runBots(c.db, c.game, { budgetMs: 20_000, force: true })));
+route('POST', '/api/admin/anim/pause', admin(async ({ c, body }) => {
   await c.db.run("INSERT INTO meta (key, value) VALUES ('bots_paused', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [body.paused ? '1' : '0']);
   return { ok: true };
 }));
-route('POST', '/api/admin/bots/delete', admin(async ({ c }) => { await deleteBots(c.db); return { ok: true }; }));
+route('POST', '/api/admin/anim/delete', admin(async ({ c, body }) => deleteBots(c.db, { keep: Number(body.keep) || 0 })));
 
 // Tâche planifiée quotidienne (Vercel Cron) : grosse passe de bots.
-route('GET', '/api/cron/bots', async ({ c, req }) => {
+route('GET', '/api/cron/tick', async ({ c, req }) => {
   if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) throw new GameError('Interdit.', 403);
   const budget = Math.max(5, Math.min(250, Number(new URL(req.url, 'http://x').searchParams.get('budget')) || 250));
   await snapshotIndex(c.db).catch((e) => console.error('index', e.message));

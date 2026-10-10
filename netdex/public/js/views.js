@@ -1082,16 +1082,16 @@ export async function viewAdmin(el) {
     </form>
     <h2>Joueurs</h2>
     <div class="row" style="margin-bottom:10px"><input type="search" placeholder="Rechercher un pseudo…" data-uq style="flex:1">
-      <select data-kind style="width:auto"><option value="humans">Joueurs</option><option value="bots">Animation</option><option value="all">Tous</option></select></div>
+      <select data-kind style="width:auto"><option value="humans">Joueurs</option><option value="anim">Animation</option><option value="all">Tous</option></select></div>
     <div class="panel" style="padding:0;overflow-x:auto"><table class="data" data-users></table></div>`;
 
   const overview = async () => {
     const d = await api('/admin/overview');
-    const b = d.bots;
+    const b = d.anim;
     $('[data-overview]', el).innerHTML = `
       <div class="quick-grid">
         <div class="quick"><b>${fmt(d.counts.humans)}</b><span>Joueurs</span></div>
-        <div class="quick"><b>${fmt(d.counts.bots)}</b><span>Animation (${fmt(b.active)} actifs/h)</span></div>
+        <div class="quick"><b>${fmt(d.counts.anim)}</b><span>Animation (${fmt(b.active)} actifs/h)</span></div>
         <div class="quick"><b>${fmt(d.counts.cards)}</b><span>Cartes en jeu</span></div>
         <div class="quick"><b>${fmt(d.counts.auctions)}</b><span>Ventes ouvertes</span></div>
         <div class="quick"><b>${b.dbMb} / ${d.dbLimitMb} Mo</b><span>Base de données</span></div>
@@ -1099,16 +1099,19 @@ export async function viewAdmin(el) {
       <div class="panel" style="margin-top:10px"><div class="row">
         <div class="grow"><b>Animation</b> <span class="tag ${b.paused ? 'warn' : 'good'}">${b.paused ? 'en pause' : 'actifs'}</span>
           <div class="muted small">${fmt(b.due)} en attente · dernière passe ${b.lastTick ? ago(b.lastTick) : 'jamais'}${b.dbMb >= d.dbLimitMb ? ' · base presque pleine : ils n\'ouvrent plus de boosters' : ''}</div></div>
-        ${Number(d.counts.bots) ? '' : '<button class="btn primary sm" data-seed>Lancer l'animation (10 000 comptes)</button>'}
+        ${Number(d.counts.anim) ? '' : '<button class="btn primary sm" data-seed>Lancer l\'animation (10 000 comptes)</button>'}
         <button class="btn sm" data-tick>Lancer une passe</button>
         <button class="btn sm" data-pause="${b.paused ? 0 : 1}">${b.paused ? 'Reprendre' : 'Mettre en pause'}</button>
-        ${Number(d.counts.bots) ? '<button class="btn sm danger" data-del-bots>Arrêter et supprimer l'animation</button>' : ''}
-      </div></div>`;
+        ${Number(d.counts.anim) ? '<button class="btn sm danger" data-del-anim>Arrêter et supprimer l\'animation</button>' : ''}
+      </div>
+      ${Number(d.counts.anim) ? `<div class="row" style="margin-top:10px"><span class="muted small grow">Garder seulement les comptes les plus actifs (ceux amis avec des joueurs sont gardés en priorité) :</span>
+        <input type="number" min="0" step="100" value="${Math.min(1500, d.counts.anim)}" data-keep style="width:110px"><button class="btn sm" data-resize>Réduire</button></div>` : ''}
+      </div>`;
   };
   const users = async () => {
     const d = await api('/admin/users?' + new URLSearchParams({ q: $('[data-uq]', el).value.trim(), kind: $('[data-kind]', el).value }));
     $('[data-users]', el).innerHTML = `<tr><th>Pseudo</th><th>Bits</th><th>Sites</th><th>Boosters</th><th>Vu</th><th></th></tr>` + d.items.map((u) => `<tr data-id="${u.id}" data-name="${esc(u.username)}">
-      <td><a href="#/u/${encodeURIComponent(u.username)}">${esc(u.username)}</a> ${u.is_bot ? '<span class="tag">anim</span>' : ''} ${u.is_admin ? '<span class="tag accent">admin</span>' : ''}</td>
+      <td><a href="#/u/${encodeURIComponent(u.username)}">${esc(u.username)}</a> ${u.anim ? '<span class="tag">anim</span>' : ''} ${u.is_admin ? '<span class="tag accent">admin</span>' : ''}</td>
       <td class="num">${fmt(u.bits)}</td><td class="num">${fmt(u.dex_count)}</td><td class="num">${fmt(u.packs_opened)}</td><td class="muted small">${ago(u.last_seen)}</td>
       <td style="white-space:nowrap"><button class="btn sm" data-pick>Choisir</button> <button class="btn sm" data-toggle-admin="${u.is_admin ? 0 : 1}">${u.is_admin ? '− admin' : '+ admin'}</button> <button class="btn sm danger" data-del>Supprimer</button></td></tr>`).join('');
     $('#adm-users').innerHTML = d.items.map((u) => `<option value="${esc(u.username)}">`).join('');
@@ -1175,10 +1178,15 @@ export async function viewAdmin(el) {
     if (!b) return;
     if (b.matches('[data-open-free]')) return openPackFlow('free', true);
     if (b.matches('[data-open-prem]')) return openPackFlow('premium', true);
-    if (b.matches('[data-seed]')) return busy(b, async () => { toast('Création… (≈ 1 min)'); const r = await api('/admin/bots/seed', { count: 10000 }); toast(`${fmt(r.created)} comptes créés`, 'ok'); overview(); });
-    if (b.matches('[data-tick]')) return busy(b, async () => { const r = await api('/admin/bots/tick', {}); toast(`${r ? r.sessions : 0} sessions jouées`, 'ok'); overview(); });
-    if (b.matches('[data-pause]')) return busy(b, async () => { await api('/admin/bots/pause', { paused: b.dataset.pause === '1' }); overview(); });
-    if (b.matches('[data-del-bots]')) return busy(b, async () => { if (await confirmDialog('Supprimer l\'animation', 'Tous les comptes d\'animation et leurs cartes seront supprimés.', 'Supprimer', true)) { await api('/admin/bots/delete', {}); overview(); users(); } });
+    if (b.matches('[data-seed]')) return busy(b, async () => { toast('Création… (≈ 1 min)'); const r = await api('/admin/anim/seed', { count: 10000 }); toast(`${fmt(r.created)} comptes créés`, 'ok'); overview(); });
+    if (b.matches('[data-tick]')) return busy(b, async () => { const r = await api('/admin/anim/tick', {}); toast(`${r ? r.sessions : 0} sessions jouées`, 'ok'); overview(); });
+    if (b.matches('[data-pause]')) return busy(b, async () => { await api('/admin/anim/pause', { paused: b.dataset.pause === '1' }); overview(); });
+    if (b.matches('[data-resize]')) return busy(b, async () => {
+      const keep = Number($('[data-keep]', el).value) || 0;
+      if (!(await confirmDialog('Réduire l\'animation', `Garder <b>${fmt(keep)}</b> comptes d'animation et supprimer les autres (avec leurs cartes) ?`, 'Réduire', true))) return;
+      const r = await api('/admin/anim/delete', { keep }); toast(`${fmt(r.deleted)} comptes supprimés`, 'ok'); overview(); users();
+    });
+    if (b.matches('[data-del-anim]')) return busy(b, async () => { if (await confirmDialog('Supprimer l\'animation', 'Tous les comptes d\'animation et leurs cartes seront supprimés.', 'Supprimer', true)) { await api('/admin/anim/delete', {}); overview(); users(); } });
     const row = b.closest('tr');
     if (!row) return;
     if (b.matches('[data-pick]')) { form.username.value = row.dataset.name; form.everyone.checked = false; form.scrollIntoView({ behavior: 'smooth' }); }

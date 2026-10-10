@@ -234,25 +234,78 @@ async function session(db, game, bot, opts) {
   return log;
 }
 
-// Réponses courtes de bot aux messages privés, selon ce qu'on lui écrit.
-const REPLIES = [
-  [/\b(salut|slt|yo|coucou|bonjour|bonsoir|hello|cc|wesh)\b/i, ['salut !', 'yo', 'coucou :)', 'hey, ça va ?', 'salut, bien ou quoi ?']],
-  [/\b(ça va|ca va|cv|la forme)\b/i, ['ça va et toi ?', 'tranquille, j\'ouvre des boosters', 'bien, je viens de choper une rare', 'ça va, un peu fatigué']],
-  [/(échange|echange|trade|troc)/i, ['envoie une proposition, je regarde', 'ok fais une offre', 'ça dépend de ce que tu proposes', 'propose, je verrai ce soir']],
-  [/(vend|achète|achete|prix|combien|bits)/i, ['regarde au marché, j\'ai mis des trucs en vente', 'je vends pas en dessous de la cote', 'trop cher pour moi là', 'je garde mes bits pour les enchères']],
-  [/(mythique|légendaire|legendaire|holo|épique|epique)/i, ['j\'en rêve', 'jamais eu de mythique moi', 'gg si t\'en as une', 'les holo c\'est la vie']],
-  [/\?$/, ['bonne question', 'aucune idée', 'je sais pas trop', 'peut-être, pourquoi ?']],
+// ---------- Messages privés ----------
+// Chaque compte a son style d'écriture (minuscules, émojis, fautes de frappe, ponctuation), tiré de son id,
+// et répond selon ce qu'on lui dit et ce qu'il possède vraiment.
+const hash32 = (x) => { let h = 2166136261; for (const c of String(x)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+export function styleOf(id) {
+  const h = hash32('style' + id);
+  return { lower: h % 3 !== 0, emoji: (h >> 3) % 4 === 0, typos: (h >> 5) % 3 === 0, dots: (h >> 7) % 4 === 0, noPunct: (h >> 9) % 2 === 0 };
+}
+const EMO = ['😅', '😂', '👍', '🔥', '😭', '🙏', '😎', '🤝'];
+export function stylize(text, st) {
+  let t = text;
+  if (st.lower) t = t.toLowerCase();
+  if (st.noPunct) t = t.replace(/[.!]+$/, '');
+  if (st.typos && rnd() < 0.35 && t.length > 6 && !/\w\.\w/.test(t)) { // jamais dans un nom de site
+    const i = 1 + randomInt(t.length - 2);
+    if (t[i] !== ' ' && t[i + 1] !== ' ') t = t.slice(0, i) + t[i + 1] + t[i] + t.slice(i + 2);
+  }
+  if (st.dots && rnd() < 0.5) t = t.replace(/[.!?]*$/, '...');
+  if (st.emoji && rnd() < 0.6) t += ' ' + pick(EMO);
+  return t;
+}
+const RARNAMES = ['commune', 'peu commune', 'rare', 'épique', 'légendaire', 'mythique'];
+const TOPICS = [
+  [/(combien|nombre).*(carte|site)|collection|t'as quoi|tu as quoi/i, (c) => [`${c.dex} sites trouvés, mais j'en garde que ${c.cards}`, `${c.dex} sites trouvés pour l'instant`, `${c.cards} cartes, je recycle beaucoup`]],
+  [/\b(salut|slt|yo|coucou|bonjour|bonsoir|hello|hey|cc|wesh|bjr)\b/i, (c) => [`${pick(['salut', 'yo', 'coucou', 'hey', 'wesh'])} ${pick(['', 'ça va ?', 'quoi de neuf ?', 'tu joues depuis longtemps ?', ''])}`.trim()]],
+  [/(^|[^a-zà-ÿ])(ça va|ca va|cv|la forme|tu vas bien)/i, (c) => [
+    pick(['ça va et toi ?', 'tranquille et toi', 'bien bien', 'ouais ça va, un peu crevé', 'ça va, je farm des boosters là']),
+    c.recent ? `ça va, je viens de choper ${c.recent.domain} en ${RARNAMES[c.recent.rarity]}` : 'ça va, rien de fou dans mes derniers boosters']],
+  [/(échange|echange|trade|troc|swap)/i, (c) => [
+    pick(['envoie une proposition je regarde', 'fais une offre, si c\'est au prix du marché ça passe', 'ça dépend de ce que tu proposes', 'propose, je regarde quand je peux']),
+    c.fav ? `je cherche surtout des sites ${c.fav.toLowerCase()} si t'en as` : 'je cherche des rares surtout']],
+  [/(vend|achète|achete|prix|combien|cote|bits|marché|marche)/i, (c) => [
+    pick(['regarde au marché, j\'ai mis des trucs en vente', 'je vends jamais en dessous de la cote', 'je garde mes bits pour les enchères', 'les prix ont monté je trouve']),
+    `j'ai ${c.bits} bits là, pas énorme`]],
+  [/(mythique|légendaire|legendaire|holo|épique|epique)/i, (c) => [
+    c.best && c.best.rarity >= 4 ? `ma meilleure c'est ${c.best.domain}, ${RARNAMES[c.best.rarity]}` : pick(['jamais eu de légendaire moi', 'j\'en rêve', 'gg si t\'en as une', 'les holo c\'est la vie']),
+    c.best ? `ma meilleure carte c'est ${c.best.domain} (${RARNAMES[c.best.rarity]})` : 'j\'ai rien de ouf encore']],
+  [/(merci|thx|thanks|mrc)/i, () => [pick(['de rien', 'tkt', 'avec plaisir', 'np'])]],
+  [/(bye|a\+|ciao|bonne nuit|à plus|a plus|tchao)/i, () => [pick(['a+', 'bye', 'bonne soirée', 'à plus', 'ciao'])]],
 ];
-const FALLBACK = ['ok', 'mdr', 'ah ouais ?', 'grave', 'je vois', 'trop bien', 'pas faux', 'haha', 'bon jeu !'];
-function botReply(text) {
-  for (const [re, list] of REPLIES) if (re.test(text)) return pick(list);
-  return pick(FALLBACK);
+const FALLBACK = ['ok', 'mdr', 'ah ouais ?', 'grave', 'je vois', 'ah ok', 'pas faux', 'haha', 'ouais', 'ptdr', 'ah bon ?', 'carrément', 'jsp', 'trop bien'];
+
+async function replyContext(db, bot) {
+  const [best, recent, n] = await Promise.all([
+    db.one('SELECT s.domain, s.rarity FROM cards c JOIN sites s ON s.id = c.site_id WHERE c.user_id = $1 ORDER BY s.rarity DESC, s.id LIMIT 1', [bot.id]),
+    db.one('SELECT s.domain, s.rarity FROM cards c JOIN sites s ON s.id = c.site_id WHERE c.user_id = $1 AND s.rarity >= 2 ORDER BY c.obtained_at DESC LIMIT 1', [bot.id]),
+    db.one('SELECT COUNT(*) n FROM cards WHERE user_id = $1', [bot.id]),
+  ]);
+  return { best, recent, cards: n.n, dex: bot.dex_count, bits: bot.bits, fav: bot.bot?.fav };
+}
+export async function composeReply(db, bot, text) {
+  const ctx = await replyContext(db, bot);
+  // On lui parle d'un site précis : il dit s'il l'a.
+  const dom = /\b([a-z0-9-]+\.(?:[a-z]{2,}\.)?[a-z]{2,})\b/i.exec(text)?.[1]?.toLowerCase();
+  if (dom) {
+    const has = await db.one('SELECT 1 FROM cards c JOIN sites s ON s.id = c.site_id WHERE c.user_id = $1 AND s.domain = $2 LIMIT 1', [bot.id, dom]);
+    return has ? pick([`oui j'ai ${dom}`, `${dom} je l'ai ouais`, `j'ai ${dom} mais je la garde pour l'instant`]) : pick([`non j'ai pas ${dom}`, `${dom} ? jamais eu`, `pas ${dom} non, tu l'as toi ?`]);
+  }
+  const hits = TOPICS.filter(([re]) => re.test(text));
+  if (!hits.length) return pick(FALLBACK);
+  return pick(hits[0][1](ctx)); // le sujet le plus précis d'abord
 }
 async function answerMessages(db, bot, p, now) {
   const msgs = await db.all('SELECT DISTINCT ON (from_id) from_id, text FROM messages WHERE to_id = $1 AND NOT read ORDER BY from_id, id DESC LIMIT 3', [bot.id]);
+  const st = styleOf(bot.id);
   for (const m of msgs) {
     await db.run('UPDATE messages SET read = true WHERE to_id = $1 AND from_id = $2 AND NOT read', [bot.id, m.from_id]);
-    if (rnd() < 0.85) await db.run('INSERT INTO messages (from_id, to_id, text, at) VALUES ($1, $2, $3, $4)', [bot.id, m.from_id, botReply(m.text), now]);
+    if (rnd() < 0.15) continue; // parfois il lit sans répondre
+    const last = await db.one('SELECT text FROM messages WHERE from_id = $1 AND to_id = $2 ORDER BY id DESC LIMIT 1', [bot.id, m.from_id]);
+    let reply = '';
+    for (let k = 0; k < 4 && (!reply || reply === last?.text); k++) reply = stylize(await composeReply(db, bot, m.text), st);
+    await db.run('INSERT INTO messages (from_id, to_id, text, at) VALUES ($1, $2, $3, $4)', [bot.id, m.from_id, reply, now]);
   }
 }
 
@@ -373,7 +426,20 @@ async function socialize(db, game, bot, me, p, tryDo, opts) {
 // Un humain qui demande un bot en ami ou lui propose un échange reçoit une réponse en quelques minutes
 // (plus longtemps si le bot « dort »), sans attendre la prochaine session du bot. Les bots proposent aussi
 // eux-mêmes des échanges équitables à leurs amis humains, au prix du marché.
-const replyDelay = (seed, sleeping) => (sleeping ? 20 + (seed % 40) : 1 + (seed % 5)) * MIN;
+// Délai de réponse propre à chaque demande : de 2 min à ~3 h (le plus souvent rapide), jamais pendant son sommeil,
+// et étalé après son réveil (il ne répond pas à tout à la seconde où il se lève).
+function lastWake(p, now) {
+  const d = new Date(now);
+  const h = (d.getUTCHours() + p.tz + 24) % 24 + d.getUTCMinutes() / 60;
+  return now - (((h - p.sleep[1]) + 24) % 24) * HOUR;
+}
+function ready(p, seed, createdAt, now) {
+  if (asleep(p, now)) return false;
+  const u = (hash32('delay' + seed) % 10000) / 10000;
+  const delay = 2 * MIN * Math.pow(90, u * u) * (p.type === 'casual' ? 1.5 : p.type === 'grinder' ? 0.6 : 1);
+  const afterWake = (hash32('wake' + seed) % 45) * MIN;
+  return now - createdAt >= delay && now - lastWake(p, now) >= Math.min(afterWake, now - createdAt);
+}
 const say = (db, from, to, text) => db.run('INSERT INTO messages (from_id, to_id, text, at) VALUES ($1, $2, $3, $4)', [from, to, text, Date.now()]);
 const DEAL = ['deal !', 'ok ça marche', 'vendu, merci !', 'parfait, échange fait', 'ça me va 👍'];
 const NO_DEAL = (need) => pick([`pas assez pour moi, ajoute ~${need} bits et c'est bon`, `presque ! encore ${need} bits et j'accepte`, `non merci… avec ${need} bits de plus ok`]);
@@ -402,11 +468,11 @@ async function judgeHumanTrade(db, game, bot, t) {
   const greed = Math.min(1.2, Math.max(0.9, p.greed || 1));
   if (gain >= loss * greed) {
     const r = await game.resolveTrade(me, t.id, 'accept').catch((e) => { if (e instanceof GameError) return null; throw e; });
-    if (r?.status === 'accepted') await say(db, bot.id, t.from_id, pick(DEAL));
+    if (r?.status === 'accepted') await say(db, bot.id, t.from_id, stylize(pick(DEAL), styleOf(bot.id)));
     return r;
   }
   await game.resolveTrade(me, t.id, 'decline');
-  return say(db, bot.id, t.from_id, NO_DEAL(Math.max(1, Math.ceil(loss * greed - gain))));
+  return say(db, bot.id, t.from_id, stylize(NO_DEAL(Math.max(1, Math.ceil(loss * greed - gain))), styleOf(bot.id)));
 }
 
 async function proposeToHuman(db, game, human) {
@@ -452,14 +518,14 @@ export async function serveHumans(db, game) {
     JOIN users h ON h.id = f.user_id AND NOT h.is_bot JOIN users b ON b.id = f.friend_id AND b.is_bot
     WHERE f.status = 'pending' AND f.created_at < $1 ORDER BY f.created_at LIMIT 40`, [now - MIN]);
   for (const r of reqs) {
-    if (now - r.created_at < replyDelay(r.user_id + r.bot_id, asleep(traits(r.bot), now))) continue;
+    if (!ready(traits(r.bot), `f${r.user_id}:${r.bot_id}`, r.created_at, now)) continue;
     try { await game.respondFriend({ id: r.bot_id, username: r.username }, r.user_id, true); out.friends++; } catch (e) { if (!(e instanceof GameError)) throw e; }
   }
   const trades = await db.all(`SELECT t.*, b.username, b.bot, b.bits FROM trades t
     JOIN users h ON h.id = t.from_id AND NOT h.is_bot JOIN users b ON b.id = t.to_id AND b.is_bot
     WHERE t.status = 'pending' AND t.created_at < $1 ORDER BY t.id LIMIT 30`, [now - MIN]);
   for (const t of trades) {
-    if (now - t.created_at < replyDelay(t.id, asleep(traits(t.bot), now))) continue;
+    if (!ready(traits(t.bot), `t${t.id}`, t.created_at, now)) continue;
     try { await judgeHumanTrade(db, game, { id: t.to_id, username: t.username, bot: t.bot, bits: t.bits }, t); out.trades++; } catch (e) { if (!(e instanceof GameError)) throw e; }
   }
   // Propositions des bots : au plus une toutes les 6 h par humain actif, et jamais s'il en a déjà une en attente.
@@ -468,6 +534,7 @@ export async function serveHumans(db, game) {
       AND NOT EXISTS (SELECT 1 FROM trades t JOIN users b ON b.id = t.from_id WHERE t.to_id = u.id AND b.is_bot AND (t.status = 'pending' OR t.created_at > $2))
     ORDER BY random() LIMIT 3`, [now - 2 * 24 * HOUR, now - 6 * HOUR]);
   for (const h of humans) {
+    if (rnd() > 0.02) continue; // irrégulier : en moyenne quelques heures après la fin du délai minimal
     try { if (await proposeToHuman(db, game, h)) out.proposals++; } catch (e) { if (!(e instanceof GameError)) throw e; }
   }
   return out;
@@ -557,13 +624,20 @@ async function cleanup(db) {
   }
 }
 
-export async function deleteBots(db) {
-  // Les cartes en vente par des bots disparaissent avec eux ; on rembourse les humains qui menaient ces enchères.
-  await db.tx(async (q) => {
-    await q.run(`UPDATE users h SET bits = h.bits + a.current_bid FROM auctions a JOIN users s ON s.id = a.seller_id
-      WHERE a.status = 'open' AND s.is_bot AND a.bidder_id = h.id AND NOT h.is_bot`);
-    await q.run("UPDATE cards c SET status = 'owned' FROM auctions a JOIN users b ON b.id = a.bidder_id WHERE a.status = 'open' AND b.is_bot AND c.id = a.card_id");
-    await q.run('DELETE FROM auctions a USING users u WHERE (u.id = a.seller_id OR u.id = a.bidder_id) AND u.is_bot AND a.status = $1', ['open']);
-    await q.run('DELETE FROM users WHERE is_bot');
+// Supprime les comptes d'animation (tous, ou seulement les moins actifs pour n'en garder que `keep`).
+// Ceux qui sont amis avec un vrai joueur sont gardés en priorité, pour ne pas vider sa liste d'amis.
+export async function deleteBots(db, { keep = 0 } = {}) {
+  return db.tx(async (q) => {
+    const victims = (await q.all(`SELECT id FROM users u WHERE is_bot ORDER BY
+        EXISTS (SELECT 1 FROM friends f JOIN users h ON h.id = f.friend_id WHERE f.user_id = u.id AND NOT h.is_bot) ASC, packs_opened ASC
+      LIMIT GREATEST(0, (SELECT COUNT(*) FROM users WHERE is_bot) - $1)`, [Math.max(0, Math.floor(keep))])).map((r) => r.id);
+    if (!victims.length) return { deleted: 0 };
+    // Leurs cartes en vente disparaissent avec eux : on rembourse les joueurs qui menaient ces enchères.
+    await q.run(`UPDATE users h SET bits = h.bits + a.current_bid FROM auctions a
+      WHERE a.status = 'open' AND a.seller_id = ANY($1::int[]) AND a.bidder_id = h.id AND NOT (h.id = ANY($1::int[]))`, [victims]);
+    await q.run("UPDATE cards c SET status = 'owned' FROM auctions a WHERE a.status = 'open' AND a.bidder_id = ANY($1::int[]) AND c.id = a.card_id", [victims]);
+    await q.run("DELETE FROM auctions WHERE status = 'open' AND (seller_id = ANY($1::int[]) OR bidder_id = ANY($1::int[]))", [victims]);
+    for (let k = 0; k < victims.length; k += 1000) await q.run('DELETE FROM users WHERE id = ANY($1::int[])', [victims.slice(k, k + 1000)]);
+    return { deleted: victims.length };
   });
 }

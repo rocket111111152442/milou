@@ -496,7 +496,7 @@ export function createFun(db, game) {
     if (recent >= 20) throw new GameError('Doucement ! Attends un peu avant d\'envoyer d\'autres messages.', 429);
     const m = await q.one('INSERT INTO messages (from_id, to_id, text, at) VALUES ($1, $2, $3, $4) RETURNING id, from_id, text, at', [me.id, otherId, text, Date.now()]);
     // Un bot qui reçoit un message passe voir dans les minutes qui suivent.
-    await q.run('UPDATE users SET bot_next_at = LEAST(bot_next_at, $1) WHERE id = $2 AND is_bot', [Date.now() + (1 + randomInt(5)) * 60_000, otherId]);
+    await q.run('UPDATE users SET bot_next_at = LEAST(bot_next_at, $1) WHERE id = $2 AND is_bot', [Date.now() + Math.round(60_000 * Math.pow(40, Math.random())), otherId]);
     await game.bump(q, me.id, { messages: 1 });
     return m;
   });

@@ -195,7 +195,7 @@ dbtest('bots : acceptent les amis humains, jugent les échanges au prix du march
   const bot = await mk('botA' + n, 1000);
   const h = await user(0);
   await game.requestFriend(h, bot.username);
-  await db.run('UPDATE friends SET created_at = $1 WHERE user_id = $2', [Date.now() - 3600e3, h.id]);
+  await db.run('UPDATE friends SET created_at = $1 WHERE user_id = $2', [Date.now() - 24 * 3600e3, h.id]);
   const r1 = await serveHumans(db, game);
   assert.ok(r1.friends >= 1);
   assert.equal(await game.relation(db, h.id, bot.id), 'friends');
@@ -204,14 +204,14 @@ dbtest('bots : acceptent les amis humains, jugent les échanges au prix du march
   const ep = await db.one('INSERT INTO cards (user_id, site_id, obtained_at) VALUES ($1, $2, 0) RETURNING id', [bot.id, game.tiers[3].lo]);
   const co = await db.one('INSERT INTO cards (user_id, site_id, obtained_at) VALUES ($1, $2, 0) RETURNING id', [h.id, game.tiers[0].lo + 7]);
   const t1 = await game.createTrade(h, { toUserId: bot.id, offerCards: [co.id], requestCards: [ep.id] });
-  await db.run('UPDATE trades SET created_at = $1 WHERE id = $2', [Date.now() - 3600e3, t1.id]);
+  await db.run('UPDATE trades SET created_at = $1 WHERE id = $2', [Date.now() - 24 * 3600e3, t1.id]);
   await serveHumans(db, game);
   assert.equal((await db.one('SELECT status FROM trades WHERE id = $1', [t1.id])).status, 'declined');
   assert.match((await db.one('SELECT text FROM messages WHERE from_id = $1 ORDER BY id DESC LIMIT 1', [bot.id])).text, /bits/);
 
   // Échange généreux (une carte offerte contre rien) : accepté.
   const t2 = await game.createTrade(h, { toUserId: bot.id, offerCards: [co.id] });
-  await db.run('UPDATE trades SET created_at = $1 WHERE id = $2', [Date.now() - 3600e3, t2.id]);
+  await db.run('UPDATE trades SET created_at = $1 WHERE id = $2', [Date.now() - 24 * 3600e3, t2.id]);
   await serveHumans(db, game);
   assert.equal((await db.one('SELECT status FROM trades WHERE id = $1', [t2.id])).status, 'accepted');
 
@@ -221,7 +221,7 @@ dbtest('bots : acceptent les amis humains, jugent les échanges au prix du march
   await db.run(`UPDATE trades SET status = 'cancelled' WHERE to_id = $1 AND status = 'pending'`, [h.id]);
   await db.run('INSERT INTO cards (user_id, site_id, obtained_at) SELECT $1, $2, 0 FROM generate_series(1, 2)', [h.id, game.tiers[1].lo + 3]);
   await db.run('INSERT INTO cards (user_id, site_id, obtained_at) VALUES ($1, $2, 0)', [bot.id, game.tiers[1].lo + 4]);
-  const r3 = await serveHumans(db, game);
+  let r3; for (let k = 0; k < 400 && !(r3 && r3.proposals); k++) r3 = await serveHumans(db, game); // propositions irrégulières
   assert.equal(r3.proposals, 1);
   const prop = await db.one(`SELECT * FROM trades WHERE from_id = $1 AND to_id = $2 AND status = 'pending'`, [bot.id, h.id]);
   assert.ok(prop);
