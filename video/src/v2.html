@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Netdex promo v2</title>
+<style>
+@font-face { font-family: JBM; src: url(assets/jbm500.ttf); font-weight: 500; }
+@font-face { font-family: JBM; src: url(assets/jbm700.ttf); font-weight: 700; }
+@font-face { font-family: JBM; src: url(assets/jbm800.ttf); font-weight: 800; }
+:root {
+  --bg: #111110; --surface: #191918; --surface-2: #222120; --line: #2e2d2b; --line-2: #3b3a37;
+  --text: #ecebe6; --muted: #8d8b84; --accent: #ff5b1f; --accent-ink: #160803;
+  --r0: #8f8c84; --r1: #57b26a; --r2: #3d8ee6; --r3: #9b5de5; --r4: #e0a100; --r5: #e5484d;
+  --mono: JBM, "DejaVu Sans Mono", monospace; --sans: "Inter Display", Inter, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+body { color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+#stage { position: absolute; inset: 0; overflow: hidden; background: var(--bg); }
+#cam { position: absolute; inset: 0; transform-origin: 50% 50%; }
+.scene { position: absolute; inset: 0; display: none; overflow: hidden; }
+.abs { position: absolute; }
+.center { left: 50%; top: 50%; }
+.mono { font-family: var(--mono); }
+
+/* grille de fond */
+.grid-bg { position: absolute; inset: -200px; background-image:
+  linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 90px 90px; opacity: .35; }
+
+/* ---------- carte (reprise fidèle du design Netdex, en em) ---------- */
+.card { position: absolute; width: 10em; height: 14em; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); border: .08em solid var(--c); border-radius: .45em; font-size: 30px; }
+.card .c-bar { display: flex; align-items: center; gap: .35em; padding: .35em .5em; background: var(--c); color: #111; font: 700 .75em/1 var(--mono); }
+.card .c-bar i { width: .4em; height: .4em; border-radius: 50%; background: rgba(0,0,0,.28); flex: none; }
+.card .c-bar .rk { margin-left: auto; }
+.card .c-url { margin: .4em .5em 0; padding: .25em .4em; border: 1px solid var(--line); border-radius: .2em; background: var(--bg);
+  font: 500 .76em/1.2 var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .c-art { flex: 1; display: grid; place-items: center; }
+.card .c-art img { width: 4em; height: 4em; object-fit: contain; border-radius: .5em; image-rendering: auto; }
+.card .c-name { padding: 0 .48em; font: 700 1.05em/1.15 var(--sans); text-transform: capitalize; white-space: nowrap; overflow: hidden; }
+.card .c-foot { display: flex; justify-content: space-between; padding: .3em .55em .45em; font: 700 .73em/1 var(--mono); color: var(--muted); }
+.card .c-foot .rar { color: var(--c); text-transform: uppercase; letter-spacing: .03em; }
+.card .holo { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: soft-light; opacity: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.7) 45%, rgba(120,200,255,.55) 55%, transparent 70%); background-size: 300% 300%; }
+.card.r5 .c-bar { background: repeating-linear-gradient(-45deg, var(--r5) 0 .2em, #c23a3e .2em .4em); }
+.r0 { --c: var(--r0); } .r1 { --c: var(--r1); } .r2 { --c: var(--r2); } .r3 { --c: var(--r3); } .r4 { --c: var(--r4); } .r5 { --c: var(--r5); }
+
+/* booster */
+.pack { position: absolute; width: 520px; height: 714px; border-radius: 16px; background: var(--accent); color: var(--accent-ink);
+  font-family: var(--mono); padding: 44px 40px; display: flex; flex-direction: column; justify-content: space-between;
+  box-shadow: 22px 22px 0 var(--line-2); }
+.pack::before { content: ""; position: absolute; left: 0; right: 0; top: 112px; border-top: 6px dashed rgba(0,0,0,.35); }
+.pack .pv-top { font: 700 40px var(--mono); letter-spacing: .1em; }
+.pack .pv-logo { font: 800 104px/1 var(--mono); letter-spacing: -.04em; }
+.pack .pv-label { font: 700 36px/1.4 var(--mono); opacity: .8; }
+.pack .pv-count { position: absolute; top: -30px; right: -30px; min-width: 104px; height: 104px; background: var(--text); color: var(--bg);
+  font: 800 54px/104px var(--mono); text-align: center; border-radius: 10px; }
+
+.big { font: 900 190px/0.92 var(--sans); letter-spacing: -.05em; }
+.mask { overflow: hidden; display: block; padding: 0 0 .06em; }
+.mask > span { display: inline-block; }
+.uscore::after { content: "_"; color: var(--accent); }
+
+#flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+#grain { position: absolute; inset: 0; pointer-events: none; opacity: .07; mix-blend-mode: screen; }
+#vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%); }
+#hud { position: absolute; left: 56px; right: 56px; top: 64px; display: flex; justify-content: space-between; font: 700 28px var(--mono); color: var(--muted); }
+#hud .rec { color: var(--accent); }
+#bars { position: absolute; left: 56px; right: 56px; bottom: 70px; height: 6px; display: flex; gap: 8px; }
+#bars i { flex: 1; background: var(--line); position: relative; overflow: hidden; }
+#bars i b { position: absolute; inset: 0; background: var(--accent); transform-origin: 0 50%; }
+</style>
+</head>
+<body>
+<style>
+.scene { display: block; opacity: 0; }
+.kicker { font: 700 32px var(--mono); color: var(--accent); letter-spacing: .25em; }
+.h { font: 900 118px/1 var(--sans); letter-spacing: -.045em; }
+.feat { display: flex; align-items: center; gap: 40px; padding: 34px 40px; background: var(--surface); border: 2px solid var(--line); border-radius: 16px; }
+.feat .ic { width: 120px; height: 120px; flex: none; border-radius: 14px; display: grid; place-items: center; font: 800 64px var(--mono); }
+.feat b { display: block; font: 800 62px/1.05 var(--sans); letter-spacing: -.03em; }
+.feat span { font: 600 32px var(--mono); color: var(--muted); }
+#free-badge { position: absolute; right: 56px; top: 52px; padding: 10px 18px; border: 2px solid var(--accent); border-radius: 8px; font: 800 28px var(--mono); color: var(--accent); }
+</style>
+<div id="stage">
+  <div id="cam">
+    <!-- 1 logo -->
+    <div class="scene" id="s1">
+      <div class="grid-bg" id="s1grid"></div>
+      <svg id="logo" class="abs" width="420" height="420" viewBox="0 0 512 512" style="left:330px;top:560px">
+        <rect width="512" height="512" rx="96" fill="#ff5b1f"/>
+        <g id="lg-win">
+          <rect x="104" y="128" width="304" height="256" rx="18" fill="#111110"/>
+          <circle id="lg-d1" cx="146" cy="156" r="10" fill="#ff5b1f"/><circle id="lg-d2" cx="178" cy="156" r="10" fill="#ecebe6"/><circle id="lg-d3" cx="210" cy="156" r="10" fill="#ecebe6"/>
+          <rect id="lg-line" x="104" y="184" width="304" height="4" fill="#ff5b1f"/>
+          <text id="lg-n" x="152" y="320" font-family="JBM, monospace" font-weight="800" font-size="120" fill="#ecebe6">n</text>
+          <rect id="lg-u" x="236" y="300" width="96" height="20" fill="#ff5b1f"/>
+        </g>
+      </svg>
+      <div id="s1word" class="abs mono" style="left:0;right:0;top:1060px;text-align:center;font:800 150px/1 var(--mono);letter-spacing:-.04em"></div>
+      <div class="abs" style="left:0;right:0;top:1250px;text-align:center"><div class="mask h" style="font-size:80px;color:var(--muted)"><span id="s1tag">Le web, en cartes.</span></div></div>
+    </div>
+
+    <!-- 2 concept -->
+    <div class="scene" id="s2">
+      <div class="abs" style="left:80px;right:60px;top:260px">
+        <div class="kicker" id="s2k">LE CONCEPT</div>
+        <div class="mask h" style="margin-top:30px"><span id="s2a">Chaque site</span></div>
+        <div class="mask h"><span id="s2b">d'internet devient</span></div>
+        <div class="mask h" style="color:var(--accent)"><span id="s2c">une carte.</span></div>
+      </div>
+      <div id="s2cards" class="abs" style="left:540px;top:1330px"></div>
+    </div>
+
+    <!-- 3 booster -->
+    <div class="scene" id="s3">
+      <div class="abs" style="left:80px;right:60px;top:220px">
+        <div class="kicker">LES BOOSTERS</div>
+        <div class="mask h" style="margin-top:30px"><span id="s3a">1 booster offert</span></div>
+        <div class="mask h" style="color:var(--accent)"><span id="s3b">toutes les 3 min.</span></div>
+      </div>
+      <div id="s3timer" class="abs mono" style="left:80px;top:610px;font:800 64px var(--mono);color:var(--muted)"></div>
+      <div id="s3fan" class="abs" style="left:540px;top:1250px"></div>
+      <div id="pack" class="pack" style="left:280px;top:880px">
+        <div class="pv-top">BOOSTER</div>
+        <div><div class="pv-logo">netdex<span style="color:var(--bg)">_</span></div><div class="pv-label">5 sites du web</div></div>
+        <div class="pv-count">1</div>
+      </div>
+    </div>
+
+    <!-- 4 raretés -->
+    <div class="scene" id="s4">
+      <div class="abs" style="left:80px;right:60px;top:220px">
+        <div class="kicker">LES RARETÉS</div>
+        <div class="mask h" style="margin-top:30px"><span id="s4a">De Commune</span></div>
+        <div class="mask h"><span id="s4b">à <span style="color:var(--r5)">Mythique</span>.</span></div>
+      </div>
+      <div id="s4glow" class="abs" style="left:540px;top:1130px;width:0;height:0"></div>
+      <div id="s4wrap" class="abs" style="left:540px;top:1130px;perspective:1600px"></div>
+      <div id="s4name" class="abs mono" style="left:0;right:0;top:1640px;text-align:center;font:800 64px var(--mono);text-transform:uppercase"></div>
+      <div id="s4dots" class="abs" style="left:0;right:0;top:1740px;display:flex;justify-content:center;gap:18px"></div>
+    </div>
+
+    <!-- 5 fonctionnalités -->
+    <div class="scene" id="s5">
+      <div class="abs" style="left:80px;right:60px;top:220px">
+        <div class="kicker">ET AUSSI</div>
+        <div class="mask h" style="margin-top:30px"><span id="s5a">Joue avec</span></div>
+        <div class="mask h" style="color:var(--accent)"><span id="s5b">tes amis.</span></div>
+      </div>
+      <div id="s5list" class="abs" style="left:80px;right:80px;top:640px;display:flex;flex-direction:column;gap:28px">
+        <div class="feat"><div class="ic" style="background:var(--r2);color:#111">⇄</div><div><b>Échanges</b><span>troque tes doublons</span></div></div>
+        <div class="feat"><div class="ic" style="background:var(--accent);color:#111">◆</div><div><b>Enchères</b><span>vends au plus offrant</span></div></div>
+        <div class="feat"><div class="ic" style="background:var(--r5);color:#111">VS</div><div><b>Duels</b><span>carte contre carte</span></div></div>
+        <div class="feat"><div class="ic" style="background:var(--r1);color:#111">☺</div><div><b>Amis</b><span>compare vos collections</span></div></div>
+      </div>
+    </div>
+
+    <!-- 6 gratuit + CTA -->
+    <div class="scene" id="s6">
+      <div class="grid-bg" id="s6grid"></div>
+      <div id="s6orbit" class="abs" style="left:540px;top:640px;z-index:0"></div>
+      <div class="abs" style="left:0;right:0;top:330px;text-align:center">
+        <div class="mask" style="font:900 330px/0.9 var(--sans);letter-spacing:-.06em;color:var(--accent)"><span id="s6a">100%</span></div>
+        <div class="mask" style="font:900 190px/1 var(--sans);letter-spacing:-.05em"><span id="s6b">gratuit.</span></div>
+      </div>
+      <div id="s6sub" class="abs mono" style="left:0;right:0;top:920px;text-align:center;font:700 38px/1.6 var(--mono);color:var(--muted)">Aucun paiement. Aucune carte bancaire.<br>Juste toi et tes cartes.</div>
+      <div id="s6btn" class="abs" style="left:120px;right:120px;top:1180px;height:160px;border-radius:16px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;font:800 60px var(--mono);letter-spacing:-.02em;box-shadow:14px 14px 0 var(--line-2)">Commence en 2 min →</div>
+      <div id="s6url" class="abs" style="left:0;right:0;top:1460px;display:flex;justify-content:center;align-items:center;gap:26px">
+        <svg width="110" height="110" viewBox="0 0 512 512"><rect width="512" height="512" rx="96" fill="#ff5b1f"/><rect x="104" y="128" width="304" height="256" rx="18" fill="#111110"/><circle cx="146" cy="156" r="10" fill="#ff5b1f"/><circle cx="178" cy="156" r="10" fill="#ecebe6"/><circle cx="210" cy="156" r="10" fill="#ecebe6"/><rect x="104" y="184" width="304" height="4" fill="#ff5b1f"/><text x="152" y="320" font-family="JBM, monospace" font-weight="800" font-size="120" fill="#ecebe6">n</text><rect x="236" y="300" width="96" height="20" fill="#ff5b1f"/></svg>
+        <span style="font:800 80px var(--mono);letter-spacing:-.03em">netdex.site</span>
+      </div>
+      <div id="s6plat" class="abs mono" style="left:0;right:0;top:1640px;text-align:center;font:700 30px var(--mono);color:var(--muted);letter-spacing:.2em">SUR MOBILE ET PC · DANS TON NAVIGATEUR</div>
+    </div>
+  </div>
+  <div id="hud"><span class="uscore">netdex</span></div>
+  <div id="free-badge">100% GRATUIT</div>
+  <div id="bars"></div>
+  <canvas id="grain" width="540" height="960"></canvas>
+  <div id="vignette"></div>
+</div>
+
+<script>
+const FPS = 30, BPM = 96, BEAT = 60 / BPM, SC = 2.5, NS = 6;
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const eOutExpo = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+const eOutCubic = (x) => 1 - Math.pow(1 - x, 3);
+const eInOutCubic = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const eInCubic = (x) => x * x * x;
+const eOutBack = (x, s = 1.7) => 1 + (s + 1) * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2);
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const S = (el, o) => { for (const k in o) el.style[k] = o[k]; };
+
+const RAR = ['Commune', 'Peu commune', 'Rare', 'Épique', 'Légendaire', 'Mythique'];
+const RCOL = ['#8f8c84', '#57b26a', '#3d8ee6', '#9b5de5', '#e0a100', '#e5484d'];
+const SITES = [
+  ['google.com', 1, 5], ['youtube.com', 2, 5], ['wikipedia.org', 7, 4], ['reddit.com', 9, 4], ['amazon.com', 12, 4],
+  ['instagram.com', 4, 5], ['github.com', 38, 3], ['netflix.com', 25, 3], ['x.com', 6, 4], ['openai.com', 15, 4],
+  ['spotify.com', 48, 3], ['discord.com', 61, 3], ['apple.com', 33, 3], ['figma.com', 210, 2], ['notion.so', 180, 2],
+  ['chess.com', 160, 2], ['duolingo.com', 420, 2], ['airbnb.com', 290, 2], ['lemonde.fr', 870, 1], ['nasa.gov', 640, 1],
+];
+const power = (rank) => Math.max(1, Math.round(1000 * (1 - Math.log10(rank) / 6)));
+function card([domain, rank, r], scale = 1) {
+  const el = document.createElement('div');
+  el.className = 'card r' + r;
+  el.style.fontSize = (30 * scale) + 'px';
+  el.innerHTML = `<div class="c-bar"><i></i><i></i><i></i><span class="rk">#${rank}</span></div>
+    <div class="c-url">${domain}</div><div class="c-art"><img src="assets/fav/${domain}.png"></div>
+    <div class="c-name">${domain.split('.')[0]}</div>
+    <div class="c-foot"><span class="rar">${RAR[r]}</span><span>${power(rank)}</span></div><div class="holo"></div>`;
+  return el;
+}
+
+for (let i = 0; i < NS; i++) $('bars').insertAdjacentHTML('beforeend', '<i><b></b></i>');
+const barEls = [...$('bars').querySelectorAll('b')];
+const s2cards = [SITES[2], SITES[1], SITES[6]].map((s) => { const el = card(s, .95); $('s2cards').appendChild(el); return el; });
+const fan = [SITES[13], SITES[7], SITES[0], SITES[10], SITES[17]].map((s) => { const el = card(s, .9); $('s3fan').appendChild(el); return el; });
+const big = card(['youtube.com', 2, 0], 1.6); $('s4wrap').appendChild(big);
+const dots = RAR.map((_, i) => { const d = document.createElement('i'); S(d, { width: '22px', height: '22px', borderRadius: '50%', background: RCOL[i], display: 'block' }); $('s4dots').appendChild(d); return d; });
+const feats = [...document.querySelectorAll('.feat')];
+const orbit = [SITES[0], SITES[1], SITES[2], SITES[5], SITES[6], SITES[8], SITES[11], SITES[16]].map((s) => { const el = card(s, .5); $('s6orbit').appendChild(el); return el; });
+const scenes = [...Array(NS)].map((_, i) => $('s' + (i + 1)));
+const gctx = $('grain').getContext('2d'), gimg = gctx.createImageData(540, 960);
+
+function maskIn(el, lt, at, dur = .7) { el.style.transform = `translateY(${(1 - eOutExpo(prog(lt, at, at + dur))) * 110}%)`; }
+
+function render(t) {
+  // fondus enchaînés : chaque scène entre sur 0.35 s et sort sur 0.3 s
+  scenes.forEach((s, i) => {
+    const lt = t - i * SC;
+    const vin = i === 0 ? 1 : eOutCubic(prog(lt, 0, .35));
+    const vout = i === NS - 1 ? 1 : 1 - eInCubic(prog(lt, SC - .3, SC));
+    const vis = lt >= 0 && lt < SC + (i === NS - 1 ? 1 : 0) ? vin * vout : 0;
+    S(s, { opacity: vis, display: vis > 0 ? 'block' : 'none', transform: `translateY(${(1 - vin) * 40 - (1 - vout) * 40}px)` });
+    if (vis > 0) FN[i](lt);
+  });
+  const sc = Math.min(NS - 1, Math.floor(t / SC));
+  const hud = sc > 0 && sc < NS - 1 ? 1 : 0;
+  $('hud').style.opacity = hud; $('bars').style.opacity = hud;
+  $('free-badge').style.opacity = sc > 0 && sc < NS - 1 ? eOutCubic(prog(t, SC, SC + .5)) : 0;
+  barEls.forEach((b, i) => (b.style.transform = `scaleX(${clamp((t - i * SC) / SC)})`));
+  const r = rng(Math.floor(t * FPS) + 7), d = gimg.data;
+  for (let i = 0; i < d.length; i += 4) { const v = r() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+  gctx.putImageData(gimg, 0, 0);
+}
+
+const FN = [
+  // 1 logo
+  (lt) => {
+    const k = eOutBack(prog(lt, 0, .6), 1.4);
+    $('logo').style.transform = `scale(${k}) rotate(${(1 - eOutExpo(prog(lt, 0, .8))) * -60}deg)`;
+    const win = eOutExpo(prog(lt, .3, .8));
+    $('lg-win').setAttribute('transform', `translate(256 256) scale(${win}) translate(-256 -256)`);
+    ['lg-d1', 'lg-d2', 'lg-d3'].forEach((id, i) => $(id).setAttribute('r', 10 * eOutBack(prog(lt, .6 + i * .08, .85 + i * .08), 2.5)));
+    $('lg-line').setAttribute('width', 304 * eOutExpo(prog(lt, .7, 1.1)));
+    $('lg-n').style.opacity = lt > .85 ? 1 : 0;
+    $('lg-u').setAttribute('width', 96 * eOutExpo(prog(lt, .95, 1.2)));
+    const n = Math.floor(clamp((lt - .9) / .08, 0, 6));
+    $('s1word').innerHTML = 'netdex'.slice(0, n) + `<span style="color:var(--accent);opacity:${lt > .85 && (n < 6 || Math.floor(lt / .3) % 2 === 0) ? 1 : 0}">_</span>`;
+    maskIn($('s1tag'), lt, 1.45, .8);
+    S($('s1grid'), { opacity: .3 * eOutCubic(prog(lt, 0, 1.5)), transform: `scale(${lerp(1.2, 1, eOutCubic(prog(lt, 0, 2.5)))})` });
+  },
+  // 2 concept
+  (lt) => {
+    $('s2k').style.opacity = eOutCubic(prog(lt, .1, .5));
+    maskIn($('s2a'), lt, .15); maskIn($('s2b'), lt, .3); maskIn($('s2c'), lt, .45);
+    s2cards.forEach((el, i) => {
+      const k = eOutBack(prog(lt, .7 + i * .2, 1.4 + i * .2), 1.3);
+      const float = Math.sin(lt * 2 + i) * 10;
+      S(el, { left: (i - 1) * 320 - 142 + 'px', top: -200 + (i === 1 ? -40 : 30) + float + (1 - k) * 260 + 'px', opacity: clamp(k), transform: `rotate(${(i - 1) * 7}deg) scale(${i === 1 ? 1.08 : 1})`, zIndex: i === 1 ? 2 : 1 });
+    });
+  },
+  // 3 booster
+  (lt) => {
+    maskIn($('s3a'), lt, .1); maskIn($('s3b'), lt, .25);
+    const cd = Math.max(0, 180 - Math.floor(eInOutCubic(prog(lt, .3, 1.2)) * 180));
+    $('s3timer').innerHTML = cd ? `prochain booster · 0${Math.floor(cd / 60)}:${String(cd % 60).padStart(2, '0')}` : '<span style="color:var(--accent)">booster prêt ✓</span>';
+    const open = prog(lt, 1.35, 1.75);
+    const k = eOutBack(prog(lt, .2, .8), 1.3);
+    const wob = lt > 1 && lt < 1.35 ? Math.sin(lt * 50) * 3 : 0;
+    S($('pack'), { transform: `translateY(${(1 - k) * 700 - eInCubic(open) * 200}px) rotate(${wob}deg) scale(${1 - .15 * open})`, opacity: 1 - open });
+    fan.forEach((el, i) => {
+      const f = eOutBack(prog(lt, 1.45 + i * .07, 2.05 + i * .07), 1.2);
+      S(el, { left: (i - 2) * 150 * f - 135 + 'px', top: -190 + Math.abs(i - 2) * 34 * f + 'px', transform: `rotate(${(i - 2) * 11 * f}deg) scale(${lerp(.4, 1, f)})`, opacity: f > 0 ? 1 : 0, zIndex: 10 - Math.abs(i - 2) });
+    });
+  },
+  // 4 raretés
+  (lt) => {
+    maskIn($('s4a'), lt, .1); maskIn($('s4b'), lt, .25);
+    const r = Math.min(5, Math.floor(clamp((lt - .45) / .26, 0, 5)));
+    big.className = 'card r' + r; big.querySelector('.rar').textContent = RAR[r];
+    big.querySelector('.rk').textContent = r === 5 ? 'HOLO #2' : '#2';
+    const ent = eOutCubic(prog(lt, 0, .6));
+    const since = (lt - .45) - r * .26;
+    const punch = 1 + .05 * Math.exp(-Math.max(0, since) * 10) * (lt > .45);
+    S(big, { left: '-240px', top: '-336px', transform: `rotateY(${(1 - ent) * 40 + (r === 5 ? Math.sin((lt - 1.75) * 2.5) * 12 : 0)}deg) scale(${punch * lerp(.85, 1, ent)})`, opacity: ent, boxShadow: `0 0 ${30 + r * 25}px ${RCOL[r]}55` });
+    const hk = prog(lt, 1.75, 2.5);
+    S(big.querySelector('.holo'), { opacity: r === 5 ? .9 : 0, backgroundPosition: `${lerp(100, 0, hk)}% ${lerp(100, 0, hk)}%` });
+    if (r === 5) big.querySelector('.c-bar').style.backgroundPosition = `${lt * 30}px 0`;
+    const G = 360 + r * 30;
+    S($('s4glow'), { left: -G + 'px', top: -G + 'px', width: 2 * G + 'px', height: 2 * G + 'px', borderRadius: '50%', background: `radial-gradient(circle, ${RCOL[r]}40, transparent 65%)` });
+    S($('s4name'), { color: RCOL[r], opacity: ent });
+    $('s4name').textContent = RAR[r];
+    dots.forEach((d, i) => S(d, { opacity: i <= r ? 1 : .2, transform: `scale(${i === r ? 1.4 : 1})` }));
+  },
+  // 5 fonctionnalités
+  (lt) => {
+    maskIn($('s5a'), lt, .1); maskIn($('s5b'), lt, .25);
+    feats.forEach((el, i) => {
+      const k = eOutExpo(prog(lt, .45 + i * .22, 1.15 + i * .22));
+      S(el, { opacity: k, transform: `translateX(${(1 - k) * 120}px)` });
+    });
+  },
+  // 6 gratuit + CTA
+  (lt) => {
+    maskIn($('s6a'), lt, .05, .8); maskIn($('s6b'), lt, .25, .8);
+    $('s6sub').style.opacity = eOutCubic(prog(lt, .6, 1));
+    const bk = eOutBack(prog(lt, .8, 1.3), 1.6);
+    const pulse = 1 + .025 * Math.max(0, Math.sin((lt - 1.3) * Math.PI * 2 / (BEAT * 2))) * (lt > 1.3);
+    S($('s6btn'), { transform: `scale(${bk * pulse})`, opacity: clamp(bk * 2) });
+    S($('s6url'), { opacity: eOutCubic(prog(lt, 1.1, 1.5)), transform: `translateY(${(1 - eOutCubic(prog(lt, 1.1, 1.5))) * 30}px)` });
+    $('s6plat').style.opacity = eOutCubic(prog(lt, 1.3, 1.7));
+    orbit.forEach((el, i) => {
+      const a = (i / orbit.length) * Math.PI * 2 + lt * .4;
+      const R = 470;
+      const x = Math.cos(a) * R, y = Math.sin(a) * R * .5;
+      const depth = (Math.sin(a) + 1) / 2;
+      S(el, { left: x - 75 + 'px', top: y - 105 + 'px', opacity: (.04 + .08 * depth) * eOutCubic(prog(lt, 0, 1)), transform: `rotate(${Math.cos(a) * 12}deg)`, filter: `blur(${(1 - depth) * 3}px)` });
+    });
+    S($('s6grid'), { opacity: .25, transform: `translateY(${-lt * 25}px)` });
+  },
+];
+window.render = render;
+window.ready = document.fonts.ready.then(() => Promise.all([...document.images].map((im) => im.complete ? 0 : new Promise((r) => (im.onload = im.onerror = r)))));
+</script>
+</body>
+</html>
