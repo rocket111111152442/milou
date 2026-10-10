@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Netdex promo</title>
+<style>
+@font-face { font-family: JBM; src: url(assets/jbm500.ttf); font-weight: 500; }
+@font-face { font-family: JBM; src: url(assets/jbm700.ttf); font-weight: 700; }
+@font-face { font-family: JBM; src: url(assets/jbm800.ttf); font-weight: 800; }
+:root {
+  --bg: #111110; --surface: #191918; --surface-2: #222120; --line: #2e2d2b; --line-2: #3b3a37;
+  --text: #ecebe6; --muted: #8d8b84; --accent: #ff5b1f; --accent-ink: #160803;
+  --r0: #8f8c84; --r1: #57b26a; --r2: #3d8ee6; --r3: #9b5de5; --r4: #e0a100; --r5: #e5484d;
+  --mono: JBM, "DejaVu Sans Mono", monospace; --sans: "Inter Display", Inter, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+body { color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+#stage { position: absolute; inset: 0; overflow: hidden; background: var(--bg); }
+#cam { position: absolute; inset: 0; transform-origin: 50% 50%; }
+.scene { position: absolute; inset: 0; display: none; overflow: hidden; }
+.abs { position: absolute; }
+.center { left: 50%; top: 50%; }
+.mono { font-family: var(--mono); }
+
+/* grille de fond */
+.grid-bg { position: absolute; inset: -200px; background-image:
+  linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 90px 90px; opacity: .35; }
+
+/* ---------- carte (reprise fidèle du design Netdex, en em) ---------- */
+.card { position: absolute; width: 10em; height: 14em; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); border: .08em solid var(--c); border-radius: .45em; font-size: 30px; }
+.card .c-bar { display: flex; align-items: center; gap: .35em; padding: .35em .5em; background: var(--c); color: #111; font: 700 .75em/1 var(--mono); }
+.card .c-bar i { width: .4em; height: .4em; border-radius: 50%; background: rgba(0,0,0,.28); flex: none; }
+.card .c-bar .rk { margin-left: auto; }
+.card .c-url { margin: .4em .5em 0; padding: .25em .4em; border: 1px solid var(--line); border-radius: .2em; background: var(--bg);
+  font: 500 .76em/1.2 var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .c-art { flex: 1; display: grid; place-items: center; }
+.card .c-art img { width: 4em; height: 4em; object-fit: contain; border-radius: .5em; image-rendering: auto; }
+.card .c-name { padding: 0 .48em; font: 700 1.05em/1.15 var(--sans); text-transform: capitalize; white-space: nowrap; overflow: hidden; }
+.card .c-foot { display: flex; justify-content: space-between; padding: .3em .55em .45em; font: 700 .73em/1 var(--mono); color: var(--muted); }
+.card .c-foot .rar { color: var(--c); text-transform: uppercase; letter-spacing: .03em; }
+.card .holo { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: soft-light; opacity: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.7) 45%, rgba(120,200,255,.55) 55%, transparent 70%); background-size: 300% 300%; }
+.card.r5 .c-bar { background: repeating-linear-gradient(-45deg, var(--r5) 0 .2em, #c23a3e .2em .4em); }
+.r0 { --c: var(--r0); } .r1 { --c: var(--r1); } .r2 { --c: var(--r2); } .r3 { --c: var(--r3); } .r4 { --c: var(--r4); } .r5 { --c: var(--r5); }
+
+/* booster */
+.pack { position: absolute; width: 520px; height: 714px; border-radius: 16px; background: var(--accent); color: var(--accent-ink);
+  font-family: var(--mono); padding: 44px 40px; display: flex; flex-direction: column; justify-content: space-between;
+  box-shadow: 22px 22px 0 var(--line-2); }
+.pack::before { content: ""; position: absolute; left: 0; right: 0; top: 112px; border-top: 6px dashed rgba(0,0,0,.35); }
+.pack .pv-top { font: 700 40px var(--mono); letter-spacing: .1em; }
+.pack .pv-logo { font: 800 104px/1 var(--mono); letter-spacing: -.04em; }
+.pack .pv-label { font: 700 36px/1.4 var(--mono); opacity: .8; }
+.pack .pv-count { position: absolute; top: -30px; right: -30px; min-width: 104px; height: 104px; background: var(--text); color: var(--bg);
+  font: 800 54px/104px var(--mono); text-align: center; border-radius: 10px; }
+
+.big { font: 900 190px/0.92 var(--sans); letter-spacing: -.05em; }
+.mask { overflow: hidden; display: block; padding: 0 0 .06em; }
+.mask > span { display: inline-block; }
+.uscore::after { content: "_"; color: var(--accent); }
+
+#flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+#grain { position: absolute; inset: 0; pointer-events: none; opacity: .07; mix-blend-mode: screen; }
+#vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%); }
+#hud { position: absolute; left: 56px; right: 56px; top: 64px; display: flex; justify-content: space-between; font: 700 28px var(--mono); color: var(--muted); }
+#hud .rec { color: var(--accent); }
+#bars { position: absolute; left: 56px; right: 56px; bottom: 70px; height: 6px; display: flex; gap: 8px; }
+#bars i { flex: 1; background: var(--line); position: relative; overflow: hidden; }
+#bars i b { position: absolute; inset: 0; background: var(--accent); transform-origin: 0 50%; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="cam">
+    <!-- S1 logo -->
+    <div class="scene" id="s1">
+      <div class="grid-bg" id="s1grid"></div>
+      <svg id="logo" class="abs" width="440" height="440" viewBox="0 0 512 512" style="left:320px;top:640px">
+        <rect id="lg-bg" width="512" height="512" rx="96" fill="#ff5b1f"/>
+        <g id="lg-win">
+          <rect x="104" y="128" width="304" height="256" rx="18" fill="#111110"/>
+          <circle id="lg-d1" cx="146" cy="156" r="10" fill="#ff5b1f"/><circle id="lg-d2" cx="178" cy="156" r="10" fill="#ecebe6"/><circle id="lg-d3" cx="210" cy="156" r="10" fill="#ecebe6"/>
+          <rect id="lg-line" x="104" y="184" width="304" height="4" fill="#ff5b1f"/>
+          <text id="lg-n" x="152" y="320" font-family="JBM, monospace" font-weight="800" font-size="120" fill="#ecebe6">n</text>
+          <rect id="lg-u" x="236" y="300" width="96" height="20" fill="#ff5b1f"/>
+        </g>
+      </svg>
+      <div id="s1word" class="abs mono" style="left:0;right:0;top:1150px;text-align:center;font:800 150px/1 var(--mono);letter-spacing:-.04em"></div>
+      <div id="s1sub" class="abs mono" style="left:0;right:0;top:1340px;text-align:center;font:700 34px var(--mono);color:var(--muted);letter-spacing:.3em">LE WEB · EN CARTES</div>
+    </div>
+
+    <!-- S2 kinetic type -->
+    <div class="scene" id="s2">
+      <div class="abs" style="left:80px;top:560px;right:40px">
+        <div class="mask big" style="font-size:150px"><span id="s2a">Collectionne</span></div>
+        <div class="mask big" style="font-size:260px;color:var(--accent)"><span id="s2b">internet</span></div>
+        <div class="mask big" style="font-size:190px"><span id="s2c">en cartes<span id="s2dot" style="color:var(--accent)">.</span></span></div>
+      </div>
+      <div id="s2tag" class="abs mono" style="left:84px;top:1330px;font:700 34px var(--mono);color:var(--muted)">// ton album du web</div>
+      <div id="s2wipe" class="abs" style="background:var(--accent);border-radius:50%"></div>
+    </div>
+
+    <!-- S3 card wall -->
+    <div class="scene" id="s3">
+      <div id="wall" class="abs" style="left:50%;top:50%;width:0;height:0"></div>
+      <div id="s3shade" class="abs" style="inset:0;background:linear-gradient(180deg,rgba(17,17,16,.0) 0%,rgba(17,17,16,.85) 45%,rgba(17,17,16,.85) 58%,rgba(17,17,16,0) 100%)"></div>
+      <div class="abs" style="left:0;right:0;top:800px;text-align:center">
+        <div class="mask big" style="font-size:150px"><span id="s3a">Chaque site</span></div>
+        <div class="mask big" style="font-size:150px"><span id="s3b">= <span style="color:var(--accent)">une carte</span></span></div>
+      </div>
+    </div>
+
+    <!-- S4 booster -->
+    <div class="scene" id="s4">
+      <div class="grid-bg"></div>
+      <div id="s4timer" class="abs mono" style="left:0;right:0;top:250px;text-align:center;font:800 170px/1 var(--mono);letter-spacing:-.03em"></div>
+      <div id="s4lbl" class="abs mono" style="left:0;right:0;top:440px;text-align:center;font:700 36px var(--mono);color:var(--muted);letter-spacing:.2em">PROCHAIN BOOSTER</div>
+      <div id="s4fan" class="abs" style="left:540px;top:1020px;width:0;height:0"></div>
+      <div id="pack" class="pack" style="left:280px;top:660px">
+        <div class="pv-top">BOOSTER</div>
+        <div><div class="pv-logo">netdex<span style="color:var(--bg)">_</span></div><div class="pv-label">5 sites du web</div></div>
+        <div class="pv-count">1</div>
+      </div>
+      <div id="s4rip" class="abs" style="left:0;right:0;top:0;height:0;background:#fff"></div>
+      <div class="abs" style="left:0;right:0;top:1520px;text-align:center">
+        <div class="mask big" style="font-size:96px"><span id="s4a">1 booster gratuit</span></div>
+        <div class="mask big" style="font-size:96px;color:var(--accent)"><span id="s4b">toutes les 3 min.</span></div>
+      </div>
+    </div>
+
+    <!-- S5 rarity climb -->
+    <div class="scene" id="s5">
+      <div id="s5ghost" class="abs" style="left:-200px;right:-200px;top:300px;text-align:center;font:900 300px/1 var(--sans);letter-spacing:-.06em;color:transparent;-webkit-text-stroke:3px var(--line-2);white-space:nowrap"></div>
+      <div id="s5rings" class="abs" style="left:540px;top:980px"></div>
+      <div id="s5cardwrap" class="abs" style="left:540px;top:980px;perspective:1600px"></div>
+      <div id="s5name" class="abs mono" style="left:0;right:0;top:1560px;text-align:center;font:800 80px/1 var(--mono);text-transform:uppercase;letter-spacing:.02em"></div>
+      <div id="s5pow" class="abs mono" style="left:0;right:0;top:1660px;text-align:center;font:700 34px var(--mono);color:var(--muted)"></div>
+      <div class="abs mono" id="s5top" style="left:0;right:0;top:220px;text-align:center;font:700 36px var(--mono);color:var(--muted);letter-spacing:.2em">6 RARETÉS · CARTES HOLO</div>
+    </div>
+
+    <!-- S6 features -->
+    <div class="scene" id="s6"><div id="s6in" class="abs" style="inset:0"></div></div>
+
+    <!-- S7 collection -->
+    <div class="scene" id="s7">
+      <div class="abs" style="left:80px;top:230px">
+        <div class="mask big" style="font-size:120px"><span id="s7a">Complète ta</span></div>
+        <div class="mask big" style="font-size:150px;color:var(--accent)"><span id="s7b">collection<span style="color:var(--text)">.</span></span></div>
+      </div>
+      <div id="s7grid" class="abs" style="left:80px;top:620px;width:920px;height:960px"></div>
+      <div class="abs mono" style="left:80px;right:80px;top:1620px;display:flex;justify-content:space-between;font:700 34px var(--mono)">
+        <span style="color:var(--muted)">MON NETDEX</span><span id="s7count"></span>
+      </div>
+      <div class="abs" style="left:80px;right:80px;top:1680px;height:16px;background:var(--line);border-radius:3px;overflow:hidden">
+        <div id="s7prog" style="height:100%;background:var(--accent);transform-origin:0 50%"></div>
+      </div>
+    </div>
+
+    <!-- S8 CTA -->
+    <div class="scene" id="s8">
+      <div class="grid-bg" id="s8grid"></div>
+      <div id="s8orbit" class="abs" style="left:540px;top:900px;z-index:0"></div>
+      <svg id="logo2" class="abs" width="300" height="300" viewBox="0 0 512 512" style="left:390px;top:470px">
+        <rect width="512" height="512" rx="96" fill="#ff5b1f"/>
+        <rect x="104" y="128" width="304" height="256" rx="18" fill="#111110"/>
+        <circle cx="146" cy="156" r="10" fill="#ff5b1f"/><circle cx="178" cy="156" r="10" fill="#ecebe6"/><circle cx="210" cy="156" r="10" fill="#ecebe6"/>
+        <rect x="104" y="184" width="304" height="4" fill="#ff5b1f"/>
+        <text x="152" y="320" font-family="JBM, monospace" font-weight="800" font-size="120" fill="#ecebe6">n</text>
+        <rect id="lg2-u" x="236" y="300" width="96" height="20" fill="#ff5b1f"/>
+      </svg>
+      <div id="s8word" class="abs mono uscore" style="left:0;right:0;top:830px;text-align:center;font:800 150px/1 var(--mono);letter-spacing:-.04em">netdex</div>
+      <div class="abs" style="left:0;right:0;top:1060px;text-align:center">
+        <div class="mask big" style="font-size:84px;letter-spacing:-.03em"><span id="s8a">Ton premier booster</span></div>
+        <div class="mask big" style="font-size:84px;letter-spacing:-.03em;color:var(--muted)"><span id="s8b">t'attend.</span></div>
+      </div>
+      <div id="s8btn" class="abs" style="left:140px;right:140px;top:1340px;height:150px;border-radius:14px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;gap:24px;font:800 58px var(--mono);letter-spacing:-.02em;box-shadow:14px 14px 0 var(--line-2)">
+        Commencer <span style="opacity:.6">·</span> 2 min →
+      </div>
+      <div id="s8url" class="abs mono" style="left:0;right:0;top:1580px;text-align:center;font:700 52px var(--mono)">netdex.site</div>
+      <div id="s8free" class="abs mono" style="left:0;right:0;top:1660px;text-align:center;font:700 30px var(--mono);color:var(--muted);letter-spacing:.2em">GRATUIT · SUR MOBILE ET PC</div>
+    </div>
+  </div>
+
+  <div id="hud"><span class="uscore">netdex</span><span><span class="rec">●</span> <span id="tc"></span></span></div>
+  <div id="bars"></div>
+  <canvas id="grain" width="540" height="960"></canvas>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+</div>
+
+<script>
+// ---------- outils ----------
+const FPS = 30, DUR = 15, BPM = 128, BEAT = 60 / BPM, BAR = BEAT * 4;
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const eOutExpo = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+const eInExpo = (x) => (x <= 0 ? 0 : Math.pow(2, 10 * x - 10));
+const eOutCubic = (x) => 1 - Math.pow(1 - x, 3);
+const eInOutCubic = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const eOutBack = (x, s = 2.2) => 1 + (s + 1) * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2);
+const eOutElastic = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : Math.pow(2, -10 * x) * Math.sin((x * 10 - .75) * (2 * Math.PI / 3)) + 1);
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+const RAR = ['Commune', 'Peu commune', 'Rare', 'Épique', 'Légendaire', 'Mythique'];
+const RCOL = ['#8f8c84', '#57b26a', '#3d8ee6', '#9b5de5', '#e0a100', '#e5484d'];
+const SITES = [
+  ['google.com', 1, 5], ['youtube.com', 2, 5], ['wikipedia.org', 7, 4], ['reddit.com', 9, 4], ['amazon.com', 12, 4],
+  ['instagram.com', 4, 5], ['github.com', 38, 3], ['netflix.com', 25, 3], ['x.com', 6, 4], ['openai.com', 15, 4],
+  ['spotify.com', 48, 3], ['discord.com', 61, 3], ['apple.com', 33, 3], ['figma.com', 210, 2], ['notion.so', 180, 2],
+  ['chess.com', 160, 2], ['duolingo.com', 420, 2], ['airbnb.com', 290, 2], ['lemonde.fr', 870, 1], ['nasa.gov', 640, 1],
+  ['steampowered.com', 130, 2],
+];
+const power = (rank) => Math.max(1, Math.round(1000 * (1 - Math.log10(rank) / 6)));
+function card([domain, rank, r], scale = 1) {
+  const el = document.createElement('div');
+  el.className = 'card r' + r;
+  el.style.fontSize = (30 * scale) + 'px';
+  el.innerHTML = `<div class="c-bar"><i></i><i></i><i></i><span class="rk">#${rank}</span></div>
+    <div class="c-url">${domain}</div><div class="c-art"><img src="assets/fav/${domain}.png"></div>
+    <div class="c-name">${domain.split('.')[0]}</div>
+    <div class="c-foot"><span class="rar">${RAR[r]}</span><span>${power(rank)}</span></div><div class="holo"></div>`;
+  return el;
+}
+function setRarity(el, r) {
+  el.className = 'card r' + r;
+  el.querySelector('.rar').textContent = RAR[r];
+}
+const S = (el, o) => { for (const k in o) el.style[k] = o[k]; };
+
+// ---------- construction ----------
+// barres de progression (8 mesures)
+for (let i = 0; i < 8; i++) $('bars').insertAdjacentHTML('beforeend', '<i><b></b></i>');
+const barEls = [...$('bars').querySelectorAll('b')];
+
+// S3 : mur de cartes
+const wallCols = [];
+for (let c = 0; c < 6; c++) {
+  const col = document.createElement('div');
+  col.className = 'abs';
+  $('wall').appendChild(col);
+  const cards = [];
+  for (let k = 0; k < 7; k++) {
+    const s = SITES[(c * 5 + k * 3) % SITES.length];
+    const el = card(s, 1);
+    col.appendChild(el);
+    cards.push(el);
+  }
+  wallCols.push({ col, cards });
+}
+
+// S4 : éventail
+const fanCards = [SITES[6], SITES[13], SITES[1], SITES[17], SITES[10]].map((s) => { const el = card(s, 1.05); $('s4fan').appendChild(el); return el; });
+
+// S5 : grande carte
+const bigCard = card(['youtube.com', 2, 0], 2.2);
+$('s5cardwrap').appendChild(bigCard);
+const rings = [];
+for (let i = 0; i < 6; i++) { const r = document.createElement('div'); r.className = 'abs'; S(r, { borderRadius: '50%', border: '10px solid ' + RCOL[i] }); $('s5rings').appendChild(r); rings.push(r); }
+
+// S6 : 4 features
+$('s6in').innerHTML = `
+  <div id="f0" class="abs" style="inset:0"></div><div id="f1" class="abs" style="inset:0"></div>
+  <div id="f2" class="abs" style="inset:0"></div><div id="f3" class="abs" style="inset:0"></div>`;
+const FEAT = [
+  { w: 'Échanges', sub: 'troque tes doublons', bg: 'var(--bg)', fg: 'var(--text)' },
+  { w: 'Enchères', sub: 'vends au plus offrant', bg: 'var(--accent)', fg: 'var(--accent-ink)' },
+  { w: 'Duels', sub: 'carte contre carte', bg: 'var(--bg)', fg: 'var(--text)' },
+  { w: 'Amis', sub: 'compare vos collections', bg: 'var(--text)', fg: 'var(--bg)' },
+];
+FEAT.forEach((f, i) => {
+  const el = $('f' + i);
+  S(el, { background: f.bg, color: f.fg });
+  el.innerHTML = `<div class="abs mono" style="left:84px;top:300px;font:700 36px var(--mono);opacity:.7;letter-spacing:.2em">0${i + 1} / 04</div>
+    <div class="abs" style="left:80px;right:40px;top:380px"><div class="mask big" style="font-size:${i === 3 ? 230 : 200}px"><span class="fw">${f.w}</span></div></div>
+    <div class="abs mono fs" style="left:84px;top:620px;font:700 44px var(--mono)">${f.sub}</div>
+    <div class="abs fx" style="left:540px;top:1180px;width:0;height:0"></div>`;
+});
+// micro-UI par feature
+const fx = (i) => $('f' + i).querySelector('.fx');
+const swapA = card(SITES[3], 1.25), swapB = card(SITES[7], 1.25);
+fx(0).append(swapA, swapB);
+fx(0).insertAdjacentHTML('beforeend', '<div class="abs mono swaparr" style="left:-60px;top:-70px;width:120px;text-align:center;font:800 110px/1 var(--mono);color:var(--accent)">⇄</div>');
+const aucCard = card(SITES[0], 1.25); fx(1).append(aucCard);
+fx(1).insertAdjacentHTML('beforeend', `<div class="abs mono" style="left:-420px;top:-40px;width:840px;text-align:center"></div>
+  <div class="abs" id="bid" style="left:-400px;top:300px;width:800px;height:150px;background:var(--bg);color:var(--text);border-radius:14px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;font:800 76px var(--mono)"><span style="font-size:36px;color:var(--muted)">OFFRE</span><span id="bidv"></span></div>`);
+const duelA = card(SITES[1], 1.2), duelB = card(SITES[5], 1.2); fx(2).append(duelA, duelB);
+fx(2).insertAdjacentHTML('beforeend', '<div class="abs vs" style="left:-140px;top:-110px;width:280px;text-align:center;font:900 200px/1 var(--sans);color:var(--accent);letter-spacing:-.06em">VS</div>');
+const AV = ['#ff5b1f', '#3d8ee6', '#57b26a', '#9b5de5', '#e0a100', '#e5484d', '#8f8c84'];
+const AVN = ['L', 'M', 'S', 'K', 'A', 'J', 'N'];
+fx(3).insertAdjacentHTML('beforeend', '<svg class="abs" id="netsvg" width="1080" height="1000" style="left:-540px;top:-500px"></svg>');
+const avatars = AV.map((c, i) => { const d = document.createElement('div'); d.className = 'abs mono'; S(d, { width: '170px', height: '170px', borderRadius: '50%', background: c, color: '#111', display: 'grid', placeItems: 'center', font: '800 76px var(--mono)', border: '8px solid var(--text)' }); d.textContent = AVN[i]; fx(3).appendChild(d); return d; });
+const avPos = [[0, 0], [-300, -260], [300, -240], [-340, 170], [320, 200], [-60, 360], [40, -340]];
+
+// S7 grille collection
+const COLS = 4, CW = 210, CH = 294, GX = (920 - COLS * CW) / (COLS - 1);
+const collCards = [];
+for (let i = 0; i < 12; i++) {
+  const s = SITES[(i * 5 + 1) % SITES.length];
+  const el = card(s, 0.7); // 7em*... 0.7*30=21px → 210 x 294
+  S(el, { left: (i % COLS) * (CW + GX) + 'px', top: Math.floor(i / COLS) * (CH + 24) + 'px' });
+  $('s7grid').appendChild(el);
+  collCards.push(el);
+}
+
+// S8 orbite
+const orbit = [SITES[0], SITES[1], SITES[2], SITES[5], SITES[6], SITES[8], SITES[11], SITES[16]].map((s) => { const el = card(s, .62); $('s8orbit').appendChild(el); return el; });
+
+// grain
+const gctx = $('grain').getContext('2d');
+const gimg = gctx.createImageData(540, 960);
+
+// ---------- rendu ----------
+const scenes = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'].map($);
+
+function render(t) {
+  const sc = Math.min(7, Math.floor(t / BAR));
+  scenes.forEach((s, i) => (s.style.display = i === sc ? 'block' : 'none'));
+  const lt = t - sc * BAR;              // temps local dans la mesure
+  const lb = lt / BEAT;                 // en temps (beats)
+  const beatPhase = (t / BEAT) % 1;
+
+  // caméra : punch sur chaque temps + léger shake
+  const kick = Math.exp(-beatPhase * 9);
+  const r = rng(Math.floor(t * FPS) + 7);
+  const shake = sc === 0 || sc === 7 ? 0 : 4 * kick;
+  const zoomPunch = 1 + 0.018 * kick;
+  $('cam').style.transform = `translate(${(r() - .5) * shake}px, ${(r() - .5) * shake}px) scale(${zoomPunch})`;
+
+  // flash aux coupes
+  const cutAge = lt;
+  const fl = sc > 0 ? Math.max(0, 1 - cutAge / 0.09) : 0;
+  S($('flash'), { opacity: fl * .65, background: sc % 2 ? '#ff5b1f' : '#ecebe6' });
+
+  // HUD
+  const showHud = sc > 0 && sc < 7;
+  $('hud').style.opacity = showHud ? 1 : 0;
+  $('bars').style.opacity = showHud ? 1 : 0;
+  const s = Math.floor(t), f = Math.floor((t % 1) * FPS);
+  $('tc').textContent = `00:${String(s).padStart(2, '0')}:${String(f).padStart(2, '0')}`;
+  barEls.forEach((b, i) => (b.style.transform = `scaleX(${clamp((t - i * BAR) / BAR)})`));
+
+  ({ 0: s1, 1: s2, 2: s3, 3: s4, 4: s5, 5: s6, 6: s7, 7: s8 })[sc](lt, lb);
+
+  // grain
+  const d = gimg.data;
+  for (let i = 0; i < d.length; i += 4) { const v = r() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+  gctx.putImageData(gimg, 0, 0);
+}
+
+function maskIn(el, lt, at, dur = .45, from = 110) {
+  const k = eOutExpo(prog(lt, at, at + dur));
+  el.style.transform = `translateY(${(1 - k) * from}%)`;
+}
+
+// S1 — construction du logo
+function s1(lt) {
+  const bg = eOutBack(prog(lt, 0, .38), 1.8);
+  const rot = (1 - eOutExpo(prog(lt, 0, .5))) * -120;
+  const lift = eInOutCubic(prog(lt, .95, 1.35));
+  const sc = lerp(1, .72, lift);
+  $('logo').style.transform = `translateY(${-lift * 300}px) rotate(${rot}deg) scale(${bg * sc})`;
+  const win = eOutExpo(prog(lt, .2, .55));
+  $('lg-win').setAttribute('transform', `translate(256 256) scale(${win} ${win}) translate(-256 -256)`);
+  ['lg-d1', 'lg-d2', 'lg-d3'].forEach((id, i) => { const k = eOutBack(prog(lt, .45 + i * .06, .65 + i * .06), 3); $(id).setAttribute('r', 10 * k); });
+  const ln = eOutExpo(prog(lt, .5, .8));
+  $('lg-line').setAttribute('width', 304 * ln);
+  $('lg-n').style.opacity = lt > .62 ? 1 : 0;
+  const u = eOutExpo(prog(lt, .7, .9));
+  $('lg-u').setAttribute('width', 96 * u);
+  $('lg-u').style.opacity = lt > 1.3 && Math.floor(lt / .16) % 2 ? .2 : 1;
+  // mot-symbole tapé lettre par lettre
+  const word = 'netdex';
+  const n = Math.floor(clamp((lt - 1.05) / .06, 0, 6));
+  const cursorOn = Math.floor(lt / .14) % 2 === 0 || n < 6;
+  $('s1word').innerHTML = word.slice(0, n) + `<span style="color:var(--accent);opacity:${lt > 1.0 && cursorOn ? 1 : 0}">_</span>`;
+  const sub = eOutExpo(prog(lt, 1.45, 1.8));
+  S($('s1sub'), { opacity: sub, letterSpacing: lerp(.8, .3, sub) + 'em' });
+  S($('s1grid'), { opacity: .35 * eOutCubic(prog(lt, 0, 1)), transform: `scale(${lerp(1.4, 1, eOutExpo(prog(lt, 0, 1.8)))})` });
+}
+
+// S2 — typo cinétique
+function s2(lt, lb) {
+  maskIn($('s2a'), lt, 0);
+  maskIn($('s2b'), lt, BEAT);
+  maskIn($('s2c'), lt, BEAT * 2);
+  // glitch sur "internet"
+  const g = lb > 1 && lb < 1.35 ? (Math.floor(lt * 60) % 3 - 1) * 14 : 0;
+  $('s2b').style.textShadow = g ? `${g}px 0 #3d8ee6, ${-g}px 0 #e5484d` : 'none';
+  $('s2tag').style.opacity = eOutCubic(prog(lt, BEAT * 2.4, BEAT * 3));
+  // le point grossit et avale l'écran
+  const w = eInExpo(prog(lt, BEAT * 3.1, BAR));
+  const dot = $('s2dot').getBoundingClientRect();
+  const R = w * 2600;
+  S($('s2wipe'), { left: (dot.left + dot.width / 2 - R) + 'px', top: (dot.top + dot.height * .8 - R) + 'px', width: R * 2 + 'px', height: R * 2 + 'px' });
+}
+
+// S3 — mur de cartes 3D
+function s3(lt) {
+  const W = 300, H = 420, gap = 34;
+  wallCols.forEach(({ col, cards }, c) => {
+    const dir = c % 2 ? 1 : -1;
+    const speed = 260;
+    const off = (dir * lt * speed) % (H + gap);
+    const x = (c - 2.5) * (W + gap) - W / 2;
+    cards.forEach((el, k) => {
+      const drop = eOutExpo(prog(lt, .02 * (c + k), .5 + .02 * (c + k)));
+      const y = (k - 3.5) * (H + gap) + off - H / 2;
+      S(el, { left: x + 'px', top: y + 'px', opacity: drop, transform: `translateZ(${(1 - drop) * 900}px)` });
+    });
+  });
+  const tilt = lerp(1.25, 1, eOutExpo(prog(lt, 0, 1.2)));
+  $('wall').style.transform = `perspective(1800px) rotateX(28deg) rotateZ(-14deg) scale(${tilt * 1.15})`;
+  maskIn($('s3a'), lt, BEAT * .5);
+  maskIn($('s3b'), lt, BEAT * 1.5);
+  $('s3shade').style.opacity = eOutCubic(prog(lt, BEAT * .3, BEAT));
+}
+
+// S4 — booster
+function s4(lt, lb) {
+  const cd = Math.max(0, 180 - Math.floor(eInOutCubic(prog(lt, 0, BEAT * 2)) * 180));
+  const ready = cd === 0;
+  $('s4timer').textContent = ready ? 'PRÊT !' : `0${Math.floor(cd / 60)}:${String(cd % 60).padStart(2, '0')}`;
+  $('s4timer').style.color = ready ? 'var(--accent)' : 'var(--text)';
+  $('s4lbl').textContent = ready ? 'BOOSTER DISPONIBLE' : 'PROCHAIN BOOSTER';
+  const inK = eOutBack(prog(lt, 0, .4), 1.6);
+  const shake = lb > 1 && lb < 2 ? Math.sin(lt * 90) * 8 * (lb - 1) : 0;
+  const open = prog(lt, BEAT * 2, BEAT * 2.6);
+  S($('pack'), { transform: `translateY(${(1 - inK) * 900 + eInExpo(open) * 1400}px) rotate(${shake}deg) scale(${1 + .04 * Math.sin(lb * Math.PI * 2) * (lb < 2)})`, opacity: open < 1 ? 1 : 0 });
+  // flash d'ouverture
+  const rip = prog(lt, BEAT * 2, BEAT * 2.3);
+  S($('s4rip'), { height: '1920px', opacity: rip > 0 && rip < 1 ? (1 - rip) * .9 : 0 });
+  // cartes en éventail
+  fanCards.forEach((el, i) => {
+    const k = eOutBack(prog(lt, BEAT * 2.1 + i * .045, BEAT * 2.1 + i * .045 + .45), 1.4);
+    const a = (i - 2) * 13 * k;
+    const x = (i - 2) * 175 * k - 165, y = -220 + Math.abs(i - 2) * 40 * k - (1 - k) * -300;
+    S(el, { left: x + 'px', top: y + 'px', transform: `rotate(${a}deg) scale(${lerp(.3, 1, k)})`, opacity: k > 0 ? 1 : 0, zIndex: 10 - Math.abs(i - 2) });
+  });
+  maskIn($('s4a'), lt, BEAT * 2.2);
+  maskIn($('s4b'), lt, BEAT * 2.6);
+}
+
+// S5 — montée en rareté
+function s5(lt) {
+  const step = BEAT / 2;
+  const r = Math.min(5, Math.floor(lt / step));
+  setRarity(bigCard, r);
+  const sinceStep = lt - r * step;
+  const punch = r < 5 ? 1 + .08 * Math.exp(-sinceStep * 18) : 1 + .1 * Math.exp(-(lt - 5 * step) * 6);
+  const intro = eOutExpo(prog(lt, 0, .35));
+  const ry = r === 5 ? Math.sin(prog(lt, 5 * step, BAR) * Math.PI * 1.2) * 18 : (1 - intro) * 90;
+  S(bigCard, { left: -330 + 'px', top: -462 + 'px', transform: `rotateY(${ry}deg) rotateX(${r === 5 ? 6 : 0}deg) scale(${punch * lerp(.6, 1, intro)})`, boxShadow: `0 0 ${r * 40}px ${RCOL[r]}66` });
+  const holo = bigCard.querySelector('.holo');
+  const hk = prog(lt, 5 * step, BAR);
+  S(holo, { opacity: r === 5 ? .9 : 0, backgroundPosition: `${lerp(100, 0, hk)}% ${lerp(100, 0, hk)}%` });
+  bigCard.querySelector('.rk').textContent = r === 5 ? 'HOLO #2' : '#2';
+  if (r === 5) bigCard.querySelector('.c-bar').style.backgroundPosition = `${lt * 40}px 0`;
+  rings.forEach((el, i) => {
+    const age = lt - i * step;
+    const k = clamp(age / .55);
+    const R = 360 + eOutExpo(k) * 700;
+    S(el, { display: age >= 0 && k < 1 ? 'block' : 'none', left: -R + 'px', top: -R + 'px', width: 2 * R + 'px', height: 2 * R + 'px', opacity: 1 - k, borderWidth: lerp(26, 2, k) + 'px' });
+  });
+  $('s5ghost').textContent = RAR[r].toUpperCase();
+  $('s5ghost').style.webkitTextStroke = `3px ${RCOL[r]}`;
+  $('s5ghost').style.transform = `translateX(${-sinceStep * 300}px)`;
+  S($('s5name'), { color: RCOL[r] });
+  $('s5name').textContent = RAR[r];
+  $('s5pow').textContent = `PUISSANCE ${power(2)} · RANG #2 MONDIAL`;
+}
+
+// S6 — features, une par temps
+function s6(lt, lb) {
+  const i = Math.min(3, Math.floor(lb));
+  const ft = lt - i * BEAT;
+  FEAT.forEach((_, j) => ($('f' + j).style.display = j === i ? 'block' : 'none'));
+  const el = $('f' + i);
+  maskIn(el.querySelector('.fw'), ft, 0, .3);
+  el.querySelector('.fs').style.opacity = eOutCubic(prog(ft, .08, .3));
+  el.style.clipPath = `inset(0 0 0 ${(1 - eOutExpo(prog(ft, 0, .2))) * 100}%)`;
+  const k = eOutExpo(prog(ft, .05, .4));
+  if (i === 0) {
+    const sw = eInOutCubic(prog(ft, .12, .42));
+    S(swapA, { left: lerp(-420, 120, sw) + 'px', top: -260 + Math.sin(sw * Math.PI) * -120 + 'px', transform: `rotate(${lerp(-8, 8, sw)}deg) scale(${k})` });
+    S(swapB, { left: lerp(120, -420, sw) + 'px', top: -260 + Math.sin(sw * Math.PI) * 120 + 'px', transform: `rotate(${lerp(8, -8, sw)}deg) scale(${k})` });
+    el.querySelector('.swaparr').style.transform = `rotate(${sw * 180}deg) scale(${k})`;
+  } else if (i === 1) {
+    S(aucCard, { left: '-187px', top: '-420px', transform: `scale(${eOutBack(k, 1.6)}) rotate(${lerp(-12, -3, k)}deg)` });
+    const v = Math.round(lerp(120, 4850, eOutCubic(prog(ft, .05, .42))) / 10) * 10;
+    $('bidv').innerHTML = `${v.toLocaleString('fr-FR')} <span style="color:var(--accent)">◆</span>`;
+    $('bid').style.transform = `translateY(${(1 - k) * 200}px)`;
+  } else if (i === 2) {
+    const hit = eInExpo(prog(ft, 0, .2));
+    const bounce = ft > .2 ? eOutCubic(prog(ft, .2, .45)) : 0;
+    S(duelA, { left: lerp(-900, -330, hit) - bounce * 40 + 'px', top: '-200px', transform: `rotate(${-10 + bounce * 4}deg)` });
+    S(duelB, { left: lerp(800, 30, hit) + bounce * 40 + 'px', top: '-200px', transform: `rotate(${10 - bounce * 4}deg)` });
+    el.querySelector('.vs').style.transform = `scale(${ft > .2 ? eOutBack(prog(ft, .2, .38), 3) : 0}) rotate(-8deg)`;
+  } else {
+    let lines = '';
+    avatars.forEach((a, j) => {
+      const kk = eOutBack(prog(ft, .02 * j, .25 + .02 * j), 2.5);
+      const [x, y] = avPos[j];
+      S(a, { left: x * kk - 85 + 'px', top: y * kk - 85 + 'px', transform: `scale(${kk})` });
+      if (j > 0) { const lk = prog(ft, .12 + .02 * j, .3 + .02 * j); lines += `<line x1="540" y1="500" x2="${540 + x * lk}" y2="${500 + y * lk}" stroke="#111110" stroke-width="8" stroke-dasharray="4 14" stroke-linecap="round"/>`; }
+    });
+    $('netsvg').innerHTML = lines;
+  }
+}
+
+// S7 — collection
+function s7(lt) {
+  maskIn($('s7a'), lt, 0);
+  maskIn($('s7b'), lt, BEAT * .5);
+  const step = BEAT / 4; // double-croches
+  let n = 0;
+  collCards.forEach((el, i) => {
+    const at = BEAT * .5 + i * step;
+    const k = eOutBack(prog(lt, at, at + .3), 2.4);
+    if (lt >= at) n++;
+    S(el, { opacity: lt >= at ? 1 : .12, transform: `scale(${lt >= at ? k : 1}) rotate(${(1 - k) * 18 * (i % 2 ? 1 : -1)}deg)`, filter: lt >= at ? 'none' : 'grayscale(1)' });
+  });
+  const done = n === collCards.length;
+  $('s7count').innerHTML = done ? '<span style="color:var(--r1)">12/12 ✓</span>' : `${n}/12`;
+  $('s7prog').style.transform = `scaleX(${n / 12})`;
+  const out = eInExpo(prog(lt, BEAT * 3.3, BAR));
+  $('s7grid').style.transform = `scale(${1 + out * .25})`;
+  $('s7grid').style.opacity = 1 - out;
+}
+
+// S8 — appel à l'action
+function s8(lt) {
+  const lk = eOutBack(prog(lt, 0, .45), 2);
+  $('logo2').style.transform = `scale(${lk}) rotate(${(1 - eOutExpo(prog(lt, 0, .5))) * 90}deg)`;
+  $('lg2-u').style.opacity = Math.floor(lt / .2) % 2 ? .25 : 1;
+  const wk = eOutExpo(prog(lt, .12, .5));
+  S($('s8word'), { opacity: wk, letterSpacing: lerp(.3, -.04, wk) + 'em' });
+  maskIn($('s8a'), lt, .25);
+  maskIn($('s8b'), lt, .38);
+  const bk = eOutBack(prog(lt, .5, .85), 2.2);
+  const pulse = 1 + .035 * Math.max(0, Math.sin((lt - .9) * Math.PI * 2 / BEAT)) * (lt > .9);
+  S($('s8btn'), { transform: `scale(${bk * pulse})` });
+  $('s8url').style.opacity = eOutCubic(prog(lt, .7, 1));
+  $('s8free').style.opacity = eOutCubic(prog(lt, .85, 1.15));
+  orbit.forEach((el, i) => {
+    const a = (i / orbit.length) * Math.PI * 2 + lt * .9;
+    const R = lerp(1500, 520, eOutExpo(prog(lt, 0, .8)));
+    const x = Math.cos(a) * R, y = Math.sin(a) * R * 1.45;
+    const depth = (Math.sin(a) + 1) / 2;
+    S(el, { left: x - 105 + 'px', top: y - 145 + 'px', opacity: .12 + .22 * depth, transform: `rotate(${Math.cos(a) * 14}deg) scale(${.7 + .4 * depth})`, filter: `blur(${(1 - depth) * 3}px)`, zIndex: Math.round(depth * 10) });
+  });
+  S($('s8grid'), { opacity: .3, transform: `translateY(${-lt * 40}px)` });
+  // fondu au noir final
+  $('flash').style.opacity = Math.max(parseFloat($('flash').style.opacity) || 0, 0);
+}
+
+window.render = render;
+window.ready = document.fonts.ready.then(() => Promise.all([...document.images].map((im) => im.complete ? 0 : new Promise((r) => (im.onload = im.onerror = r)))));
+</script>
+</body>
+</html>
