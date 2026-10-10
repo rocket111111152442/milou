@@ -711,6 +711,7 @@ export async function viewTrade(el, { query }) {
   const sel = { give: new Map(), get: new Map() };
   let side = 'give';
   el.innerHTML = `<div class="page-head"><h1>Échange avec ${esc(prof.username)}</h1></div>
+    ${prof.isBot ? '<p class="muted small" style="margin-top:-6px">Joueur automatique : il répond en quelques minutes (plus tard s\'il dort) et juge ton offre au prix du marché. S\'il refuse, il te dit par message combien de bits ajouter.</p>' : ''}
     <div class="panel builder-tray" data-tray></div>
     <div class="tabs" style="margin-top:12px"><button data-side="give">Je donne (ma collection)</button><button data-side="get">Je demande (sa collection)</button></div>
     <input type="search" placeholder="Rechercher…" data-q style="margin-bottom:10px">

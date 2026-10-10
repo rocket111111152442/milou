@@ -5,6 +5,7 @@
 // d'un joueur (et une fois par jour par la tâche planifiée). Un bot en retard rattrape le temps écoulé
 // comme un humain qui revient : il ouvre les boosters accumulés, répond aux échanges, etc.
 import { randomInt } from 'node:crypto';
+import { sitePrices } from './market.js';
 import { RARITIES } from './sites.js';
 import { CONFIG, GameError } from './game.js';
 
@@ -192,10 +193,11 @@ async function session(db, game, bot, opts) {
   }
 
   // 1. Il regarde ses demandes d'amis et ses échanges reçus.
-  const reqs = await db.all("SELECT user_id FROM friends WHERE friend_id = $1 AND status = 'pending' LIMIT 5", [bot.id]);
+  // (les demandes des humains passent par serveHumans)
+  const reqs = await db.all("SELECT f.user_id FROM friends f JOIN users u ON u.id = f.user_id AND u.is_bot WHERE f.friend_id = $1 AND f.status = 'pending' LIMIT 5", [bot.id]);
   for (const r of reqs) await tryDo('ami', () => game.respondFriend(me, r.user_id, rnd() < 0.92));
   await answerMessages(db, bot, p, now);
-  const trades = await db.all("SELECT id FROM trades WHERE to_id = $1 AND status = 'pending' ORDER BY id LIMIT 5", [bot.id]);
+  const trades = await db.all("SELECT t.id FROM trades t JOIN users u ON u.id = t.from_id AND u.is_bot WHERE t.to_id = $1 AND t.status = 'pending' ORDER BY t.id LIMIT 5", [bot.id]);
   for (const t of trades) await considerTrade(db, game, bot, me, t.id, tryDo);
 
   // 2. Bonus quotidien.
@@ -366,6 +368,110 @@ async function socialize(db, game, bot, me, p, tryDo, opts) {
   }
 }
 
+// ---------- Guichet des humains ----------
+// Un humain qui demande un bot en ami ou lui propose un échange reçoit une réponse en quelques minutes
+// (plus longtemps si le bot « dort »), sans attendre la prochaine session du bot. Les bots proposent aussi
+// eux-mêmes des échanges équitables à leurs amis humains, au prix du marché.
+const replyDelay = (seed, sleeping) => (sleeping ? 20 + (seed % 40) : 1 + (seed % 5)) * MIN;
+const say = (db, from, to, text) => db.run('INSERT INTO messages (from_id, to_id, text, at) VALUES ($1, $2, $3, $4)', [from, to, text, Date.now()]);
+const DEAL = ['deal !', 'ok ça marche', 'vendu, merci !', 'parfait, échange fait', 'ça me va 👍'];
+const NO_DEAL = (need) => pick([`pas assez pour moi, ajoute ~${need} bits et c'est bon`, `presque ! encore ${need} bits et j'accepte`, `non merci… avec ${need} bits de plus ok`]);
+
+async function cardPrices(db, game, items) {
+  const prices = await sitePrices(db, game, items.map((i) => i.site_id));
+  return (i) => (prices.get(i.site_id) || 1) * (i.holo ? CONFIG.holoMultiplier : 1);
+}
+
+async function judgeHumanTrade(db, game, bot, t) {
+  const p = traits(bot.bot);
+  const me = { id: bot.id, username: bot.username };
+  const items = await db.all(`SELECT ti.side, c.holo, c.user_id, c.status, s.id site_id, s.rarity, s.family FROM trade_items ti
+    JOIN cards c ON c.id = ti.card_id JOIN sites s ON s.id = c.site_id WHERE ti.trade_id = $1`, [t.id]);
+  const offer = items.filter((i) => i.side === 'offer'), request = items.filter((i) => i.side === 'request');
+  if (bot.bits < t.request_bits) {
+    await game.resolveTrade(me, t.id, 'decline');
+    return say(db, bot.id, t.from_id, `j'ai pas ${t.request_bits} bits, désolé`);
+  }
+  const price = await cardPrices(db, game, items);
+  const owns = await ownedSites(db, bot.id, offer.map((i) => i.site_id));
+  // Ce qu'il reçoit : prix du marché, un peu plus s'il ne l'a pas ou si c'est sa famille préférée.
+  const gain = offer.reduce((a, i) => a + price(i) * (owns.has(i.site_id) ? 0.8 : 1.15) * (p.fav && i.family === p.fav ? 1.2 : 1), 0) + t.offer_bits;
+  // Ce qu'il donne : prix du marché ; il tient davantage à ses Légendaires et Mythiques.
+  const loss = request.reduce((a, i) => a + price(i) * (i.rarity >= 4 ? 1.3 : 1), 0) + t.request_bits;
+  const greed = Math.min(1.2, Math.max(0.9, p.greed || 1));
+  if (gain >= loss * greed) {
+    const r = await game.resolveTrade(me, t.id, 'accept').catch((e) => { if (e instanceof GameError) return null; throw e; });
+    if (r?.status === 'accepted') await say(db, bot.id, t.from_id, pick(DEAL));
+    return r;
+  }
+  await game.resolveTrade(me, t.id, 'decline');
+  return say(db, bot.id, t.from_id, NO_DEAL(Math.max(1, Math.ceil(loss * greed - gain))));
+}
+
+async function proposeToHuman(db, game, human) {
+  // Un de ses amis bots, réveillé, au hasard.
+  const now = Date.now();
+  const bots = await db.all(`SELECT u.* FROM friends f JOIN users u ON u.id = f.friend_id WHERE f.user_id = $1 AND f.status = 'accepted' AND u.is_bot ORDER BY random() LIMIT 5`, [human.id]);
+  const bot = bots.find((b) => !asleep(traits(b.bot), now));
+  if (!bot) return null;
+  // Ce que le bot veut : un doublon de l'humain (hors favoris) qu'il n'a pas.
+  const wants = await db.all(`SELECT DISTINCT ON (c.site_id) c.id, c.holo, s.id site_id, s.rarity, s.family FROM cards c JOIN sites s ON s.id = c.site_id
+    WHERE c.user_id = $1 AND c.status = 'owned' AND s.rarity <= 3
+      AND (SELECT COUNT(*) FROM cards d WHERE d.user_id = $1 AND d.site_id = c.site_id) > 1
+      AND NOT EXISTS (SELECT 1 FROM favorites f WHERE f.user_id = $1 AND f.site_id = c.site_id)
+      AND NOT EXISTS (SELECT 1 FROM cards o WHERE o.user_id = $2 AND o.site_id = c.site_id)
+    ORDER BY c.site_id, c.holo LIMIT 30`, [human.id, bot.id]);
+  if (!wants.length) return null;
+  // Ce qu'il propose : une carte que l'humain n'a jamais eue.
+  const gives = await db.all(`SELECT c.id, c.holo, s.id site_id, s.rarity, s.family FROM cards c JOIN sites s ON s.id = c.site_id
+    WHERE c.user_id = $1 AND c.status = 'owned' AND s.rarity <= 3
+      AND NOT EXISTS (SELECT 1 FROM dex d WHERE d.user_id = $2 AND d.site_id = c.site_id)
+    ORDER BY random() LIMIT 40`, [bot.id, human.id]);
+  if (!gives.length) return null;
+  const price = await cardPrices(db, game, [...wants, ...gives]);
+  let best = null;
+  for (const w of wants) for (const g of gives) {
+    const gap = price(w) - price(g); // > 0 : le bot complète en bits
+    const score = Math.abs(gap) / price(w);
+    if (gap >= 0 && gap <= bot.bits * 0.3 && (!best || score < best.score)) best = { w, g, gap, score };
+  }
+  if (!best || best.score > 0.6) return null;
+  const bits = Math.round(best.gap);
+  await game.createTrade({ id: bot.id, username: bot.username }, {
+    toUserId: human.id, offerCards: [best.g.id], requestCards: [best.w.id], offerBits: bits,
+    message: pick(['échange ? t\'as un doublon que je cherche', 'ça t\'intéresse ? c\'est au prix du marché', 'je complète ma collec, deal ?', 'petit échange équitable ?']),
+  });
+  return bot.id;
+}
+
+export async function serveHumans(db, game) {
+  const now = Date.now();
+  const out = { friends: 0, trades: 0, proposals: 0 };
+  const reqs = await db.all(`SELECT f.user_id, f.created_at, b.id bot_id, b.username, b.bot FROM friends f
+    JOIN users h ON h.id = f.user_id AND NOT h.is_bot JOIN users b ON b.id = f.friend_id AND b.is_bot
+    WHERE f.status = 'pending' AND f.created_at < $1 ORDER BY f.created_at LIMIT 40`, [now - MIN]);
+  for (const r of reqs) {
+    if (now - r.created_at < replyDelay(r.user_id + r.bot_id, asleep(traits(r.bot), now))) continue;
+    try { await game.respondFriend({ id: r.bot_id, username: r.username }, r.user_id, true); out.friends++; } catch (e) { if (!(e instanceof GameError)) throw e; }
+  }
+  const trades = await db.all(`SELECT t.*, b.username, b.bot, b.bits FROM trades t
+    JOIN users h ON h.id = t.from_id AND NOT h.is_bot JOIN users b ON b.id = t.to_id AND b.is_bot
+    WHERE t.status = 'pending' AND t.created_at < $1 ORDER BY t.id LIMIT 30`, [now - MIN]);
+  for (const t of trades) {
+    if (now - t.created_at < replyDelay(t.id, asleep(traits(t.bot), now))) continue;
+    try { await judgeHumanTrade(db, game, { id: t.to_id, username: t.username, bot: t.bot, bits: t.bits }, t); out.trades++; } catch (e) { if (!(e instanceof GameError)) throw e; }
+  }
+  // Propositions des bots : au plus une toutes les 6 h par humain actif, et jamais s'il en a déjà une en attente.
+  const humans = await db.all(`SELECT u.id FROM users u WHERE NOT u.is_bot AND u.last_seen > $1
+      AND EXISTS (SELECT 1 FROM friends f JOIN users b ON b.id = f.friend_id WHERE f.user_id = u.id AND f.status = 'accepted' AND b.is_bot)
+      AND NOT EXISTS (SELECT 1 FROM trades t JOIN users b ON b.id = t.from_id WHERE t.to_id = u.id AND b.is_bot AND (t.status = 'pending' OR t.created_at > $2))
+    ORDER BY random() LIMIT 3`, [now - 2 * 24 * HOUR, now - 6 * HOUR]);
+  for (const h of humans) {
+    try { if (await proposeToHuman(db, game, h)) out.proposals++; } catch (e) { if (!(e instanceof GameError)) throw e; }
+  }
+  return out;
+}
+
 // ---------- Ordonnanceur ----------
 let lastLocalTick = 0;
 let sizeCache = { at: 0, mb: 0 };
@@ -402,6 +508,8 @@ export async function runBots(db, game, { budgetMs = 8000, batch = 25, throttleM
   const done = { sessions: 0, actions: 0, dbFull: opts.dbFull };
   const deadline = now + budgetMs;
   if (rnd() < 0.05 || force) await cleanup(db);
+  // Les demandes des vrais joueurs passent avant tout le reste.
+  done.humans = await serveHumans(db, game).catch((e) => { console.error('humains', e.message); return null; });
   while (Date.now() < deadline) {
     // Réserve un lot de bots dus (SKIP LOCKED : plusieurs instances peuvent travailler sans se gêner).
     const bots = await db.all(`UPDATE users SET bot_next_at = $1 WHERE id IN (
