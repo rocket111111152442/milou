@@ -164,7 +164,7 @@ async function publicProfile(c, meId, name) {
   const showcase = prof.showcase?.length ? await sitesByIds(c, prof.showcase) : [];
   const prog = u.is_bot ? null : progression(u);
   return {
-    id: u.id, username: u.username, isBot: u.is_bot, createdAt: u.created_at, lastSeen: u.last_seen, dexCount: u.dex_count, dexScore: u.dex_score,
+    id: u.id, username: u.username, createdAt: u.created_at, lastSeen: u.last_seen, dexCount: u.dex_count, dexScore: u.dex_score,
     packsOpened: u.packs_opened, avatarSite: u.avatar_site, avatarDomain: u.avatar_domain, rank: rank.r, relation, best, stats: st,
     bio: prof.bio || '', title: prof.title || '', color: prof.color || null, showcase,
     level: prog?.level ?? Math.max(1, Math.floor(Math.sqrt((u.packs_opened * 10 + u.dex_count * 2) / 40)) + 1),

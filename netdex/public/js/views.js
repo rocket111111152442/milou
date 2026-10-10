@@ -711,7 +711,6 @@ export async function viewTrade(el, { query }) {
   const sel = { give: new Map(), get: new Map() };
   let side = 'give';
   el.innerHTML = `<div class="page-head"><h1>Échange avec ${esc(prof.username)}</h1></div>
-    ${prof.isBot ? '<p class="muted small" style="margin-top:-6px">Joueur automatique : il répond en quelques minutes (plus tard s\'il dort) et juge ton offre au prix du marché. S\'il refuse, il te dit par message combien de bits ajouter.</p>' : ''}
     <div class="panel builder-tray" data-tray></div>
     <div class="tabs" style="margin-top:12px"><button data-side="give">Je donne (ma collection)</button><button data-side="get">Je demande (sa collection)</button></div>
     <input type="search" placeholder="Rechercher…" data-q style="margin-bottom:10px">
@@ -913,7 +912,6 @@ export async function viewRules(el) {
         <li>Les nouveaux joueurs démarrent avec <b>0 bit</b> : on en gagne en recyclant, avec le bonus quotidien et en vendant.</li>
         <li>5 cartes par booster, la 5ᵉ est au moins <b>Peu commune</b>. Les Mythiques sortent environ une fois tous les 10 000 boosters.</li>
         <li>1 % de chance qu'une carte soit <b>HOLO</b> (valeur ×${state.me.config.holoMultiplier}).</li>
-        <li>Netdex compte aussi des joueurs automatiques qui ouvrent des boosters, vendent, enchérissent et échangent, avec les mêmes règles que tout le monde.</li>
         <li>Recycle tes doublons en bits, utilise-les aux enchères ou pour des boosters Premium.</li>
         <li>Échanges uniquement entre amis. Enchères ouvertes à tous (commission ${state.me.config.auctionFee * 100} %).</li>
         <li><b>Compteur de pitié</b> : après ${state.me.config.pityAfter} boosters sans Épique, le suivant en contient une à coup sûr.</li>
@@ -1045,7 +1043,7 @@ export async function viewAdmin(el) {
     <form class="panel" data-give>
       <div class="grid-2">
         <label class="field"><span>Joueur</span><input type="text" name="username" placeholder="pseudo" autocomplete="off" list="adm-users"></label>
-        <label class="field" style="display:flex;align-items:end;gap:8px"><input type="checkbox" name="everyone" style="width:18px;height:18px"> Tous les joueurs (humains)</label>
+        <label class="field" style="display:flex;align-items:end;gap:8px"><input type="checkbox" name="everyone" style="width:18px;height:18px"> Tous les joueurs</label>
         <label class="field"><span>Bits (négatif pour retirer)</span><input type="number" name="bits" value="0"></label>
         <label class="field"><span>Boosters</span><input type="number" name="packs" value="0" min="0"></label>
         <label class="field"><span>Carte (domaine)</span><input type="text" name="domain" placeholder="ex : google.com" autocomplete="off" list="adm-sites"></label>
@@ -1084,7 +1082,7 @@ export async function viewAdmin(el) {
     </form>
     <h2>Joueurs</h2>
     <div class="row" style="margin-bottom:10px"><input type="search" placeholder="Rechercher un pseudo…" data-uq style="flex:1">
-      <select data-kind style="width:auto"><option value="humans">Humains</option><option value="bots">Bots</option><option value="all">Tous</option></select></div>
+      <select data-kind style="width:auto"><option value="humans">Joueurs</option><option value="bots">Animation</option><option value="all">Tous</option></select></div>
     <div class="panel" style="padding:0;overflow-x:auto"><table class="data" data-users></table></div>`;
 
   const overview = async () => {
@@ -1092,25 +1090,25 @@ export async function viewAdmin(el) {
     const b = d.bots;
     $('[data-overview]', el).innerHTML = `
       <div class="quick-grid">
-        <div class="quick"><b>${fmt(d.counts.humans)}</b><span>Joueurs humains</span></div>
-        <div class="quick"><b>${fmt(d.counts.bots)}</b><span>Bots (${fmt(b.active)} actifs/h)</span></div>
+        <div class="quick"><b>${fmt(d.counts.humans)}</b><span>Joueurs</span></div>
+        <div class="quick"><b>${fmt(d.counts.bots)}</b><span>Animation (${fmt(b.active)} actifs/h)</span></div>
         <div class="quick"><b>${fmt(d.counts.cards)}</b><span>Cartes en jeu</span></div>
         <div class="quick"><b>${fmt(d.counts.auctions)}</b><span>Ventes ouvertes</span></div>
         <div class="quick"><b>${b.dbMb} / ${d.dbLimitMb} Mo</b><span>Base de données</span></div>
       </div>
       <div class="panel" style="margin-top:10px"><div class="row">
-        <div class="grow"><b>Bots</b> <span class="tag ${b.paused ? 'warn' : 'good'}">${b.paused ? 'en pause' : 'actifs'}</span>
+        <div class="grow"><b>Animation</b> <span class="tag ${b.paused ? 'warn' : 'good'}">${b.paused ? 'en pause' : 'actifs'}</span>
           <div class="muted small">${fmt(b.due)} en attente · dernière passe ${b.lastTick ? ago(b.lastTick) : 'jamais'}${b.dbMb >= d.dbLimitMb ? ' · base presque pleine : ils n\'ouvrent plus de boosters' : ''}</div></div>
-        ${Number(d.counts.bots) ? '' : '<button class="btn primary sm" data-seed>Créer 10 000 bots</button>'}
+        ${Number(d.counts.bots) ? '' : '<button class="btn primary sm" data-seed>Lancer l'animation (10 000 comptes)</button>'}
         <button class="btn sm" data-tick>Lancer une passe</button>
         <button class="btn sm" data-pause="${b.paused ? 0 : 1}">${b.paused ? 'Reprendre' : 'Mettre en pause'}</button>
-        ${Number(d.counts.bots) ? '<button class="btn sm danger" data-del-bots>Supprimer les bots</button>' : ''}
+        ${Number(d.counts.bots) ? '<button class="btn sm danger" data-del-bots>Arrêter et supprimer l'animation</button>' : ''}
       </div></div>`;
   };
   const users = async () => {
     const d = await api('/admin/users?' + new URLSearchParams({ q: $('[data-uq]', el).value.trim(), kind: $('[data-kind]', el).value }));
     $('[data-users]', el).innerHTML = `<tr><th>Pseudo</th><th>Bits</th><th>Sites</th><th>Boosters</th><th>Vu</th><th></th></tr>` + d.items.map((u) => `<tr data-id="${u.id}" data-name="${esc(u.username)}">
-      <td><a href="#/u/${encodeURIComponent(u.username)}">${esc(u.username)}</a> ${u.is_bot ? '<span class="tag">bot</span>' : ''} ${u.is_admin ? '<span class="tag accent">admin</span>' : ''}</td>
+      <td><a href="#/u/${encodeURIComponent(u.username)}">${esc(u.username)}</a> ${u.is_bot ? '<span class="tag">anim</span>' : ''} ${u.is_admin ? '<span class="tag accent">admin</span>' : ''}</td>
       <td class="num">${fmt(u.bits)}</td><td class="num">${fmt(u.dex_count)}</td><td class="num">${fmt(u.packs_opened)}</td><td class="muted small">${ago(u.last_seen)}</td>
       <td style="white-space:nowrap"><button class="btn sm" data-pick>Choisir</button> <button class="btn sm" data-toggle-admin="${u.is_admin ? 0 : 1}">${u.is_admin ? '− admin' : '+ admin'}</button> <button class="btn sm danger" data-del>Supprimer</button></td></tr>`).join('');
     $('#adm-users').innerHTML = d.items.map((u) => `<option value="${esc(u.username)}">`).join('');
@@ -1177,10 +1175,10 @@ export async function viewAdmin(el) {
     if (!b) return;
     if (b.matches('[data-open-free]')) return openPackFlow('free', true);
     if (b.matches('[data-open-prem]')) return openPackFlow('premium', true);
-    if (b.matches('[data-seed]')) return busy(b, async () => { toast('Création des bots… (≈ 1 min)'); const r = await api('/admin/bots/seed', { count: 10000 }); toast(`${fmt(r.created)} bots créés`, 'ok'); overview(); });
-    if (b.matches('[data-tick]')) return busy(b, async () => { const r = await api('/admin/bots/tick', {}); toast(`${r ? r.sessions : 0} sessions de bots jouées`, 'ok'); overview(); });
+    if (b.matches('[data-seed]')) return busy(b, async () => { toast('Création… (≈ 1 min)'); const r = await api('/admin/bots/seed', { count: 10000 }); toast(`${fmt(r.created)} comptes créés`, 'ok'); overview(); });
+    if (b.matches('[data-tick]')) return busy(b, async () => { const r = await api('/admin/bots/tick', {}); toast(`${r ? r.sessions : 0} sessions jouées`, 'ok'); overview(); });
     if (b.matches('[data-pause]')) return busy(b, async () => { await api('/admin/bots/pause', { paused: b.dataset.pause === '1' }); overview(); });
-    if (b.matches('[data-del-bots]')) return busy(b, async () => { if (await confirmDialog('Supprimer les bots', 'Tous les bots et leurs cartes seront supprimés.', 'Supprimer', true)) { await api('/admin/bots/delete', {}); overview(); users(); } });
+    if (b.matches('[data-del-bots]')) return busy(b, async () => { if (await confirmDialog('Supprimer l\'animation', 'Tous les comptes d\'animation et leurs cartes seront supprimés.', 'Supprimer', true)) { await api('/admin/bots/delete', {}); overview(); users(); } });
     const row = b.closest('tr');
     if (!row) return;
     if (b.matches('[data-pick]')) { form.username.value = row.dataset.name; form.everyone.checked = false; form.scrollIntoView({ behavior: 'smooth' }); }

@@ -120,7 +120,7 @@ export async function viewPlay(el, { on }) {
       <h2>Défi communautaire de la semaine</h2>
       <div class="panel">
         <div class="row"><div class="grow"><b>${fmt(comm.target)} boosters ouverts par tous les joueurs</b>
-          <div class="muted small">Bots compris · récompense pour chacun : ${rewardText(comm.reward)}</div></div>
+          <div class="muted small">Tous les joueurs comptent · récompense pour chacun : ${rewardText(comm.reward)}</div></div>
           ${comm.done ? (comm.claimed ? '<span class="tag good">récupéré</span>' : '<button class="btn primary sm" data-community>Récupérer</button>') : ''}</div>
         <div class="progress" style="margin-top:10px"><i style="width:${Math.min(100, (comm.progress / comm.target) * 100)}%"></i></div>
         <div class="muted small mono" style="margin-top:6px">${fmt(comm.progress)} / ${fmt(comm.target)}</div>

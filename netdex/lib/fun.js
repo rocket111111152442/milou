@@ -110,7 +110,7 @@ export function createFun(db, game) {
   async function lockUser(q, userId) {
     const u = await q.one('SELECT * FROM users WHERE id = $1 FOR UPDATE', [userId]);
     if (!u) throw new GameError('Joueur introuvable.', 404);
-    if (u.is_bot) throw new GameError('Réservé aux joueurs humains.', 403);
+    if (u.is_bot) throw new GameError('Action impossible.', 403);
     return u;
   }
   const setFun = (q, userId, patch) => q.run('UPDATE users SET fun = fun || $2::jsonb WHERE id = $1', [userId, JSON.stringify(patch)]);
