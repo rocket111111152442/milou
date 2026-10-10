@@ -226,3 +226,18 @@ dbtest('bots : acceptent les amis humains, jugent les échanges au prix du march
   const prop = await db.one(`SELECT * FROM trades WHERE from_id = $1 AND to_id = $2 AND status = 'pending'`, [bot.id, h.id]);
   assert.ok(prop);
 });
+
+dbtest('défi communautaire à paliers : chaque palier atteint se récupère une fois', async () => {
+  const u = await user(0);
+  const c0 = await fun.community();
+  await db.run("UPDATE meta SET value = $1 WHERE key = 'community'", [JSON.stringify({ week: c0.week, base: c0.progress + (await db.one('SELECT 0 z')).z, target: 10 })]);
+  // Base = total actuel - 25 : progression de 25 → paliers 10 et 20 atteints, 40 et 80 non.
+  const total = (await db.one('SELECT SUM(packs_opened)::int n FROM users')).n;
+  await db.run("UPDATE meta SET value = $1 WHERE key = 'community'", [JSON.stringify({ week: c0.week, base: total - 25, target: 10 })]);
+  const r = await fun.claimCommunity(u.id);
+  assert.deepEqual(r, { bits: 200 + 400, packs: 4 });
+  await assert.rejects(fun.claimCommunity(u.id), /palier suivant/);
+  const h = await fun.hub(u.id);
+  assert.equal(h.community.claimed, 2);
+  assert.equal(h.community.reached, 2);
+});

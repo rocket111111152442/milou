@@ -119,11 +119,16 @@ export async function viewPlay(el, { on }) {
 
       <h2>Défi communautaire de la semaine</h2>
       <div class="panel">
-        <div class="row"><div class="grow"><b>${fmt(comm.target)} boosters ouverts par tous les joueurs</b>
-          <div class="muted small">Tous les joueurs comptent · récompense pour chacun : ${rewardText(comm.reward)}</div></div>
-          ${comm.done ? (comm.claimed ? '<span class="tag good">récupéré</span>' : '<button class="btn primary sm" data-community>Récupérer</button>') : ''}</div>
-        <div class="progress" style="margin-top:10px"><i style="width:${Math.min(100, (comm.progress / comm.target) * 100)}%"></i></div>
-        <div class="muted small mono" style="margin-top:6px">${fmt(comm.progress)} / ${fmt(comm.target)}</div>
+        ${(() => {
+          const next = comm.tiers.find((t) => !t.done) || comm.tiers[comm.tiers.length - 1];
+          const claimable = comm.reached - comm.claimed;
+          return `<div class="row"><div class="grow"><b>${fmt(next.target)} boosters ouverts par tous les joueurs</b>
+            <div class="muted small">Palier ${Math.min(comm.reached + 1, comm.tiers.length)}/${comm.tiers.length} · récompense pour chacun : ${rewardText(next.reward)}</div></div>
+            ${claimable > 0 ? `<button class="btn primary sm" data-community>Récupérer ${claimable > 1 ? claimable + ' paliers' : 'le palier'}</button>` : comm.claimed ? `<span class="tag good">${comm.claimed}/${comm.tiers.length} récupéré${comm.claimed > 1 ? 's' : ''}</span>` : ''}</div>
+          <div class="progress" style="margin-top:10px"><i style="width:${Math.min(100, (comm.progress / next.target) * 100)}%"></i></div>
+          <div class="tiers-row">${comm.tiers.map((t, k) => `<span class="${k < comm.claimed ? 'got' : t.done ? 'ready' : ''}">${fmt(t.target)}</span>`).join('')}</div>
+          <div class="muted small mono" style="margin-top:6px">${fmt(comm.progress)} / ${fmt(next.target)}</div>`;
+        })()}
       </div>
 
       <h2>Mini-jeux <span class="muted" style="text-transform:none;letter-spacing:0">· encore ${d.gamesLeft} bits à gagner aujourd'hui</span></h2>

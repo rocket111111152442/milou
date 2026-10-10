@@ -446,3 +446,8 @@ table.data td.num { font-family: var(--mono); text-align: right; }
 .overlay > * { flex: none; }
 .all-reveal { padding-bottom: 24px; }
 .duel-round .card { width: 100%; }
+.tiers-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
+.tiers-row span { text-align: center; padding: 3px 0; border: 1px solid var(--line); border-radius: 3px; font: 600 11px var(--mono); color: var(--muted); }
+.tiers-row span.ready { border-color: var(--accent); color: var(--accent); }
+.tiers-row span.got { background: var(--surface-2); color: var(--good); }
+.tiers-row span.got::after { content: " ✓"; }

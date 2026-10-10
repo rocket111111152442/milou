@@ -19,7 +19,13 @@ window.ndInstall = {
   available: () => !!installEvent,
   prompt: async () => { if (!installEvent) return; installEvent.prompt(); await installEvent.userChoice; installEvent = null; },
 };
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  // Une nouvelle version vient de s'installer : on recharge une fois pour l'afficher tout de suite.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.register('/sw.js').then((r) => r.update()).catch(() => {});
+}
 
 const app = $('#app');
 

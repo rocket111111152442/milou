@@ -103,7 +103,10 @@ const COTD_BITS = 50;
 const FORGE_COST = [5, 5, 5, 10, 25]; // cartes de la rareté r pour 1 carte de la rareté r + 1
 const GIFTS_PER_DAY = 5, GIFT_BITS_PER_DAY = 500;
 export const PROFILE_COLORS = ['#ff5b1f', '#3d8ee6', '#57b26a', '#9b5de5', '#e5484d', '#e0a100', '#14b8a6', '#ec4899'];
-const COMMUNITY_REWARD = { bits: 200, packs: 2 };
+// Défi à 4 paliers : objectif, ×2, ×4, ×8. Chaque palier atteint se récupère (récompense croissante).
+const COMMUNITY_TIERS = 4;
+const tierReward = (k) => ({ bits: 200 * (k + 1), packs: 2 });
+const claimedTiers = (f, week) => (f?.commTiers?.week === week ? f.commTiers.n : f?.comm === week ? 1 : 0);
 
 export function createFun(db, game) {
   // Lit le joueur verrouillé et remet à zéro les compteurs du jour si besoin.
@@ -151,13 +154,15 @@ export function createFun(db, game) {
     let c = row ? JSON.parse(row.value) : null;
     const total = (await db.one('SELECT COALESCE(SUM(packs_opened), 0) n FROM users')).n;
     if (!c || c.week !== wk) {
-      // Objectif : 10 % de plus que ce que la communauté a fait la semaine précédente.
+      // Palier 1 : 60 % de ce que la communauté a fait la semaine précédente (×2, ×4, ×8 ensuite).
       const prevDone = c ? total - c.base : 0;
-      const target = c ? Math.max(5000, Math.round((prevDone * 1.1) / 1000) * 1000) : 50000;
+      const target = c ? Math.max(5000, Math.round((prevDone * 0.6) / 1000) * 1000) : 50000;
       c = { week: wk, base: total, target };
       await db.run("INSERT INTO meta (key, value) VALUES ('community', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [JSON.stringify(c)]);
     }
-    return { week: wk, progress: total - c.base, target: c.target, reward: COMMUNITY_REWARD };
+    const progress = total - c.base;
+    const tiers = Array.from({ length: COMMUNITY_TIERS }, (_, k) => ({ target: c.target * 2 ** k, reward: tierReward(k), done: progress >= c.target * 2 ** k }));
+    return { week: wk, progress, target: c.target, tiers };
   }
 
   async function hub(userId) {
@@ -177,7 +182,7 @@ export function createFun(db, game) {
       daily: { chest: f.chest !== day, wheel: f.wheel !== day, scratch: f.scratch !== day, cotd: f.cotd !== day },
       cotd: { site: cotdSite, owned: ownsCotd, bits: COTD_BITS },
       gamesLeft: Math.max(0, GAME_BITS_PER_DAY - (f.gb?.day === day ? f.gb.n : 0)),
-      community: { ...comm, claimed: f.comm === comm.week, done: comm.progress >= comm.target },
+      community: { ...comm, claimed: claimedTiers(f, comm.week), reached: comm.tiers.filter((t) => t.done).length },
       pity: { n: u.pity, after: CONFIG.pityAfter },
       event: game.activeEvent(),
       wheel: WHEEL.map((w) => w.label),
@@ -262,15 +267,20 @@ export function createFun(db, game) {
 
   async function claimCommunity(userId) {
     const c = await community();
-    if (c.progress < c.target) throw new GameError('Objectif communautaire pas encore atteint.');
+    const reached = c.tiers.filter((t) => t.done).length;
+    if (!reached) throw new GameError('Objectif communautaire pas encore atteint.');
     return db.tx(async (q) => {
       const u = await lockUser(q, userId);
-      if (u.fun?.comm === c.week) throw new GameError('Récompense déjà récupérée cette semaine.');
-      await setFun(q, userId, { comm: c.week });
-      await reward(q, userId, COMMUNITY_REWARD);
-      return COMMUNITY_REWARD;
+      const done = claimedTiers(u.fun, c.week);
+      if (done >= reached) throw new GameError('Récompense déjà récupérée : vise le palier suivant !');
+      const total = { bits: 0, packs: 0 };
+      for (let k = done; k < reached; k++) { total.bits += tierReward(k).bits; total.packs += tierReward(k).packs; }
+      await setFun(q, userId, { commTiers: { week: c.week, n: reached } });
+      await reward(q, userId, total);
+      return total;
     });
   }
+
 
   async function konami(userId) {
     return db.tx(async (q) => {
