@@ -448,7 +448,7 @@ export async function viewMessages(el, { params, on }) {
         <div class="grow"><b>${esc(c.username)}</b> ${isOnline(c.last_seen) ? '<span class="online"></span>' : ''}
           <div class="muted small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.text ? (c.from_id === state.me.user.id ? 'Toi : ' : '') + esc(c.text) : 'Aucun message'}</div></div>
         ${c.unread ? `<span class="tag accent">${c.unread}</span>` : c.at ? `<span class="muted small">${ago(c.at)}</span>` : ''}</a>`).join('')}</div>`
-        : '<div class="panel empty"><b>Aucun ami</b>Ajoute des amis dans l\'onglet Social pour discuter.</div>'}`;
+        : '<div class="panel empty"><b>Aucune conversation</b>Ajoute des amis dans l\'onglet Social pour discuter.</div>'}`;
     return;
   }
   const meId = state.me.user.id;
@@ -460,6 +460,7 @@ export async function viewMessages(el, { params, on }) {
       el.innerHTML = `<div class="page-head"><a class="btn sm ghost" href="#/messages">‹</a><h1><a href="#/u/${encodeURIComponent(d.other.username)}" style="text-decoration:none">${esc(d.other.username)}</a></h1>
         ${isOnline(d.other.last_seen) ? '<span class="online"></span>' : ''}<div class="row"><button class="btn sm" data-gift>Offrir</button></div></div>
         <div class="chat" data-msgs></div>
+        ${d.other.friend ? '' : '<p class="muted small">Vous n\'êtes pas (ou plus) amis : tu peux lire ces messages, mais pour répondre il faut l\'ajouter en ami.</p>'}
         <form class="chat-form" data-send><input type="text" name="t" maxlength="500" placeholder="Écris un message…" autocomplete="off"><button class="btn primary">Envoyer</button></form>`;
       $('[data-send]', el).addEventListener('submit', (e) => {
         e.preventDefault();

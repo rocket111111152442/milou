@@ -465,16 +465,22 @@ export function createFun(db, game) {
   const friendsOnly = async (q, a, b) => {
     if ((await game.relation(q, a, b)) !== 'friends') throw new GameError('Réservé à tes amis.', 403);
   };
+  // Amis + toute personne avec qui on a échangé des messages (ex-amis, demandes en attente...).
   async function conversations(userId) {
-    return { items: await db.all(`SELECT u.id, u.username, u.last_seen, s.domain avatar_domain, m.text, m.at, m.from_id,
+    return { items: await db.all(`WITH people AS (
+        SELECT friend_id id FROM friends WHERE user_id = $1 AND status = 'accepted'
+        UNION SELECT from_id FROM messages WHERE to_id = $1 UNION SELECT to_id FROM messages WHERE from_id = $1)
+      SELECT u.id, u.username, u.last_seen, s.domain avatar_domain, m.text, m.at, m.from_id,
+        EXISTS (SELECT 1 FROM friends f WHERE f.user_id = $1 AND f.friend_id = u.id AND f.status = 'accepted') friend,
         (SELECT COUNT(*) FROM messages x WHERE x.to_id = $1 AND x.from_id = u.id AND NOT x.read) unread
-      FROM friends f JOIN users u ON u.id = f.friend_id LEFT JOIN sites s ON s.id = u.avatar_site
+      FROM people p JOIN users u ON u.id = p.id LEFT JOIN sites s ON s.id = u.avatar_site
       LEFT JOIN LATERAL (SELECT text, at, from_id FROM messages WHERE (from_id = $1 AND to_id = u.id) OR (from_id = u.id AND to_id = $1) ORDER BY id DESC LIMIT 1) m ON true
-      WHERE f.user_id = $1 AND f.status = 'accepted' ORDER BY m.at DESC NULLS LAST, u.last_seen DESC`, [userId]) };
+      WHERE u.id != $1 ORDER BY m.at DESC NULLS LAST, u.last_seen DESC`, [userId]) };
   }
   async function thread(userId, otherId) {
     otherId = Number(otherId);
     const other = await db.one('SELECT id, username, last_seen FROM users WHERE id = $1', [otherId]);
+    if (other) other.friend = (await game.relation(db, userId, otherId)) === 'friends';
     if (!other) throw new GameError('Joueur introuvable.', 404);
     await db.run('UPDATE messages SET read = true WHERE to_id = $1 AND from_id = $2 AND NOT read', [userId, otherId]);
     const items = await db.all(`SELECT id, from_id, text, at FROM messages WHERE (from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1)

@@ -132,6 +132,12 @@ dbtest('cadeaux et messages entre amis seulement, avec limites', async () => {
   const th = await fun.thread(b.id, a.id);
   assert.equal(th.items[0].text, 'salut');
   assert.equal((await fun.conversations(b.id)).items[0].unread, 0);
+  // Un message d'un non-ami doit apparaître dans la liste (sinon le compteur affiche des messages introuvables).
+  await db.run("INSERT INTO messages (from_id, to_id, text, at) VALUES ($1, $2, 'coucou', $3)", [c.id, b.id, Date.now()]);
+  const conv2 = await fun.conversations(b.id);
+  const fromC = conv2.items.find((x) => x.id === c.id);
+  assert.equal(fromC.unread, 1);
+  assert.equal(fromC.friend, false);
 });
 
 dbtest('codes promo : une fois par joueur, nombre d\'utilisations limité', async () => {
