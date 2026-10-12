@@ -35,13 +35,13 @@ export const weekId = (t = Date.now()) => Math.floor((t - 4 * 24 * 3600 * 1000) 
 export const CUSTOM_BASE = 100_000_000;
 
 // Qualité de chaque booster : multiplie les chances des raretés hautes (Rare × √m, Épique et plus × m).
-// La moyenne des multiplicateurs vaut ~1 : la rareté globale des bonnes cartes ne change pas.
+// Les bons boosters sont rares (Prestige : 1 sur 500) ; la moyenne des multiplicateurs vaut ~0,9.
 export const QUALITIES = {
-  terne: { name: 'Terne', p: 0.45, lo: 0.2, hi: 0.2 },
+  terne: { name: 'Terne', p: 0.55, lo: 0.6, hi: 0.6 },
   standard: { name: 'Standard', p: 0.38, lo: 1, hi: 1 },
-  chanceux: { name: 'Chanceux', p: 0.12, lo: 1.5, hi: 2.5 },
-  brillant: { name: 'Brillant', p: 0.04, lo: 3, hi: 6 },
-  prestige: { name: 'Prestige', p: 0.01, lo: 8, hi: 16 },
+  chanceux: { name: 'Chanceux', p: 0.055, lo: 1.5, hi: 2.5 },
+  brillant: { name: 'Brillant', p: 0.013, lo: 3, hi: 6 },
+  prestige: { name: 'Prestige', p: 0.002, lo: 8, hi: 16 },
 };
 export function rollQuality() {
   let x = randomInt(1_000_000) / 1_000_000;

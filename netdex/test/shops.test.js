@@ -34,15 +34,15 @@ const user = async (bits = 0, packs = 5) => {
 const bits = async (u) => (await db.one('SELECT bits FROM users WHERE id = $1', [u.id])).bits;
 const dbtest = (name, fn) => test(name, { skip: !URL && 'TEST_DATABASE_URL absent' }, fn);
 
-test('qualités : chaque booster est différent, mais la moyenne des multiplicateurs reste ~1', () => {
+test('qualités : chaque booster est différent, les bons sont rares, moyenne ~0,9', () => {
   const c = {};
   let sum = 0;
   for (let i = 0; i < 50000; i++) { const r = rollQuality(); c[r.quality] = (c[r.quality] || 0) + 1; sum += r.boost; }
   assert.equal(Object.keys(c).length, Object.keys(QUALITIES).length);
-  assert.ok(c.terne > 21500 && c.terne < 23500);
-  assert.ok(c.prestige > 350 && c.prestige < 700);
+  assert.ok(c.terne > 26500 && c.terne < 28500);
+  assert.ok(c.prestige > 40 && c.prestige < 180); // ~1 sur 500
   const mean = sum / 50000;
-  assert.ok(mean > 0.93 && mean < 1.08, 'moyenne ' + mean);
+  assert.ok(mean > 0.85 && mean < 0.96, 'moyenne ' + mean);
 });
 
 dbtest('cotes : un booster boosté a de meilleures chances', () => {
