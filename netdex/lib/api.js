@@ -508,6 +508,7 @@ route('GET', '/api/packs/odds', ({ c }) => ({ standard: c.shops.odds(1) }));
 route('GET', '/api/shops', ({ c }) => c.shops.listShops());
 route('POST', '/api/shops', ({ c, me, body }) => c.shops.createShop(me, body));
 route('GET', '/api/shops/:id', ({ c, me, params }) => c.shops.shopDetail(me.id, params.id));
+route('POST', '/api/shops/:id/upgrade', ({ c, me, params }) => c.shops.upgradeShop(me, params.id));
 route('POST', '/api/shops/:id/settings', ({ c, me, params, body }) => c.shops.updateShop(me, params.id, body));
 route('POST', '/api/shops/:id/deposit', ({ c, me, params, body }) => c.shops.deposit(me, params.id, body.amount));
 route('POST', '/api/shops/:id/list', ({ c, me, params, body }) => c.shops.listPack(me, { ...body, shopId: params.id }));

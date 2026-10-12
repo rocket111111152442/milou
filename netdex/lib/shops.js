@@ -7,6 +7,11 @@
 import { GameError, QUALITIES, rollQuality } from './game.js';
 
 export const SHOP_PRICE = 25_000;
+// Boutique Premium : plus chère, commission jusqu'à 40 %, et les boosters achetés chez elle gagnent +15 % de chances (une seule fois par booster).
+export const TIERS = {
+  standard: { name: 'Standard', price: 25_000, maxFee: 25, packBonus: 1 },
+  premium: { name: 'Premium', price: 30_000, maxFee: 40, packBonus: 1.15 },
+};
 export const TOTAL_SHARES = 1000;
 export { QUALITIES };
 const MAX_SEALED = 30;
@@ -65,6 +70,7 @@ export function createShops(db, game) {
       (SELECT COUNT(*) FROM shares h WHERE h.shop_id = s.id AND h.qty > 0) holders
     FROM shops s JOIN users u ON u.id = s.owner_id`;
   const shopView = (s) => ({
+    tier: s.tier || 'standard', tierName: TIERS[s.tier || 'standard'].name, maxFee: TIERS[s.tier || 'standard'].maxFee, packBonus: TIERS[s.tier || 'standard'].packBonus,
     id: s.id, name: s.name, description: s.description, ownerId: s.owner_id, owner: s.owner_name, feePct: s.fee_pct, accepts: s.accepts,
     balance: s.balance, divPct: s.div_pct, loanRate: s.loan_rate, loanMax: s.loan_max, totalShares: s.total_shares,
     lastPrice: s.last_price, change24h: s.last_price && s.price_24h ? +(((s.last_price - s.price_24h) / s.price_24h) * 100).toFixed(1) : null,
@@ -74,7 +80,7 @@ export function createShops(db, game) {
 
   async function listShops() {
     const rows = await db.all(`${shopSelect} ORDER BY s.sales_count DESC, s.id`, [Date.now() - DAY]);
-    return { items: rows.map(shopView), price: SHOP_PRICE };
+    return { items: rows.map(shopView), price: SHOP_PRICE, tiers: TIERS };
   }
 
   function cleanSettings(b, cur = {}) {
@@ -86,7 +92,7 @@ export function createShops(db, game) {
     return {
       name, accepts,
       description: b.description !== undefined ? String(b.description).trim().slice(0, 280) : cur.description ?? '',
-      fee: num(b.feePct, 0, 25, cur.fee_pct ?? 5, 'Commission : entre 0 et 25 %.'),
+      fee: num(b.feePct, 0, TIERS[cur.tier || b.tier || 'standard'].maxFee, cur.fee_pct ?? 5, `Commission : entre 0 et ${TIERS[cur.tier || b.tier || 'standard'].maxFee} %.`),
       div: num(b.divPct, 0, 50, cur.div_pct ?? 0, 'Dividendes : entre 0 et 50 % du coffre par jour.'),
       rate: num(b.loanRate, 0, 100, cur.loan_rate ?? 10, 'Taux de prêt : entre 0 et 100 %.'),
       loanMax: b.loanMax !== undefined ? intIn(b.loanMax, 0, 1_000_000, 'Prêt maximum invalide.') : cur.loan_max ?? 1000,
@@ -94,15 +100,30 @@ export function createShops(db, game) {
   }
 
   async function createShop(me, body) {
-    const c = cleanSettings({ accepts: Object.keys(QUALITIES), ...body });
+    const tier = TIERS[body.tier] ? body.tier : 'standard';
+    const c = cleanSettings({ accepts: Object.keys(QUALITIES), ...body, tier });
+    const price = TIERS[tier].price;
     return db.tx(async (q) => {
       if (await q.one('SELECT 1 FROM shops WHERE lower(name) = lower($1)', [c.name])) throw new GameError('Ce nom de boutique est déjà pris.');
-      await game.debit(q, me.id, SHOP_PRICE, `Il faut ${SHOP_PRICE.toLocaleString('fr-FR')} bits pour ouvrir une boutique.`);
-      const s = await q.one(`INSERT INTO shops (owner_id, name, description, fee_pct, accepts, div_pct, loan_rate, loan_max, total_shares, div_day, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-      [me.id, c.name, c.description, c.fee, c.accepts, c.div, c.rate, c.loanMax, TOTAL_SHARES, dayId(), Date.now()]);
+      await game.debit(q, me.id, price, `Il faut ${price.toLocaleString('fr-FR')} bits pour ouvrir une boutique ${TIERS[tier].name}.`);
+      const s = await q.one(`INSERT INTO shops (owner_id, name, description, fee_pct, accepts, div_pct, loan_rate, loan_max, total_shares, div_day, created_at, tier)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+      [me.id, c.name, c.description, c.fee, c.accepts, c.div, c.rate, c.loanMax, TOTAL_SHARES, dayId(), Date.now(), tier]);
       await q.run('INSERT INTO shares (shop_id, user_id, qty) VALUES ($1, $2, $3)', [s.id, me.id, TOTAL_SHARES]);
       return { id: s.id };
+    });
+  }
+
+  // Une boutique Standard passe Premium en payant la différence.
+  async function upgradeShop(me, shopId) {
+    return db.tx(async (q) => {
+      const s = await q.one('SELECT * FROM shops WHERE id = $1 FOR UPDATE', [Number(shopId)]);
+      if (!s || s.owner_id !== me.id) throw new GameError('Seul le propriétaire peut faire évoluer la boutique.', 403);
+      if (s.tier === 'premium') throw new GameError('Cette boutique est déjà Premium.');
+      const cost = TIERS.premium.price - TIERS.standard.price;
+      await game.debit(q, me.id, cost, `Il faut ${cost.toLocaleString('fr-FR')} bits.`);
+      await q.run("UPDATE shops SET tier = 'premium' WHERE id = $1", [s.id]);
+      return { ok: true, cost };
     });
   }
 
@@ -134,7 +155,7 @@ export function createShops(db, game) {
     if (!s) throw new GameError('Boutique introuvable.', 404);
     const owner = s.owner_id === meId;
     const [listings, myLoans, pending, active, myShares, payouts] = await Promise.all([
-      db.all(`SELECT l.id, l.price, l.created_at, l.seller_id, u.username seller, p.id pack_id, p.boost, p.quality, p.status, p.created_at pack_created
+      db.all(`SELECT l.id, l.price, l.created_at, l.seller_id, u.username seller, p.id pack_id, p.boost, p.quality, p.status, p.created_at pack_created, p.shop_boosted
         FROM shop_listings l JOIN sealed_packs p ON p.id = l.pack_id JOIN users u ON u.id = l.seller_id
         WHERE l.shop_id = $1 AND l.status = 'open' ORDER BY p.boost DESC, l.price ASC LIMIT 100`, [s.id]),
       db.all("SELECT * FROM shop_loans WHERE shop_id = $1 AND borrower_id = $2 AND status IN ('pending', 'active', 'defaulted') ORDER BY id DESC", [s.id, meId]),
@@ -149,7 +170,12 @@ export function createShops(db, game) {
     ]);
     return {
       shop: shopView(s), owner, qualities: QUALITIES,
-      listings: listings.map((l) => ({ id: l.id, price: l.price, seller: l.seller, mine: l.seller_id === meId, pack: packView({ id: l.pack_id, boost: l.boost, quality: l.quality, status: l.status, created_at: l.pack_created }) })),
+      // En boutique Premium, on affiche les chances que le booster aura une fois acheté (+15 %).
+      listings: listings.map((l) => {
+        const bonus = !l.shop_boosted ? TIERS[s.tier]?.packBonus || 1 : 1;
+        return { id: l.id, price: l.price, seller: l.seller, mine: l.seller_id === meId, bonus: bonus > 1,
+          pack: packView({ id: l.pack_id, boost: +(l.boost * bonus).toFixed(2), quality: l.quality, status: l.status, created_at: l.pack_created }) };
+      }),
       myLoans, pendingLoans: pending, activeLoans: active, myShares: myShares || { qty: 0, locked: 0 }, payouts,
     };
   }
@@ -190,10 +216,15 @@ export function createShops(db, game) {
       const fee = Math.floor((l.price * s.fee_pct) / 100);
       await game.credit(q, l.seller_id, l.price - fee);
       await q.run('UPDATE shops SET balance = balance + $1, fees_total = fees_total + $1, sales_count = sales_count + 1 WHERE id = $2', [fee, s.id]);
-      await q.run("UPDATE sealed_packs SET owner_id = $1, status = 'owned' WHERE id = $2", [me.id, l.pack_id]);
+      // Boutique Premium : +15 % de chances sur le booster, une seule fois dans sa vie.
+      const bonus = TIERS[s.tier]?.packBonus || 1;
+      const boosted = await q.one(`UPDATE sealed_packs SET owner_id = $1, status = 'owned',
+          boost = CASE WHEN $3::real > 1 AND NOT shop_boosted THEN round((boost * $3::real)::numeric, 2) ELSE boost END,
+          shop_boosted = shop_boosted OR $3::real > 1
+        WHERE id = $2 RETURNING boost`, [me.id, l.pack_id, bonus]);
       await q.run("UPDATE shop_listings SET status = 'sold', buyer_id = $1, sold_at = $2 WHERE id = $3", [me.id, Date.now(), l.id]);
       await game.notify(q, l.seller_id, `Ton booster a été vendu ${l.price} bits chez ${s.name} (−${fee} de commission).`, `#/shop/${s.id}`);
-      return { ok: true, fee };
+      return { ok: true, fee, boost: boosted.boost };
     });
   }
 
@@ -424,7 +455,7 @@ export function createShops(db, game) {
   }
 
   return {
-    sealPack, myPacks, openSealed, listShops, createShop, updateShop, deposit, shopDetail, listPack, cancelListing, buyListing,
+    sealPack, myPacks, openSealed, listShops, createShop, upgradeShop, updateShop, deposit, shopDetail, listPack, cancelListing, buyListing,
     requestLoan, respondLoan, repayLoan, myLoans, placeOrder, cancelOrder, stock, portfolio, dailyJobs, odds,
   };
 }

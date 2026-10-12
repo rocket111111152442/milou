@@ -81,29 +81,43 @@ export async function viewShops(el) {
   const d = await api('/shops');
   const mine = d.items.filter((s) => s.ownerId === state.me.user.id);
   el.innerHTML = `${marketTabs('shops')}
-    <div class="page-head"><h1>Boutiques d'échange</h1><div class="row"><button class="btn primary sm" data-create>Ouvrir ma boutique (${fmt(d.price)} bits)</button></div></div>
+    <div class="page-head"><h1>Boutiques d'échange</h1><div class="row"><button class="btn primary sm" data-create>Ouvrir ma boutique (dès ${fmt(d.price)} bits)</button></div></div>
     <p class="muted small">Chaque boutique prend une commission sur les boosters scellés vendus chez elle. Son coffre sert à prêter aux joueurs et à verser des dividendes à ses actionnaires.</p>
     ${mine.length ? `<h2>Mes boutiques</h2><div class="shop-grid">${mine.map(shopCard).join('')}</div>` : ''}
     <h2>Toutes les boutiques (${d.items.length})</h2>
     ${d.items.length ? `<div class="shop-grid">${d.items.map(shopCard).join('')}</div>` : '<div class="panel empty"><b>Aucune boutique pour l\'instant</b>Sois le premier à en ouvrir une.</div>'}`;
-  $('[data-create]', el).addEventListener('click', () => createShopDialog(d.price));
+  $('[data-create]', el).addEventListener('click', () => createShopDialog(d.tiers));
 }
 
 const shopCard = (s) => `<a class="shop-card" href="#/shop/${s.id}">
-  <div class="row"><b class="grow">${esc(s.name)}</b><span class="tag">${String(s.feePct).replace('.', ',')} %</span></div>
+  <div class="row"><b class="grow">${esc(s.name)}</b>${s.tier === 'premium' ? '<span class="tag premium">Premium</span>' : ''}<span class="tag">${String(s.feePct).replace('.', ',')} %</span></div>
   <div class="muted small">par ${esc(s.owner)} · ${s.listings} booster${s.listings > 1 ? 's' : ''} en vente · ${fmt(s.salesCount)} ventes</div>
   ${s.description ? `<p class="small" style="margin:6px 0 0">${esc(s.description.slice(0, 120))}</p>` : ''}
   <div class="row small" style="margin-top:8px;gap:6px">${s.accepts.map((q) => `<span class="q-chip q-${q}">${QUAL[q]}</span>`).join('')}</div>
   <div class="row small mono" style="margin-top:8px"><span class="grow">Coffre ${fmt(s.balance)}</span><span>${s.lastPrice ? `Action ${fmt(s.lastPrice)}` : 'Pas encore cotée'}</span></div>
 </a>`;
 
-function createShopDialog(price) {
-  modal('Ouvrir une boutique', `<p class="muted small" style="margin-top:0">Coût : <b>${fmt(price)} bits</b> (ton solde : ${fmt(state.me.user.bits)}). Tu reçois les 1 000 actions de la boutique.</p>
-    ${settingsForm({ name: '', description: '', feePct: 5, accepts: Object.keys(QUAL), divPct: 0, loanRate: 10, loanMax: 1000 })}
-    <button class="btn primary" data-go>Ouvrir pour ${fmt(price)} bits</button>`, {
+function createShopDialog(tiers) {
+  let tier = 'standard';
+  modal('Ouvrir une boutique', `<p class="muted small" style="margin-top:0">Ton solde : ${fmt(state.me.user.bits)} bits. Tu reçois les 1 000 actions de la boutique.</p>
+    <div class="tier-pick">
+      <button type="button" class="tier-opt on" data-tier="standard"><b>Standard</b><span class="mono">${fmt(tiers.standard.price)} bits</span><span>Commission jusqu'à ${tiers.standard.maxFee} %</span></button>
+      <button type="button" class="tier-opt premium" data-tier="premium"><b>Premium</b><span class="mono">${fmt(tiers.premium.price)} bits</span><span>Commission jusqu'à ${tiers.premium.maxFee} %</span><span>Boosters achetés chez toi : chances +${Math.round((tiers.premium.packBonus - 1) * 100)} %</span></button>
+    </div>
+    ${settingsForm({ name: '', description: '', feePct: 5, accepts: Object.keys(QUAL), divPct: 0, loanRate: 10, loanMax: 1000, maxFee: tiers.standard.maxFee })}
+    <button class="btn primary" data-go>Ouvrir pour ${fmt(tiers.standard.price)} bits</button>`, {
     onMount(body, close) {
+      body.addEventListener('click', (e) => {
+        const t = e.target.closest('[data-tier]');
+        if (!t) return;
+        tier = t.dataset.tier;
+        $$('[data-tier]', body).forEach((x) => x.classList.toggle('on', x === t));
+        $('[name=feePct]', body).max = tiers[tier].maxFee;
+        $('[data-fee-label]', body).textContent = `Commission sur les ventes (0–${tiers[tier].maxFee} %)`;
+        $('[data-go]', body).textContent = `Ouvrir pour ${fmt(tiers[tier].price)} bits`;
+      });
       $('[data-go]', body).addEventListener('click', (e) => busy(e.target, async () => {
-        const r = await api('/shops', readSettings(body));
+        const r = await api('/shops', { ...readSettings(body), tier });
         toast('Boutique ouverte !', 'ok'); sfx('legend'); close(); await refreshMe(); location.hash = '#/shop/' + r.id;
       }));
     },
@@ -112,7 +126,7 @@ function createShopDialog(price) {
 
 const settingsForm = (s) => `<div class="grid-2">
   <label class="field"><span>Nom</span><input type="text" name="name" maxlength="30" value="${esc(s.name)}"></label>
-  <label class="field"><span>Commission sur les ventes (0–25 %)</span><input type="number" name="feePct" min="0" max="25" step="0.5" value="${s.feePct}"></label>
+  <label class="field"><span data-fee-label>Commission sur les ventes (0–${s.maxFee || 25} %)</span><input type="number" name="feePct" min="0" max="${s.maxFee || 25}" step="0.5" value="${s.feePct}"></label>
 </div>
 <label class="field"><span>Description</span><input type="text" name="description" maxlength="280" value="${esc(s.description)}"></label>
 <div class="field"><span class="muted small" style="font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:12px">Qualités de boosters acceptées</span>
@@ -136,7 +150,8 @@ export async function viewShop(el, { params, on }) {
     const d = await api('/shops/' + params.id);
     const s = d.shop;
     el.innerHTML = `${marketTabs('shops')}
-      <div class="page-head"><h1>${esc(s.name)}</h1><div class="row"><a class="btn sm" href="#/bourse/${s.id}">Action ${s.lastPrice ? fmt(s.lastPrice) : '—'}</a></div></div>
+      <div class="page-head"><h1>${esc(s.name)}</h1>${s.tier === 'premium' ? '<span class="tag premium">Premium</span>' : ''}<div class="row"><a class="btn sm" href="#/bourse/${s.id}">Action ${s.lastPrice ? fmt(s.lastPrice) : '—'}</a></div></div>
+      ${s.tier === 'premium' ? `<div class="event-banner"><b>Boutique Premium</b> Les boosters achetés ici gagnent +${Math.round((s.packBonus - 1) * 100)} % de chances (une fois par booster). Les chances affichées incluent déjà ce bonus.</div>` : ''}
       <div class="panel">
         <div class="muted small">Tenue par <a href="#/u/${encodeURIComponent(s.owner)}">${esc(s.owner)}</a> · ouverte ${ago(s.createdAt)}</div>
         ${s.description ? `<p style="margin:8px 0 0">${esc(s.description)}</p>` : ''}
@@ -149,7 +164,7 @@ export async function viewShop(el, { params, on }) {
         <div class="quick"><b>${String(s.divPct).replace('.', ',')} %</b><span>Dividendes / jour</span></div>
       </div>
       <h2>Boosters en vente (${d.listings.length})</h2>
-      ${d.listings.length ? `<div class="sealed-grid">${d.listings.map((l) => packCardHtml(l.pack, `<div class="row" style="gap:6px"><b class="mono grow">${fmt(l.price)}</b>${l.mine
+      ${d.listings.length ? `<div class="sealed-grid">${d.listings.map((l) => packCardHtml(l.pack, `${l.bonus ? '<div class="small" style="color:var(--r-legendary)">+15 % inclus à l\'achat</div>' : ''}<div class="row" style="gap:6px"><b class="mono grow">${fmt(l.price)}</b>${l.mine
         ? `<button class="btn sm" data-unlist="${l.id}">Retirer</button>` : `<button class="btn primary sm" data-buy="${l.id}" data-price="${l.price}">Acheter</button>`}</div><div class="muted small">par ${esc(l.seller)}</div>`)).join('')}</div>`
         : '<div class="panel empty"><b>Rien en vente</b>Vends un booster scellé depuis l\'accueil.</div>'}
       <h2>Prêt</h2>
@@ -173,6 +188,7 @@ export async function viewShop(el, { params, on }) {
         <div class="muted small">${l.repaid_count} prêt(s) remboursé(s) · ${l.default_count} défaut(s)</div></div>
       <button class="btn primary sm" data-loan-ok="${l.id}">Accepter</button><button class="btn sm" data-loan-no="${l.id}">Refuser</button></div>`).join('')}</div></div>` : ''}
     ${d.activeLoans.length ? `<div class="panel"><b>Prêts en cours</b><div class="list small" style="margin-top:6px">${d.activeLoans.map((l) => `<div><span class="grow">${esc(l.username)} · ${fmt(l.due_amount - l.paid)} restants${l.status === 'defaulted' ? ' <span class="tag bad">défaut</span>' : ''}</span><span class="muted">${new Date(Number(l.due_at)).toLocaleDateString('fr-FR')}</span></div>`).join('')}</div></div>` : ''}
+    ${d.shop.tier !== 'premium' ? `<div class="panel"><div class="row"><div class="grow"><b>Passer Premium</b><div class="muted small">Commission jusqu'à 40 % et +15 % de chances sur les boosters achetés chez toi.</div></div><button class="btn primary sm" data-upgrade>5 000 bits</button></div></div>` : ''}
     <div class="panel"><b>Alimenter le coffre</b><div class="row" style="margin-top:8px"><input type="number" min="1" placeholder="Bits" data-dep style="width:140px"><button class="btn" data-deposit>Déposer</button></div>
       <p class="muted small" style="margin:6px 0 0">L'argent du coffre ne peut pas être retiré directement : il sert aux prêts et revient aux actionnaires par les dividendes.</p></div>
     <form class="panel" data-settings><b>Réglages</b><div style="margin-top:10px">${settingsForm(d.shop)}</div><button class="btn primary">Enregistrer</button></form>`;
@@ -192,6 +208,10 @@ export async function viewShop(el, { params, on }) {
     });
     if (b.dataset.loanOk || b.dataset.loanNo) busy(b, async () => {
       await api(`/loans/${b.dataset.loanOk || b.dataset.loanNo}/respond`, { accept: !!b.dataset.loanOk }); toast(b.dataset.loanOk ? 'Prêt accordé' : 'Prêt refusé'); again();
+    });
+    if (b.matches('[data-upgrade]')) busy(b, async () => {
+      if (!(await confirmDialog('Passer Premium', 'Payer <b>5 000 bits</b> pour passer ta boutique en Premium ?', 'Passer Premium'))) return;
+      await api(`/shops/${params.id}/upgrade`, {}); toast('Boutique Premium !', 'ok'); sfx('legend'); refreshMe(); again();
     });
     if (b.matches('[data-deposit]')) busy(b, async () => { await api(`/shops/${params.id}/deposit`, { amount: Number($('[data-dep]', el).value) }); toast('Coffre alimenté', 'ok'); refreshMe(); again(); });
   });

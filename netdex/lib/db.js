@@ -313,6 +313,10 @@ CREATE TABLE IF NOT EXISTS shop_payouts (
   per_share REAL NOT NULL,
   PRIMARY KEY (shop_id, day)
 );
+
+-- v7 : boutiques Premium.
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'standard';
+ALTER TABLE sealed_packs ADD COLUMN IF NOT EXISTS shop_boosted BOOLEAN NOT NULL DEFAULT false;
 `;
 
 // DB_SOURCE choisit la base parmi celles branchées sur Vercel : « supabase » (POSTGRES_URL) ou « neon » (stockage_DATABASE_URL).

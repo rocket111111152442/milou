@@ -155,3 +155,29 @@ dbtest('dividendes : une fois par jour, au prorata des actions', async () => {
   await shops.dailyJobs();
   assert.equal(await bits(z), before + 25); // pas deux fois le même jour
 });
+
+dbtest('boutique Premium : 30 000 bits, commission jusqu\'à 40 %, +15 % une seule fois par booster', async () => {
+  const owner = await user(30_000 + 25_000 + 5_000), a = await user(0, 3), b = await user(5000), c = await user(5000);
+  await assert.rejects(shops.createShop(owner, { name: 'Trop cher', feePct: 30 }), /entre 0 et 25/); // Standard : 25 % max
+  const { id } = await shops.createShop(owner, { name: 'Le Palace', tier: 'premium', feePct: 35 });
+  assert.equal(await bits(owner), 30_000);
+  assert.equal((await db.one('SELECT tier, fee_pct FROM shops WHERE id = $1', [id])).tier, 'premium');
+  await db.run(`UPDATE users SET next_pack = '{"quality":"standard","boost":1}' WHERE id = $1`, [a.id]);
+  const p = await shops.sealPack(a.id);
+  const l1 = await shops.listPack(a, { packId: p.id, shopId: id, price: 100 });
+  const view = await shops.shopDetail(b.id, id);
+  assert.equal(view.listings[0].pack.boost, 1.15); // chances affichées = après bonus
+  const r = await shops.buyListing(b, l1.id);
+  assert.equal(r.fee, 35);
+  assert.equal(r.boost, 1.15);
+  // Revendu dans la même boutique : pas de deuxième bonus.
+  const l2 = await shops.listPack(b, { packId: p.id, shopId: id, price: 100 });
+  assert.equal((await shops.shopDetail(c.id, id)).listings[0].pack.boost, 1.15);
+  assert.equal((await shops.buyListing(c, l2.id)).boost, 1.15);
+  // Une boutique Standard passe Premium pour 5 000 bits.
+  const s2 = await shops.createShop(owner, { name: 'Petite échoppe' });
+  await shops.upgradeShop(owner, s2.id);
+  assert.equal(await bits(owner), 0);
+  await shops.updateShop(owner, s2.id, { feePct: 40 });
+  await assert.rejects(shops.updateShop(owner, s2.id, { feePct: 41 }), /entre 0 et 40/);
+});

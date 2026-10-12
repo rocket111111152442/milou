@@ -482,3 +482,10 @@ table.data td.num { font-family: var(--mono); text-align: right; }
 .next-pack { border-left: 4px solid var(--qc, var(--line)); }
 .q-open { margin-bottom: 12px; }
 .q-open .mono { color: #ecebe6; }
+.tag.premium { color: var(--r-legendary); border-color: var(--r-legendary); }
+.tier-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.tier-opt { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; padding: 12px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--bg); color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
+.tier-opt b { font-size: 15px; }
+.tier-opt span { color: var(--muted); }
+.tier-opt.premium b { color: var(--r-legendary); }
+.tier-opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
