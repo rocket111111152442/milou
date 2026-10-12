@@ -30,7 +30,22 @@ export function getContext(db) {
   }
   return ctx;
 }
-export function resetContext() { ctx = null; }
+export function resetContext() { ctx = null; animCtx = null; }
+
+// L'animation a sa propre petite réserve de connexions (2) et son propre état de jeu :
+// elle ne peut jamais prendre les connexions dont les vrais joueurs ont besoin.
+let animCtx = null;
+function getAnimContext() {
+  if (!animCtx) {
+    animCtx = (async () => {
+      const d = createDb(undefined, { max: 2 });
+      if (!d) throw new GameError('Base de données non configurée.', 503);
+      return { db: d, game: await createGame(d) };
+    })();
+    animCtx.catch(() => { animCtx = null; });
+  }
+  return animCtx;
+}
 
 // ---------- Comptes ----------
 async function hashPassword(pw) {
@@ -590,7 +605,7 @@ route('POST', '/api/admin/user/:id/:action', admin(async ({ c, me, params, body 
 }));
 
 route('POST', '/api/admin/anim/seed', admin(async ({ c, body }) => seedBots(c.db, c.game, Number(body.count) || 10_000)));
-route('POST', '/api/admin/anim/tick', admin(async ({ c }) => runBots(c.db, c.game, { budgetMs: 20_000, force: true })));
+route('POST', '/api/admin/anim/tick', admin(async () => { const a = await getAnimContext(); return runBots(a.db, a.game, { budgetMs: 20_000, force: true }); }));
 route('POST', '/api/admin/anim/pause', admin(async ({ c, body }) => {
   await c.db.run("INSERT INTO meta (key, value) VALUES ('bots_paused', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [body.paused ? '1' : '0']);
   return { ok: true };
@@ -601,9 +616,11 @@ route('POST', '/api/admin/anim/delete', admin(async ({ c, body }) => deleteBots(
 route('GET', '/api/cron/tick', async ({ c, req }) => {
   if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) throw new GameError('Interdit.', 403);
   const budget = Math.max(5, Math.min(250, Number(new URL(req.url, 'http://x').searchParams.get('budget')) || 250));
+  await c.game.settleAuctions(500).catch((e) => console.error('enchères', e.message));
   await snapshotIndex(c.db).catch((e) => console.error('index', e.message));
   const snaps = await snapshotDue(c.db, c.game).catch((e) => { console.error('snapshots', e.message); return 0; });
-  const r = await runBots(c.db, c.game, { budgetMs: budget * 1000, batch: 40, force: true });
+  const a = await getAnimContext();
+  const r = await runBots(a.db, a.game, { budgetMs: budget * 1000, batch: 40, force: true });
   return { ...r, snapshots: snaps };
 }, { auth: false });
 
@@ -736,9 +753,10 @@ export async function handleApi(req, res, { db } = {}) {
       res.setHeader('Content-Length', data.__raw.length);
       res.end(data.__raw);
     } else sendJson(req, res, 200, data);
-    // Les bots avancent pendant que de vrais joueurs sont connectés (après la réponse, sans la ralentir).
-    if (me && c && !me.is_bot) {
-      const work = runBots(c.db, c.game).catch((e) => console.error('bots', e.message));
+    // L'animation tourne via la tâche planifiée de chaque minute. En option (ANIM_PIGGYBACK=1), une petite passe
+    // après les requêtes des joueurs, sur sa propre réserve de connexions.
+    if (process.env.ANIM_PIGGYBACK === '1' && me && c && !me.is_bot) {
+      const work = getAnimContext().then((a) => runBots(a.db, a.game, { budgetMs: 4000 })).catch((e) => console.error('anim', e.message));
       if (process.env.VERCEL) waitUntil(work);
     }
   } catch (e) {

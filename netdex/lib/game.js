@@ -538,12 +538,12 @@ export async function createGame(db) {
   }
 
   // Pas de tâche de fond en serverless : les enchères échues sont clôturées à la volée par les requêtes.
-  async function settleAuctions() {
+  async function settleAuctions(limit = 10) {
     const now = Date.now();
     const due = await db.one("SELECT 1 FROM auctions WHERE status = 'open' AND ends_at <= $1 LIMIT 1", [now]);
     if (!due) return 0;
     return db.tx(async (q) => {
-      const rows = await q.all("SELECT id FROM auctions WHERE status = 'open' AND ends_at <= $1 ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED", [now]);
+      const rows = await q.all("SELECT id FROM auctions WHERE status = 'open' AND ends_at <= $1 ORDER BY id LIMIT $2 FOR UPDATE SKIP LOCKED", [now, limit]);
       for (const { id } of rows) await settleOne(q, id, now);
       return rows.length;
     });

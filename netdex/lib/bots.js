@@ -562,7 +562,7 @@ async function dbSizeMb(db, fresh = false) {
 }
 
 // Traite les bots en attente pendant au plus budgetMs. throttle : intervalle minimum global entre deux passages.
-export async function runBots(db, game, { budgetMs = 8000, batch = 25, throttleMs = 15_000, force = false, maxSessions = 2000 } = {}) {
+export async function runBots(db, game, { budgetMs = 8000, batch = 25, throttleMs = 15_000, force = false, maxSessions = 2000, parallel = 2 } = {}) {
   const now = Date.now();
   if (!force && now - lastLocalTick < throttleMs) return null;
   lastLocalTick = now;
@@ -571,6 +571,15 @@ export async function runBots(db, game, { budgetMs = 8000, batch = 25, throttleM
   const lock = await db.one(`INSERT INTO meta (key, value) VALUES ('bots_tick', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
     WHERE meta.value::bigint < $2 RETURNING value`, [String(now), String(now - throttleMs)]);
   if (!lock && !force) return null;
+  // Bail exclusif : jamais deux passes en même temps (sinon elles se disputent la base et ralentissent le jeu).
+  const lease = await db.one(`INSERT INTO meta (key, value) VALUES ('anim_lease', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    WHERE meta.value::bigint < $2 RETURNING value`, [String(now + budgetMs + 90_000), String(now)]);
+  if (!lease) return null;
+  try { return await runPass(db, game, { now, budgetMs, batch, maxSessions, parallel, force }); }
+  finally { await db.run("UPDATE meta SET value = '0' WHERE key = 'anim_lease'").catch(() => {}); }
+}
+
+async function runPass(db, game, { now, budgetMs, batch, maxSessions, parallel, force }) {
   const maxMb = Number(process.env.BOT_DB_MAX_MB) || 90;
   const opts = { dbFull: (await dbSizeMb(db)) >= maxMb };
   const done = { sessions: 0, actions: 0, dbFull: opts.dbFull };
@@ -585,8 +594,8 @@ export async function runBots(db, game, { budgetMs = 8000, batch = 25, throttleM
     [Date.now() + 15 * MIN, Date.now(), batch]);
     if (!bots.length) break;
     // 4 bots en parallèle : assez pour suivre le rythme, sans saturer la base.
-    for (let i = 0; i < bots.length && Date.now() < deadline; i += 4) {
-      await Promise.all(bots.slice(i, i + 4).map(async (bot) => {
+    for (let i = 0; i < bots.length && Date.now() < deadline; i += parallel) {
+      await Promise.all(bots.slice(i, i + parallel).map(async (bot) => {
         try {
           const log = await session(db, game, bot, opts);
           done.sessions++;

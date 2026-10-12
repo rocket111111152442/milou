@@ -246,12 +246,12 @@ function wrap(runner) {
   };
 }
 
-export function createDb(url = databaseUrl()) {
+export function createDb(url = databaseUrl(), { max } = {}) {
   if (!url) return null;
   const local = /localhost|127\.0\.0\.1/.test(url);
   const pool = new pg.Pool({
     connectionString: cleanUrl(url),
-    max: Number(process.env.PG_POOL_MAX) || 5,
+    max: max || Number(process.env.PG_POOL_MAX) || 5,
     idleTimeoutMillis: 10_000,
     ssl: local ? false : { rejectUnauthorized: false },
   });
