@@ -13,7 +13,12 @@ const rnd = () => randomInt(1_000_000) / 1_000_000;
 const pick = (arr) => arr[randomInt(arr.length)];
 const between = (a, b) => a + rnd() * (b - a);
 const HOUR = 3600e3;
-const MAX_ANIM_SHOPS = 8;      // boutiques tenues par des comptes animés, au total
+const MAX_ANIM_SHOPS = 20;     // boutiques tenues par des comptes animés, au total (pour laisser la place aux joueurs)
+const SAVE_FROM = 5000;        // au-delà, celui qui veut une boutique met ses bits de côté
+const hash32 = (x) => { let h = 2166136261; for (const c of String(x)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+// Certains comptes rêvent d'avoir leur boutique (plus souvent les marchands), les autres non : c'est stable pour un même compte.
+const WANTS_SHOP = { trader: 0.6, collector: 0.4, grinder: 0.25, regular: 0.15, casual: 0.05 };
+export const wantsShop = (bot, p) => p.wantsShop ?? (hash32('boutique' + bot.id) % 1000) / 1000 < (WANTS_SHOP[p.type] ?? 0.1);
 
 // Valeur de recyclage moyenne d'un booster pour un multiplicateur de chances donné.
 export function packWorth(game, boost) {
@@ -204,12 +209,19 @@ export function createBotEconomy(db, game, shops, fun) {
   async function ownShop(bot, me, p, tryDo) {
     let s = await db.one('SELECT * FROM shops WHERE owner_id = $1 LIMIT 1', [bot.id]);
     if (!s) {
-      if (!['trader', 'collector'].includes(p.type) || rnd() > 0.3) return;
+      // Il ouvre sa boutique dès qu'il en a les moyens, en gardant 10 % de réserve.
+      if (!wantsShop(bot, p) || rnd() > 0.5) return;
       const bits = await bitsOf(bot.id);
-      const tier = bits >= TIERS.premium.price * 1.3 ? 'premium' : bits >= TIERS.standard.price * 1.3 ? 'standard' : null;
+      const tier = bits >= TIERS.premium.price * 1.1 && (p.type === 'trader' || rnd() < 0.4) ? 'premium' : bits >= TIERS.standard.price * 1.1 ? 'standard' : null;
       if (!tier) return;
       if ((await db.one('SELECT COUNT(*) n FROM shops s JOIN users u ON u.id = s.owner_id WHERE u.is_bot')).n >= MAX_ANIM_SHOPS) return;
-      const name = `${pick(SHOP_A)} ${pick(SHOP_B)}`;
+      // Un nom libre (le nom d'une boutique est unique).
+      let name = null;
+      for (let k = 0; k < 5 && !name; k++) {
+        const n = rnd() < 0.3 ? `Chez ${bot.username}`.slice(0, 30) : `${pick(SHOP_A)} ${pick(SHOP_B)}`;
+        if (!(await db.one('SELECT 1 FROM shops WHERE lower(name) = lower($1)', [n]))) name = n;
+      }
+      if (!name) return;
       const accepts = rnd() < 0.5 ? Object.keys(QUALITIES) : Object.keys(QUALITIES).filter((q) => q !== 'terne');
       const r = await tryDo('boutique ouverte', () => shops.createShop(me, {
         name, tier, description: pick(SHOP_DESC), accepts,
@@ -251,14 +263,16 @@ export function createBotEconomy(db, game, shops, fun) {
   async function play(bot, me, p, tryDo, opts) {
     await daily(bot, p, tryDo);
     if (rnd() < ({ grinder: 0.7, regular: 0.35, casual: 0.15 }[p.type] ?? 0.3)) await miniGames(bot, p, tryDo);
-    await forgeAndHolo(bot, p, tryDo);
-    const list = await openShops();
     await ownShop(bot, me, p, tryDo);
+    // Celui qui veut une boutique et s'en approche économise : pas d'achats de boosters, de parts ni de holo.
+    const saving = wantsShop(bot, p) && (await bitsOf(bot.id)) >= SAVE_FROM && !(await db.one('SELECT 1 FROM shops WHERE owner_id = $1', [bot.id]));
+    if (!saving) await forgeAndHolo(bot, p, tryDo);
+    const list = await openShops();
     if (!list.length) return;
     await manageListings(bot, me, p, tryDo, list, opts);
     await sealAndSell(bot, me, p, tryDo, list, opts);
-    await buyPacks(bot, me, p, tryDo, list, opts);
-    await bourse.session(bot, me, p, tryDo, list);
+    if (!saving) await buyPacks(bot, me, p, tryDo, list, opts);
+    await bourse.session(bot, me, p, tryDo, list, { noBuy: saving });
     await loans(bot, me, p, tryDo, list);
   }
 

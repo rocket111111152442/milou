@@ -114,7 +114,7 @@ export function createBotBourse(db, shops) {
     await tryDo('offre de parts', () => shops.makeOffer(me, s.id, { sellerId: seller.user_id, qty, price }));
   }
 
-  async function session(bot, me, p, tryDo, list) {
+  async function session(bot, me, p, tryDo, list, { noBuy = false } = {}) {
     // Les offres reçues passent avant tout : un joueur attend sa réponse.
     await answerOffers(bot, me, { ...investorOf(bot, p), botId: bot.id }, tryDo);
     const holding = await db.all('SELECT shop_id, qty FROM shares WHERE user_id = $1 AND qty > 0', [bot.id]);
@@ -129,17 +129,18 @@ export function createBotBourse(db, shops) {
     const wealth = bits + rows.reduce((a, s) => a + (held.get(s.id) || 0) * s.share_price, 0);
     const best = Math.max(0, ...rows.filter((s) => s.owner_id !== bot.id).map(yieldOf));
     // Ses lignes d'abord, puis une ou deux boutiques : la plus rentable pour le chasseur, la plus populaire pour l'impulsif.
-    const others = rows.filter((s) => !held.has(s.id));
+    // Les boutiques où il peut vraiment acheter (ouvertes, parts restantes, pas la sienne) ; les complètes passent par les offres.
+    const others = rows.filter((s) => !held.has(s.id) && s.owner_id !== bot.id && s.is_open !== false && s.shares_max - Number(s.sold) > 0);
     const score = (s) => (inv.name === 'chasseur' ? yieldOf(s) : inv.name === 'impulsif' ? Number(s.holders) + 1 : yieldOf(s) + rnd() * 0.01) * between(0.8, 1.2);
     others.sort((a, b) => score(b) - score(a));
     const watch = [...rows.filter((s) => held.has(s.id)), ...others.slice(0, 1 + randomInt(2))];
     for (const s of watch) {
       const d = decide(inv, s, held.get(s.id) || 0, bits, wealth, best);
-      if (!d) continue;
+      if (!d || (noBuy && d.side === 'buy')) continue; // il économise
       const r = await tryDo(`${d.side === 'buy' ? 'achat' : 'revente'} de parts (${d.why})`, () => (d.side === 'buy' ? shops.buyShares(me, s.id, d.qty) : shops.sellShares(me, s.id, d.qty)));
       if (r) bits += d.side === 'buy' ? -r.cost : r.amount;
     }
-    await makeOffer(bot, me, inv, rows, held, bits, tryDo);
+    if (!noBuy) await makeOffer(bot, me, inv, rows, held, bits, tryDo);
   }
   return { session };
 }

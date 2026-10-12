@@ -327,7 +327,7 @@ dbtest('comptes animés : coffre, mini-jeux, boosters en boutique, bourse, prêt
   await shops.updateShop(owner, id, { sharePrice: 5, divPct: 5 });
   const mk = async (type, b) => db.one(`INSERT INTO users (username, pass_hash, created_at, bits, pack_stock, pack_anchor, is_bot, bot, bot_next_at)
     VALUES ($1, 'x', 0, $2, 10, $3, true, $4, 0) RETURNING *`,
-  ['anim' + ++n, b, Date.now(), JSON.stringify({ type, tz: 0, sleep: [3, 4], greed: 1, eye: 2.5, fav: null, market: 1, social: 0, stall: 4 })]);
+  ['anim' + ++n, b, Date.now(), JSON.stringify({ type, tz: 0, sleep: [3, 4], greed: 1, eye: 2.5, fav: null, market: 1, social: 0, stall: 4, wantsShop: b >= 40_000 })]);
   const bots = [await mk('trader', 40_000), await mk('trader', 3000), await mk('collector', 5000), await mk('regular', 50), await mk('grinder', 800)];
   const log = [];
   const tryDo = async (label, fn) => { try { const r = await fn(); if (r !== undefined) log.push(label); return r; } catch (e) { if (!(e instanceof GameError)) throw e; } };
@@ -376,4 +376,33 @@ dbtest('comptes animés : demandent des prêts (à court ou pour investir), à l
   assert.ok(!loans.some((l) => l.shop_id === dear.id), 'ils évitent la boutique à 80 %');
   assert.ok(loans.some((l) => l.shop_id === cheap.id), 'la moins chère, qui accorde tout de suite');
   assert.ok(loans.some((l) => l.status === 'active' || l.status === 'repaid'), 'accordés automatiquement');
+});
+
+dbtest('comptes animés : ouvrent une boutique dès qu\'ils en ont les moyens, et économisent pour y arriver', async () => {
+  const { createBotEconomy, wantsShop } = await import('../lib/bot-economy.js');
+  const { createFun } = await import('../lib/fun.js');
+  const { GameError } = await import('../lib/game.js');
+  const eco = createBotEconomy(db, game, shops, createFun(db, game));
+  const owner = await user(SHOP_PRICE + 1000);
+  await shops.createShop(owner, { name: 'Parts juteuses', sharePrice: 5, divMode: 'fixe', divPct: 5 });
+  const mk = async (b, dream) => db.one(`INSERT INTO users (username, pass_hash, created_at, bits, pack_stock, pack_anchor, is_bot, bot, bot_next_at)
+    VALUES ($1, 'x', 0, $2, 0, $3, true, $4, 0) RETURNING *`,
+  ['bout' + ++n, b, Date.now(), JSON.stringify({ type: 'trader', tz: 0, sleep: [3, 4], greed: 1, eye: 2, fav: null, market: 0, social: 0, stall: 1, bourse: 'chasseur', wantsShop: dream })]);
+  const rich = await mk(27_600, true);   // 25 000 + 10 % de réserve : de quoi ouvrir
+  const saver = await mk(15_000, true);  // veut une boutique mais n'a pas assez : il économise
+  const other = await mk(15_000, false); // ne veut pas de boutique : il investit
+  const tryDo = async (_l, fn) => { try { return await fn(); } catch (e) { if (!(e instanceof GameError)) throw e; } };
+  for (let round = 0; round < 40; round++) {
+    for (const b of [rich, saver, other]) {
+      const fresh = await db.one('SELECT * FROM users WHERE id = $1', [b.id]);
+      await eco.play(fresh, { id: b.id, username: b.username }, { ...fresh.bot }, tryDo, { dbFull: true });
+    }
+  }
+  const shopOf = async (u) => db.one('SELECT tier FROM shops WHERE owner_id = $1', [u.id]);
+  assert.ok(await shopOf(rich), 'le compte qui en a les moyens ouvre sa boutique');
+  assert.ok(!(await shopOf(saver)) && !(await shopOf(other)));
+  const parts = async (u) => Number((await db.one('SELECT COALESCE(SUM(qty), 0) n FROM shares WHERE user_id = $1', [u.id])).n);
+  assert.equal(await parts(saver), 0, 'il économise : pas d\'achat de parts');
+  assert.ok(await parts(other) > 0, 'celui qui ne veut pas de boutique investit');
+  assert.equal(typeof wantsShop({ id: 1 }, { type: 'trader' }), 'boolean');
 });
