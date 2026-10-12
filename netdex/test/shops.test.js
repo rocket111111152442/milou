@@ -137,6 +137,11 @@ dbtest('parts : on achète directement à la boutique, l\'argent va dans le coff
   await assert.rejects(shops.buyShares(x, id, 1), /fermée/);
   const st = await shops.stock(x.id, id);
   assert.equal(st.shop.sharesLeft, 10);
+  // Le coffre n'est visible que par le propriétaire.
+  assert.equal(st.shop.balance, null);
+  assert.equal((await shops.shopDetail(x.id, id)).shop.balance, null);
+  assert.equal((await shops.listShops(x.id)).items.find((i) => i.id === id).balance, null);
+  assert.equal((await shops.shopDetail(owner.id, id)).shop.balance, 204);
   assert.deepEqual(st.recent.map((g) => g.kind), ['revente', 'achat', 'achat']);
 });
 

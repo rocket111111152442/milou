@@ -87,12 +87,13 @@ export function createShops(db, game) {
       (SELECT COUNT(*) FROM shares h WHERE h.shop_id = s.id AND h.qty > 0) holders
     FROM shops s JOIN users u ON u.id = s.owner_id`;
   const tierOf = (s) => TIERS[s.tier] || TIERS.standard;
-  const shopView = (s) => {
+  // Le coffre n'est visible que par le propriétaire (viewerId) ; null pour les autres.
+  const shopView = (s, viewerId) => {
     const sold = Number(s.sold || 0);
     return {
       tier: s.tier || 'standard', tierName: tierOf(s).name, maxFee: tierOf(s).maxFee, packBonus: tierOf(s).packBonus,
       id: s.id, name: s.name, description: s.description, ownerId: s.owner_id, owner: s.owner_name, isOpen: s.is_open !== false,
-      color: s.color || '', emoji: s.emoji || '', accepts: s.accepts, balance: Number(s.balance),
+      color: s.color || '', emoji: s.emoji || '', accepts: s.accepts, balance: s.owner_id === viewerId ? Number(s.balance) : null,
       // Ventes de boosters
       feePct: s.fee_pct, listingFee: s.listing_fee, minPrice: s.min_price, maxPrice: s.max_price, sellerMax: s.seller_max, holderDiscount: s.holder_discount,
       // Parts
@@ -106,9 +107,9 @@ export function createShops(db, game) {
     };
   };
 
-  async function listShops() {
+  async function listShops(viewerId = null) {
     const rows = await db.all(`${shopSelect} ORDER BY s.sales_count DESC, s.id`);
-    return { items: rows.map(shopView), price: SHOP_PRICE, tiers: TIERS, colors: SHOP_COLORS };
+    return { items: rows.map((r) => shopView(r, viewerId)), price: SHOP_PRICE, tiers: TIERS, colors: SHOP_COLORS };
   }
 
   // Tous les réglages modifiables par le propriétaire, avec leurs bornes.
@@ -293,7 +294,7 @@ export function createShops(db, game) {
       db.all('SELECT day, amount, per_share FROM shop_payouts WHERE shop_id = $1 ORDER BY day DESC LIMIT 7', [s.id]),
     ]);
     return {
-      shop: shopView(s), owner, qualities: QUALITIES, colors: SHOP_COLORS,
+      shop: shopView(s, meId), owner, qualities: QUALITIES, colors: SHOP_COLORS,
       holderFee: myShares?.qty > 0 ? +(s.fee_pct * (1 - s.holder_discount / 100)).toFixed(2) : null,
       withdrawRoom: owner ? withdrawRoom(s) : null, withdrawPct: WITHDRAW_PCT,
       // En boutique Premium, on affiche les chances que le booster aura une fois acheté (+15 %).
@@ -488,7 +489,7 @@ export function createShops(db, game) {
       const h = await q.one('SELECT * FROM shares WHERE shop_id = $1 AND user_id = $2 FOR UPDATE', [s.id, me.id]);
       if (!h || h.qty < qty) throw new GameError(`Tu n'as que ${h?.qty || 0} part${h?.qty > 1 ? 's' : ''}.`);
       const amount = Math.floor((qty * s.share_price * s.buyback_pct) / 100);
-      if (Number(s.balance) < amount) throw new GameError(`Le coffre de ${s.name} ne contient que ${s.balance} bits : pas assez pour te racheter ces parts.`);
+      if (Number(s.balance) < amount) throw new GameError(`${s.name} n'a pas assez de bits dans son coffre pour te racheter ces parts pour le moment.`);
       await q.run('UPDATE shops SET balance = balance - $1 WHERE id = $2', [amount, s.id]);
       await game.credit(q, me.id, amount);
       const paidPart = Math.round((Number(h.paid) * qty) / h.qty);
@@ -510,7 +511,7 @@ export function createShops(db, game) {
       db.one('SELECT bits FROM users WHERE id = $1', [meId]),
     ]);
     const offers = await offersFor(meId, id);
-    return { shop: shopView(s), owner: s.owner_id === meId, offers, holding: holding ? { qty: holding.qty, paid: Number(holding.paid), received: Number(holding.received) } : { qty: 0, paid: 0, received: 0 },
+    return { shop: shopView(s, meId), owner: s.owner_id === meId, offers, holding: holding ? { qty: holding.qty, paid: Number(holding.paid), received: Number(holding.received) } : { qty: 0, paid: 0, received: 0 },
       holders, payouts, recent, bits: me.bits,
       bids: [], asks: [], trades: [], history: [], myOrders: [] }; // vides : compatibilité avec l'ancienne page encore ouverte
   }

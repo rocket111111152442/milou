@@ -166,7 +166,8 @@ export function createBotEconomy(db, game, shops, fun) {
     }
     // Emprunt : rare, quand il est à court et qu'il n'a rien en cours.
     if (mine.length || bits > 300 || rnd() > 0.06 || !list.length) return;
-    const cands = list.filter((s) => s.is_open !== false && s.owner_id !== bot.id && s.loan_max >= Math.max(50, s.loan_min) && s.balance >= Math.max(50, s.loan_min));
+    // Comme un joueur, il ne voit pas le coffre des autres boutiques : il demande, le propriétaire décide.
+    const cands = list.filter((s) => s.is_open !== false && s.owner_id !== bot.id && s.loan_max >= Math.max(50, s.loan_min));
     if (!cands.length) return;
     const s = pick(cands);
     // Durée : la plus courte qui lui laisse le temps de rembourser ; il renonce si le prêt coûte trop cher.
@@ -176,7 +177,7 @@ export function createBotEconomy(db, game, shops, fun) {
     const recent = await db.one(`SELECT 1 FROM shop_loans l JOIN users u ON u.id = l.borrower_id WHERE l.shop_id = $1 AND u.is_bot AND l.created_at > $2 LIMIT 1`,
       [s.id, Date.now() - 24 * HOUR]);
     if (recent) return;
-    const amount = Math.max(s.loan_min, Math.min(s.loan_max, Math.round(between(80, 800) / 10) * 10, Math.floor(s.balance * 0.5)));
+    const amount = Math.max(s.loan_min, Math.min(s.loan_max, Math.round(between(80, 800) / 10) * 10));
     await tryDo('demande de prêt', () => shops.requestLoan(me, s.id, { amount, days }));
   }
 

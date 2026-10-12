@@ -96,7 +96,7 @@ const shopCard = (s) => `<a class="shop-card" href="#/shop/${s.id}"${s.color ? `
   <div class="muted small">par ${esc(s.owner)} · ${s.listings} booster${s.listings > 1 ? 's' : ''} en vente · ${fmt(s.salesCount)} ventes</div>
   ${s.description ? `<p class="small" style="margin:6px 0 0">${esc(s.description.slice(0, 120))}</p>` : ''}
   <div class="row small" style="margin-top:8px;gap:6px">${s.accepts.map((q) => `<span class="q-chip q-${q}">${QUAL[q]}</span>`).join('')}</div>
-  <div class="row small mono" style="margin-top:8px"><span class="grow">Coffre ${fmt(s.balance)}</span><span>Part ${fmt(s.sharePrice)} · ${s.sharesLeft} dispo</span></div>
+  <div class="row small mono" style="margin-top:8px"><span class="grow">${s.balance != null ? `Coffre ${fmt(s.balance)}` : `${fmt(s.salesCount)} ventes`}</span><span>Part ${fmt(s.sharePrice)} · ${s.sharesLeft} dispo</span></div>
 </a>`;
 
 function createShopDialog(tiers, colors) {
@@ -228,7 +228,7 @@ export async function viewShop(el, { params }) {
       </div>
       <div class="quick-grid" style="margin-top:10px">
         <div class="quick"><b>${num(s.feePct)} %</b><span>Commission${d.holderFee != null ? ` · ${num(d.holderFee)} % pour toi (actionnaire)` : s.holderDiscount ? ` · −${num(s.holderDiscount)} % pour les actionnaires` : ''}</span></div>
-        <div class="quick"><b>${fmt(s.balance)}</b><span>Coffre (bits)</span></div>
+        ${s.balance != null ? `<div class="quick"><b>${fmt(s.balance)}</b><span>Coffre (bits, visible par toi seul)</span></div>` : `<div class="quick"><b>${s.holders}</b><span>Détenteur${s.holders > 1 ? 's' : ''} de parts</span></div>`}
         <div class="quick"><b>${fmt(s.salesCount)}</b><span>Ventes · ${fmt(s.feesTotal)} de commissions</span></div>
         <div class="quick"><b>${fmt(s.sharePrice)}</b><span>Prix d'une part · ${s.sharesLeft} dispo</span></div>
       </div>
@@ -419,7 +419,7 @@ export async function viewStock(el, { params }) {
         <div class="quick"><b>${s.sharesLeft} / ${s.sharesMax}</b><span>Parts encore à vendre</span></div>
         <div class="quick"><b>${resale ? fmt(resale) : 'Non'}</b><span>${resale ? `Rachat d'une part (${num(s.buybackPct)} %)` : 'La boutique ne rachète pas'}</span></div>
       </div>
-      <p class="muted small">Coffre ${fmt(s.balance)} bits · dividendes : ${s.divMode === 'fixe' ? `${num(s.divPct)} % du prix d'une part par jour` : `${num(s.divPct)} % du coffre par jour, partagé entre les 1 000 parts`} · ${s.holders} détenteur${s.holders > 1 ? 's' : ''}${s.withdrawnTotal ? ` · le propriétaire s'est versé ${fmt(s.withdrawnTotal)} bits` : ''}</p>
+      <p class="muted small">${s.balance != null ? `Coffre ${fmt(s.balance)} bits · ` : ''}dividendes : ${s.divMode === 'fixe' ? `${num(s.divPct)} % du prix d'une part par jour` : `${num(s.divPct)} % du coffre par jour, partagé entre les 1 000 parts`} · ${s.holders} détenteur${s.holders > 1 ? 's' : ''}${s.withdrawnTotal ? ` · le propriétaire s'est versé ${fmt(s.withdrawnTotal)} bits` : ''}</p>
       <div class="grid-2">
         <div class="panel"><b>Acheter des parts</b>
           ${d.owner ? '<p class="muted small">C\'est ta boutique : tu règles le prix et les dividendes dans ses réglages.</p>' : !s.isOpen ? '<p class="muted small">Boutique fermée pour le moment.</p>' : !s.sharesLeft ? '<p class="muted small">La boutique n\'a plus de parts à vendre : fais une offre à un détenteur (liste plus bas).</p>' : `
