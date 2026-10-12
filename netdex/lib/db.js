@@ -1,5 +1,6 @@
 // Accès Postgres (Neon en production). Un pool par instance de fonction.
 import pg from 'pg';
+import { createHash } from 'node:crypto';
 
 // BIGINT / COUNT / SUM reviennent en chaînes par défaut : on les veut en nombres (timestamps en ms, compteurs).
 pg.types.setTypeParser(20, Number);
@@ -251,8 +252,9 @@ export function createDb(url = databaseUrl(), { max } = {}) {
   const local = /localhost|127\.0\.0\.1/.test(url);
   const pool = new pg.Pool({
     connectionString: cleanUrl(url),
-    max: max || Number(process.env.PG_POOL_MAX) || 5,
-    idleTimeoutMillis: 10_000,
+    max: max || Number(process.env.PG_POOL_MAX) || 4,
+    idleTimeoutMillis: 5_000,
+    connectionTimeoutMillis: 10_000,
     ssl: local ? false : { rejectUnauthorized: false },
   });
   const db = wrap(pool);
@@ -277,7 +279,18 @@ export function createDb(url = databaseUrl(), { max } = {}) {
 
 export const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || 'Ismaelleboulit').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 
-export async function migrate(db) {
-  await db.query(SCHEMA);
+// Empreinte du schéma : si la base est déjà à jour, on ne relance pas les ALTER TABLE (ils verrouillent les tables).
+const SCHEMA_HASH = createHash('sha256').update(SCHEMA).digest('hex').slice(0, 16);
+
+export async function migrate(db, { force = false } = {}) {
+  const done = await db.one("SELECT value FROM meta WHERE key = 'schema'").catch(() => null);
+  if (!force && done?.value === SCHEMA_HASH) return 'à jour';
+  // Ne jamais faire la queue derrière une transaction longue : mieux vaut échouer vite que bloquer tout le jeu.
+  await db.tx(async (q) => {
+    await q.query("SET LOCAL lock_timeout = '3s'");
+    await q.query(SCHEMA);
+    await q.query("INSERT INTO meta (key, value) VALUES ('schema', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [SCHEMA_HASH]);
+  });
   await db.query('UPDATE users SET is_admin = true WHERE lower(username) = ANY($1::text[]) AND NOT is_admin', [ADMIN_USERNAMES]);
+  return 'migré';
 }
