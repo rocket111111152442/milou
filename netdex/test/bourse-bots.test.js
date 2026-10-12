@@ -1,7 +1,7 @@
 // Parts de boutiques : décisions des comptes animés selon leur profil.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decide, investorOf, yieldOf, STYLES } from '../lib/bot-bourse.js';
+import { decide, investorOf, yieldOf, STYLES, judgeOffer, partValue } from '../lib/bot-bourse.js';
 
 // Boutique type : part à 10, dividende fixe de 1 %/jour (0,1 bit par part), rachat 80 %, coffre bien rempli.
 const shop = (o = {}) => ({ id: 1, owner_id: 999, is_open: true, share_price: 10, div_mode: 'fixe', div_pct: 1, balance: 5000, total_shares: 1000,
@@ -54,4 +54,13 @@ test('limites : parts restantes, maximum par joueur, sa propre boutique, boutiqu
 test('à court de bits : revend une partie si la boutique rachète', () => {
   assert.equal(often(() => decide(inv('rentier'), shop({ div_pct: 2 }), 40, 20, 420)), 'sell:besoin de bits');
   assert.equal(decide(inv('rentier'), shop({ div_pct: 2, buyback_pct: 0 }), 40, 20, 420)?.side ?? 'rien', 'rien');
+});
+
+test('offre reçue : acceptée au-dessus de son estimation, jamais à perte sauf besoin de bits', () => {
+  const s = shop({ div_pct: 1 }); // 0,1 bit/jour : un rentier l'estime à 15 (150 jours), un impulsif au prix (10)
+  assert.equal(partValue(inv('rentier'), s), 15);
+  assert.equal(judgeOffer(inv('rentier'), s, { price: 12 }, 10, 5000), false);
+  assert.equal(judgeOffer(inv('rentier'), s, { price: 20 }, 10, 5000), true);
+  assert.equal(judgeOffer(inv('impulsif'), s, { price: 13 }, 20, 5000), false); // il a payé 20 : pas de vente à perte
+  assert.equal(judgeOffer(inv('impulsif'), s, { price: 13 }, 20, 50), true); // sauf s'il manque de bits
 });

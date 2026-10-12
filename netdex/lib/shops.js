@@ -21,6 +21,8 @@ const MAX_SEALED = 30;
 const MAX_LISTINGS = 20;
 const MAX_LOANS = 3;
 const LOAN_PENDING_MS = 48 * 3600e3;
+const OFFER_MS = 48 * 3600e3; // durée de vie d'une offre de parts
+const MAX_OFFERS = 10;
 const DAY = 24 * 3600e3;
 const dayId = (t = Date.now()) => Math.floor(t / DAY);
 
@@ -95,7 +97,7 @@ export function createShops(db, game) {
       feePct: s.fee_pct, listingFee: s.listing_fee, minPrice: s.min_price, maxPrice: s.max_price, sellerMax: s.seller_max, holderDiscount: s.holder_discount,
       // Parts
       sharePrice: s.share_price, sharesMax: s.shares_max, sharesSold: sold, sharesLeft: Math.max(0, s.shares_max - sold), maxPerPlayer: s.max_per_player,
-      buybackPct: s.buyback_pct, divMode: s.div_mode, divPct: s.div_pct, totalShares: s.total_shares, sharesRaised: Number(s.shares_raised), holders: Number(s.holders || 0),
+      buybackPct: s.buyback_pct, transferFee: s.transfer_fee, divMode: s.div_mode, divPct: s.div_pct, totalShares: s.total_shares, sharesRaised: Number(s.shares_raised), holders: Number(s.holders || 0),
       divPerShare: divPerShare(s),
       // Prêts
       loanRate: s.loan_rate, loanDaily: s.loan_daily, loanFee: s.loan_fee, loanLate: s.loan_late, loanMin: s.loan_min, loanMax: s.loan_max,
@@ -141,6 +143,7 @@ export function createShops(db, game) {
       shares_max: num('sharesMax', 'shares_max', 0, TOTAL_SHARES, TOTAL_SHARES, 'Parts à vendre', true),
       max_per_player: num('maxPerPlayer', 'max_per_player', 1, TOTAL_SHARES, TOTAL_SHARES, 'Parts maximum par joueur', true),
       buyback_pct: num('buybackPct', 'buyback_pct', 0, 100, 0, 'Rachat des parts (%)'),
+      transfer_fee: num('transferFee', 'transfer_fee', 0, 20, 0, 'Taxe sur les reventes entre joueurs (%)'),
       div_pct: num('divPct', 'div_pct', 0, divMode === 'fixe' ? 20 : 50, 0, divMode === 'fixe' ? 'Dividende (% du prix d\'une part par jour)' : 'Dividende (% du coffre par jour)'),
       loan_rate: num('loanRate', 'loan_rate', 0, 200, 10, 'Intérêts de base (%)'),
       loan_daily: num('loanDaily', 'loan_daily', 0, 20, 0, 'Intérêts par jour (%)'),
@@ -158,7 +161,7 @@ export function createShops(db, game) {
     return c;
   }
   const COLS = ['name', 'description', 'accepts', 'color', 'emoji', 'is_open', 'fee_pct', 'listing_fee', 'min_price', 'max_price', 'seller_max', 'holder_discount',
-    'share_price', 'shares_max', 'max_per_player', 'buyback_pct', 'div_mode', 'div_pct', 'loan_rate', 'loan_daily', 'loan_fee', 'loan_late', 'loan_min', 'loan_max',
+    'share_price', 'shares_max', 'max_per_player', 'buyback_pct', 'transfer_fee', 'div_mode', 'div_pct', 'loan_rate', 'loan_daily', 'loan_fee', 'loan_late', 'loan_min', 'loan_max',
     'loan_min_days', 'loan_max_days', 'loan_auto'];
 
   async function createShop(me, body) {
@@ -251,6 +254,8 @@ export function createShops(db, game) {
       for (const l of loans) {
         await game.notify(q, l.borrower_id, l.status === 'pending' ? `${s.name} a fermé : ta demande de prêt est annulée.` : `${s.name} a fermé : ton prêt est annulé, tu n'as plus rien à rembourser.`, '#/loans');
       }
+      const offers = await q.all("SELECT * FROM share_offers WHERE shop_id = $1 AND status = 'pending'", [s.id]);
+      for (const o of offers) await game.credit(q, o.buyer_id, o.qty * o.price); // bits bloqués rendus
       let balance = Number(s.balance);
       const holders = await q.all('SELECT user_id, qty FROM shares WHERE shop_id = $1 AND qty > 0', [s.id]);
       const owed = holders.reduce((a, h) => a + h.qty * s.share_price, 0);
@@ -499,12 +504,13 @@ export function createShops(db, game) {
     if (!s) throw new GameError('Boutique introuvable.', 404);
     const [holding, holders, payouts, recent, me] = await Promise.all([
       db.one('SELECT qty, paid, received FROM shares WHERE shop_id = $1 AND user_id = $2', [id, meId]),
-      db.all('SELECT u.username, h.qty FROM shares h JOIN users u ON u.id = h.user_id WHERE h.shop_id = $1 AND h.qty > 0 ORDER BY h.qty DESC LIMIT 10', [id]),
+      db.all('SELECT u.id, u.username, h.qty FROM shares h JOIN users u ON u.id = h.user_id WHERE h.shop_id = $1 AND h.qty > 0 ORDER BY h.qty DESC LIMIT 30', [id]),
       db.all('SELECT day, amount, per_share FROM shop_payouts WHERE shop_id = $1 ORDER BY day DESC LIMIT 14', [id]),
       db.all('SELECT g.kind, g.qty, g.amount, g.at, u.username FROM shop_log g LEFT JOIN users u ON u.id = g.user_id WHERE g.shop_id = $1 ORDER BY g.id DESC LIMIT 12', [id]),
       db.one('SELECT bits FROM users WHERE id = $1', [meId]),
     ]);
-    return { shop: shopView(s), owner: s.owner_id === meId, holding: holding ? { qty: holding.qty, paid: Number(holding.paid), received: Number(holding.received) } : { qty: 0, paid: 0, received: 0 },
+    const offers = await offersFor(meId, id);
+    return { shop: shopView(s), owner: s.owner_id === meId, offers, holding: holding ? { qty: holding.qty, paid: Number(holding.paid), received: Number(holding.received) } : { qty: 0, paid: 0, received: 0 },
       holders, payouts, recent, bits: me.bits,
       bids: [], asks: [], trades: [], history: [], myOrders: [] }; // vides : compatibilité avec l'ancienne page encore ouverte
   }
@@ -515,7 +521,91 @@ export function createShops(db, game) {
     const items = rows.map((r) => ({ id: r.id, name: r.name, emoji: r.emoji, qty: r.qty, paid: Number(r.paid), received: Number(r.received),
       perDay: +(divPerShare(r) * r.qty).toFixed(2), buyback: r.buyback_pct > 0 ? Math.floor((r.qty * r.share_price * r.buyback_pct) / 100) : null }));
     // orders : vide, gardé pour les onglets encore ouverts sur l'ancienne page Bourse.
-    return { items, orders: [], paid: items.reduce((a, x) => a + x.paid, 0), received: items.reduce((a, x) => a + x.received, 0), perDay: +items.reduce((a, x) => a + x.perDay, 0).toFixed(2) };
+    return { items, orders: [], offers: await offersFor(userId), paid: items.reduce((a, x) => a + x.paid, 0), received: items.reduce((a, x) => a + x.received, 0), perDay: +items.reduce((a, x) => a + x.perDay, 0).toFixed(2) };
+  }
+
+  // ---------- Offres d'achat de parts entre joueurs ----------
+  // L'acheteur propose un prix par part à un détenteur ; ses bits sont bloqués jusqu'à la réponse (48 h au plus).
+  // Si le détenteur accepte, les parts changent de main ; la boutique peut prélever une taxe sur le prix de vente.
+  async function offersFor(userId, shopId = null) {
+    const rows = await db.all(`SELECT o.*, s.name shop_name, s.transfer_fee, ub.username buyer, us.username seller,
+        (SELECT qty FROM shares h WHERE h.shop_id = o.shop_id AND h.user_id = o.seller_id) seller_qty
+      FROM share_offers o JOIN shops s ON s.id = o.shop_id JOIN users ub ON ub.id = o.buyer_id JOIN users us ON us.id = o.seller_id
+      WHERE o.status = 'pending' AND (o.buyer_id = $1 OR o.seller_id = $1) ${shopId ? 'AND o.shop_id = $2' : ''} ORDER BY o.id DESC LIMIT 50`,
+    shopId ? [userId, shopId] : [userId]);
+    const view = (o) => ({ id: o.id, shopId: o.shop_id, shopName: o.shop_name, buyer: o.buyer, seller: o.seller, qty: o.qty, price: o.price,
+      total: o.qty * o.price, tax: Math.floor((o.qty * o.price * o.transfer_fee) / 100), sellerQty: o.seller_qty || 0, createdAt: o.created_at,
+      expiresAt: Number(o.created_at) + OFFER_MS });
+    return { received: rows.filter((o) => o.seller_id === userId).map(view), sent: rows.filter((o) => o.buyer_id === userId).map(view) };
+  }
+
+  async function makeOffer(me, shopId, body) {
+    const qty = intIn(body.qty, 1, TOTAL_SHARES, 'Nombre de parts invalide.');
+    const price = intIn(body.price, 1, 1_000_000, 'Prix par part invalide.');
+    return db.tx(async (q) => {
+      const s = await q.one('SELECT * FROM shops WHERE id = $1 FOR UPDATE', [Number(shopId)]);
+      if (!s) throw new GameError('Boutique introuvable.', 404);
+      if (s.owner_id === me.id) throw new GameError('Tu ne peux pas acheter des parts de ta propre boutique.');
+      const seller = await q.one('SELECT u.id, u.username, h.qty FROM shares h JOIN users u ON u.id = h.user_id WHERE h.shop_id = $1 AND h.user_id = $2',
+        [s.id, Number(body.sellerId)]);
+      if (!seller || seller.id === me.id) throw new GameError('Ce joueur n\'a pas de parts de cette boutique.');
+      if (qty > seller.qty) throw new GameError(`${seller.username} n'a que ${seller.qty} part${seller.qty > 1 ? 's' : ''}.`);
+      const mine = Number((await q.one('SELECT qty FROM shares WHERE shop_id = $1 AND user_id = $2', [s.id, me.id]))?.qty || 0);
+      if (mine + qty > s.max_per_player) throw new GameError(`${s.name} limite à ${s.max_per_player} parts par joueur (tu en as ${mine}).`);
+      const open = (await q.one("SELECT COUNT(*) n FROM share_offers WHERE buyer_id = $1 AND status = 'pending'", [me.id])).n;
+      if (open >= MAX_OFFERS) throw new GameError(`Maximum ${MAX_OFFERS} offres en attente.`);
+      if (await q.one("SELECT 1 FROM share_offers WHERE buyer_id = $1 AND seller_id = $2 AND shop_id = $3 AND status = 'pending'", [me.id, seller.id, s.id])) {
+        throw new GameError('Tu as déjà une offre en attente pour ce joueur : annule-la pour en faire une autre.');
+      }
+      const total = qty * price;
+      await game.debit(q, me.id, total, `Il te faut ${total} bits pour cette offre (ils sont bloqués jusqu'à la réponse).`);
+      const o = await q.one('INSERT INTO share_offers (shop_id, buyer_id, seller_id, qty, price, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+        [s.id, me.id, seller.id, qty, price, Date.now()]);
+      await game.notify(q, seller.id, `${me.username} te propose ${total} bits pour ${qty} part${qty > 1 ? 's' : ''} de ${s.name} (${price} par part).`, `#/bourse/${s.id}`);
+      await game.wakeBot(q, seller.id); // un compte animé répond à sa prochaine session
+      return { id: o.id, total };
+    });
+  }
+
+  async function respondOffer(me, offerId, accept) {
+    return db.tx(async (q) => {
+      const o = await q.one("SELECT * FROM share_offers WHERE id = $1 AND status = 'pending' FOR UPDATE", [Number(offerId)]);
+      if (!o || o.seller_id !== me.id) throw new GameError('Offre introuvable.', 404);
+      const s = await q.one('SELECT * FROM shops WHERE id = $1 FOR UPDATE', [o.shop_id]);
+      const total = o.qty * o.price;
+      const close = (status) => q.run('UPDATE share_offers SET status = $1, resolved_at = $2 WHERE id = $3', [status, Date.now(), o.id]);
+      if (!accept) {
+        await close('refused');
+        await game.credit(q, o.buyer_id, total);
+        await game.notify(q, o.buyer_id, `${me.username} a refusé ton offre sur ${s.name} : ${total} bits rendus.`, `#/bourse/${s.id}`);
+        return { status: 'refused' };
+      }
+      const h = await q.one('SELECT * FROM shares WHERE shop_id = $1 AND user_id = $2 FOR UPDATE', [s.id, me.id]);
+      if (!h || h.qty < o.qty) throw new GameError(`Tu n'as plus que ${h?.qty || 0} part${h?.qty > 1 ? 's' : ''} : impossible d'accepter.`);
+      const buyerQty = Number((await q.one('SELECT qty FROM shares WHERE shop_id = $1 AND user_id = $2', [s.id, o.buyer_id]))?.qty || 0);
+      if (buyerQty + o.qty > s.max_per_player) throw new GameError(`L'acheteur dépasserait la limite de ${s.max_per_player} parts par joueur.`);
+      const tax = Math.floor((total * s.transfer_fee) / 100);
+      await game.credit(q, me.id, total - tax);
+      if (tax) await q.run('UPDATE shops SET balance = balance + $1, fees_total = fees_total + $1 WHERE id = $2', [tax, s.id]);
+      const paidPart = Math.round((Number(h.paid) * o.qty) / h.qty);
+      await q.run('UPDATE shares SET qty = qty - $3, paid = GREATEST(0, paid - $4) WHERE shop_id = $1 AND user_id = $2', [s.id, me.id, o.qty, paidPart]);
+      await q.run(`INSERT INTO shares (shop_id, user_id, qty, paid) VALUES ($1, $2, $3, $4)
+        ON CONFLICT (shop_id, user_id) DO UPDATE SET qty = shares.qty + EXCLUDED.qty, paid = shares.paid + EXCLUDED.paid`, [s.id, o.buyer_id, o.qty, total]);
+      await close('accepted');
+      await log(q, s.id, o.buyer_id, 'cession', o.qty, total);
+      await game.notify(q, o.buyer_id, `${me.username} a accepté ton offre : tu as ${o.qty} part${o.qty > 1 ? 's' : ''} de plus dans ${s.name}.`, `#/bourse/${s.id}`);
+      return { status: 'accepted', received: total - tax, tax };
+    });
+  }
+
+  async function cancelOffer(me, offerId) {
+    return db.tx(async (q) => {
+      const o = await q.one("SELECT * FROM share_offers WHERE id = $1 AND status = 'pending' FOR UPDATE", [Number(offerId)]);
+      if (!o || o.buyer_id !== me.id) throw new GameError('Offre introuvable.', 404);
+      await q.run("UPDATE share_offers SET status = 'cancelled', resolved_at = $1 WHERE id = $2", [Date.now(), o.id]);
+      await game.credit(q, me.id, o.qty * o.price);
+      return { ok: true };
+    });
   }
 
   // ---------- Tâches périodiques (appelées par la tâche planifiée) ----------
@@ -575,11 +665,21 @@ export function createShops(db, game) {
       });
     }
     out.expired = await db.run("UPDATE shop_loans SET status = 'expired' WHERE status = 'pending' AND created_at < $1", [now - LOAN_PENDING_MS]);
+    // Offres de parts sans réponse après 48 h : annulées, bits rendus à l'acheteur.
+    out.offers = await db.tx(async (q) => {
+      const old = await q.all("UPDATE share_offers SET status = 'expired', resolved_at = $1 WHERE status = 'pending' AND created_at < $2 RETURNING buyer_id, qty, price",
+        [now, now - OFFER_MS]);
+      for (const o of old) {
+        await game.credit(q, o.buyer_id, o.qty * o.price);
+        await game.notify(q, o.buyer_id, `Ton offre de parts n'a pas eu de réponse en 48 h : ${o.qty * o.price} bits rendus.`, '#/bourse');
+      }
+      return old.length;
+    });
     return out;
   }
 
   return {
     sealPack, myPacks, openSealed, listShops, createShop, upgradeShop, updateShop, deposit, withdraw, deleteShop, shopDetail, listPack, cancelListing, buyListing,
-    requestLoan, respondLoan, repayLoan, myLoans, buyShares, sellShares, stock, portfolio, dailyJobs, odds,
+    requestLoan, respondLoan, repayLoan, myLoans, buyShares, sellShares, stock, portfolio, makeOffer, respondOffer, cancelOffer, offersFor, dailyJobs, odds,
   };
 }

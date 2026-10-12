@@ -619,7 +619,7 @@ export async function createGame(db) {
   return {
     get totalSites() { return rankedSites + custom.size; },
     isCustom: (id) => custom.has(id), loadCustom, refreshCustom,
-    db, tail, ensureSites, minBid, drawCards, debit, credit, discover, logEvent,
+    db, tail, ensureSites, minBid, drawCards, debit, credit, discover, logEvent, wakeBot,
     tiers, tierOf, value, notify, packState, consumeFreePack, takeNextPack, packOdds, bump, addWeek, rollTier, pickIn, holoRoll, grantCards, activeEvent, eventIs, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
     relation, requestFriend, respondFriend, removeFriend, listFriends,
     createTrade, listTrades, resolveTrade,

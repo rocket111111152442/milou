@@ -72,8 +72,51 @@ export function decide(inv, s, held, bits, wealth, best = 0) {
   return { side: 'buy', qty, why };
 }
 
+// Combien il estime qu'une part vaut : au moins son prix, et ce qu'elle rapportera sur l'horizon qu'il a en tête.
+const HORIZON = { rentier: 150, prudent: 100, chasseur: 60, impulsif: 40 };
+export const partValue = (inv, s) => Math.max(s.share_price, divPerShare(s) * (HORIZON[inv.name] || 80));
+
+// Une offre reçue : il accepte si le prix dépasse sa propre estimation (plus facilement s'il manque de bits),
+// et jamais à perte sauf besoin de bits.
+export function judgeOffer(inv, s, offer, avgPaid, bits) {
+  const want = partValue(inv, s) * (bits < 100 ? 0.8 : between(1.0, 1.2));
+  if (offer.price < want) return false;
+  return !(avgPaid && offer.price < avgPaid && bits >= 100);
+}
+
 export function createBotBourse(db, shops) {
+  async function answerOffers(bot, me, inv, tryDo) {
+    const offers = await db.all(`SELECT o.*, s.share_price, s.div_mode, s.div_pct, s.balance, s.total_shares, h.qty held, h.paid
+      FROM share_offers o JOIN shops s ON s.id = o.shop_id LEFT JOIN shares h ON h.shop_id = o.shop_id AND h.user_id = o.seller_id
+      WHERE o.seller_id = $1 AND o.status = 'pending' ORDER BY o.id LIMIT 5`, [bot.id]);
+    if (!offers.length) return;
+    const bits = (await db.one('SELECT bits FROM users WHERE id = $1', [bot.id])).bits;
+    for (const o of offers) {
+      const ok = o.held >= o.qty && judgeOffer(inv, o, o, o.held ? Number(o.paid) / o.held : 0, bits);
+      await tryDo(ok ? 'offre de parts acceptée' : 'offre de parts refusée', () => shops.respondOffer(me, o.id, ok));
+    }
+  }
+
+  // Une boutique rentable n'a plus de parts à vendre : il fait une offre à un détenteur, un peu au-dessus du prix.
+  async function makeOffer(bot, me, inv, rows, held, bits, tryDo) {
+    if (inv.name === 'impulsif' || rnd() > 0.15) return;
+    if (await db.one("SELECT 1 FROM share_offers WHERE buyer_id = $1 AND status = 'pending' LIMIT 1", [bot.id])) return;
+    const s = rows.find((x) => x.owner_id !== bot.id && x.is_open !== false && x.shares_max - Number(x.sold) <= 0 && yieldOf(x) >= inv.minYield && (held.get(x.id) || 0) < x.max_per_player);
+    if (!s) return;
+    // Pas plus d'une offre de compte animé à la fois pour un même joueur.
+    const seller = await db.one(`SELECT h.user_id, h.qty FROM shares h JOIN users u ON u.id = h.user_id WHERE h.shop_id = $1 AND h.qty > 0 AND h.user_id != $2
+      AND NOT EXISTS (SELECT 1 FROM share_offers o JOIN users b ON b.id = o.buyer_id WHERE o.seller_id = h.user_id AND o.status = 'pending' AND b.is_bot)
+      ORDER BY random() LIMIT 1`, [s.id, bot.id]);
+    if (!seller) return;
+    const price = Math.max(1, Math.round(Math.min(partValue(inv, s), s.share_price * between(1.05, 1.3))));
+    const qty = Math.min(seller.qty, s.max_per_player - (held.get(s.id) || 0), Math.floor((bits * inv.risk) / price), randomInt(1, 30));
+    if (qty < 1) return;
+    await tryDo('offre de parts', () => shops.makeOffer(me, s.id, { sellerId: seller.user_id, qty, price }));
+  }
+
   async function session(bot, me, p, tryDo, list) {
+    // Les offres reçues passent avant tout : un joueur attend sa réponse.
+    await answerOffers(bot, me, { ...investorOf(bot, p), botId: bot.id }, tryDo);
     const holding = await db.all('SELECT shop_id, qty FROM shares WHERE user_id = $1 AND qty > 0', [bot.id]);
     // Quelqu'un qui détient des parts regarde plus souvent son portefeuille.
     const look = (LOOKS[p.type] ?? 0.15) * (holding.length ? 1.6 : 1);
@@ -96,6 +139,7 @@ export function createBotBourse(db, shops) {
       const r = await tryDo(`${d.side === 'buy' ? 'achat' : 'revente'} de parts (${d.why})`, () => (d.side === 'buy' ? shops.buyShares(me, s.id, d.qty) : shops.sellShares(me, s.id, d.qty)));
       if (r) bits += d.side === 'buy' ? -r.cost : r.amount;
     }
+    await makeOffer(bot, me, inv, rows, held, bits, tryDo);
   }
   return { session };
 }

@@ -127,7 +127,7 @@ function createShopDialog(tiers, colors) {
   });
 }
 
-const DEFAULTS = { name: '', description: '', emoji: '', color: '', isOpen: true, feePct: 5, listingFee: 0, minPrice: 0, maxPrice: 0, sellerMax: 0, holderDiscount: 0,
+const DEFAULTS = { transferFee: 0, name: '', description: '', emoji: '', color: '', isOpen: true, feePct: 5, listingFee: 0, minPrice: 0, maxPrice: 0, sellerMax: 0, holderDiscount: 0,
   accepts: Object.keys(QUAL), sharePrice: 10, sharesMax: 1000, maxPerPlayer: 1000, buybackPct: 0, divMode: 'coffre', divPct: 0,
   loanRate: 10, loanDaily: 0, loanFee: 0, loanLate: 0, loanMin: 1, loanMax: 1000, loanMinDays: 1, loanMaxDays: 14, loanAuto: 0 };
 
@@ -162,6 +162,7 @@ ${section('Parts (bourse)', 'prix, nombre, dividendes, rachat', `
     ${field('sharesMax', 'Parts mises en vente (sur 1 000)', s.sharesMax, 'min="0" max="1000"')}
     ${field('maxPerPlayer', 'Parts maximum par joueur', s.maxPerPlayer, 'min="1" max="1000"')}
     ${field('buybackPct', 'Rachat des parts (% du prix, 0 = jamais)', s.buybackPct, 'min="0" max="100" step="5"', 'Si 80 % : un joueur peut revendre une part 10 bits à la boutique pour 8 bits.')}
+    ${field('transferFee', 'Taxe sur les reventes entre joueurs (%)', s.transferFee || 0, 'min="0" max="20" step="0.5"', 'Prélevée sur le prix quand un joueur vend ses parts à un autre ; elle va dans le coffre.')}
   </div>
   <div class="grid-2">
     <label class="field"><span>Dividendes</span><select name="divMode">
@@ -190,7 +191,7 @@ const readSettings = (root) => {
     name: $('[name=name]', root).value, description: $('[name=description]', root).value, emoji: $('[name=emoji]', root).value,
     color: $('[name=color]:checked', root)?.value || '', isOpen: $('[name=isOpen]', root).checked,
     accepts: $$('[name=accepts]:checked', root).map((x) => x.value), divMode: $('[name=divMode]', root).value,
-    ...Object.fromEntries(['feePct', 'listingFee', 'minPrice', 'maxPrice', 'sellerMax', 'holderDiscount', 'sharePrice', 'sharesMax', 'maxPerPlayer', 'buybackPct', 'divPct',
+    ...Object.fromEntries(['feePct', 'listingFee', 'minPrice', 'maxPrice', 'sellerMax', 'holderDiscount', 'sharePrice', 'sharesMax', 'maxPerPlayer', 'buybackPct', 'transferFee', 'divPct',
       'loanRate', 'loanDaily', 'loanFee', 'loanLate', 'loanMin', 'loanMax', 'loanMinDays', 'loanMaxDays', 'loanAuto'].map((k) => [k, n(k)])),
   };
 };
@@ -329,6 +330,47 @@ export async function viewLoans(el) {
 // ======================================================================
 // Bourse : on achète des parts directement à la boutique
 // ======================================================================
+const offersHtml = (o, withShop = true) => {
+  if (!o.received.length && !o.sent.length) return '';
+  const left = (x) => { const h = Math.max(0, Math.round((x.expiresAt - Date.now()) / 3600e3)); return `expire dans ${h} h`; };
+  return `<div class="panel" style="margin-top:10px"><b>Offres de parts</b>
+    ${o.received.length ? `<div class="muted small" style="margin-top:8px">Reçues</div><div class="list small">${o.received.map((x) => `<div class="row" style="gap:8px;align-items:flex-start">
+      <div class="grow"><b>${esc(x.buyer)}</b> veut ${x.qty} part${x.qty > 1 ? 's' : ''}${withShop ? ` de <a href="#/bourse/${x.shopId}">${esc(x.shopName)}</a>` : ''} à <b>${fmt(x.price)}</b> la part
+        <div class="muted">Tu recevrais ${fmt(x.total - x.tax)} bits${x.tax ? ` (taxe de la boutique : ${fmt(x.tax)})` : ''} · tu en as ${x.sellerQty} · ${left(x)}</div></div>
+      <button class="btn primary sm" data-offer-ok="${x.id}">Accepter</button><button class="btn sm" data-offer-no="${x.id}">Refuser</button></div>`).join('')}</div>` : ''}
+    ${o.sent.length ? `<div class="muted small" style="margin-top:8px">Envoyées (bits bloqués jusqu'à la réponse)</div><div class="list small">${o.sent.map((x) => `<div class="row" style="gap:8px">
+      <span class="grow">À <b>${esc(x.seller)}</b> : ${x.qty} part${x.qty > 1 ? 's' : ''}${withShop ? ` de <a href="#/bourse/${x.shopId}">${esc(x.shopName)}</a>` : ''} à ${fmt(x.price)} · ${fmt(x.total)} bits · ${left(x)}</span>
+      <button class="btn sm" data-offer-cancel="${x.id}">Annuler</button></div>`).join('')}</div>` : ''}</div>`;
+};
+// Actions sur les offres (Accepter / Refuser / Annuler), puis redessin de la page.
+function offerClick(e, redraw) {
+  const b = e.target.closest('[data-offer-ok],[data-offer-no],[data-offer-cancel]');
+  if (!b) return false;
+  busy(b, async () => {
+    if (b.dataset.offerCancel) { await api(`/offers/${b.dataset.offerCancel}/cancel`, {}); toast('Offre annulée, tes bits sont revenus'); }
+    else {
+      const r = await api(`/offers/${b.dataset.offerOk || b.dataset.offerNo}/respond`, { accept: !!b.dataset.offerOk });
+      toast(r.status === 'accepted' ? `Parts vendues : +${fmt(r.received)} bits` : 'Offre refusée', r.status === 'accepted' ? 'ok' : undefined);
+    }
+    refreshMe(); redraw();
+  });
+  return true;
+}
+function offerDialog(shop, holder, after) {
+  modal(`Offre à ${esc(holder.username)}`, `<p class="muted small" style="margin-top:0">${esc(holder.username)} a ${holder.qty} part${holder.qty > 1 ? 's' : ''} de ${esc(shop.name)}. Propose un prix par part : tes bits sont bloqués jusqu'à sa réponse (48 h au plus), et rendus s'il refuse.</p>
+    <div class="grid-2"><label class="field"><span>Nombre de parts</span><input type="number" min="1" max="${holder.qty}" value="${Math.min(holder.qty, 5)}" data-oq></label>
+    <label class="field"><span>Prix par part (bits)</span><input type="number" min="1" value="${Math.ceil(shop.sharePrice * 1.1)}" data-op></label></div>
+    <p class="small" data-ot></p><button class="btn primary" data-go>Envoyer l'offre</button>`, {
+    onMount(body, close) {
+      const upd = () => { const t = (Number($('[data-oq]', body).value) || 0) * (Number($('[data-op]', body).value) || 0); $('[data-ot]', body).innerHTML = `Total : <b>${fmt(t)}</b> bits (prix de la boutique : ${fmt(shop.sharePrice)} par part)`; };
+      body.addEventListener('input', upd); upd();
+      $('[data-go]', body).addEventListener('click', (e) => busy(e.target, async () => {
+        await api(`/bourse/${shop.id}/offer`, { sellerId: holder.id, qty: Number($('[data-oq]', body).value), price: Number($('[data-op]', body).value) });
+        toast('Offre envoyée', 'ok'); close(); refreshMe(); after();
+      }));
+    },
+  });
+}
 const perDayText = (v) => (v >= 1 ? fmt(Math.round(v * 10) / 10) : num(+v.toFixed(3)));
 export async function viewBourse(el) {
   const [d, pf] = await Promise.all([api('/shops'), api('/portfolio')]);
@@ -339,12 +381,14 @@ export async function viewBourse(el) {
         <li>Tu achètes des <b>parts</b> d'une boutique, au prix fixé par son propriétaire. Tes bits vont dans le <b>coffre</b> de la boutique.</li>
         <li>Chaque jour, la boutique te verse des <b>dividendes</b> selon ton nombre de parts.</li>
         <li>Si la boutique le propose, tu peux lui <b>revendre</b> tes parts (au pourcentage de rachat qu'elle a choisi).</li>
+        <li>Tu peux aussi <b>racheter des parts à un autre joueur</b> : fais-lui une offre depuis la page de la boutique. Il accepte ou refuse ; tes bits sont bloqués en attendant et rendus en cas de refus.</li>
       </ol></div>
     <div class="panel" style="margin-top:10px"><div class="row"><b class="grow">Mes parts</b>${pf.items.length ? `<span class="mono small">≈ ${perDayText(pf.perDay)} bits / jour</span>` : ''}</div>
       ${pf.items.length ? `<div class="list small" style="margin-top:6px">${pf.items.map((x) => `<a href="#/bourse/${x.id}" style="color:var(--text)"><span class="grow">${x.emoji ? esc(x.emoji) + ' ' : ''}${esc(x.name)} · ${x.qty} part${x.qty > 1 ? 's' : ''}
           <span class="muted">· payé ${fmt(x.paid)} · déjà touché ${fmt(x.received)}</span></span><span class="mono">+${perDayText(x.perDay)}/j</span></a>`).join('')}</div>
         <div class="muted small" style="margin-top:6px">Total payé ${fmt(pf.paid)} bits · dividendes touchés ${fmt(pf.received)} bits</div>`
         : '<div class="muted small" style="margin-top:6px">Tu n\'as pas encore de parts. Choisis une boutique ci-dessous.</div>'}</div>
+    ${offersHtml(pf.offers || { received: [], sent: [] })}
     <div class="panel" style="padding:0;overflow-x:auto;margin-top:10px"><table class="data"><tr><th>Boutique</th><th style="text-align:right">Prix / part</th><th style="text-align:right">Rapporte / jour</th><th style="text-align:right">Rentabilisée en</th><th style="text-align:right">Dispo</th><th style="text-align:right">Rachat</th></tr>
       ${rows.map((s) => {
         const days = s.divPerShare > 0 ? Math.ceil(s.sharePrice / s.divPerShare) : null;
@@ -353,12 +397,16 @@ export async function viewBourse(el) {
           <td class="num">${s.sharesLeft}</td><td class="num">${s.buybackPct ? `${num(s.buybackPct)} %` : 'non'}</td></tr>`;
       }).join('') || '<tr><td colspan="6" class="muted center" style="padding:20px">Aucune boutique</td></tr>'}</table></div>
     <p class="muted small">« Rentabilisée en » : nombre de jours de dividendes pour récupérer le prix d'une part, au rythme actuel. Les dividendes peuvent changer si le propriétaire modifie ses réglages ou si le coffre se vide.</p>`;
-  el.onclick = (e) => { const r = e.target.closest('[data-go]'); if (r) location.hash = '#/bourse/' + r.dataset.go; };
+  el.onclick = (e) => {
+    if (offerClick(e, () => viewBourse(el))) return;
+    const r = e.target.closest('[data-go]'); if (r) location.hash = '#/bourse/' + r.dataset.go;
+  };
 }
 
 export async function viewStock(el, { params }) {
+  let last = null;
   const render = async () => {
-    const d = await api('/bourse/' + params.id);
+    const d = last = await api('/bourse/' + params.id);
     const s = d.shop, h = d.holding;
     const resale = s.buybackPct ? Math.floor((s.sharePrice * s.buybackPct) / 100) : 0;
     const maxBuy = Math.max(0, Math.min(s.sharesLeft, s.maxPerPlayer - h.qty, Math.floor(d.bits / s.sharePrice)));
@@ -374,7 +422,7 @@ export async function viewStock(el, { params }) {
       <p class="muted small">Coffre ${fmt(s.balance)} bits · dividendes : ${s.divMode === 'fixe' ? `${num(s.divPct)} % du prix d'une part par jour` : `${num(s.divPct)} % du coffre par jour, partagé entre les 1 000 parts`} · ${s.holders} détenteur${s.holders > 1 ? 's' : ''}${s.withdrawnTotal ? ` · le propriétaire s'est versé ${fmt(s.withdrawnTotal)} bits` : ''}</p>
       <div class="grid-2">
         <div class="panel"><b>Acheter des parts</b>
-          ${d.owner ? '<p class="muted small">C\'est ta boutique : tu règles le prix et les dividendes dans ses réglages.</p>' : !s.isOpen ? '<p class="muted small">Boutique fermée pour le moment.</p>' : !s.sharesLeft ? '<p class="muted small">Plus aucune part à vendre.</p>' : `
+          ${d.owner ? '<p class="muted small">C\'est ta boutique : tu règles le prix et les dividendes dans ses réglages.</p>' : !s.isOpen ? '<p class="muted small">Boutique fermée pour le moment.</p>' : !s.sharesLeft ? '<p class="muted small">La boutique n\'a plus de parts à vendre : fais une offre à un détenteur (liste plus bas).</p>' : `
           <label class="field" style="margin-top:10px"><span>Nombre de parts</span><input type="number" min="1" max="${Math.max(1, maxBuy)}" value="${Math.min(Math.max(1, maxBuy), 10)}" data-qty></label>
           <p class="small" data-buy-total></p>
           <button class="btn primary" style="width:100%" data-buy-shares ${maxBuy ? '' : 'disabled'}>Acheter</button>
@@ -389,8 +437,9 @@ export async function viewStock(el, { params }) {
       </div>
       <div class="grid-2" style="margin-top:10px">
         <div class="panel"><b>Derniers mouvements</b><div class="list small" style="margin-top:6px">${d.recent.map((g) => `<div><span class="grow">${esc(g.username || '?')} ${kind[g.kind] || g.kind} ${g.qty ? `${g.qty} part${g.qty > 1 ? 's' : ''} · ` : ''}${fmt(g.amount)} bits</span><span class="muted">${ago(g.at)}</span></div>`).join('') || '<div class="muted">Aucun mouvement</div>'}</div></div>
-        <div class="panel"><b>Détenteurs</b><div class="list small" style="margin-top:6px">${d.holders.map((x) => `<div><span class="grow">${esc(x.username)}</span><span class="mono">${x.qty} part${x.qty > 1 ? 's' : ''}</span></div>`).join('') || '<div class="muted">Personne pour l\'instant</div>'}</div></div>
+        <div class="panel"><b>Détenteurs</b>${!d.owner ? '<div class="muted small">Propose-leur un prix pour racheter leurs parts.</div>' : ''}<div class="list small" style="margin-top:6px">${d.holders.map((x) => `<div class="row" style="gap:8px"><span class="grow">${esc(x.username)}</span><span class="mono">${x.qty} part${x.qty > 1 ? 's' : ''}</span>${!d.owner && x.id !== state.me.user.id ? `<button class="btn sm" data-offer-to="${x.id}">Faire une offre</button>` : ''}</div>`).join('') || '<div class="muted">Personne pour l\'instant</div>'}</div></div>
       </div>
+      ${offersHtml(d.offers || { received: [], sent: [] }, false)}
       ${d.payouts.length ? `<h2>Dividendes versés</h2><div class="panel list small">${d.payouts.map((p) => `<div><span class="grow">${new Date(p.day * 864e5).toLocaleDateString('fr-FR')}</span><span class="mono">${fmt(p.amount)} bits · ${num(p.per_share.toFixed(3))} / part</span></div>`).join('')}</div>` : ''}`;
     const q = $('[data-qty]', el);
     if (q) {
@@ -407,6 +456,8 @@ export async function viewStock(el, { params }) {
   el.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (offerClick(e, render)) return;
+    if (b.dataset.offerTo) { const h = last.holders.find((x) => String(x.id) === b.dataset.offerTo); if (h) offerDialog(last.shop, h, render); return; }
     if (b.matches('[data-buy-shares]')) busy(b, async () => {
       const r = await api(`/bourse/${params.id}/buy`, { qty: Number($('[data-qty]', el).value) });
       toast(`Parts achetées (${fmt(r.cost)} bits). Tu en as ${r.qty}.`, 'ok'); sfx('coin'); refreshMe(); render();

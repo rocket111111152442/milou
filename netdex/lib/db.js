@@ -358,6 +358,23 @@ CREATE TABLE IF NOT EXISTS shop_log (
   at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS shop_log_shop ON shop_log (shop_id, at);
+
+-- v9 : offres d'achat de parts entre joueurs (l'acheteur bloque ses bits, le détenteur accepte ou refuse).
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS transfer_fee REAL NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS share_offers (
+  id SERIAL PRIMARY KEY,
+  shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  qty INTEGER NOT NULL CHECK (qty > 0),
+  price INTEGER NOT NULL CHECK (price > 0),
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at BIGINT NOT NULL,
+  resolved_at BIGINT
+);
+CREATE INDEX IF NOT EXISTS offers_seller ON share_offers (seller_id, status);
+CREATE INDEX IF NOT EXISTS offers_buyer ON share_offers (buyer_id, status);
+CREATE INDEX IF NOT EXISTS offers_shop ON share_offers (shop_id, status);
 `;
 
 // DB_SOURCE choisit la base parmi celles branchées sur Vercel : « supabase » (POSTGRES_URL) ou « neon » (stockage_DATABASE_URL).

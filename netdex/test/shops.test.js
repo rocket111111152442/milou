@@ -203,6 +203,49 @@ dbtest('prêts : intérêts selon la durée, frais de dossier, acceptation autom
   assert.deepEqual([l.status, l.paid, l.due_amount], ['defaulted', 100, 331 + 24]);
 });
 
+dbtest('offres de parts entre joueurs : bits bloqués, accord avec taxe, refus, annulation, expiration', async () => {
+  const owner = await user(SHOP_PRICE), a = await user(100), b = await user(1000), c = await user(1000);
+  const { id } = await shops.createShop(owner, { name: 'Marché secondaire', sharePrice: 10, sharesMax: 10, maxPerPlayer: 30, transferFee: 10 });
+  await shops.buyShares(a, id, 10); // a détient toutes les parts mises en vente
+  await assert.rejects(shops.buyShares(b, id, 1), /plus de parts/);
+  await assert.rejects(shops.makeOffer(b, id, { sellerId: a.id, qty: 11, price: 15 }), /que 10 parts/);
+  await assert.rejects(shops.makeOffer(owner, id, { sellerId: a.id, qty: 1, price: 15 }), /propre boutique/);
+  // b propose 4 parts à 15 : 60 bits bloqués.
+  const o1 = await shops.makeOffer(b, id, { sellerId: a.id, qty: 4, price: 15 });
+  assert.equal(await bits(b), 940);
+  await assert.rejects(shops.makeOffer(b, id, { sellerId: a.id, qty: 1, price: 20 }), /déjà une offre/);
+  await assert.rejects(shops.respondOffer(b, o1.id, true), /introuvable/); // seul le détenteur répond
+  // a accepte : 60 - 10 % de taxe = 54 pour a, 6 pour le coffre ; les parts changent de main.
+  const r = await shops.respondOffer(a, o1.id, true);
+  assert.deepEqual([r.received, r.tax], [54, 6]);
+  assert.equal(await bits(a), 0 + 54);
+  const qty = async (u) => Number((await db.one('SELECT qty FROM shares WHERE shop_id = $1 AND user_id = $2', [id, u.id]))?.qty || 0);
+  assert.deepEqual([await qty(a), await qty(b)], [6, 4]);
+  assert.equal(Number((await db.one('SELECT balance FROM shops WHERE id = $1', [id])).balance), 100 + 6);
+  // c propose, a refuse : c récupère ses bits.
+  const o2 = await shops.makeOffer(c, id, { sellerId: a.id, qty: 2, price: 30 });
+  await shops.respondOffer(a, o2.id, false);
+  assert.equal(await bits(c), 1000);
+  // c propose puis annule.
+  const o3 = await shops.makeOffer(c, id, { sellerId: b.id, qty: 4, price: 12 });
+  assert.equal((await shops.portfolio(b.id)).offers.received.length, 1);
+  await shops.cancelOffer(c, o3.id);
+  assert.equal(await bits(c), 1000);
+  // Offre sans réponse depuis plus de 48 h : expirée, bits rendus.
+  await shops.makeOffer(c, id, { sellerId: a.id, qty: 1, price: 50 });
+  await db.run("UPDATE share_offers SET created_at = 0 WHERE buyer_id = $1 AND status = 'pending'", [c.id]);
+  await shops.dailyJobs();
+  assert.equal(await bits(c), 1000);
+  // a a vendu ses parts entre-temps : l'offre ne peut plus être acceptée.
+  const o5 = await shops.makeOffer(c, id, { sellerId: a.id, qty: 6, price: 10 });
+  await db.run('UPDATE shares SET qty = 2 WHERE shop_id = $1 AND user_id = $2', [id, a.id]);
+  await assert.rejects(shops.respondOffer(a, o5.id, true), /plus que 2/);
+  // Suppression de la boutique : l'offre en attente est remboursée.
+  assert.equal(await bits(c), 940);
+  await shops.deleteShop(owner, id);
+  assert.equal(await bits(c), 1000);
+});
+
 dbtest('retrait du coffre (25 %/jour, public) et suppression de la boutique', async () => {
   const owner = await user(SHOP_PRICE + 2000), h = await user(1000), s1 = await user(0, 2), bor = await user(0);
   const { id } = await shops.createShop(owner, { name: 'Éphémère', sharePrice: 10, loanAuto: 1000 });
