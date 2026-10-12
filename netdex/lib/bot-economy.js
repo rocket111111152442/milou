@@ -5,9 +5,9 @@
 import { randomInt } from 'node:crypto';
 import { RARITIES } from './sites.js';
 import { CONFIG } from './game.js';
-import { TIERS, QUALITIES, WITHDRAW_PCT } from './shops.js';
+import { TIERS, QUALITIES, WITHDRAW_PCT, loanDue } from './shops.js';
 import { dayId } from './fun.js';
-import { createBotBourse } from './bot-bourse.js';
+import { createBotBourse, yieldOf } from './bot-bourse.js';
 
 const rnd = () => randomInt(1_000_000) / 1_000_000;
 const pick = (arr) => arr[randomInt(arr.length)];
@@ -164,21 +164,40 @@ export function createBotEconomy(db, game, shops, fun) {
         if (await tryDo('prêt remboursé', () => shops.repayLoan(me, l.id))) bits -= left;
       }
     }
-    // Emprunt : rare, quand il est à court et qu'il n'a rien en cours.
-    if (mine.length || bits > 300 || rnd() > 0.06 || !list.length) return;
+    // Emprunt, pour une raison qu'un joueur aurait aussi :
+    //  - il est à court de bits ;
+    //  - un marchand voit une boutique dont les parts rapportent plus par jour que ce que coûte le prêt (effet de levier) ;
+    //  - de temps en temps, un achat qu'il veut faire tout de suite.
+    if (!list.length || mine.length >= 2 || mine.some((l) => l.status === 'defaulted')) return;
+    const broke = bits < 300 && rnd() < 0.25;
+    const lever = ['trader', 'collector'].includes(p.type) && rnd() < 0.12;
+    const whim = rnd() < 0.03;
+    if (!broke && !lever && !whim) return;
     // Comme un joueur, il ne voit pas le coffre des autres boutiques : il demande, le propriétaire décide.
-    const cands = list.filter((s) => s.is_open !== false && s.owner_id !== bot.id && s.loan_max >= Math.max(50, s.loan_min));
+    const taken = new Set(mine.map((l) => l.shop_id));
+    const cands = list.filter((s) => s.is_open !== false && s.owner_id !== bot.id && !taken.has(s.id) && s.loan_max >= Math.max(20, s.loan_min));
     if (!cands.length) return;
-    const s = pick(cands);
-    // Durée : la plus courte qui lui laisse le temps de rembourser ; il renonce si le prêt coûte trop cher.
-    const days = Math.max(s.loan_min_days, Math.min(s.loan_max_days, pick([2, 3, 5, 7, 7, 10, 14])));
-    if (s.loan_rate + s.loan_daily * days > 60) return;
-    // Pas plus d'une demande de compte animé par boutique et par jour (le propriétaire doit pouvoir suivre).
-    const recent = await db.one(`SELECT 1 FROM shop_loans l JOIN users u ON u.id = l.borrower_id WHERE l.shop_id = $1 AND u.is_bot AND l.created_at > $2 LIMIT 1`,
-      [s.id, Date.now() - 24 * HOUR]);
-    if (recent) return;
-    const amount = Math.max(s.loan_min, Math.min(s.loan_max, Math.round(between(80, 800) / 10) * 10));
-    await tryDo('demande de prêt', () => shops.requestLoan(me, s.id, { amount, days }));
+    // Il compare le coût total des boutiques pour la durée qu'il vise, et préfère celles qui accordent tout de suite.
+    const want = broke ? between(100, 600) : lever ? between(300, 2000) : between(100, 1000);
+    const offerFor = (s) => {
+      const days = Math.max(s.loan_min_days, Math.min(s.loan_max_days, pick([2, 3, 5, 7, 7, 10, 14])));
+      const amount = Math.max(s.loan_min, Math.min(s.loan_max, Math.round(want / 10) * 10));
+      const cost = (loanDue(s, amount, days) - amount) / amount; // part d'intérêts et de frais
+      return { s, days, amount, cost, score: cost - (s.loan_auto >= amount ? 0.03 : 0) + rnd() * 0.04 };
+    };
+    const best = cands.map(offerFor).sort((x, y) => x.score - y.score)[0];
+    // Trop cher : il renonce (un joueur à court accepte de payer plus).
+    if (best.cost > (broke ? 0.6 : 0.3)) return;
+    // Effet de levier : seulement si une part rapporte plus par jour que le prêt ne coûte par jour.
+    if (lever && !broke && !whim) {
+      const y = Math.max(0, ...list.filter((s) => s.owner_id !== bot.id).map(yieldOf));
+      if (y <= best.cost / best.days) return;
+    }
+    // Pas plus de 3 demandes de comptes animés par boutique et par jour (le propriétaire doit pouvoir suivre).
+    const recent = (await db.one(`SELECT COUNT(*) n FROM shop_loans l JOIN users u ON u.id = l.borrower_id WHERE l.shop_id = $1 AND u.is_bot AND l.created_at > $2`,
+      [best.s.id, Date.now() - 24 * HOUR])).n;
+    if (recent >= 3) return;
+    await tryDo(broke ? 'demande de prêt (à court)' : lever ? 'demande de prêt (pour investir)' : 'demande de prêt', () => shops.requestLoan(me, best.s.id, { amount: best.amount, days: best.days }));
   }
 
   // ---------- Boutiques tenues par des comptes animés ----------

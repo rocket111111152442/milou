@@ -255,7 +255,9 @@ export function stylize(text, st) {
   if (st.noPunct) t = t.replace(/[.!]+$/, '');
   if (st.typos && rnd() < 0.35 && t.length > 6 && !/\w\.\w/.test(t)) { // jamais dans un nom de site
     const i = 1 + randomInt(t.length - 2);
-    if (t[i] !== ' ' && t[i + 1] !== ' ') t = t.slice(0, i) + t[i + 1] + t[i] + t.slice(i + 2);
+    // Jamais dans un nombre ni dans « bits » : le montant demandé doit rester lisible.
+    const protectedAt = [...t.matchAll(/\d+|bits/gi)].some((m) => i + 1 >= m.index && i <= m.index + m[0].length - 1);
+    if (!protectedAt && t[i] !== ' ' && t[i + 1] !== ' ') t = t.slice(0, i) + t[i + 1] + t[i] + t.slice(i + 2);
   }
   if (st.dots && rnd() < 0.5) t = t.replace(/[.!?]*$/, '...');
   if (st.emoji && rnd() < 0.6) t += ' ' + pick(EMO);

@@ -348,3 +348,32 @@ dbtest('comptes animés : coffre, mini-jeux, boosters en boutique, bourse, prêt
   assert.equal((await db.one('SELECT COUNT(*) n FROM users WHERE bits < 0')).n, 0);
   assert.equal((await db.one('SELECT COUNT(*) n FROM shares WHERE qty < 0')).n, 0);
 });
+
+dbtest('comptes animés : demandent des prêts (à court ou pour investir), à la boutique la moins chère', async () => {
+  const { createBotEconomy } = await import('../lib/bot-economy.js');
+  const { createFun } = await import('../lib/fun.js');
+  const { GameError } = await import('../lib/game.js');
+  const eco = createBotEconomy(db, game, shops, createFun(db, game));
+  const owner = await user(SHOP_PRICE * 2 + 20_000);
+  const cheap = await shops.createShop(owner, { name: 'Banque douce', loanRate: 5, loanAuto: 2000, loanMax: 2000 });
+  const dear = await shops.createShop(owner, { name: 'Usurier', loanRate: 80, loanMax: 2000 });
+  await shops.deposit(owner, cheap.id, 10_000);
+  const mk = async (type, b) => db.one(`INSERT INTO users (username, pass_hash, created_at, bits, pack_stock, pack_anchor, is_bot, bot, bot_next_at)
+    VALUES ($1, 'x', 0, $2, 0, $3, true, $4, 0) RETURNING *`,
+  ['emp' + ++n, b, Date.now(), JSON.stringify({ type, tz: 0, sleep: [3, 4], greed: 1, eye: 2, fav: null, market: 0, social: 0, stall: 1 })]);
+  const bots = [];
+  for (let k = 0; k < 6; k++) bots.push(await mk(k % 2 ? 'regular' : 'casual', 50));
+  const log = [];
+  const tryDo = async (label, fn) => { try { const r = await fn(); if (r !== undefined) log.push(label); return r; } catch (e) { if (!(e instanceof GameError)) throw e; } };
+  for (let round = 0; round < 30; round++) {
+    for (const b of bots) {
+      const fresh = await db.one('SELECT * FROM users WHERE id = $1', [b.id]);
+      await eco.play(fresh, { id: b.id, username: b.username }, { ...fresh.bot }, tryDo, { dbFull: true });
+    }
+  }
+  const loans = await db.all('SELECT l.shop_id, l.status FROM shop_loans l WHERE l.borrower_id = ANY($1::int[])', [bots.map((b) => b.id)]);
+  assert.ok(loans.length >= 3, `seulement ${loans.length} prêt(s) : ${[...new Set(log)].join(', ')}`);
+  assert.ok(!loans.some((l) => l.shop_id === dear.id), 'ils évitent la boutique à 80 %');
+  assert.ok(loans.some((l) => l.shop_id === cheap.id), 'la moins chère, qui accorde tout de suite');
+  assert.ok(loans.some((l) => l.status === 'active' || l.status === 'repaid'), 'accordés automatiquement');
+});
