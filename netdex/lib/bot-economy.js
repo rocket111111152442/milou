@@ -5,7 +5,7 @@
 import { randomInt } from 'node:crypto';
 import { RARITIES } from './sites.js';
 import { CONFIG } from './game.js';
-import { TIERS, TOTAL_SHARES, QUALITIES } from './shops.js';
+import { TIERS, QUALITIES, WITHDRAW_PCT } from './shops.js';
 import { dayId } from './fun.js';
 import { createBotBourse } from './bot-bourse.js';
 
@@ -21,14 +21,6 @@ export function packWorth(game, boost) {
   let v = CONFIG.packSize * RARITIES[0].value;
   for (let r = 2; r <= 5; r++) v += o[r] * RARITIES[r].value;
   return v;
-}
-
-// Prix « raisonnable » d'une action : une part du coffre, les dividendes à venir et un fond lié au prix d'ouverture.
-function fairShare(s) {
-  const tierPrice = (TIERS[s.tier] || TIERS.standard).price;
-  const book = Number(s.balance) * (1 + Math.min(0.5, s.div_pct / 100) * 20);
-  const fair = Math.max(3, (0.4 * tierPrice + book + Number(s.fees_total) * 0.3) / TOTAL_SHARES);
-  return s.last_price ? fair * 0.5 + s.last_price * 0.5 : fair;
 }
 
 const SHOP_A = ['Le Comptoir', 'La Halle', 'Le Bazar', 'L\'Échoppe', 'Le Repaire', 'La Boutique', 'Le Marché', 'La Cave', 'L\'Atelier', 'Le Kiosque'];
@@ -105,12 +97,16 @@ export function createBotEconomy(db, game, shops, fun) {
   }
 
   async function listPack(bot, me, p, tryDo, pack, list, markup = 1) {
-    const ok = list.filter((s) => s.accepts.includes(pack.quality) && s.owner_id !== bot.id);
+    const want = Math.max(5, Math.round(packWorth(game, pack.boost) * p.eye * p.greed * between(0.85, 1.25) * markup));
+    // Boutiques ouvertes qui acceptent ce booster à ce prix, sans frais de dépôt trop lourds.
+    const ok = list.filter((s) => s.is_open !== false && s.accepts.includes(pack.quality) && s.owner_id !== bot.id
+      && (!s.max_price || s.max_price >= 5) && s.listing_fee <= want * 0.1);
     if (!ok.length) return;
     // Il préfère les boutiques à faible commission (et les Premium pour les bons boosters, qui s'y vendent mieux).
-    ok.sort((a, b) => (a.fee_pct - (a.tier === 'premium' ? 8 : 0)) - (b.fee_pct - (b.tier === 'premium' ? 8 : 0)));
+    const cost = (s) => s.fee_pct + (s.listing_fee / want) * 100 - (s.tier === 'premium' ? 8 : 0);
+    ok.sort((a, b) => cost(a) - cost(b));
     const shop = rnd() < 0.7 ? ok[0] : pick(ok);
-    const price = Math.max(5, Math.round(packWorth(game, pack.boost) * p.eye * p.greed * between(0.85, 1.25) * markup));
+    const price = Math.max(shop.min_price || 1, Math.min(shop.max_price || Infinity, want));
     return tryDo('booster en vente', () => shops.listPack(me, { packId: pack.id, shopId: shop.id, price }));
   }
 
@@ -119,7 +115,7 @@ export function createBotEconomy(db, game, shops, fun) {
     if (!list.length || rnd() > p.market * 0.55) return;
     const rows = await db.all(`SELECT l.id, l.price, l.seller_id, l.shop_id, p.boost, p.quality, p.shop_boosted, s.tier
       FROM shop_listings l JOIN sealed_packs p ON p.id = l.pack_id JOIN shops s ON s.id = l.shop_id
-      WHERE l.status = 'open' AND l.seller_id != $1 ORDER BY random() LIMIT 25`, [bot.id]);
+      WHERE l.status = 'open' AND l.seller_id != $1 AND s.is_open ORDER BY random() LIMIT 25`, [bot.id]);
     let bits = await bitsOf(bot.id);
     let bought = 0;
     for (const l of rows) {
@@ -170,15 +166,18 @@ export function createBotEconomy(db, game, shops, fun) {
     }
     // Emprunt : rare, quand il est à court et qu'il n'a rien en cours.
     if (mine.length || bits > 300 || rnd() > 0.06 || !list.length) return;
-    const cands = list.filter((s) => s.owner_id !== bot.id && s.loan_max >= 50 && s.balance >= 50);
+    const cands = list.filter((s) => s.is_open !== false && s.owner_id !== bot.id && s.loan_max >= Math.max(50, s.loan_min) && s.balance >= Math.max(50, s.loan_min));
     if (!cands.length) return;
     const s = pick(cands);
+    // Durée : la plus courte qui lui laisse le temps de rembourser ; il renonce si le prêt coûte trop cher.
+    const days = Math.max(s.loan_min_days, Math.min(s.loan_max_days, pick([2, 3, 5, 7, 7, 10, 14])));
+    if (s.loan_rate + s.loan_daily * days > 60) return;
     // Pas plus d'une demande de compte animé par boutique et par jour (le propriétaire doit pouvoir suivre).
     const recent = await db.one(`SELECT 1 FROM shop_loans l JOIN users u ON u.id = l.borrower_id WHERE l.shop_id = $1 AND u.is_bot AND l.created_at > $2 LIMIT 1`,
       [s.id, Date.now() - 24 * HOUR]);
     if (recent) return;
-    const amount = Math.max(20, Math.min(s.loan_max, Math.round(between(80, 800) / 10) * 10, Math.floor(s.balance * 0.5)));
-    await tryDo('demande de prêt', () => shops.requestLoan(me, s.id, { amount, days: pick([2, 3, 5, 7, 7, 10, 14]) }));
+    const amount = Math.max(s.loan_min, Math.min(s.loan_max, Math.round(between(80, 800) / 10) * 10, Math.floor(s.balance * 0.5)));
+    await tryDo('demande de prêt', () => shops.requestLoan(me, s.id, { amount, days }));
   }
 
   // ---------- Boutiques tenues par des comptes animés ----------
@@ -194,8 +193,11 @@ export function createBotEconomy(db, game, shops, fun) {
       const accepts = rnd() < 0.5 ? Object.keys(QUALITIES) : Object.keys(QUALITIES).filter((q) => q !== 'terne');
       const r = await tryDo('boutique ouverte', () => shops.createShop(me, {
         name, tier, description: pick(SHOP_DESC), accepts,
-        feePct: Math.round(between(3, tier === 'premium' ? 22 : 15)), divPct: Math.round(between(2, 12)),
-        loanRate: Math.round(between(5, 25)), loanMax: pick([200, 300, 500, 800, 1000]),
+        feePct: Math.round(between(3, tier === 'premium' ? 22 : 15)), listingFee: pick([0, 0, 0, 2, 5]),
+        sharePrice: pick([5, 10, 10, 15, 20, 25, 50]), sharesMax: pick([300, 500, 1000]), maxPerPlayer: pick([50, 100, 200, 1000]),
+        buybackPct: pick([0, 50, 70, 80, 90]), ...(rnd() < 0.5 ? { divMode: 'coffre', divPct: Math.round(between(1, 6)) } : { divMode: 'fixe', divPct: +between(0.5, 2.5).toFixed(1) }),
+        loanRate: Math.round(between(3, 15)), loanDaily: +between(0, 2).toFixed(1), loanFee: pick([0, 0, 5, 10]), loanLate: pick([0, 1, 2, 5]),
+        loanMax: pick([200, 300, 500, 800, 1000]), loanMaxDays: pick([7, 10, 14, 21]),
       }));
       if (!r) return;
       s = await db.one('SELECT * FROM shops WHERE id = $1', [r.id]);
@@ -208,12 +210,10 @@ export function createBotEconomy(db, game, shops, fun) {
       const ok = l.bad === 0 && l.amount <= s.balance * 0.6 && rnd() < (l.good > 0 ? 0.9 : 0.65);
       if (await tryDo(ok ? 'prêt accordé' : 'prêt refusé', () => shops.respondLoan(me, l.id, ok)) && ok) s.balance -= l.amount;
     }
-    // Il introduit une partie de ses actions en bourse, par petits paquets.
-    const h = await db.one('SELECT qty, locked FROM shares WHERE shop_id = $1 AND user_id = $2', [s.id, bot.id]);
-    const open = (await db.one("SELECT COUNT(*) n FROM stock_orders WHERE user_id = $1 AND shop_id = $2 AND status = 'open'", [bot.id, s.id])).n;
-    if (h && h.qty > TOTAL_SHARES * 0.55 && !open && rnd() < 0.5) {
-      const qty = Math.min(h.qty - h.locked, Math.round(between(20, 80)));
-      if (qty > 0) await tryDo('actions mises en vente', () => shops.placeOrder(me, s.id, { side: 'sell', type: 'limit', qty, price: Math.max(1, Math.round(fairShare(s) * between(1.05, 1.3))) }));
+    // Il se verse parfois une petite partie du coffre (le retrait est visible par tous sur la page de la boutique).
+    if (rnd() < 0.04 && Number(s.balance) > 500) {
+      const room = Math.floor(Number(s.balance) * WITHDRAW_PCT / 100);
+      await tryDo('retrait du coffre', () => shops.withdraw(me, s.id, Math.max(1, Math.round(room * between(0.1, 0.5)))));
     }
     // De temps en temps il ajuste sa commission selon ses ventes, et il remet un peu de bits au coffre.
     if (rnd() < 0.1) {

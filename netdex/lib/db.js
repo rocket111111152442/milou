@@ -317,6 +317,47 @@ CREATE TABLE IF NOT EXISTS shop_payouts (
 -- v7 : boutiques Premium.
 ALTER TABLE shops ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'standard';
 ALTER TABLE sealed_packs ADD COLUMN IF NOT EXISTS shop_boosted BOOLEAN NOT NULL DEFAULT false;
+
+-- v8 : bourse simplifiée (on achète ses parts directement à la boutique) et réglages avancés des boutiques.
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS share_price INTEGER NOT NULL DEFAULT 10;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS shares_max INTEGER NOT NULL DEFAULT 1000;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS max_per_player INTEGER NOT NULL DEFAULT 1000;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS buyback_pct REAL NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS div_mode TEXT NOT NULL DEFAULT 'coffre';
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS shares_raised BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS is_open BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS listing_fee INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS min_price INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS max_price INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS seller_max INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS holder_discount REAL NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS loan_daily REAL NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS loan_fee INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS loan_late REAL NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS loan_min INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS loan_min_days INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS loan_max_days INTEGER NOT NULL DEFAULT 14;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS loan_auto INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT '';
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS emoji TEXT NOT NULL DEFAULT '';
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS withdraw_day INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS withdraw_today BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS withdrawn_total BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE shares ADD COLUMN IF NOT EXISTS paid BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE shares ADD COLUMN IF NOT EXISTS received BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE shares ADD COLUMN IF NOT EXISTS carry REAL NOT NULL DEFAULT 0;
+ALTER TABLE shop_loans ADD COLUMN IF NOT EXISTS late_pct REAL NOT NULL DEFAULT 0;
+-- Journal public d'une boutique : achats et reventes de parts, retraits du propriétaire.
+CREATE TABLE IF NOT EXISTS shop_log (
+  id BIGSERIAL PRIMARY KEY,
+  shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  user_id INTEGER,
+  kind TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 0,
+  amount BIGINT NOT NULL DEFAULT 0,
+  at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS shop_log_shop ON shop_log (shop_id, at);
 `;
 
 // DB_SOURCE choisit la base parmi celles branchées sur Vercel : « supabase » (POSTGRES_URL) ou « neon » (stockage_DATABASE_URL).
@@ -383,6 +424,48 @@ export const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || 'Ismaelleboulit')
 // Empreinte du schéma : si la base est déjà à jour, on ne relance pas les ALTER TABLE (ils verrouillent les tables).
 const SCHEMA_HASH = createHash('sha256').update(SCHEMA).digest('hex').slice(0, 16);
 
+// Remise à zéro unique de l'ancienne bourse (carnet d'ordres) avant le passage aux parts achetées à la boutique :
+// ordres annulés (bits bloqués rendus), chaque acheteur remboursé de ce qu'il a payé, chaque vendeur rend ce qu'il a
+// encaissé (dans la limite de son solde), toutes les parts reviennent aux boutiques.
+export async function resetOldBourse(q) {
+  if (await q.one("SELECT 1 FROM meta WHERE key = 'bourse_v2'")) return null;
+  const now = Date.now();
+  const escrow = await q.one(`WITH r AS (SELECT user_id, SUM((qty - filled)::bigint * price) amt FROM stock_orders WHERE status = 'open' AND side = 'buy' GROUP BY 1),
+      u AS (UPDATE users SET bits = bits + r.amt FROM r WHERE users.id = r.user_id RETURNING r.amt)
+    SELECT COUNT(*)::int n, COALESCE(SUM(amt), 0)::bigint total FROM u`);
+  const flows = await q.all(`SELECT uid, SUM(paid)::bigint paid, SUM(got)::bigint got FROM (
+      SELECT buyer_id uid, price::bigint * qty paid, 0::bigint got FROM stock_trades WHERE buyer_id IS NOT NULL
+      UNION ALL SELECT seller_id, 0, price::bigint * qty FROM stock_trades WHERE seller_id IS NOT NULL) f GROUP BY uid`);
+  let refunded = 0, clawed = 0, shortfall = 0, people = 0;
+  for (const f of flows) {
+    const net = Number(f.paid) - Number(f.got);
+    if (!net) continue;
+    people++;
+    if (net > 0) {
+      await q.query('UPDATE users SET bits = bits + $1 WHERE id = $2', [net, f.uid]);
+      refunded += net;
+      await q.query(`INSERT INTO notifications (user_id, text, link, created_at) SELECT $1, $2, '#/bourse', $3 FROM users WHERE id = $1 AND NOT is_bot`,
+        [f.uid, `La bourse a été remise à zéro : ${net} bits t'ont été remboursés.`, now]);
+    } else {
+      const u = await q.one('SELECT bits FROM users WHERE id = $1', [f.uid]);
+      if (!u) continue;
+      const take = Math.min(Number(u.bits), -net);
+      await q.query('UPDATE users SET bits = bits - $1 WHERE id = $2', [take, f.uid]);
+      clawed += take; shortfall += -net - take;
+      await q.query(`INSERT INTO notifications (user_id, text, link, created_at) SELECT $1, $2, '#/bourse', $3 FROM users WHERE id = $1 AND NOT is_bot`,
+        [f.uid, `La bourse a été remise à zéro : les ${take} bits encaissés en vendant des actions ont été rendus aux acheteurs.`, now]);
+    }
+  }
+  await q.query('DELETE FROM stock_orders');
+  await q.query('DELETE FROM stock_trades');
+  await q.query('DELETE FROM shares');
+  await q.query('DELETE FROM shop_payouts');
+  await q.query('UPDATE shops SET last_price = NULL');
+  const summary = { at: now, escrow: Number(escrow.total), escrowUsers: escrow.n, people, refunded, clawed, shortfall };
+  await q.query("INSERT INTO meta (key, value) VALUES ('bourse_v2', $1)", [JSON.stringify(summary)]);
+  return summary;
+}
+
 export async function migrate(db, { force = false } = {}) {
   const done = await db.one("SELECT value FROM meta WHERE key = 'schema'").catch(() => null);
   if (!force && done?.value === SCHEMA_HASH) return 'à jour';
@@ -391,6 +474,8 @@ export async function migrate(db, { force = false } = {}) {
     await q.query("SET LOCAL lock_timeout = '3s'");
     await q.query(SCHEMA);
     await q.query("INSERT INTO meta (key, value) VALUES ('schema', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [SCHEMA_HASH]);
+    const reset = await resetOldBourse(q);
+    if (reset) console.log('Bourse remise à zéro :', JSON.stringify(reset));
   });
   await db.query('UPDATE users SET is_admin = true WHERE lower(username) = ANY($1::text[]) AND NOT is_admin', [ADMIN_USERNAMES]);
   return 'migré';

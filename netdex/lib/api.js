@@ -519,8 +519,10 @@ route('GET', '/api/loans', ({ c, me }) => c.shops.myLoans(me.id));
 route('POST', '/api/loans/:id/respond', ({ c, me, params, body }) => c.shops.respondLoan(me, params.id, !!body.accept));
 route('POST', '/api/loans/:id/repay', ({ c, me, params, body }) => c.shops.repayLoan(me, params.id, body.amount));
 route('GET', '/api/bourse/:id', ({ c, me, params }) => c.shops.stock(me.id, params.id));
-route('POST', '/api/bourse/:id/order', ({ c, me, params, body }) => c.shops.placeOrder(me, params.id, body));
-route('POST', '/api/orders/:id/cancel', ({ c, me, params }) => c.shops.cancelOrder(me, params.id));
+route('POST', '/api/bourse/:id/buy', ({ c, me, params, body }) => c.shops.buyShares(me, params.id, body.qty));
+route('POST', '/api/bourse/:id/sell', ({ c, me, params, body }) => c.shops.sellShares(me, params.id, body.qty));
+route('POST', '/api/shops/:id/withdraw', ({ c, me, params, body }) => c.shops.withdraw(me, params.id, body.amount));
+route('POST', '/api/shops/:id/delete', ({ c, me, params }) => c.shops.deleteShop(me, params.id));
 route('GET', '/api/portfolio', ({ c, me }) => c.shops.portfolio(me.id));
 
 // ---------- Administration ----------

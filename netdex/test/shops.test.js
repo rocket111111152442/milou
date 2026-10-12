@@ -115,45 +115,131 @@ dbtest('prêt : accord, remboursement automatique, défaut', async () => {
   assert.equal((await db.one('SELECT balance FROM shops WHERE id = $1', [id])).balance, 5000 + 100);
 });
 
-dbtest('bourse : carnet d\'ordres, priorité prix, bits et actions conservés', async () => {
-  const owner = await user(SHOP_PRICE), x = await user(10_000), y = await user(10_000);
-  const { id } = await shops.createShop(owner, { name: 'Cotée' });
-  await shops.placeOrder(owner, id, { side: 'sell', type: 'limit', qty: 100, price: 20 });
-  await shops.placeOrder(owner, id, { side: 'sell', type: 'limit', qty: 100, price: 15 });
-  // x achète 150 au marché : 100 à 15 puis 50 à 20.
-  const r = await shops.placeOrder(x, id, { side: 'buy', type: 'market', qty: 150 });
-  assert.equal(r.filled, 150);
-  assert.equal(await bits(x), 10_000 - 100 * 15 - 50 * 20);
-  assert.equal((await db.one('SELECT last_price FROM shops WHERE id = $1', [id])).last_price, 20);
-  // y place un achat limite à 18 (pas d'exécution), puis x vend 30 à 17 : exécuté au prix de l'acheteur (18).
-  await shops.placeOrder(y, id, { side: 'buy', type: 'limit', qty: 40, price: 18 });
-  assert.equal(await bits(y), 10_000 - 40 * 18);
-  const s = await shops.placeOrder(x, id, { side: 'sell', type: 'limit', qty: 30, price: 17 });
-  assert.equal(s.filled, 30);
-  assert.equal(s.avgPrice, 18);
-  // y annule le reste (10 actions × 18 rendus).
-  const o = await db.one("SELECT id FROM stock_orders WHERE user_id = $1 AND status = 'open'", [y.id]);
-  await shops.cancelOrder(y, o.id);
-  assert.equal(await bits(y), 10_000 - 30 * 18);
-  const sh = await db.all('SELECT user_id, qty, locked FROM shares WHERE shop_id = $1 ORDER BY user_id', [id]);
-  assert.equal(sh.reduce((a, h) => a + h.qty, 0), 1000); // les actions ne se créent ni ne disparaissent
-  assert.deepEqual(sh.find((h) => h.user_id === y.id), { user_id: y.id, qty: 30, locked: 0 });
-  await assert.rejects(shops.placeOrder(y, id, { side: 'sell', type: 'limit', qty: 31, price: 5 }), /que 30/);
+dbtest('parts : on achète directement à la boutique, l\'argent va dans le coffre, limites respectées', async () => {
+  const owner = await user(SHOP_PRICE), x = await user(1000), y = await user(1000);
+  const { id } = await shops.createShop(owner, { name: 'Parts', sharePrice: 10, sharesMax: 30, maxPerPlayer: 20 });
+  await assert.rejects(shops.buyShares(owner, id, 1), /propre boutique/);
+  const r = await shops.buyShares(x, id, 2);
+  assert.deepEqual(r, { qty: 2, cost: 20 });
+  assert.equal(await bits(x), 980);
+  assert.equal(Number((await db.one('SELECT balance FROM shops WHERE id = $1', [id])).balance), 20); // les 20 bits vont à la boutique
+  await assert.rejects(shops.buyShares(x, id, 19), /20 parts par joueur/);
+  await shops.buyShares(y, id, 20);
+  await assert.rejects(shops.buyShares(x, id, 9), /que 8 parts/);
+  // Pas de rachat par défaut ; quand le propriétaire l'active (80 %), on revend 2 parts pour 16 bits.
+  await assert.rejects(shops.sellShares(x, id, 1), /ne rachète pas/);
+  await shops.updateShop(owner, id, { buybackPct: 80 });
+  assert.equal((await shops.sellShares(x, id, 2)).amount, 16);
+  assert.equal(await bits(x), 996);
+  await assert.rejects(shops.updateShop(owner, id, { sharesMax: 10 }), /20 parts sont déjà vendues/);
+  // Boutique fermée : plus d'achat.
+  await shops.updateShop(owner, id, { isOpen: false });
+  await assert.rejects(shops.buyShares(x, id, 1), /fermée/);
+  const st = await shops.stock(x.id, id);
+  assert.equal(st.shop.sharesLeft, 10);
+  assert.deepEqual(st.recent.map((g) => g.kind), ['revente', 'achat', 'achat']);
 });
 
-dbtest('dividendes : une fois par jour, au prorata des actions', async () => {
-  const owner = await user(SHOP_PRICE + 1000), z = await user(10_000);
-  const { id } = await shops.createShop(owner, { name: 'Rentable', divPct: 10 });
+dbtest('dividendes : % du coffre ou % du prix, au prorata des parts, fractions gardées', async () => {
+  const owner = await user(SHOP_PRICE * 2 + 2000), z = await user(10_000), w = await user(10_000);
+  // Mode coffre : 10 % du coffre par jour, partagé entre les 1 000 parts.
+  const a = await shops.createShop(owner, { name: 'Rentable', divPct: 10, sharePrice: 1 });
+  await shops.deposit(owner, a.id, 1000);
+  await shops.buyShares(z, a.id, 250);
+  let before = await bits(z);
+  await db.run('UPDATE shops SET div_day = 0 WHERE id = $1', [a.id]);
+  await shops.dailyJobs();
+  assert.equal(await bits(z), before + 31); // coffre 1250 (1000 + 250 parts à 1) : 10 % = 125 → 0,125 × 250 = 31,25
+  assert.equal(Number((await db.one('SELECT balance FROM shops WHERE id = $1', [a.id])).balance), 1250 - 31);
+  await shops.dailyJobs();
+  assert.equal(await bits(z), before + 31); // pas deux fois le même jour
+  // Mode fixe : 1 % du prix (10) = 0,1 bit par part et par jour ; avec 2 parts, 0,2/jour : versé tous les 5 jours.
+  const b = await shops.createShop(owner, { name: 'Fixe', divMode: 'fixe', divPct: 1, sharePrice: 10 });
+  await shops.buyShares(w, b.id, 2);
+  before = await bits(w);
+  for (let d = 0; d < 5; d++) { await db.run('UPDATE shops SET div_day = 0 WHERE id = $1', [b.id]); await shops.dailyJobs(); }
+  assert.equal(await bits(w), before + 1);
+  assert.equal(Number((await db.one('SELECT received FROM shares WHERE shop_id = $1 AND user_id = $2', [b.id, w.id])).received), 1);
+  const pf = await shops.portfolio(w.id);
+  assert.equal(pf.items[0].perDay, 0.2);
+});
+
+dbtest('réglages : frais de dépôt, prix min/max, annonces par vendeur, réduction actionnaires', async () => {
+  const owner = await user(SHOP_PRICE), a = await user(100, 5), b = await user(5000);
+  const { id } = await shops.createShop(owner, { name: 'Stricte', feePct: 20, listingFee: 10, minPrice: 50, maxPrice: 500, sellerMax: 1, holderDiscount: 50, sharePrice: 1 });
+  await db.run(`UPDATE users SET next_pack = '{"quality":"standard","boost":1}' WHERE id = $1`, [a.id]);
+  const p1 = await shops.sealPack(a.id), p2 = await shops.sealPack(a.id);
+  await assert.rejects(shops.listPack(a, { packId: p1.id, shopId: id, price: 20 }), /au moins 50/);
+  await assert.rejects(shops.listPack(a, { packId: p1.id, shopId: id, price: 900 }), /au-dessus de 500/);
+  const l = await shops.listPack(a, { packId: p1.id, shopId: id, price: 100 });
+  assert.equal(await bits(a), 90); // 10 bits de frais de dépôt
+  await assert.rejects(shops.listPack(a, { packId: p2.id, shopId: id, price: 100 }), /1 booster en vente par vendeur/);
+  await shops.buyShares(b, id, 1); // b devient actionnaire : commission 20 % → 10 %
+  assert.equal((await shops.buyListing(b, l.id)).fee, 10);
+  assert.equal(await bits(a), 90 + 90);
+  assert.equal(Number((await db.one('SELECT balance FROM shops WHERE id = $1', [id])).balance), 10 + 1 + 10);
+  await assert.rejects(shops.updateShop(owner, id, { minPrice: 600 }), /minimum dépasse/);
+  await assert.rejects(shops.updateShop(owner, id, { color: 'red' }), /Couleur/);
+});
+
+dbtest('prêts : intérêts selon la durée, frais de dossier, acceptation automatique, pénalité de retard', async () => {
+  const owner = await user(SHOP_PRICE + 10_000), b = await user(0), c = await user(0);
+  const { id } = await shops.createShop(owner, { name: 'Crédit', loanRate: 5, loanDaily: 1, loanFee: 10, loanLate: 10, loanMin: 100, loanMax: 2000, loanMinDays: 2, loanMaxDays: 10, loanAuto: 500 });
+  await shops.deposit(owner, id, 10_000);
+  await assert.rejects(shops.requestLoan(b, id, { amount: 50, days: 3 }), /minimum 100/);
+  await assert.rejects(shops.requestLoan(b, id, { amount: 300, days: 1 }), /de 2 à 10 jours/);
+  // 300 bits sur 2 jours : 300 × (1 + 5 % + 2 × 1 %) + 10 = 331 ; acceptés tout de suite (≤ 500).
+  const r1 = await shops.requestLoan(b, id, { amount: 300, days: 2 });
+  assert.deepEqual([r1.due, r1.status], [331, 'active']);
+  assert.equal(await bits(b), 300);
+  // Plus long = plus cher : 1000 bits sur 10 jours = 1000 × 1,15 + 10 = 1160 ; au-dessus de 500 : décision du propriétaire.
+  const r2 = await shops.requestLoan(c, id, { amount: 1000, days: 10 });
+  assert.deepEqual([r2.due, r2.status], [1160, 'pending']);
+  // Retard : b n'a que 100 bits à l'échéance → 231 restants + 10 % = 24 de pénalité.
+  await db.run('UPDATE users SET bits = 100 WHERE id = $1', [b.id]);
+  await db.run('UPDATE shop_loans SET due_at = 0 WHERE id = $1', [r1.id]);
+  await shops.dailyJobs();
+  const l = await db.one('SELECT * FROM shop_loans WHERE id = $1', [r1.id]);
+  assert.deepEqual([l.status, l.paid, l.due_amount], ['defaulted', 100, 331 + 24]);
+});
+
+dbtest('retrait du coffre (25 %/jour, public) et suppression de la boutique', async () => {
+  const owner = await user(SHOP_PRICE + 2000), h = await user(1000), s1 = await user(0, 2), bor = await user(0);
+  const { id } = await shops.createShop(owner, { name: 'Éphémère', sharePrice: 10, loanAuto: 1000 });
   await shops.deposit(owner, id, 1000);
-  await shops.placeOrder(owner, id, { side: 'sell', type: 'limit', qty: 250, price: 1 });
-  await shops.placeOrder(z, id, { side: 'buy', type: 'market', qty: 250 });
-  const before = await bits(z);
-  await db.run('UPDATE shops SET div_day = 0 WHERE id = $1', [id]);
-  await shops.dailyJobs();
-  assert.equal(await bits(z), before + 25); // 10 % de 1000 = 100, ×250/1000
-  assert.equal((await db.one('SELECT balance FROM shops WHERE id = $1', [id])).balance, 900);
-  await shops.dailyJobs();
-  assert.equal(await bits(z), before + 25); // pas deux fois le même jour
+  await shops.buyShares(h, id, 50); // coffre 1500
+  await assert.rejects(shops.withdraw(owner, id, 400), /au plus 375/);
+  await shops.withdraw(owner, id, 300);
+  await assert.rejects(shops.withdraw(owner, id, 100), /au plus 75/);
+  assert.equal(await bits(owner), 2000 - 1000 + 300);
+  await assert.rejects(shops.withdraw(h, id, 1), /propriétaire/);
+  // Un booster en vente et un prêt en cours.
+  await db.run(`UPDATE users SET next_pack = '{"quality":"standard","boost":1}' WHERE id = $1`, [s1.id]);
+  const p = await shops.sealPack(s1.id);
+  await shops.listPack(s1, { packId: p.id, shopId: id, price: 50 });
+  await shops.requestLoan(bor, id, { amount: 200, days: 3 }); // accordé automatiquement : coffre 1200 - 200 = 1000
+  const r = await shops.deleteShop(owner, id);
+  assert.deepEqual([r.listings, r.loans, r.holders, r.refunded, r.toOwner], [1, 1, 1, 500, 500]);
+  assert.equal(await bits(h), 1000); // remboursé au prix d'une part
+  assert.equal((await db.one('SELECT status FROM sealed_packs WHERE id = $1', [p.id])).status, 'owned');
+  assert.ok(!(await db.one('SELECT 1 FROM shops WHERE id = $1', [id])));
+  assert.equal(await bits(bor), 200); // prêt annulé : il garde les bits
+});
+
+dbtest('remise à zéro de l\'ancienne bourse : acheteurs remboursés, vendeurs repris, ordres annulés', async () => {
+  const { resetOldBourse } = await import('../lib/db.js');
+  const owner = await user(SHOP_PRICE + 500), buyer = await user(100), bidder = await user(50);
+  const { id } = await shops.createShop(owner, { name: 'Ancienne' });
+  await db.run("DELETE FROM meta WHERE key = 'bourse_v2'");
+  // Ancien état : buyer a payé 300 à owner pour 30 actions ; bidder a 40 bits bloqués dans un ordre d'achat.
+  await db.run('INSERT INTO stock_trades (shop_id, price, qty, buyer_id, seller_id, at) VALUES ($1, 10, 30, $2, $3, 0)', [id, buyer.id, owner.id]);
+  await db.run("INSERT INTO stock_orders (shop_id, user_id, side, price, qty, filled, status, created_at) VALUES ($1, $2, 'buy', 4, 10, 0, 'open', 0)", [id, bidder.id]);
+  await db.run('INSERT INTO shares (shop_id, user_id, qty) VALUES ($1, $2, 30)', [id, buyer.id]);
+  const r = await db.tx((q) => resetOldBourse(q));
+  assert.deepEqual([r.refunded, r.clawed, r.escrow], [300, 300, 40]);
+  assert.deepEqual([await bits(buyer), await bits(owner), await bits(bidder)], [400, 200, 90]);
+  assert.equal((await db.one('SELECT COUNT(*) n FROM shares')).n, 0);
+  assert.equal(await db.tx((q) => resetOldBourse(q)), null); // une seule fois
 });
 
 dbtest('boutique Premium : 30 000 bits, commission jusqu\'à 40 %, +15 % une seule fois par booster', async () => {
@@ -190,7 +276,7 @@ dbtest('comptes animés : coffre, mini-jeux, boosters en boutique, bourse, prêt
   const owner = await user(SHOP_PRICE + 5000);
   const { id } = await shops.createShop(owner, { name: 'Chez Humain', feePct: 5, loanMax: 500 });
   await shops.deposit(owner, id, 3000);
-  await shops.placeOrder(owner, id, { side: 'sell', type: 'limit', qty: 100, price: 8 });
+  await shops.updateShop(owner, id, { sharePrice: 5, divPct: 5 });
   const mk = async (type, b) => db.one(`INSERT INTO users (username, pass_hash, created_at, bits, pack_stock, pack_anchor, is_bot, bot, bot_next_at)
     VALUES ($1, 'x', 0, $2, 10, $3, true, $4, 0) RETURNING *`,
   ['anim' + ++n, b, Date.now(), JSON.stringify({ type, tz: 0, sleep: [3, 4], greed: 1, eye: 2.5, fav: null, market: 1, social: 0, stall: 4 })]);
@@ -207,10 +293,10 @@ dbtest('comptes animés : coffre, mini-jeux, boosters en boutique, bourse, prêt
   if (process.env.BOTLOG) console.log(Object.entries(log.reduce((a, l) => ({ ...a, [l]: (a[l] || 0) + 1 }), {})));
   const has = (l) => log.includes(l);
   for (const l of ['coffre', 'roue', 'mini-jeu', 'booster scellé', 'booster en vente']) assert.ok(has(l), `${l} manquant : ${[...new Set(log)].join(', ')}`);
-  assert.ok(log.some((l) => l.startsWith('achat d\'actions')), `aucun achat d'actions : ${[...new Set(log)].join(', ')}`);
+  assert.ok(log.some((l) => l.startsWith('achat de parts')), `aucun achat de parts : ${[...new Set(log)].join(', ')}`);
   assert.ok(has('boutique ouverte'), 'le compte riche ouvre une boutique');
   assert.ok((await db.one("SELECT COUNT(*) n FROM shop_listings")).n > 0);
   // Aucun bit créé : bits des joueurs + coffres + ordres d'achat bloqués restent cohérents (pas de solde négatif).
   assert.equal((await db.one('SELECT COUNT(*) n FROM users WHERE bits < 0')).n, 0);
-  assert.equal((await db.one('SELECT COUNT(*) n FROM shares WHERE locked > qty')).n, 0);
+  assert.equal((await db.one('SELECT COUNT(*) n FROM shares WHERE qty < 0')).n, 0);
 });

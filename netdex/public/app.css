@@ -489,3 +489,20 @@ table.data td.num { font-family: var(--mono); text-align: right; }
 .tier-opt span { color: var(--muted); }
 .tier-opt.premium b { color: var(--r-legendary); }
 .tier-opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+
+/* Réglages de boutique : sections repliables, couleurs, zone de suppression */
+.settings-sec { border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 10px; background: var(--surface); }
+.settings-sec > summary { cursor: pointer; padding: 12px 14px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; list-style: none; }
+.settings-sec > summary::-webkit-details-marker { display: none; }
+.settings-sec > summary::before { content: '▸'; color: var(--muted); }
+.settings-sec[open] > summary::before { content: '▾'; }
+.settings-body { padding: 0 14px 12px; }
+.settings-body small.muted { display: block; margin-top: 4px; font-size: 12px; line-height: 1.35; }
+.field-label { display: block; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.color-pick label { cursor: pointer; }
+.color-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.color-pick i { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; font-style: normal; font-size: 12px; color: var(--muted); }
+.color-pick input:checked + i { border-color: var(--text); }
+.shop-emoji { font-style: normal; }
+.danger-zone { border-color: var(--bad); margin-top: 10px; }
+.panel.how ol li { margin: 2px 0; }

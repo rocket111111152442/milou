@@ -1,19 +1,24 @@
-// Profils d'investisseurs des comptes animés : décisions face à des situations de marché typiques.
+// Parts de boutiques : décisions des comptes animés selon leur profil.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBotBourse, investorOf, STYLES } from '../lib/bot-bourse.js';
+import { decide, investorOf, yieldOf, STYLES } from '../lib/bot-bourse.js';
 
-const { decide } = createBotBourse(null, null);
-const shop = { id: 1, owner_id: 999, tier: 'standard', balance: 5000, div_pct: 5, fees_total: 2000, last_price: 20, sales_count: 10 };
+// Boutique type : part à 10, dividende fixe de 1 %/jour (0,1 bit par part), rachat 80 %, coffre bien rempli.
+const shop = (o = {}) => ({ id: 1, owner_id: 999, is_open: true, share_price: 10, div_mode: 'fixe', div_pct: 1, balance: 5000, total_shares: 1000,
+  shares_max: 1000, sold: 0, max_per_player: 1000, buyback_pct: 80, holders: 3, ...o });
 const inv = (name, id = 7) => ({ ...investorOf({ id }, { type: 'trader', bourse: name }), botId: id });
-const q = (o) => ({ bid: 19, ask: 21, last: 20, ref: 20, fair: 20, vol: 30, trend24: 0, trend6: 0, yld: 0, div: null, ...o });
-const none = { qty: 0, free: 0, avg: null };
 // Décision la plus fréquente sur 300 essais (les profils gardent une part de hasard, comme un joueur).
 const often = (fn) => {
   const c = {};
   for (let i = 0; i < 300; i++) { const d = fn(); const k = d ? `${d.side}:${d.why}` : 'rien'; c[k] = (c[k] || 0) + 1; }
   return Object.entries(c).sort((a, b) => b[1] - a[1])[0][0];
 };
+
+test('rendement : dividende par part et par jour rapporté au prix', () => {
+  assert.equal(yieldOf(shop()), 0.01);
+  assert.equal(yieldOf(shop({ div_mode: 'coffre', div_pct: 5, balance: 2000 })), 0.01); // 5 % de 2000 / 1000 parts = 0,1
+  assert.equal(yieldOf(shop({ div_pct: 0 })), 0);
+});
 
 test('chaque compte a un profil stable, tous les profils existent', () => {
   assert.equal(investorOf({ id: 42 }, { type: 'trader' }).name, investorOf({ id: 42 }, { type: 'trader' }).name);
@@ -22,44 +27,31 @@ test('chaque compte a un profil stable, tous les profils existent', () => {
   assert.deepEqual([...seen].sort(), Object.keys(STYLES).sort());
 });
 
-test('fondamental : achète sous la valeur, ignore ce qui est cher, vend quand c\'est surcoté', () => {
-  assert.equal(often(() => decide(inv('fondamental'), q({ last: 10, ref: 10, bid: 9, ask: 11, fair: 20 }), none, 10000, 5000, shop)), 'buy:sous sa valeur');
-  assert.equal(often(() => decide(inv('fondamental'), q({ fair: 15 }), none, 10000, 5000, shop)), 'rien');
-  assert.equal(often(() => decide(inv('fondamental'), q({ last: 40, ref: 40, fair: 20 }), { qty: 50, free: 50, avg: 38 }, 10000, 5000, shop)), 'sell:trop cher');
+test('rentier : achète un bon rendement, ignore une boutique qui ne verse rien, revend si les dividendes s\'arrêtent', () => {
+  assert.equal(often(() => decide(inv('rentier'), shop({ div_pct: 2 }), 0, 5000, 5000)), 'buy:pour les dividendes');
+  assert.equal(often(() => decide(inv('rentier'), shop({ div_pct: 0 }), 0, 5000, 5000)), 'rien');
+  assert.equal(often(() => decide(inv('rentier'), shop({ div_pct: 0 }), 50, 5000, 5500)), 'sell:plus de dividendes');
 });
 
-test('tendance : suit la hausse, coupe à la baisse', () => {
-  assert.equal(often(() => decide(inv('tendance'), q({ trend6: 0.1, trend24: 0.05 }), none, 10000, 5000, shop)), 'buy:tendance haussière');
-  assert.equal(often(() => decide(inv('tendance'), q({ trend6: -0.08 }), { qty: 30, free: 30, avg: 20 }, 10000, 5000, shop)), 'sell:retournement');
+test('prudent : exige un rachat garanti', () => {
+  assert.equal(often(() => decide(inv('prudent'), shop({ div_pct: 4, buyback_pct: 0 }), 0, 5000, 5000)), 'rien');
+  assert.equal(often(() => decide(inv('prudent'), shop({ div_pct: 4 }), 0, 5000, 5000)), 'buy:rendement sûr');
 });
 
-test('creux : achète après une chute, revend au rebond', () => {
-  assert.equal(often(() => decide(inv('creux'), q({ trend24: -0.2, last: 16, ref: 16 }), none, 10000, 5000, shop)), 'buy:achat sur repli');
-  assert.match(often(() => decide(inv('creux'), q({ last: 23, ref: 23 }), { qty: 30, free: 30, avg: 20 }, 10000, 5000, shop)), /^sell:(rebond|prise de bénéfices)$/);
+test('chasseur : quitte une boutique quand une autre rapporte deux fois plus', () => {
+  assert.equal(often(() => decide(inv('chasseur'), shop({ div_pct: 2 }), 40, 3000, 3400, 0.05)), 'sell:mieux ailleurs');
 });
 
-test('rentier : achète les boutiques qui versent, vend si les dividendes s\'arrêtent', () => {
-  assert.equal(often(() => decide(inv('rentier'), q({ div: 0.2, yld: 0.01 }), none, 10000, 5000, shop)), 'buy:pour les dividendes');
-  assert.equal(often(() => decide(inv('rentier'), q({}), none, 10000, 5000, { ...shop, div_pct: 0 })), 'rien');
+test('limites : parts restantes, maximum par joueur, sa propre boutique, boutique fermée, budget', () => {
+  const d = decide(inv('chasseur'), shop({ div_pct: 3, shares_max: 100, sold: 95 }), 0, 100_000, 100_000);
+  assert.ok(d && d.qty <= 5);
+  assert.equal(decide(inv('chasseur'), shop({ div_pct: 3, max_per_player: 10 }), 10, 100_000, 100_000), null);
+  assert.equal(decide(inv('chasseur'), shop({ div_pct: 3, owner_id: 7 }), 0, 100_000, 100_000), null);
+  assert.equal(decide(inv('chasseur'), shop({ div_pct: 3, is_open: false }), 0, 100_000, 100_000), null);
+  assert.equal(decide(inv('chasseur'), shop({ div_pct: 3 }), 0, 5, 5), null);
 });
 
-test('impulsif : prix ronds, vend tout dès qu\'il gagne, panique à la baisse', () => {
-  const d = decide(inv('impulsif'), q({ trend24: 0.3, ask: 47, last: 46, ref: 46 }), none, 10000, 5000, shop);
-  assert.ok(d && d.side === 'buy' && (d.type === 'market' || d.price % 5 === 0), JSON.stringify(d));
-  assert.equal(often(() => decide(inv('impulsif'), q({ trend6: -0.25, last: 14, ref: 14 }), { qty: 40, free: 40, avg: 20 }, 10000, 5000, shop)), 'sell:vente panique');
-  const tp = decide(inv('impulsif'), q({ last: 30, ref: 30 }), { qty: 40, free: 40, avg: 20 }, 10000, 5000, shop);
-  assert.equal(tp.why, 'prise de bénéfices');
-  assert.equal(tp.qty, 40);
-});
-
-test('teneur : se place juste devant le meilleur acheteur, petites quantités', () => {
-  const d = decide(inv('teneur'), q({ bid: 18, ask: 24 }), none, 10000, 5000, shop);
-  assert.equal(d.price, 19);
-  assert.ok(d.qty <= 25);
-});
-
-test('jamais plus d\'une part de sa fortune sur une boutique, rien sans bits', () => {
-  const d = decide(inv('fondamental'), q({ last: 10, ref: 10, fair: 20, ask: null }), { qty: 340, free: 340, avg: 10 }, 10000, 5000, shop);
-  assert.ok(!d || d.side !== 'buy' || d.qty * (d.price || 10) <= 10000 * 0.35 - 3400 + 10);
-  assert.equal(decide(inv('tendance'), q({ trend6: 0.1, trend24: 0.05 }), none, 5, 5, shop), null);
+test('à court de bits : revend une partie si la boutique rachète', () => {
+  assert.equal(often(() => decide(inv('rentier'), shop({ div_pct: 2 }), 40, 20, 420)), 'sell:besoin de bits');
+  assert.equal(decide(inv('rentier'), shop({ div_pct: 2, buyback_pct: 0 }), 40, 20, 420)?.side ?? 'rien', 'rien');
 });

@@ -622,8 +622,7 @@ async function cleanup(db) {
   await db.run('DELETE FROM sales WHERE at < $1', [Date.now() - 90 * 24 * HOUR]);
   await db.run('DELETE FROM messages WHERE at < $1', [Date.now() - 60 * 24 * HOUR]);
   // Boutiques : on garde l'historique utile (30 jours de cours, 7 jours d'annonces et d'ordres terminés).
-  await db.run("DELETE FROM stock_orders WHERE status != 'open' AND created_at < $1", [old]);
-  await db.run('DELETE FROM stock_trades WHERE at < $1', [Date.now() - 31 * 24 * HOUR]);
+  await db.run('DELETE FROM shop_log WHERE at < $1', [Date.now() - 30 * 24 * HOUR]);
   await db.run("DELETE FROM shop_listings WHERE status != 'open' AND created_at < $1", [old]);
   await db.run("DELETE FROM sealed_packs WHERE status = 'opened' AND created_at < $1", [old]);
   await db.run("DELETE FROM shop_loans WHERE status IN ('repaid', 'refused', 'expired') AND created_at < $1", [Date.now() - 30 * 24 * HOUR]);
