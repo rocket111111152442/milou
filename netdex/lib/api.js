@@ -736,8 +736,12 @@ function readBody(req) {
   });
 }
 
+// Version déployée : un onglet resté ouvert sur une ancienne version se recharge tout seul (voir public/js/core.js).
+const APP_VERSION = (process.env.VERCEL_GIT_COMMIT_SHA || 'dev').slice(0, 12);
+
 function sendJson(req, res, status, data) {
   let body = Buffer.from(JSON.stringify(data));
+  res.setHeader('X-App-Version', APP_VERSION);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');

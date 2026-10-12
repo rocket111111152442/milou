@@ -505,7 +505,8 @@ export function createShops(db, game) {
       db.one('SELECT bits FROM users WHERE id = $1', [meId]),
     ]);
     return { shop: shopView(s), owner: s.owner_id === meId, holding: holding ? { qty: holding.qty, paid: Number(holding.paid), received: Number(holding.received) } : { qty: 0, paid: 0, received: 0 },
-      holders, payouts, recent, bits: me.bits };
+      holders, payouts, recent, bits: me.bits,
+      bids: [], asks: [], trades: [], history: [], myOrders: [] }; // vides : compatibilité avec l'ancienne page encore ouverte
   }
 
   async function portfolio(userId) {
@@ -513,7 +514,8 @@ export function createShops(db, game) {
       FROM shares h JOIN shops s ON s.id = h.shop_id WHERE h.user_id = $1 AND h.qty > 0 ORDER BY h.paid DESC`, [userId]);
     const items = rows.map((r) => ({ id: r.id, name: r.name, emoji: r.emoji, qty: r.qty, paid: Number(r.paid), received: Number(r.received),
       perDay: +(divPerShare(r) * r.qty).toFixed(2), buyback: r.buyback_pct > 0 ? Math.floor((r.qty * r.share_price * r.buyback_pct) / 100) : null }));
-    return { items, paid: items.reduce((a, x) => a + x.paid, 0), received: items.reduce((a, x) => a + x.received, 0), perDay: +items.reduce((a, x) => a + x.perDay, 0).toFixed(2) };
+    // orders : vide, gardé pour les onglets encore ouverts sur l'ancienne page Bourse.
+    return { items, orders: [], paid: items.reduce((a, x) => a + x.paid, 0), received: items.reduce((a, x) => a + x.received, 0), perDay: +items.reduce((a, x) => a + x.perDay, 0).toFixed(2) };
   }
 
   // ---------- Tâches périodiques (appelées par la tâche planifiée) ----------

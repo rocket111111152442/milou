@@ -8,10 +8,25 @@ export const VALUES = [1, 3, 12, 100, 1500, 40000]; // valeur de recyclage (iden
 export const state = { me: null, clockOffset: 0 };
 export const now = () => Date.now() + state.clockOffset;
 
+// Si une nouvelle version a été déployée pendant que l'onglet était ouvert, la page se recharge au prochain
+// changement d'écran (jamais pendant qu'on remplit un formulaire), pour ne pas mélanger ancien affichage et nouveau serveur.
+let appVersion = null, stale = false;
+function checkVersion(v) {
+  if (!v) return;
+  if (!appVersion) { appVersion = v; return; }
+  if (v !== appVersion) stale = true;
+}
+window.addEventListener('hashchange', () => {
+  if (!stale) return;
+  try { if (sessionStorage.getItem('nd_reloaded') === location.hash + appVersion) return; sessionStorage.setItem('nd_reloaded', location.hash + appVersion); } catch { /* stockage indisponible */ }
+  location.reload();
+});
+
 export async function api(path, body) {
   const opts = body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
   let res;
   try { res = await fetch('/api' + path, opts); } catch { throw new Error('Connexion impossible. Vérifie ton réseau.'); }
+  checkVersion(res.headers.get('X-App-Version'));
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && path !== '/login') { document.dispatchEvent(new CustomEvent('nd:logout')); }
   if (!res.ok) throw new Error(data.error || 'Erreur ' + res.status);

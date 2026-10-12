@@ -1,4 +1,4 @@
-const VERSION = 'netdex-v21';
+const VERSION = 'netdex-v22';
 const SHELL = ['/', '/app.css', '/js/app.js', '/js/core.js', '/js/views.js', '/js/chart.js', '/js/fun.js', '/js/shops.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon.svg'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
