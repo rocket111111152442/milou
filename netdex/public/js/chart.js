@@ -16,7 +16,15 @@ function niceTicks(min, max, count = 4) {
   return ticks;
 }
 
+// Format de date par défaut : heures sur une courte période, jours au-delà.
+const autoDate = (span) => (t, long) => {
+  const d = new Date(t);
+  if (long) return d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return span <= 36 * 3600e3 ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+};
+
 export function lineChart(container, points, { format = (v) => String(v), dateFormat, height = 200, label = '' } = {}) {
+  if (typeof dateFormat !== 'function') dateFormat = autoDate(points.length ? points.at(-1).x - points[0].x : 0);
   container.innerHTML = '';
   container.style.position = 'relative';
   if (!points.length) { container.innerHTML = '<div class="empty small">Pas encore de données.</div>'; return; }

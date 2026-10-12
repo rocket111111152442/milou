@@ -261,7 +261,7 @@ export async function viewBourse(el) {
           return `<div class="row" style="align-items:flex-start;gap:8px"><div class="grow"><a href="#/bourse/${o.shop_id}" style="color:var(--text)"><b>${o.side === 'buy' ? 'Achat' : 'Vente'}</b> · ${esc(o.shop_name)}</a>
             <div>${left} action${left > 1 ? 's' : ''} à ${fmt(o.price)} bits${o.filled ? ` (${o.filled} déjà ${o.side === 'buy' ? 'achetée' : 'vendue'}${o.filled > 1 ? 's' : ''})` : ''}${o.side === 'buy' ? ` · ${fmt(left * o.price)} bits mis de côté` : ''}</div>
             <div class="muted">${why}</div></div>
-            <button class="btn small" data-cancel-order="${o.id}">Annuler</button></div>`;
+            <button class="btn sm" data-cancel-order="${o.id}">Annuler</button></div>`;
         }).join('')}</div></div>` : ''}</div>
     <div class="panel" style="padding:0;overflow-x:auto;margin-top:10px"><table class="data"><tr><th>Boutique</th><th style="text-align:right">Cours</th><th style="text-align:right">24 h</th><th style="text-align:right">Capitalisation</th><th style="text-align:right">Volume 24 h</th><th style="text-align:right">Div./j</th></tr>
       ${quoted.map((s) => `<tr data-go="${s.id}" style="cursor:pointer"><td><b>${esc(s.name)}</b></td><td class="num">${s.lastPrice ? fmt(s.lastPrice) : '—'}</td>
