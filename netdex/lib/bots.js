@@ -296,17 +296,10 @@ export async function composeReply(db, bot, text) {
   if (!hits.length) return pick(FALLBACK);
   return pick(hits[0][1](ctx)); // le sujet le plus précis d'abord
 }
-async function answerMessages(db, bot, p, now) {
-  const msgs = await db.all('SELECT DISTINCT ON (from_id) from_id, text FROM messages WHERE to_id = $1 AND NOT read ORDER BY from_id, id DESC LIMIT 3', [bot.id]);
-  const st = styleOf(bot.id);
-  for (const m of msgs) {
-    await db.run('UPDATE messages SET read = true WHERE to_id = $1 AND from_id = $2 AND NOT read', [bot.id, m.from_id]);
-    if (rnd() < 0.15) continue; // parfois il lit sans répondre
-    const last = await db.one('SELECT text FROM messages WHERE from_id = $1 AND to_id = $2 ORDER BY id DESC LIMIT 1', [bot.id, m.from_id]);
-    let reply = '';
-    for (let k = 0; k < 4 && (!reply || reply === last?.text); k++) reply = stylize(await composeReply(db, bot, m.text), st);
-    await db.run('INSERT INTO messages (from_id, to_id, text, at) VALUES ($1, $2, $3, $4)', [bot.id, m.from_id, reply, now]);
-  }
+// Ils lisent leurs messages mais n'y répondent pas : des phrases toutes faites ne peuvent pas suivre une vraie
+// conversation. Ils ne s'expriment que sur les échanges (accord, refus avec le complément demandé).
+async function answerMessages(db, bot) {
+  await db.run('UPDATE messages SET read = true WHERE to_id = $1 AND NOT read', [bot.id]);
 }
 
 async function ownedSites(db, botId, siteIds) {
