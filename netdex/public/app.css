@@ -478,3 +478,7 @@ table.data td.num { font-family: var(--mono); text-align: right; }
 .book tr[data-px]:hover { background: var(--surface-2); }
 .up { color: var(--good); }
 .down { color: var(--bad); }
+.q-terne { --qc: #6b6a65; }
+.next-pack { border-left: 4px solid var(--qc, var(--line)); }
+.q-open { margin-bottom: 12px; }
+.q-open .mono { color: #ecebe6; }

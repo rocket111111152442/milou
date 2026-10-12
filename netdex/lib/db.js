@@ -227,6 +227,7 @@ CREATE TABLE IF NOT EXISTS sealed_packs (
   created_at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sealed_owner ON sealed_packs (owner_id, status);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS next_pack JSONB;
 CREATE TABLE IF NOT EXISTS shops (
   id SERIAL PRIMARY KEY,
   owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

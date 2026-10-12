@@ -3,7 +3,7 @@ import { lineChart } from './chart.js';
 import { api, state, refreshMe, setMe, esc, fmt, $, $$, h, ago, toast, toastErr, modal, confirmDialog, busy, RARITY, sfx } from './core.js';
 import { openPackFlow } from './views.js';
 
-const QUAL = { standard: 'Standard', chanceux: 'Chanceux', brillant: 'Brillant', prestige: 'Prestige' };
+const QUAL = { terne: 'Terne', standard: 'Standard', chanceux: 'Chanceux', brillant: 'Brillant', prestige: 'Prestige' };
 const pct = (v) => (v >= 10 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : v >= 0.1 ? v.toFixed(2) : v.toPrecision(2)).replace('.', ',') + ' %';
 export const oddsHtml = (o) => `<div class="odds">${[5, 4, 3, 2].map((r) => `<div class="r-${r}"><span class="rtext">${RARITY[r].name}${r < 5 ? '+' : ''}</span><b class="mono">${pct(o[r])}</b></div>`).join('')}</div>`;
 const marketTabs = (on) => `<div class="tabs"><a href="#/market"${on === 'auctions' ? ' class="on"' : ''}>Enchères</a><a href="#/shops"${on === 'shops' ? ' class="on"' : ''}>Boutiques</a><a href="#/bourse"${on === 'bourse' ? ' class="on"' : ''}>Bourse</a><a href="#/loans"${on === 'loans' ? ' class="on"' : ''}>Mes prêts</a></div>`;
@@ -26,7 +26,7 @@ export async function sealedSection(el) {
     const d = await api('/packs/sealed');
     el.innerHTML = `<div class="row" style="margin-bottom:8px"><b class="grow">Mes boosters scellés <span class="muted small">${d.items.length}/${d.max}</span></b>
       <button class="btn sm" data-seal ${state.me.packs.available ? '' : 'disabled'}>Garder un booster scellé</button></div>
-      <p class="muted small" style="margin:0 0 10px">Un booster scellé reçoit une qualité et affiche ses vraies chances. Ouvre-le, ou revends-le dans une boutique d'échange.</p>
+      <p class="muted small" style="margin:0 0 10px">Garde ton prochain booster fermé avec sa qualité et ses chances : ouvre-le plus tard ou revends-le dans une boutique d'échange.</p>
       ${d.items.length ? `<div class="sealed-grid">${d.items.map((p) => packCardHtml(p, p.listing
         ? `<div class="small muted">En vente ${fmt(p.listing.price)} bits chez <a href="#/shop/${p.listing.shopId}">${esc(p.listing.shopName)}</a></div>`
         : `<div class="row" style="gap:6px"><button class="btn primary sm" data-open-sealed="${p.id}">Ouvrir</button><button class="btn sm" data-sell-sealed="${p.id}">Vendre</button></div>`)).join('')}</div>`
@@ -39,7 +39,7 @@ export async function sealedSection(el) {
     if (b.matches('[data-seal]')) busy(b, async () => {
       const r = await api('/packs/seal', {});
       setMe(r.me); sfx(r.pack.quality === 'standard' ? 'pop' : r.pack.quality === 'prestige' ? 'legend' : 'rare');
-      toast(`Booster ${r.pack.qualityName} scellé !`, 'ok'); await draw();
+      toast(`Booster ${r.pack.qualityName} gardé scellé !`, 'ok'); await draw();
     });
     if (b.dataset.openSealed) busy(b, async () => {
       const r = await api(`/packs/sealed/${b.dataset.openSealed}/open`, {});

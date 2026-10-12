@@ -27,7 +27,8 @@ export async function openPackFlow(kind = 'free', free = false, preset = null) {
   const fast = prefs.get('fast', false);
   sfx('pop');
   const ov = h(`<div class="overlay">
-    ${cards.pity ? '<div class="pity-note">Compteur de pitié plein : Épique ou mieux garantie !</div>' : ''}
+    ${res.pity ? '<div class="pity-note">Compteur de pitié plein : Épique ou mieux garantie !</div>' : ''}
+    ${res.quality || res.pack ? `<div class="q-open q-${(res.quality || res.pack).quality}"><span class="q-badge">Booster ${esc((res.pack?.qualityName) || ({ terne: 'Terne', standard: 'Standard', chanceux: 'Chanceux', brillant: 'Brillant', prestige: 'Prestige' })[res.quality.quality])}</span>${(res.quality || res.pack).boost !== 1 ? ` <span class="mono small">×${String((res.quality || res.pack).boost).replace('.', ',')}</span>` : ''}</div>` : ''}
     <div class="reveal">${cards.map((c, i) => `<div class="flip" data-i="${i}">
         <div class="back r-${c.site.rarity}${c.site.rarity >= 3 ? ' hint' : ''}"></div>
         ${cardHtml(c.site, { holo: c.holo, isNew: c.isNew })}
@@ -236,7 +237,7 @@ export async function viewHome(el, { on }) {
     <a class="level-strip" href="#/play" data-level></a>
     <section class="hero" data-hero></section>
     <div class="quick-grid" style="margin-top:12px" data-quick></div>
-    <div class="panel" style="margin-top:12px"><div class="row"><b class="grow">Chances d'un booster</b><span class="muted small">au moins une carte de cette rareté</span></div><div data-odds style="margin-top:8px"></div></div>
+    <div class="panel next-pack" style="margin-top:12px" data-next-pack></div>
     <div class="panel" style="margin-top:12px" data-sealed><div class="spinner"></div></div>
     <div class="grid-2" style="margin-top:12px">
       <div class="panel" data-daily></div>
@@ -314,7 +315,17 @@ export async function viewHome(el, { on }) {
   };
   loadTiers().catch(toastErr);
   on('nd:cards', () => loadTiers().catch(() => {}));
-  api('/packs/odds').then((o) => { $('[data-odds]', el).innerHTML = oddsHtml(o.standard); }).catch(() => {});
+  // Chaque booster a sa qualité : on montre celle du prochain, avant de l'ouvrir.
+  const renderNext = () => {
+    const np = state.me.nextPack;
+    if (!np) return;
+    $('[data-next-pack]', el).className = `panel next-pack q-${np.quality}`;
+    $('[data-next-pack]', el).innerHTML = `<div class="row"><b class="grow">Prochain booster : <span class="q-badge">${esc(np.name)}</span>${np.boost !== 1 ? ` <span class="mono small">×${String(np.boost).replace('.', ',')}</span>` : ''}</b>
+      <span class="muted small">chances d'avoir au moins une carte…</span></div><div style="margin-top:8px">${oddsHtml(np.odds)}</div>
+      <p class="muted small" style="margin:8px 0 0">${np.quality === 'terne' ? 'Booster terne : mieux vaut peut-être le garder scellé et le revendre…' : np.quality === 'standard' ? 'Booster standard.' : 'Belle qualité : à ouvrir… ou à revendre cher en boutique.'} Chaque booster a sa propre qualité.</p>`;
+  };
+  renderNext();
+  on('nd:me', renderNext);
   sealedSection($('[data-sealed]', el)).catch(toastErr);
 
   if (window.ndInstall?.available() && !prefs.get('installDismissed', false)) {

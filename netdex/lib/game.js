@@ -34,6 +34,22 @@ export const weekId = (t = Date.now()) => Math.floor((t - 4 * 24 * 3600 * 1000) 
 
 export const CUSTOM_BASE = 100_000_000;
 
+// Qualité de chaque booster : multiplie les chances des raretés hautes (Rare × √m, Épique et plus × m).
+// La moyenne des multiplicateurs vaut ~1 : la rareté globale des bonnes cartes ne change pas.
+export const QUALITIES = {
+  terne: { name: 'Terne', p: 0.45, lo: 0.2, hi: 0.2 },
+  standard: { name: 'Standard', p: 0.38, lo: 1, hi: 1 },
+  chanceux: { name: 'Chanceux', p: 0.12, lo: 1.5, hi: 2.5 },
+  brillant: { name: 'Brillant', p: 0.04, lo: 3, hi: 6 },
+  prestige: { name: 'Prestige', p: 0.01, lo: 8, hi: 16 },
+};
+export function rollQuality() {
+  let x = randomInt(1_000_000) / 1_000_000;
+  for (const [quality, q] of Object.entries(QUALITIES)) {
+    if ((x -= q.p) < 0 || quality === 'prestige') return { quality, boost: +(q.lo + (randomInt(1_000_001) / 1_000_000) * (q.hi - q.lo)).toFixed(2) };
+  }
+}
+
 export class GameError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
 }
@@ -137,7 +153,7 @@ export async function createGame(db) {
     const pool = tiers.filter((t) => t.id >= minRarity && (t.total > 0 || t.extra?.length));
     const w = (t) => tierWeight(t, boost);
     const sum = pool.reduce((a, t) => a + w(t), 0);
-    let x = randomInt(sum);
+    let x = (randomInt(1_000_000_000) / 1_000_000_000) * sum; // poids non entiers avec les qualités de booster
     for (const t of pool) { if ((x -= w(t)) < 0) return t; }
     return pool[0];
   }
@@ -216,14 +232,24 @@ export async function createGame(db) {
       const u = await q.one('SELECT * FROM users WHERE id = $1 FOR UPDATE', [userId]);
       // Admin : boosters illimités, sans toucher au stock ni aux bits.
       const opts = { pity: u.pity };
-      if (free && u.is_admin) return drawCards(q, userId, kind === 'premium', false, opts);
+      if (free && u.is_admin) return drawCards(q, userId, kind === 'premium', false, { ...opts, boost: kind === 'premium' ? 1 : rollQuality().boost });
       if (kind === 'premium') {
         await debit(q, userId, CONFIG.premiumPrice, `Il te faut ${CONFIG.premiumPrice} bits.`);
         return drawCards(q, userId, true, u.is_bot, opts);
       }
+      const next = await takeNextPack(q, u);
       await consumeFreePack(q, u);
-      return drawCards(q, userId, false, u.is_bot, opts);
+      const out = await drawCards(q, userId, false, u.is_bot, { ...opts, boost: next.boost });
+      out.quality = next;
+      return out;
     });
+  }
+
+  // Qualité du prochain booster (visible avant l'ouverture) ; on en tire une nouvelle pour le suivant.
+  async function takeNextPack(q, u) {
+    const cur = u.next_pack || rollQuality();
+    if (!u.is_bot) await q.run('UPDATE users SET next_pack = $1 WHERE id = $2', [JSON.stringify(rollQuality()), u.id]);
+    return cur;
   }
 
   // Retire un booster du stock (u verrouillé FOR UPDATE par l'appelant).
@@ -594,7 +620,7 @@ export async function createGame(db) {
     get totalSites() { return rankedSites + custom.size; },
     isCustom: (id) => custom.has(id), loadCustom, refreshCustom,
     db, tail, ensureSites, minBid, drawCards, debit, credit, discover, logEvent,
-    tiers, tierOf, value, notify, packState, consumeFreePack, packOdds, bump, addWeek, rollTier, pickIn, holoRoll, grantCards, activeEvent, eventIs, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
+    tiers, tierOf, value, notify, packState, consumeFreePack, takeNextPack, packOdds, bump, addWeek, rollTier, pickIn, holoRoll, grantCards, activeEvent, eventIs, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
     relation, requestFriend, respondFriend, removeFriend, listFriends,
     createTrade, listTrades, resolveTrade,
     createAuction, bid, cancelAuction, settleAuctions, listAuctions,

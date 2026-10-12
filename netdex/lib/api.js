@@ -6,7 +6,7 @@ import { createDb, databaseUrl, ADMIN_USERNAMES } from './db.js';
 import { copyDatabase, scheduleCron } from './transfer.js';
 import { RARITIES, tailDomains, searchTail, siteRow } from './sites.js';
 import { wallet, marketIndex, sitePrices, snapshotDue, snapshotIndex, siteMarket } from './market.js';
-import { createGame, CONFIG, GameError, CUSTOM_BASE, EVENTS, weekId } from './game.js';
+import { createGame, CONFIG, GameError, CUSTOM_BASE, EVENTS, weekId, QUALITIES, rollQuality } from './game.js';
 import { createFun, progression, ACHIEVEMENTS, PROFILE_COLORS } from './fun.js';
 import { createShops } from './shops.js';
 import { setupDatabase, setupTail } from './setup.js';
@@ -100,10 +100,16 @@ async function meView({ db, game }, u) {
       (SELECT COUNT(*) FROM messages WHERE to_id = $1 AND NOT read) messages`, [u.id]);
   await game.refreshCustom();
   const prog = progression(u);
+  if (!u.next_pack && !u.is_bot) {
+    u.next_pack = rollQuality();
+    await db.run('UPDATE users SET next_pack = $1 WHERE id = $2 AND next_pack IS NULL', [JSON.stringify(u.next_pack), u.id]);
+  }
+  const np = u.next_pack || { quality: 'standard', boost: 1 };
   return {
     user: { id: u.id, username: u.username, isAdmin: u.is_admin, bits: u.bits, dexCount: u.dex_count, dexScore: u.dex_score, packsOpened: u.packs_opened, avatarSite: u.avatar_site, createdAt: u.created_at,
       level: prog.level, xp: prog.xp, levelUp: prog.level > prog.claimedLevel, achievements: prog.unlocked, pity: u.pity, profile: u.profile },
     event: game.activeEvent(),
+    nextPack: { ...np, name: QUALITIES[np.quality]?.name || np.quality, odds: Object.fromEntries(Object.entries(game.packOdds(np.boost)).map(([r, p]) => [r, +(p * 100).toPrecision(3)])) },
     packs: game.packState(u, now),
     daily: game.dailyState(u, now),
     counts: { notifications: c.notifications, trades: c.trades, friendRequests: c.friend_requests, messages: c.messages },
@@ -306,7 +312,8 @@ route('POST', '/api/account/avatar', async ({ c, me, body }) => {
 route('GET', '/api/me', async ({ c, me }) => { await c.game.settleAuctions(); await c.fun.touch(me.id); return meView(c, await reloadUser(c.db, me.id)); });
 route('POST', '/api/packs/open', async ({ c, me, body }) => {
   const cards = await c.game.openPack(me.id, body.kind === 'premium' ? 'premium' : 'free', { free: !!body.free });
-  return { cards, me: await meView(c, await reloadUser(c.db, me.id)) };
+  // Les propriétés d'un tableau ne passent pas en JSON : on les remonte à part.
+  return { cards, quality: cards.quality || null, pity: !!cards.pity, me: await meView(c, await reloadUser(c.db, me.id)) };
 });
 // Ouvrir tout le stock d'un coup (10 boosters max par appel).
 route('POST', '/api/packs/open-all', async ({ c, me }) => {

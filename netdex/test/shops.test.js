@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { createDb, migrate } from '../lib/db.js';
 import { importSites } from '../lib/sites.js';
 import { createGame, CONFIG } from '../lib/game.js';
-import { createShops, rollQuality, SHOP_PRICE } from '../lib/shops.js';
+import { createShops, SHOP_PRICE } from '../lib/shops.js';
+import { rollQuality, QUALITIES } from '../lib/game.js';
 
 const URL = process.env.TEST_DATABASE_URL ? process.env.TEST_DATABASE_URL.replace(/\/[^/?]+(\?|$)/, '/netdex_shops$1') : null;
 let db, game, shops, n = 0;
@@ -33,11 +34,15 @@ const user = async (bits = 0, packs = 5) => {
 const bits = async (u) => (await db.one('SELECT bits FROM users WHERE id = $1', [u.id])).bits;
 const dbtest = (name, fn) => test(name, { skip: !URL && 'TEST_DATABASE_URL absent' }, fn);
 
-test('qualités : majorité de Standard, Prestige rare', () => {
+test('qualités : chaque booster est différent, mais la moyenne des multiplicateurs reste ~1', () => {
   const c = {};
-  for (let i = 0; i < 20000; i++) { const q = rollQuality().quality; c[q] = (c[q] || 0) + 1; }
-  assert.ok(c.standard > 13000 && c.standard < 15000);
-  assert.ok(c.prestige > 200 && c.prestige < 700);
+  let sum = 0;
+  for (let i = 0; i < 50000; i++) { const r = rollQuality(); c[r.quality] = (c[r.quality] || 0) + 1; sum += r.boost; }
+  assert.equal(Object.keys(c).length, Object.keys(QUALITIES).length);
+  assert.ok(c.terne > 21500 && c.terne < 23500);
+  assert.ok(c.prestige > 350 && c.prestige < 700);
+  const mean = sum / 50000;
+  assert.ok(mean > 0.93 && mean < 1.08, 'moyenne ' + mean);
 });
 
 dbtest('cotes : un booster boosté a de meilleures chances', () => {
@@ -48,7 +53,10 @@ dbtest('cotes : un booster boosté a de meilleures chances', () => {
 
 dbtest('sceller puis ouvrir un booster', async () => {
   const u = await user(0, 2);
+  await db.run(`UPDATE users SET next_pack = '{"quality":"brillant","boost":4.5}' WHERE id = $1`, [u.id]);
   const p = await shops.sealPack(u.id);
+  assert.equal(p.quality, 'brillant'); // il garde la qualité annoncée
+  assert.ok((await db.one('SELECT next_pack FROM users WHERE id = $1', [u.id])).next_pack.quality); // une nouvelle est tirée
   assert.ok(p.odds[5] > 0);
   assert.equal((await db.one('SELECT pack_stock FROM users WHERE id = $1', [u.id])).pack_stock, 1);
   const r = await shops.openSealed(u.id, p.id);

@@ -4,32 +4,17 @@
 //  - Une boutique (25 000 bits) prend une commission sur chaque booster vendu chez elle ; la commission remplit son coffre.
 //  - Le coffre sert à prêter aux joueurs (avec intérêts) et à verser des dividendes quotidiens aux actionnaires.
 //  - Chaque boutique a 1 000 actions échangées sur un carnet d'ordres (priorité prix puis ancienneté).
-import { randomInt } from 'node:crypto';
-import { GameError } from './game.js';
+import { GameError, QUALITIES, rollQuality } from './game.js';
 
 export const SHOP_PRICE = 25_000;
 export const TOTAL_SHARES = 1000;
-export const QUALITIES = {
-  standard: { name: 'Standard' },
-  chanceux: { name: 'Chanceux' },
-  brillant: { name: 'Brillant' },
-  prestige: { name: 'Prestige' },
-};
+export { QUALITIES };
 const MAX_SEALED = 30;
 const MAX_LISTINGS = 20;
 const MAX_LOANS = 3;
 const LOAN_PENDING_MS = 48 * 3600e3;
 const DAY = 24 * 3600e3;
 const dayId = (t = Date.now()) => Math.floor(t / DAY);
-const rnd = () => randomInt(1_000_000) / 1_000_000;
-
-export function rollQuality() {
-  const x = rnd();
-  if (x < 0.70) return { boost: 1, quality: 'standard' };
-  if (x < 0.90) return { boost: +(1.5 + rnd() * 1.5).toFixed(2), quality: 'chanceux' };
-  if (x < 0.98) return { boost: +(3 + rnd() * 5).toFixed(2), quality: 'brillant' };
-  return { boost: +(8 + rnd() * 17).toFixed(2), quality: 'prestige' };
-}
 
 export function createShops(db, game) {
   const odds = (boost) => {
@@ -46,8 +31,8 @@ export function createShops(db, game) {
       const u = await lockUser(q, userId);
       const n = (await q.one("SELECT COUNT(*) n FROM sealed_packs WHERE owner_id = $1 AND status IN ('owned', 'listed')", [userId])).n;
       if (n >= MAX_SEALED) throw new GameError(`Maximum ${MAX_SEALED} boosters scellés.`);
+      const { boost, quality } = await game.takeNextPack(q, u); // il garde la qualité affichée sur l'accueil
       await game.consumeFreePack(q, u);
-      const { boost, quality } = rollQuality();
       const p = await q.one('INSERT INTO sealed_packs (owner_id, boost, quality, created_at) VALUES ($1, $2, $3, $4) RETURNING *', [userId, boost, quality, Date.now()]);
       return packView(p);
     });
