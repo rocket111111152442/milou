@@ -206,7 +206,8 @@ dbtest('comptes animés : coffre, mini-jeux, boosters en boutique, bourse, prêt
   }
   if (process.env.BOTLOG) console.log(Object.entries(log.reduce((a, l) => ({ ...a, [l]: (a[l] || 0) + 1 }), {})));
   const has = (l) => log.includes(l);
-  for (const l of ['coffre', 'roue', 'mini-jeu', 'booster scellé', 'booster en vente', 'achat d\'actions']) assert.ok(has(l), `${l} manquant : ${[...new Set(log)].join(', ')}`);
+  for (const l of ['coffre', 'roue', 'mini-jeu', 'booster scellé', 'booster en vente']) assert.ok(has(l), `${l} manquant : ${[...new Set(log)].join(', ')}`);
+  assert.ok(log.some((l) => l.startsWith('achat d\'actions')), `aucun achat d'actions : ${[...new Set(log)].join(', ')}`);
   assert.ok(has('boutique ouverte'), 'le compte riche ouvre une boutique');
   assert.ok((await db.one("SELECT COUNT(*) n FROM shop_listings")).n > 0);
   // Aucun bit créé : bits des joueurs + coffres + ordres d'achat bloqués restent cohérents (pas de solde négatif).

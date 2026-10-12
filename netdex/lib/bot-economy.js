@@ -1,21 +1,19 @@
 // Ce que les comptes animés font des fonctions récentes, avec les mêmes règles et les mêmes prix que les joueurs :
 // coffre/roue/ticket du jour, mini-jeux, forge, boosters scellés vendus et achetés en boutique,
-// bourse des boutiques, prêts, et quelques boutiques tenues par les plus riches.
+// bourse des boutiques (lib/bot-bourse.js), prêts, et quelques boutiques tenues par les plus riches.
 // Tout passe par les fonctions du jeu (lib/fun.js, lib/shops.js) : aucun raccourci, aucun bit créé à part.
 import { randomInt } from 'node:crypto';
 import { RARITIES } from './sites.js';
 import { CONFIG } from './game.js';
 import { TIERS, TOTAL_SHARES, QUALITIES } from './shops.js';
 import { dayId } from './fun.js';
+import { createBotBourse } from './bot-bourse.js';
 
 const rnd = () => randomInt(1_000_000) / 1_000_000;
 const pick = (arr) => arr[randomInt(arr.length)];
 const between = (a, b) => a + rnd() * (b - a);
 const HOUR = 3600e3;
-const MAX_ORDERS = 2;          // ordres de bourse ouverts par compte
-const MAX_BOOK_SHARE = 12;     // ordres ouverts des comptes animés par boutique
 const MAX_ANIM_SHOPS = 8;      // boutiques tenues par des comptes animés, au total
-const ORDER_TTL = 8 * HOUR;    // un ordre qui ne trouve pas preneur est retiré au bout de quelques heures
 
 // Valeur de recyclage moyenne d'un booster pour un multiplicateur de chances donné.
 export function packWorth(game, boost) {
@@ -38,6 +36,7 @@ const SHOP_B = ['des Boosters', 'du Pixel', 'des Raretés', 'Holo', 'du Web', 'd
 const SHOP_DESC = ['Boosters triés, prix honnêtes.', 'Que des bons boosters, venez voir.', 'Achat / vente de boosters, commission réduite.', 'Boutique de quartier, prêts possibles.', ''];
 
 export function createBotEconomy(db, game, shops, fun) {
+  const bourse = createBotBourse(db, shops);
   // Petite enveloppe : une règle du jeu qui refuse l'action n'est pas une erreur.
   const bitsOf = async (id) => (await db.one('SELECT bits FROM users WHERE id = $1', [id])).bits;
 
@@ -158,41 +157,6 @@ export function createBotEconomy(db, game, shops, fun) {
     }
   }
 
-  // ---------- Bourse ----------
-  async function trade(bot, me, p, tryDo, list) {
-    const chance = { trader: 0.7, collector: 0.2, grinder: 0.15, regular: 0.15, casual: 0.06 }[p.type] ?? 0.1;
-    if (!list.length || rnd() > chance) return;
-    // Ses ordres trop vieux sont retirés (les bits ou actions bloqués lui reviennent).
-    const old = await db.all("SELECT id FROM stock_orders WHERE user_id = $1 AND status = 'open' AND created_at < $2", [bot.id, Math.round(Date.now() - ORDER_TTL * between(0.5, 1.5))]);
-    for (const o of old) await tryDo('ordre annulé', () => shops.cancelOrder(me, o.id));
-    const mine = (await db.one("SELECT COUNT(*) n FROM stock_orders WHERE user_id = $1 AND status = 'open'", [bot.id])).n;
-    if (mine >= MAX_ORDERS) return;
-
-    const held = await db.all('SELECT h.shop_id, h.qty - h.locked free FROM shares h WHERE h.user_id = $1 AND h.qty > h.locked', [bot.id]);
-    const s = held.length && rnd() < 0.45 ? list.find((x) => x.id === pick(held).shop_id) || pick(list) : pick(list);
-    const crowd = (await db.one(`SELECT COUNT(*) n FROM stock_orders o JOIN users u ON u.id = o.user_id
-      WHERE o.shop_id = $1 AND o.status = 'open' AND u.is_bot`, [s.id])).n;
-    if (crowd >= MAX_BOOK_SHARE) return;
-
-    const opinion = fairShare(s) * between(0.75, 1.3);
-    const free = held.find((h) => h.shop_id === s.id)?.free || 0;
-    const market = rnd() < (p.type === 'trader' ? 0.25 : 0.1);
-    if (free > 0 && ((s.last_price && opinion < s.last_price * 0.97) || rnd() < 0.3)) {
-      const qty = Math.max(1, Math.round(free * between(0.2, 0.8)));
-      const price = Math.max(1, Math.round(opinion * between(1.0, 1.12)));
-      await tryDo('vente d\'actions', () => shops.placeOrder(me, s.id, market ? { side: 'sell', type: 'market', qty } : { side: 'sell', type: 'limit', qty, price }));
-    } else if (s.owner_id !== bot.id) {
-      const price = Math.max(1, Math.round(opinion * between(0.85, 1.0)));
-      const budget = (await bitsOf(bot.id)) * (p.type === 'trader' ? 0.35 : 0.15);
-      const qty = Math.min(80, Math.floor(budget / price));
-      if (qty < 1) return;
-      // Achat au marché seulement s'il y a des vendeurs à un prix qu'il trouve correct.
-      const ask = market && await db.one("SELECT MIN(price) price FROM stock_orders WHERE shop_id = $1 AND side = 'sell' AND status = 'open'", [s.id]);
-      if (ask?.price && ask.price <= opinion * 1.05) await tryDo('achat d\'actions', () => shops.placeOrder(me, s.id, { side: 'buy', type: 'market', qty }));
-      else await tryDo('achat d\'actions', () => shops.placeOrder(me, s.id, { side: 'buy', type: 'limit', qty, price }));
-    }
-  }
-
   // ---------- Prêts ----------
   async function loans(bot, me, p, tryDo, list) {
     const mine = await db.all("SELECT * FROM shop_loans WHERE borrower_id = $1 AND status IN ('pending', 'active', 'defaulted')", [bot.id]);
@@ -274,7 +238,7 @@ export function createBotEconomy(db, game, shops, fun) {
     await manageListings(bot, me, p, tryDo, list, opts);
     await sealAndSell(bot, me, p, tryDo, list, opts);
     await buyPacks(bot, me, p, tryDo, list, opts);
-    await trade(bot, me, p, tryDo, list);
+    await bourse.session(bot, me, p, tryDo, list);
     await loans(bot, me, p, tryDo, list);
   }
 
