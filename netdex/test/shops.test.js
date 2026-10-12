@@ -181,3 +181,35 @@ dbtest('boutique Premium : 30 000 bits, commission jusqu\'à 40 %, +15 % une seu
   await shops.updateShop(owner, s2.id, { feePct: 40 });
   await assert.rejects(shops.updateShop(owner, s2.id, { feePct: 41 }), /entre 0 et 40/);
 });
+
+dbtest('comptes animés : coffre, mini-jeux, boosters en boutique, bourse, prêts et boutique à eux', async () => {
+  const { createBotEconomy } = await import('../lib/bot-economy.js');
+  const { createFun } = await import('../lib/fun.js');
+  const { GameError } = await import('../lib/game.js');
+  const eco = createBotEconomy(db, game, shops, createFun(db, game));
+  const owner = await user(SHOP_PRICE + 5000);
+  const { id } = await shops.createShop(owner, { name: 'Chez Humain', feePct: 5, loanMax: 500 });
+  await shops.deposit(owner, id, 3000);
+  await shops.placeOrder(owner, id, { side: 'sell', type: 'limit', qty: 100, price: 8 });
+  const mk = async (type, b) => db.one(`INSERT INTO users (username, pass_hash, created_at, bits, pack_stock, pack_anchor, is_bot, bot, bot_next_at)
+    VALUES ($1, 'x', 0, $2, 10, $3, true, $4, 0) RETURNING *`,
+  ['anim' + ++n, b, Date.now(), JSON.stringify({ type, tz: 0, sleep: [3, 4], greed: 1, eye: 2.5, fav: null, market: 1, social: 0, stall: 4 })]);
+  const bots = [await mk('trader', 40_000), await mk('trader', 3000), await mk('collector', 5000), await mk('regular', 50), await mk('grinder', 800)];
+  const log = [];
+  const tryDo = async (label, fn) => { try { const r = await fn(); if (r !== undefined) log.push(label); return r; } catch (e) { if (!(e instanceof GameError)) throw e; } };
+  for (let round = 0; round < 25; round++) {
+    for (const b of bots) {
+      const fresh = await db.one('SELECT * FROM users WHERE id = $1', [b.id]);
+      await db.run('UPDATE users SET pack_stock = 10, pack_anchor = $1 WHERE id = $2', [Date.now(), b.id]);
+      await eco.play(fresh, { id: b.id, username: b.username }, { ...JSON.parse(JSON.stringify(fresh.bot)), packs: 1 }, tryDo, { dbFull: false });
+    }
+  }
+  if (process.env.BOTLOG) console.log(Object.entries(log.reduce((a, l) => ({ ...a, [l]: (a[l] || 0) + 1 }), {})));
+  const has = (l) => log.includes(l);
+  for (const l of ['coffre', 'roue', 'mini-jeu', 'booster scellé', 'booster en vente', 'achat d\'actions']) assert.ok(has(l), `${l} manquant : ${[...new Set(log)].join(', ')}`);
+  assert.ok(has('boutique ouverte'), 'le compte riche ouvre une boutique');
+  assert.ok((await db.one("SELECT COUNT(*) n FROM shop_listings")).n > 0);
+  // Aucun bit créé : bits des joueurs + coffres + ordres d'achat bloqués restent cohérents (pas de solde négatif).
+  assert.equal((await db.one('SELECT COUNT(*) n FROM users WHERE bits < 0')).n, 0);
+  assert.equal((await db.one('SELECT COUNT(*) n FROM shares WHERE locked > qty')).n, 0);
+});

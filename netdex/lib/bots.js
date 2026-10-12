@@ -8,6 +8,9 @@ import { randomInt } from 'node:crypto';
 import { sitePrices } from './market.js';
 import { RARITIES } from './sites.js';
 import { CONFIG, GameError } from './game.js';
+import { createShops } from './shops.js';
+import { createFun } from './fun.js';
+import { createBotEconomy } from './bot-economy.js';
 
 const rnd = () => randomInt(1_000_000) / 1_000_000;
 const pick = (arr) => arr[randomInt(arr.length)];
@@ -43,11 +46,11 @@ function makeName() {
 // ---------- Personnalités ----------
 const TYPES = [
   // every : minutes entre deux sessions ; packs : part des boosters ouverts ; market/social : propension
-  { type: 'casual', p: 0.5, every: [120, 420], packs: 0.5, market: 0.3, social: 0.08, cap: 18, stall: 1 },
-  { type: 'regular', p: 0.28, every: [45, 150], packs: 0.8, market: 0.5, social: 0.12, cap: 24, stall: 2 },
-  { type: 'grinder', p: 0.08, every: [20, 50], packs: 1, market: 0.45, social: 0.08, cap: 30, stall: 2 },
-  { type: 'collector', p: 0.09, every: [40, 120], packs: 0.9, market: 0.7, social: 0.18, cap: 30, stall: 3 },
-  { type: 'trader', p: 0.05, every: [20, 60], packs: 0.7, market: 0.95, social: 0.3, cap: 26, stall: 6 },
+  { type: 'casual', p: 0.5, every: [80, 300], packs: 0.5, market: 0.3, social: 0.08, cap: 18, stall: 1 },
+  { type: 'regular', p: 0.28, every: [30, 100], packs: 0.8, market: 0.5, social: 0.12, cap: 24, stall: 2 },
+  { type: 'grinder', p: 0.08, every: [12, 35], packs: 1, market: 0.45, social: 0.08, cap: 30, stall: 2 },
+  { type: 'collector', p: 0.09, every: [25, 80], packs: 0.9, market: 0.7, social: 0.18, cap: 30, stall: 3 },
+  { type: 'trader', p: 0.05, every: [12, 40], packs: 0.7, market: 0.95, social: 0.3, cap: 26, stall: 6 },
 ];
 const TYPE_BY = Object.fromEntries(TYPES.map((t) => [t.type, t]));
 // Les réglages de comportement viennent du type (modifiables sans recréer les bots) ; le reste est propre à chaque bot.
@@ -203,7 +206,10 @@ async function session(db, game, bot, opts) {
   // 2. Bonus quotidien.
   if (game.dailyState(bot, now).available) await tryDo('bonus', () => game.claimDaily(bot.id));
 
-  // 3. Boosters (sauf si la base approche de sa taille max).
+  // 3. Coffre, roue, mini-jeux, forge, boutiques, bourse et prêts, comme les joueurs.
+  await opts.eco.play(bot, me, p, tryDo, opts);
+
+  // 3 bis. Boosters (sauf si la base approche de sa taille max).
   const full = opts.dbFull;
   if (!full) {
     const avail = game.packState(bot, now).available;
@@ -222,7 +228,7 @@ async function session(db, game, bot, opts) {
 
   // 5. Marché.
   if (rnd() < p.market) await shop(db, game, bot, me, p, tryDo);
-  if (!full && rnd() < p.market * 0.6) await sell(db, game, bot, me, p, tryDo);
+  if (rnd() < p.market * 0.6) await sell(db, game, bot, me, p, tryDo);
 
   // 6. Vie sociale.
   if (rnd() < p.social) await socialize(db, game, bot, me, p, tryDo, opts);
@@ -574,7 +580,7 @@ export async function runBots(db, game, { budgetMs = 8000, batch = 25, throttleM
 
 async function runPass(db, game, { now, budgetMs, batch, maxSessions, parallel, force }) {
   const maxMb = Number(process.env.BOT_DB_MAX_MB) || 90;
-  const opts = { dbFull: (await dbSizeMb(db)) >= maxMb };
+  const opts = { dbFull: (await dbSizeMb(db)) >= maxMb, eco: createBotEconomy(db, game, createShops(db, game), createFun(db, game)) };
   const done = { sessions: 0, actions: 0, dbFull: opts.dbFull };
   const deadline = now + budgetMs;
   if (rnd() < 0.05 || force) await cleanup(db);
@@ -600,7 +606,7 @@ async function runPass(db, game, { now, budgetMs, batch, maxSessions, parallel, 
     }
     if (done.sessions >= maxSessions) break;
   }
-  if (!opts.dbFull) done.listed = await stockMarket(db, game, Number(process.env.MARKET_TARGET) || 400).catch((e) => { console.error('market', e.message); return 0; });
+  done.listed = await stockMarket(db, game, Number(process.env.MARKET_TARGET) || 400).catch((e) => { console.error('market', e.message); return 0; });
   return done;
 }
 
@@ -615,6 +621,13 @@ async function cleanup(db) {
   await db.run('DELETE FROM events WHERE id < (SELECT MAX(id) - 3000 FROM events)');
   await db.run('DELETE FROM sales WHERE at < $1', [Date.now() - 90 * 24 * HOUR]);
   await db.run('DELETE FROM messages WHERE at < $1', [Date.now() - 60 * 24 * HOUR]);
+  // Boutiques : on garde l'historique utile (30 jours de cours, 7 jours d'annonces et d'ordres terminés).
+  await db.run("DELETE FROM stock_orders WHERE status != 'open' AND created_at < $1", [old]);
+  await db.run('DELETE FROM stock_trades WHERE at < $1', [Date.now() - 31 * 24 * HOUR]);
+  await db.run("DELETE FROM shop_listings WHERE status != 'open' AND created_at < $1", [old]);
+  await db.run("DELETE FROM sealed_packs WHERE status = 'opened' AND created_at < $1", [old]);
+  await db.run("DELETE FROM shop_loans WHERE status IN ('repaid', 'refused', 'expired') AND created_at < $1", [Date.now() - 30 * 24 * HOUR]);
+  await db.run('DELETE FROM shop_payouts WHERE day < $1', [Math.floor(Date.now() / (24 * HOUR)) - 30]);
   // Sites de la traîne dépliés mais plus utilisés par personne : on les replie (ils restent dans les blocs).
   const tail = await db.one("SELECT value FROM meta WHERE key = 'tail'");
   if (tail) {
