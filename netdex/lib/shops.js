@@ -396,7 +396,11 @@ export function createShops(db, game) {
     const rows = await db.all(`SELECT h.qty, h.locked, s.id, s.name, s.last_price, s.total_shares, s.div_pct, s.balance,
         (SELECT per_share FROM shop_payouts p WHERE p.shop_id = s.id ORDER BY day DESC LIMIT 1) last_div
       FROM shares h JOIN shops s ON s.id = h.shop_id WHERE h.user_id = $1 AND h.qty > 0 ORDER BY h.qty * COALESCE(s.last_price, 0) DESC`, [userId]);
-    const orders = await db.all(`SELECT o.*, s.name shop_name FROM stock_orders o JOIN shops s ON s.id = o.shop_id
+    // Pour chaque ordre : le meilleur prix d'en face, pour expliquer pourquoi il attend.
+    const orders = await db.all(`SELECT o.*, s.name shop_name,
+        (SELECT CASE WHEN o.side = 'buy' THEN MIN(x.price) ELSE MAX(x.price) END FROM stock_orders x
+          WHERE x.shop_id = o.shop_id AND x.status = 'open' AND x.side != o.side AND x.user_id != o.user_id) best_other
+      FROM stock_orders o JOIN shops s ON s.id = o.shop_id
       WHERE o.user_id = $1 AND o.status = 'open' ORDER BY o.id DESC`, [userId]);
     return { items: rows, orders, value: rows.reduce((a, r) => a + r.qty * (r.last_price || 0), 0) };
   }

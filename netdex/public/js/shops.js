@@ -249,15 +249,29 @@ export async function viewBourse(el) {
   const quoted = d.items.slice().sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0));
   el.innerHTML = `${marketTabs('bourse')}<div class="page-head"><h1>Bourse</h1></div>
     <p class="muted small">Chaque boutique a 1 000 actions. Le cours est le prix du dernier échange. Les actionnaires touchent chaque jour les dividendes fixés par la boutique.</p>
-    <div class="panel"><div class="row"><b class="grow">Mon portefeuille</b><span class="mono">${fmt(pf.value)} bits</span></div>
+    <div class="panel"><div class="row"><b class="grow">Mon portefeuille</b><span class="mono" title="Valeur de tes actions au dernier cours">valeur ${fmt(pf.value)} bits</span></div>
       ${pf.items.length ? `<div class="list small" style="margin-top:6px">${pf.items.map((x) => `<a href="#/bourse/${x.id}" style="color:var(--text)"><span class="grow">${esc(x.name)} · ${x.qty} action${x.qty > 1 ? 's' : ''}${x.locked ? ` (${x.locked} en vente)` : ''}</span>
         <span class="mono">${x.last_price ? fmt(x.qty * x.last_price) : '—'}</span></a>`).join('')}</div>` : '<div class="muted small" style="margin-top:6px">Aucune action.</div>'}
-      ${pf.orders.length ? `<div class="muted small" style="margin-top:8px">${pf.orders.length} ordre(s) en attente</div>` : ''}</div>
+      ${pf.orders.length ? `<div style="margin-top:10px"><b class="small">Mes ordres en attente</b>
+        <div class="list small" style="margin-top:6px">${pf.orders.map((o) => {
+          const left = o.qty - o.filled;
+          const why = o.side === 'buy'
+            ? (o.best_other ? `Le vendeur le moins cher demande ${fmt(o.best_other)} bits : ton prix est trop bas pour l'instant.` : 'Personne ne vend d\'actions de cette boutique pour l\'instant : ton ordre attend un vendeur.')
+            : (o.best_other ? `Le meilleur acheteur propose ${fmt(o.best_other)} bits : ton prix est trop haut pour l'instant.` : 'Personne ne veut acheter pour l\'instant : ton ordre attend un acheteur.');
+          return `<div class="row" style="align-items:flex-start;gap:8px"><div class="grow"><a href="#/bourse/${o.shop_id}" style="color:var(--text)"><b>${o.side === 'buy' ? 'Achat' : 'Vente'}</b> · ${esc(o.shop_name)}</a>
+            <div>${left} action${left > 1 ? 's' : ''} à ${fmt(o.price)} bits${o.filled ? ` (${o.filled} déjà ${o.side === 'buy' ? 'achetée' : 'vendue'}${o.filled > 1 ? 's' : ''})` : ''}${o.side === 'buy' ? ` · ${fmt(left * o.price)} bits mis de côté` : ''}</div>
+            <div class="muted">${why}</div></div>
+            <button class="btn small" data-cancel-order="${o.id}">Annuler</button></div>`;
+        }).join('')}</div></div>` : ''}</div>
     <div class="panel" style="padding:0;overflow-x:auto;margin-top:10px"><table class="data"><tr><th>Boutique</th><th style="text-align:right">Cours</th><th style="text-align:right">24 h</th><th style="text-align:right">Capitalisation</th><th style="text-align:right">Volume 24 h</th><th style="text-align:right">Div./j</th></tr>
       ${quoted.map((s) => `<tr data-go="${s.id}" style="cursor:pointer"><td><b>${esc(s.name)}</b></td><td class="num">${s.lastPrice ? fmt(s.lastPrice) : '—'}</td>
         <td class="num">${s.change24h == null ? '—' : `<span class="${s.change24h >= 0 ? 'up' : 'down'}">${s.change24h >= 0 ? '+' : ''}${String(s.change24h).replace('.', ',')} %</span>`}</td>
         <td class="num">${s.marketCap ? fmt(s.marketCap) : '—'}</td><td class="num">${fmt(s.volume24h)}</td><td class="num">${String(s.divPct).replace('.', ',')} %</td></tr>`).join('') || '<tr><td colspan="6" class="muted center" style="padding:20px">Aucune boutique cotée</td></tr>'}</table></div>`;
-  el.addEventListener('click', (e) => { const r = e.target.closest('[data-go]'); if (r) location.hash = '#/bourse/' + r.dataset.go; });
+  el.onclick = (e) => { // onclick : remplacé (pas empilé) quand la page se redessine
+    const b = e.target.closest('[data-cancel-order]');
+    if (b) return busy(b, async () => { await api(`/orders/${b.dataset.cancelOrder}/cancel`, {}); toast('Ordre annulé, tes bits sont revenus'); refreshMe(); viewBourse(el); });
+    const r = e.target.closest('[data-go]'); if (r) location.hash = '#/bourse/' + r.dataset.go;
+  };
 }
 
 export async function viewStock(el, { params, on }) {
