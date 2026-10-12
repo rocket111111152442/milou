@@ -4,6 +4,7 @@ import {
   api, state, refreshMe, setMe, esc, fmt, $, $$, h, duration, ago, isOnline, cardHtml, unknownCardHtml, toast, toastErr,
   modal, confirmDialog, busy, prefs, RARITY, VALUES, ICONS, favicon, siteName, power, now, isSpecial, sfx,
 } from './core.js';
+import { sealedSection, oddsHtml, marketTabs } from './shops.js';
 import { revealFx, inspectCard, shareSite, giftDialog, profileEditor, ACCENTS, PACK_BACKS, applyStyle, shortcutsHelp } from './fun.js';
 
 const rarityChips = (current, withAll = true) =>
@@ -18,9 +19,9 @@ const parseCards = (s) => (s ? String(s).split(',').map((x) => ({ id: parseInt(x
 // ======================================================================
 // Ouverture de booster
 // ======================================================================
-export async function openPackFlow(kind = 'free', free = false) {
-  let res;
-  try { res = await api('/packs/open', { kind, free }); } catch (e) { toastErr(e); return; }
+export async function openPackFlow(kind = 'free', free = false, preset = null) {
+  let res = preset;
+  if (!res) try { res = await api('/packs/open', { kind, free }); } catch (e) { toastErr(e); return; }
   setMe(res.me);
   const cards = res.cards;
   const fast = prefs.get('fast', false);
@@ -235,6 +236,8 @@ export async function viewHome(el, { on }) {
     <a class="level-strip" href="#/play" data-level></a>
     <section class="hero" data-hero></section>
     <div class="quick-grid" style="margin-top:12px" data-quick></div>
+    <div class="panel" style="margin-top:12px"><div class="row"><b class="grow">Chances d'un booster</b><span class="muted small">au moins une carte de cette rareté</span></div><div data-odds style="margin-top:8px"></div></div>
+    <div class="panel" style="margin-top:12px" data-sealed><div class="spinner"></div></div>
     <div class="grid-2" style="margin-top:12px">
       <div class="panel" data-daily></div>
       <div class="panel">
@@ -311,6 +314,8 @@ export async function viewHome(el, { on }) {
   };
   loadTiers().catch(toastErr);
   on('nd:cards', () => loadTiers().catch(() => {}));
+  api('/packs/odds').then((o) => { $('[data-odds]', el).innerHTML = oddsHtml(o.standard); }).catch(() => {});
+  sealedSection($('[data-sealed]', el)).catch(toastErr);
 
   if (window.ndInstall?.available() && !prefs.get('installDismissed', false)) {
     $('[data-install]', el).innerHTML = `<div class="panel" style="margin-top:12px"><div class="row"><div class="grow"><b>Installer Netdex</b><div class="muted small">Accès direct depuis l'écran d'accueil</div></div>
@@ -455,6 +460,7 @@ export async function viewDex(el) {
 export async function viewMarket(el, { on, query }) {
   const f = { scope: query.scope || 'all', rarity: '', q: query.q || '', sort: 'ending', wish: query.wish === '1' ? '1' : '', missing: '' };
   el.innerHTML = `
+    ${marketTabs('auctions')}
     <div class="page-head"><h1>Marché</h1><div class="row"><a class="btn sm" href="#/history">Historique</a><a class="btn sm" href="#/wishlist">♡ Souhaits</a><button class="btn primary sm" data-sell>+ Vendre une carte</button></div></div>
     <details class="panel" style="margin-bottom:14px" data-index><summary><b>Cours du marché</b> <span class="muted small">médiane des ventes, 7 jours</span></summary><div data-index-body class="small" style="margin-top:10px"></div></details>
     <div class="tabs" data-tabs><button data-scope="all">Toutes les ventes</button><button data-scope="mine">Mes ventes</button><button data-scope="bids">Mes enchères</button></div>

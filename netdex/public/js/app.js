@@ -1,6 +1,7 @@
 import { api, state, setMe, refreshMe, $, $$, h, esc, fmt, duration, now, cardHtml, toastErr, busy, prefs, ICONS } from './core.js';
 import * as V from './views.js';
 import * as F from './fun.js';
+import * as S from './shops.js';
 
 // ---------- Thème ----------
 window.ndApplyTheme = () => {
@@ -80,7 +81,7 @@ const TABS = [
   { href: '#/', label: 'Boosters', icon: ICONS.pack, match: /^$|^\/$/ },
   { href: '#/collection', label: 'Collection', icon: ICONS.cards, match: /^\/(collection|dex|cards|forge|albums)/ },
   { href: '#/play', label: 'Jeux', icon: ICONS.play, match: /^\/(play|progress)/, badge: (c, me) => (me.user.levelUp ? 1 : 0) },
-  { href: '#/market', label: 'Marché', icon: ICONS.market, match: /^\/(market|wishlist|history)/ },
+  { href: '#/market', label: 'Marché', icon: ICONS.market, match: /^\/(market|wishlist|history|shops?|bourse|loans)/ },
   { href: '#/social', label: 'Social', icon: ICONS.social, match: /^\/(social|trade|messages|compare)/, badge: (c) => c.trades + c.friendRequests + c.messages },
   { href: '#/more', label: 'Plus', icon: ICONS.more, match: /^\/(more|top|search|settings|rules|admin|wallet|u\/)/ },
 ];
@@ -101,6 +102,11 @@ const ROUTES = [
   [/^\/more$/, V.viewMore],
   [/^\/rules$/, V.viewRules],
   [/^\/settings$/, V.viewSettings],
+  [/^\/shops$/, S.viewShops],
+  [/^\/shop\/(\d+)$/, S.viewShop, ['id']],
+  [/^\/loans$/, S.viewLoans],
+  [/^\/bourse$/, S.viewBourse],
+  [/^\/bourse\/(\d+)$/, S.viewStock, ['id']],
   [/^\/play$/, F.viewPlay],
   [/^\/progress$/, F.viewProgress],
   [/^\/messages$/, F.viewMessages],

@@ -8,6 +8,7 @@ import { RARITIES, tailDomains, searchTail, siteRow } from './sites.js';
 import { wallet, marketIndex, sitePrices, snapshotDue, snapshotIndex, siteMarket } from './market.js';
 import { createGame, CONFIG, GameError, CUSTOM_BASE, EVENTS, weekId } from './game.js';
 import { createFun, progression, ACHIEVEMENTS, PROFILE_COLORS } from './fun.js';
+import { createShops } from './shops.js';
 import { setupDatabase, setupTail } from './setup.js';
 import { runBots, seedBots, botStatus, deleteBots } from './bots.js';
 import { waitUntil } from '@vercel/functions';
@@ -24,7 +25,7 @@ export function getContext(db) {
       const d = db || createDb();
       if (!d) throw new GameError('Base de données non configurée (DATABASE_URL manquant).', 503);
       const game = await createGame(d);
-      return { db: d, game, fun: createFun(d, game) };
+      return { db: d, game, fun: createFun(d, game), shops: createShops(d, game) };
     })();
     ctx.catch(() => { ctx = null; });
   }
@@ -492,6 +493,28 @@ route('GET', '/api/fun/albums', ({ c, me }) => c.fun.albums(me.id));
 route('GET', '/api/fun/stats', ({ c, me }) => c.fun.detailedStats(me.id));
 route('POST', '/api/fun/redeem', ({ c, me, body }) => c.fun.redeem(me.id, body.code));
 
+// ---------- Boosters scellés, boutiques d'échange, prêts, bourse ----------
+route('GET', '/api/packs/sealed', ({ c, me }) => c.shops.myPacks(me.id));
+route('POST', '/api/packs/seal', async ({ c, me }) => ({ pack: await c.shops.sealPack(me.id), me: await meView(c, await reloadUser(c.db, me.id)) }));
+route('POST', '/api/packs/sealed/:id/open', async ({ c, me, params }) => ({ ...(await c.shops.openSealed(me.id, params.id)), me: await meView(c, await reloadUser(c.db, me.id)) }));
+route('GET', '/api/packs/odds', ({ c }) => ({ standard: c.shops.odds(1) }));
+route('GET', '/api/shops', ({ c }) => c.shops.listShops());
+route('POST', '/api/shops', ({ c, me, body }) => c.shops.createShop(me, body));
+route('GET', '/api/shops/:id', ({ c, me, params }) => c.shops.shopDetail(me.id, params.id));
+route('POST', '/api/shops/:id/settings', ({ c, me, params, body }) => c.shops.updateShop(me, params.id, body));
+route('POST', '/api/shops/:id/deposit', ({ c, me, params, body }) => c.shops.deposit(me, params.id, body.amount));
+route('POST', '/api/shops/:id/list', ({ c, me, params, body }) => c.shops.listPack(me, { ...body, shopId: params.id }));
+route('POST', '/api/shops/:id/loan', ({ c, me, params, body }) => c.shops.requestLoan(me, params.id, body));
+route('POST', '/api/listings/:id/buy', ({ c, me, params }) => c.shops.buyListing(me, params.id));
+route('POST', '/api/listings/:id/cancel', ({ c, me, params }) => c.shops.cancelListing(me, params.id));
+route('GET', '/api/loans', ({ c, me }) => c.shops.myLoans(me.id));
+route('POST', '/api/loans/:id/respond', ({ c, me, params, body }) => c.shops.respondLoan(me, params.id, !!body.accept));
+route('POST', '/api/loans/:id/repay', ({ c, me, params, body }) => c.shops.repayLoan(me, params.id, body.amount));
+route('GET', '/api/bourse/:id', ({ c, me, params }) => c.shops.stock(me.id, params.id));
+route('POST', '/api/bourse/:id/order', ({ c, me, params, body }) => c.shops.placeOrder(me, params.id, body));
+route('POST', '/api/orders/:id/cancel', ({ c, me, params }) => c.shops.cancelOrder(me, params.id));
+route('GET', '/api/portfolio', ({ c, me }) => c.shops.portfolio(me.id));
+
 // ---------- Administration ----------
 const admin = (fn) => async (ctx) => {
   if (!ctx.me.is_admin) throw new GameError('Réservé aux administrateurs.', 403);
@@ -617,11 +640,12 @@ route('GET', '/api/cron/tick', async ({ c, req }) => {
   if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) throw new GameError('Interdit.', 403);
   const budget = Math.max(5, Math.min(250, Number(new URL(req.url, 'http://x').searchParams.get('budget')) || 250));
   await c.game.settleAuctions(500).catch((e) => console.error('enchères', e.message));
+  const shopJobs = await c.shops.dailyJobs().catch((e) => { console.error('boutiques', e.message); return null; });
   await snapshotIndex(c.db).catch((e) => console.error('index', e.message));
   const snaps = await snapshotDue(c.db, c.game).catch((e) => { console.error('snapshots', e.message); return 0; });
   const a = await getAnimContext();
   const r = await runBots(a.db, a.game, { budgetMs: budget * 1000, batch: 40, force: true });
-  return { ...r, snapshots: snaps };
+  return { ...r, snapshots: snaps, shops: shopJobs };
 }, { auth: false });
 
 route('GET', '/api/health', async () => {

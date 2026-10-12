@@ -451,3 +451,30 @@ table.data td.num { font-family: var(--mono); text-align: right; }
 .tiers-row span.ready { border-color: var(--accent); color: var(--accent); }
 .tiers-row span.got { background: var(--surface-2); color: var(--good); }
 .tiers-row span.got::after { content: " ✓"; }
+
+/* ---------- Boosters scellés, boutiques, bourse ---------- */
+.odds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.odds div { display: flex; flex-direction: column; padding: 6px 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); }
+.odds span { font-size: 11px; }
+.odds b { font-size: 13px; }
+.sealed-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.sealed { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line-2); border-left: 4px solid var(--qc, var(--line-2)); border-radius: var(--radius); background: var(--surface); }
+.sealed .odds { grid-template-columns: repeat(2, 1fr); }
+.sealed-top { display: flex; align-items: center; justify-content: space-between; }
+.sealed-logo { font: 800 20px/1 var(--mono); letter-spacing: -.04em; color: var(--qc, var(--text)); }
+.q-standard { --qc: var(--muted); }
+.q-chanceux { --qc: var(--r-uncommon); }
+.q-brillant { --qc: var(--r-epic); }
+.q-prestige { --qc: var(--r-legendary); }
+.q-badge, .q-chip { display: inline-block; padding: 2px 7px; border: 1px solid var(--qc); color: var(--qc); border-radius: 2px; font: 700 11px var(--mono); text-transform: uppercase; }
+.sealed.q-prestige { box-shadow: 0 0 0 1px var(--r-legendary) inset; }
+.shop-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.shop-card { display: block; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); text-decoration: none; color: var(--text); }
+.shop-card:hover { border-color: var(--text); }
+.book td, .book th { padding: 5px 8px; }
+.book tr.ask td.num { color: var(--bad); }
+.book tr.bid td.num { color: var(--good); }
+.book tr[data-px] { cursor: pointer; }
+.book tr[data-px]:hover { background: var(--surface-2); }
+.up { color: var(--good); }
+.down { color: var(--bad); }

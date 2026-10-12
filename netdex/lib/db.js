@@ -216,6 +216,102 @@ CREATE TABLE IF NOT EXISTS promo_uses (
   at BIGINT NOT NULL,
   PRIMARY KEY (code, user_id)
 );
+
+-- v6 : boosters scellés, boutiques d'échange, prêts, bourse.
+CREATE TABLE IF NOT EXISTS sealed_packs (
+  id SERIAL PRIMARY KEY,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  boost REAL NOT NULL,
+  quality TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'owned',
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sealed_owner ON sealed_packs (owner_id, status);
+CREATE TABLE IF NOT EXISTS shops (
+  id SERIAL PRIMARY KEY,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  fee_pct REAL NOT NULL DEFAULT 5,
+  accepts TEXT[] NOT NULL DEFAULT ARRAY['standard','chanceux','brillant','prestige'],
+  balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  div_pct REAL NOT NULL DEFAULT 0,
+  div_day INTEGER NOT NULL DEFAULT 0,
+  loan_rate REAL NOT NULL DEFAULT 10,
+  loan_max INTEGER NOT NULL DEFAULT 1000,
+  total_shares INTEGER NOT NULL DEFAULT 1000,
+  last_price INTEGER,
+  sales_count INTEGER NOT NULL DEFAULT 0,
+  fees_total BIGINT NOT NULL DEFAULT 0,
+  created_at BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS shops_name ON shops (lower(name));
+CREATE TABLE IF NOT EXISTS shop_listings (
+  id SERIAL PRIMARY KEY,
+  shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  pack_id INTEGER NOT NULL REFERENCES sealed_packs(id) ON DELETE CASCADE,
+  seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  price INTEGER NOT NULL CHECK (price > 0),
+  status TEXT NOT NULL DEFAULT 'open',
+  buyer_id INTEGER,
+  created_at BIGINT NOT NULL,
+  sold_at BIGINT
+);
+CREATE INDEX IF NOT EXISTS listings_shop ON shop_listings (shop_id, status);
+CREATE TABLE IF NOT EXISTS shop_loans (
+  id SERIAL PRIMARY KEY,
+  shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  borrower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL CHECK (amount > 0),
+  rate REAL NOT NULL,
+  days INTEGER NOT NULL,
+  due_amount INTEGER NOT NULL,
+  paid INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at BIGINT NOT NULL,
+  accepted_at BIGINT,
+  due_at BIGINT
+);
+CREATE INDEX IF NOT EXISTS loans_shop ON shop_loans (shop_id, status);
+CREATE INDEX IF NOT EXISTS loans_borrower ON shop_loans (borrower_id, status);
+CREATE INDEX IF NOT EXISTS loans_due ON shop_loans (status, due_at);
+CREATE TABLE IF NOT EXISTS shares (
+  shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  qty INTEGER NOT NULL DEFAULT 0 CHECK (qty >= 0),
+  locked INTEGER NOT NULL DEFAULT 0 CHECK (locked >= 0 AND locked <= qty),
+  PRIMARY KEY (shop_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS stock_orders (
+  id SERIAL PRIMARY KEY,
+  shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  side TEXT NOT NULL,
+  price INTEGER NOT NULL CHECK (price > 0),
+  qty INTEGER NOT NULL CHECK (qty > 0),
+  filled INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'open',
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS orders_book ON stock_orders (shop_id, side, status, price, id);
+CREATE INDEX IF NOT EXISTS orders_user ON stock_orders (user_id, status);
+CREATE TABLE IF NOT EXISTS stock_trades (
+  id BIGSERIAL PRIMARY KEY,
+  shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  price INTEGER NOT NULL,
+  qty INTEGER NOT NULL,
+  buyer_id INTEGER,
+  seller_id INTEGER,
+  at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS trades_shop ON stock_trades (shop_id, at);
+CREATE TABLE IF NOT EXISTS shop_payouts (
+  shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  day INTEGER NOT NULL,
+  amount BIGINT NOT NULL,
+  per_share REAL NOT NULL,
+  PRIMARY KEY (shop_id, day)
+);
 `;
 
 // DB_SOURCE choisit la base parmi celles branchées sur Vercel : « supabase » (POSTGRES_URL) ou « neon » (stockage_DATABASE_URL).

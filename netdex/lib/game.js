@@ -131,10 +131,11 @@ export async function createGame(db) {
     return { available, cap: CONFIG.packCap, interval: CONFIG.packInterval, nextAt, gained };
   }
 
-  function rollTier(minRarity) {
-    const luck = eventIs('luck');
+  // boost : multiplicateur de chance d'un booster scellé (Rare × √boost, Épique et plus × boost).
+  const tierWeight = (t, boost = 1, luck = eventIs('luck')) => t.weight * (luck && t.id >= 2 ? 3 : 1) * (t.id >= 3 ? boost : t.id === 2 ? Math.sqrt(boost) : 1);
+  function rollTier(minRarity, boost = 1) {
     const pool = tiers.filter((t) => t.id >= minRarity && (t.total > 0 || t.extra?.length));
-    const w = (t) => t.weight * (luck && t.id >= 2 ? 3 : 1);
+    const w = (t) => tierWeight(t, boost);
     const sum = pool.reduce((a, t) => a + w(t), 0);
     let x = randomInt(sum);
     for (const t of pool) { if ((x -= w(t)) < 0) return t; }
@@ -166,14 +167,14 @@ export async function createGame(db) {
     holo: out.filter((c) => c.holo).length,
   });
 
-  async function drawCards(q, userId, premium, isBot = false, { pity = 0 } = {}) {
+  async function drawCards(q, userId, premium, isBot = false, { pity = 0, boost = 1 } = {}) {
     const now = Date.now();
     const picks = [];
     const pityHit = !isBot && pity >= CONFIG.pityAfter;
     for (let i = 0; i < CONFIG.packSize; i++) {
       const last = i === CONFIG.packSize - 1;
       // 5e carte Peu commune+ (Rare+ en premium, Épique+ quand le compteur de pitié est plein)
-      const tier = rollTier(last && pityHit ? 3 : premium ? (last ? 2 : 1) : (last ? 1 : 0));
+      const tier = rollTier(last && pityHit ? 3 : premium ? (last ? 2 : 1) : (last ? 1 : 0), boost);
       picks.push({ siteId: pickIn(tier), holo: holoRoll(premium) });
     }
     const byId = await ensureSites(q, picks.map((p) => p.siteId));
@@ -220,14 +221,33 @@ export async function createGame(db) {
         await debit(q, userId, CONFIG.premiumPrice, `Il te faut ${CONFIG.premiumPrice} bits.`);
         return drawCards(q, userId, true, u.is_bot, opts);
       }
-      const now = Date.now();
-      const st = packState(u, now);
-      if (st.available < 1) throw new GameError('Aucun booster disponible, patiente encore un peu.');
-      const full = u.pack_stock + st.gained >= CONFIG.packCap;
-      const anchor = full ? now : u.pack_anchor + st.gained * CONFIG.packInterval;
-      await q.run('UPDATE users SET pack_stock = $1, pack_anchor = $2 WHERE id = $3', [st.available - 1, anchor, userId]);
+      await consumeFreePack(q, u);
       return drawCards(q, userId, false, u.is_bot, opts);
     });
+  }
+
+  // Retire un booster du stock (u verrouillé FOR UPDATE par l'appelant).
+  async function consumeFreePack(q, u) {
+    const now = Date.now();
+    const st = packState(u, now);
+    if (st.available < 1) throw new GameError('Aucun booster disponible, patiente encore un peu.');
+    const full = u.pack_stock + st.gained >= CONFIG.packCap;
+    const anchor = full ? now : u.pack_anchor + st.gained * CONFIG.packInterval;
+    await q.run('UPDATE users SET pack_stock = $1, pack_anchor = $2 WHERE id = $3', [st.available - 1, anchor, u.id]);
+  }
+
+  // Probabilités réelles d'un booster gratuit : % d'avoir au moins une carte de chaque rareté (ou mieux).
+  function packOdds(boost = 1) {
+    const luck = eventIs('luck');
+    const dist = (min) => {
+      const pool = tiers.filter((t) => t.id >= min && (t.total > 0 || t.extra?.length));
+      const sum = pool.reduce((a, t) => a + tierWeight(t, boost, luck), 0);
+      return (r) => pool.filter((t) => t.id >= r).reduce((a, t) => a + tierWeight(t, boost, luck), 0) / sum;
+    };
+    const normal = dist(0), last = dist(1);
+    const out = {};
+    for (let r = 2; r <= 5; r++) out[r] = 1 - (1 - normal(r)) ** (CONFIG.packSize - 1) * (1 - last(r));
+    return out;
   }
 
   // ---------- Bonus quotidien ----------
@@ -574,7 +594,7 @@ export async function createGame(db) {
     get totalSites() { return rankedSites + custom.size; },
     isCustom: (id) => custom.has(id), loadCustom, refreshCustom,
     db, tail, ensureSites, minBid, drawCards, debit, credit, discover, logEvent,
-    tiers, tierOf, value, notify, packState, bump, addWeek, rollTier, pickIn, holoRoll, grantCards, activeEvent, eventIs, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
+    tiers, tierOf, value, notify, packState, consumeFreePack, packOdds, bump, addWeek, rollTier, pickIn, holoRoll, grantCards, activeEvent, eventIs, openPack, dailyState, claimDaily, recycle, recycleDuplicates,
     relation, requestFriend, respondFriend, removeFriend, listFriends,
     createTrade, listTrades, resolveTrade,
     createAuction, bid, cancelAuction, settleAuctions, listAuctions,
