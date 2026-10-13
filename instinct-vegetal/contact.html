@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact &amp; devis — Instinct Végétal, paysagiste à Six-Fours-les-Plages</title>
+  <meta name="description" content="Décrivez votre projet de jardin en 1 minute et recevez un devis d'Instinct Végétal, paysagiste à Six-Fours-les-Plages. Tél. 06 58 58 20 84.">
+  <meta name="theme-color" content="#1f2a1e">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%231f2a1e'/%3E%3Cpath d='M9 23c0-8 5-13 14-14-1 9-6 14-14 14zm0 0l8-8' stroke='%23a9b79a' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..500&family=Inter+Tight:wght@400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="bar">
+    <a href="index.html" class="logo" aria-label="Instinct Végétal — accueil">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15.5" fill="none" stroke="currentColor" stroke-opacity=".35"/><path d="M9 23c0-8 5-13 14-14-1 9-6 14-14 14zm0 0l8-8" stroke="#a9b79a" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+      <span>Instinct <b>Végétal</b></span>
+    </a>
+    <nav class="nav" aria-label="Navigation principale">
+      <a href="index.html#savoir-faire">Savoir-faire</a>
+      <a href="index.html#realisations">Réalisations</a>
+      <a href="index.html#methode">Méthode</a>
+      <a href="contact.html" aria-current="page">Contact</a>
+    </nav>
+    <a href="tel:+33658582084" class="btn">06 58 58 20 84</a>
+    <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false"><span></span><span></span></button>
+  </div>
+</header>
+<div class="mobile-menu" aria-hidden="true">
+  <a href="index.html">Accueil</a>
+  <a href="index.html#savoir-faire">Savoir-faire</a>
+  <a href="index.html#realisations">Réalisations</a>
+  <a href="contact.html">Contact</a>
+  <div class="mm-foot"><a href="tel:+33658582084">06 58 58 20 84</a><br>Six-Fours-les-Plages · Var</div>
+</div>
+
+<main>
+  <section class="page-hero">
+    <div class="glow"></div>
+    <div class="wrap">
+      <span class="eyebrow" style="color:var(--sage)">Contact &amp; devis</span>
+      <h1 style="margin-top:22px">Parlons de<br>votre <em>jardin</em>.</h1>
+      <p class="lead">Quatre petites étapes, environ une minute. On vous recontacte pour organiser une visite sur place.</p>
+    </div>
+  </section>
+
+  <section style="padding:60px 0 120px">
+    <div class="wrap contact-grid">
+
+      <!-- ============ FORMULAIRE EN ÉTAPES ============ -->
+      <form class="wizard" id="wizard" novalidate>
+        <div class="wz-top">
+          <div class="wz-steps" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <span class="wz-count" id="wzCount">ÉTAPE 1 / 4</span>
+        </div>
+
+        <!-- Étape 1 -->
+        <fieldset class="panel active" data-step="1" style="border:0;padding:0;margin:0">
+          <legend class="sr-only">Type de projet</legend>
+          <h3>Quel est votre <em>projet</em> ?</h3>
+          <p class="hint">Choisissez ce qui s'en rapproche le plus.</p>
+          <div class="choices">
+            <div class="choice"><input type="radio" name="projet" id="p1" value="Création de jardin"><label for="p1"><span class="ico">🌿</span><span><strong>Création de jardin</strong><small>Partir de zéro ou tout refaire</small></span></label></div>
+            <div class="choice"><input type="radio" name="projet" id="p2" value="Aménagement pierre / allées"><label for="p2"><span class="ico">🪨</span><span><strong>Pierre &amp; allées</strong><small>Murets, bordures, pas japonais</small></span></label></div>
+            <div class="choice"><input type="radio" name="projet" id="p3" value="Gazon"><label for="p3"><span class="ico">🌱</span><span><strong>Gazon</strong><small>Semis ou plaques</small></span></label></div>
+            <div class="choice"><input type="radio" name="projet" id="p4" value="Plantations"><label for="p4"><span class="ico">🌳</span><span><strong>Plantations</strong><small>Arbres, haies, massifs</small></span></label></div>
+            <div class="choice"><input type="radio" name="projet" id="p5" value="Entretien"><label for="p5"><span class="ico">✂️</span><span><strong>Entretien</strong><small>Ponctuel ou à l'année</small></span></label></div>
+            <div class="choice"><input type="radio" name="projet" id="p6" value="Autre / à définir"><label for="p6"><span class="ico">💬</span><span><strong>Autre</strong><small>On en parle ensemble</small></span></label></div>
+          </div>
+        </fieldset>
+
+        <!-- Étape 2 -->
+        <fieldset class="panel" data-step="2" style="border:0;padding:0;margin:0">
+          <legend class="sr-only">Votre terrain</legend>
+          <h3>Votre <em>terrain</em>.</h3>
+          <p class="hint">Une estimation suffit, on mesurera ensemble sur place.</p>
+          <div class="range-box">
+            <span class="field-label" style="margin-top:0" id="surfLbl">Surface approximative</span>
+            <div class="range-val"><span id="surfVal">200</span> <small>m²</small></div>
+            <input type="range" id="surface" name="surface" min="0" max="100" value="45" aria-labelledby="surfLbl">
+            <div class="range-scale"><span>20 m²</span><span>500 m²</span><span>3 000 m² +</span></div>
+          </div>
+          <span class="field-label">Ambiance souhaitée</span>
+          <div class="pills">
+            <span class="pill"><input type="radio" name="ambiance" id="a1" value="Méditerranéenne" checked><label for="a1">Méditerranéenne</label></span>
+            <span class="pill"><input type="radio" name="ambiance" id="a2" value="Contemporaine"><label for="a2">Contemporaine</label></span>
+            <span class="pill"><input type="radio" name="ambiance" id="a3" value="Japonisante"><label for="a3">Japonisante</label></span>
+            <span class="pill"><input type="radio" name="ambiance" id="a4" value="Naturelle"><label for="a4">Naturelle</label></span>
+            <span class="pill"><input type="radio" name="ambiance" id="a5" value="Potagère"><label for="a5">Potagère</label></span>
+            <span class="pill"><input type="radio" name="ambiance" id="a6" value="Je ne sais pas encore"><label for="a6">Je ne sais pas</label></span>
+          </div>
+          <span class="field-label">Quand ?</span>
+          <div class="pills">
+            <span class="pill"><input type="radio" name="delai" id="d1" value="Dès que possible"><label for="d1">Dès que possible</label></span>
+            <span class="pill"><input type="radio" name="delai" id="d2" value="Sous 3 mois" checked><label for="d2">Sous 3 mois</label></span>
+            <span class="pill"><input type="radio" name="delai" id="d3" value="Cette année"><label for="d3">Cette année</label></span>
+            <span class="pill"><input type="radio" name="delai" id="d4" value="Je me renseigne"><label for="d4">Je me renseigne</label></span>
+          </div>
+        </fieldset>
+
+        <!-- Étape 3 -->
+        <fieldset class="panel" data-step="3" style="border:0;padding:0;margin:0">
+          <legend class="sr-only">Vos coordonnées</legend>
+          <h3>Comment vous <em>joindre</em> ?</h3>
+          <p class="hint">Vos informations servent uniquement à vous répondre.</p>
+          <div class="fields">
+            <div class="f"><input id="nom" name="nom" placeholder=" " autocomplete="name" required><label for="nom">Nom *</label></div>
+            <div class="f"><input id="tel" name="telephone" type="tel" placeholder=" " autocomplete="tel" required><label for="tel">Téléphone *</label></div>
+            <div class="f"><input id="email" name="email" type="email" placeholder=" " autocomplete="email"><label for="email">E-mail</label></div>
+            <div class="f"><input id="ville" name="commune" placeholder=" " autocomplete="address-level2"><label for="ville">Commune</label></div>
+            <div class="f full"><textarea id="msg" name="message" placeholder=" "></textarea><label for="msg">Votre projet en quelques mots</label></div>
+          </div>
+          <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
+          <label class="check"><input type="checkbox" id="rgpd" required> J'accepte que mes informations soient utilisées pour être recontacté au sujet de ma demande. *</label>
+        </fieldset>
+
+        <!-- Étape 4 -->
+        <div class="panel" data-step="4">
+          <h3>Tout est <em>prêt</em>.</h3>
+          <p class="hint">Vérifiez le récapitulatif avant d'envoyer.</p>
+          <div class="summary" id="summary"></div>
+        </div>
+
+        <!-- Succès -->
+        <div class="panel" data-step="done">
+          <div class="success">
+            <svg class="leaf" viewBox="0 0 90 90" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 72c0-30 18-50 52-54-2 34-22 54-52 54z"/><path d="M20 72l30-30"/></svg>
+            <h3 id="doneTitle">Merci, c'est <em>envoyé</em> !</h3>
+            <p class="hint" id="doneText" style="margin-top:12px">On vous rappelle très vite pour organiser une visite.</p>
+            <div class="row" id="doneActions"></div>
+          </div>
+        </div>
+
+        <p class="wz-error" id="wzError" role="alert"></p>
+        <div class="wz-nav" id="wzNav">
+          <button type="button" class="back" id="prev" hidden>← Retour</button>
+          <button type="button" class="btn" id="next">Continuer <span class="arrow">→</span></button>
+        </div>
+      </form>
+
+      <!-- ============ INFOS ============ -->
+      <aside class="side">
+        <div class="card">
+          <h4>Téléphone</h4>
+          <a class="v" href="tel:+33658582084">06 58 58 20 84</a>
+          <p style="margin:10px 0 0;color:rgba(236,229,216,.6);font-size:14px">Le plus rapide pour un premier échange.</p>
+        </div>
+        <div class="card light">
+          <h4>Adresse</h4>
+          <div class="v" style="font-size:22px">397 Chem. de Francillon<br>83140 Six-Fours-les-Plages</div>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=397+Chemin+de+Francillon+83140+Six-Fours-les-Plages" target="_blank" rel="noopener" style="display:inline-block;margin-top:12px;color:var(--terra);font-size:15px">Itinéraire →</a>
+        </div>
+        <div class="card light">
+          <h4>Avis Google</h4>
+          <div class="v">5,0 <span style="color:#e2a93b">★★★★★</span></div>
+          <p style="margin:6px 0 0;color:var(--muted);font-size:14px">51 avis</p>
+        </div>
+        <div class="map">
+          <iframe title="Carte : Instinct Végétal à Six-Fours-les-Plages" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+            src="https://www.google.com/maps?q=397+Chemin+de+Francillon,+83140+Six-Fours-les-Plages&z=14&output=embed"></iframe>
+        </div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<footer class="footer" style="padding-top:40px">
+  <div class="wrap">
+    <div class="legal"><span>© <span data-year></span> Instinct Végétal · Paysagiste à Six-Fours-les-Plages</span><span><a href="mentions-legales.html">Mentions légales</a></span></div>
+  </div>
+</footer>
+
+<script src="assets/js/main.js" defer></script>
+<script src="assets/js/contact.js" defer></script>
+</body>
+</html>
