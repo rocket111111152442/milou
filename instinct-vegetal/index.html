@@ -22,14 +22,6 @@
     "name": "Instinct Végétal",
     "image": "assets/img/real-2.jpg",
     "telephone": "+33658582084",
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "397 Chemin de Francillon",
-      "postalCode": "83140",
-      "addressLocality": "Six-Fours-les-Plages",
-      "addressCountry": "FR"
-    },
-    "geo": { "@type": "GeoCoordinates", "latitude": 43.094, "longitude": 5.839 },
     "areaServed": "Six-Fours-les-Plages et alentours"
   }
   </script>
@@ -45,6 +37,7 @@
     </a>
     <nav class="nav" aria-label="Navigation principale">
       <a href="#savoir-faire">Savoir-faire</a>
+      <a href="#palette">Végétaux</a>
       <a href="#realisations">Réalisations</a>
       <a href="#methode">Méthode</a>
       <a href="#zone">Zone</a>
@@ -71,7 +64,6 @@
   <canvas id="growth" aria-hidden="true"></canvas>
 
   <div class="hero-meta" aria-hidden="true">
-    43.094° N — 5.839° E<br>
     <span class="rating">★★★★★</span> 5,0 · 51 avis Google
   </div>
 
@@ -162,23 +154,82 @@
   </div>
 </section>
 
-<!-- ============ PLAN -> JARDIN ============ -->
-<section class="pad">
-  <div class="wrap compare-wrap">
-    <div>
-      <span class="eyebrow reveal">Du plan au jardin</span>
-      <h2 class="reveal d1" style="margin-top:18px">Tout commence par un <em>tracé</em>.</h2>
-      <p class="lead reveal d2" style="margin-top:24px">Avant la première pelletée, on étudie l'orientation, l'ensoleillement, la pente et la nature du sol. Faites glisser pour passer du plan au jardin fini.</p>
-      <a href="contact.html" class="btn reveal d3" style="margin-top:34px">Faire étudier mon terrain <span class="arrow">→</span></a>
+<!-- ============ PALETTE VÉGÉTALE ============ -->
+<section class="pad" id="palette">
+  <div class="wrap palette">
+    <div class="palette-head">
+      <span class="eyebrow reveal">Palette végétale</span>
+      <h2 class="reveal d1" style="margin-top:18px">Des plantes qui<br><em>aiment</em> le Var.</h2>
+      <p class="lead reveal d2" style="margin-top:24px">Soleil, mistral, embruns, étés secs : on choisit des végétaux qui s'y plaisent, pour un jardin beau toute l'année avec peu d'arrosage.</p>
+      <div class="filters reveal d3" role="group" aria-label="Filtrer les plantes">
+        <button type="button" class="filter active" data-f="all">Tout</button>
+        <button type="button" class="filter" data-f="sobre">Très peu d'eau</button>
+        <button type="button" class="filter" data-f="persistant">Persistant</button>
+        <button type="button" class="filter" data-f="fleuri">Fleuri</button>
+      </div>
     </div>
-    <div class="compare reveal d1" tabindex="0" role="slider" aria-label="Comparer le plan et le jardin réalisé" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" data-cursor="Glisser">
-      <img src="assets/img/villa-nuit.jpg" alt="Jardin réalisé autour d'une maison contemporaine">
-      <div class="plan" aria-hidden="true"><img src="assets/img/villa-nuit.jpg" alt=""></div>
-      <div class="handle" aria-hidden="true"></div>
-      <span class="tag l">Plan</span>
-      <span class="tag r">Jardin</span>
-      <span class="coords" aria-hidden="true">PARCELLE · ORIENT. SUD · PENTE 4%</span>
-    </div>
+    <ul class="plants reveal d1">
+        <li class="plant" data-tags="persistant sobre">
+          <button type="button" class="plant-row" aria-expanded="false">
+            <span class="no">01</span>
+            <span class="name">Olivier</span>
+            <span class="latin">Olea europaea</span>
+            <span class="water" aria-label="Besoin en eau : 1 sur 3"><i class="on"><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class=""><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class=""><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i></span>
+            <span class="plus" aria-hidden="true">+</span>
+          </button>
+          <div class="plant-more"><p>L'arbre emblème du Var. Supporte la sécheresse, le vent, et traverse les décennies.</p></div>
+        </li>
+        <li class="plant" data-tags="fleuri sobre">
+          <button type="button" class="plant-row" aria-expanded="false">
+            <span class="no">02</span>
+            <span class="name">Lavande</span>
+            <span class="latin">Lavandula angustifolia</span>
+            <span class="water" aria-label="Besoin en eau : 1 sur 3"><i class="on"><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class=""><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class=""><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i></span>
+            <span class="plus" aria-hidden="true">+</span>
+          </button>
+          <div class="plant-more"><p>Floraison d'été parfumée, adorée des abeilles, parfaite en massif ou en bordure.</p></div>
+        </li>
+        <li class="plant" data-tags="fleuri persistant sobre">
+          <button type="button" class="plant-row" aria-expanded="false">
+            <span class="no">03</span>
+            <span class="name">Ciste</span>
+            <span class="latin">Cistus × purpureus</span>
+            <span class="water" aria-label="Besoin en eau : 1 sur 3"><i class="on"><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class=""><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class=""><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i></span>
+            <span class="plus" aria-hidden="true">+</span>
+          </button>
+          <div class="plant-more"><p>Fleurs froissées au printemps, se plaît en sol pauvre et caillouteux.</p></div>
+        </li>
+        <li class="plant" data-tags="fleuri persistant sobre">
+          <button type="button" class="plant-row" aria-expanded="false">
+            <span class="no">04</span>
+            <span class="name">Romarin</span>
+            <span class="latin">Salvia rosmarinus</span>
+            <span class="water" aria-label="Besoin en eau : 1 sur 3"><i class="on"><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class=""><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class=""><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i></span>
+            <span class="plus" aria-hidden="true">+</span>
+          </button>
+          <div class="plant-more"><p>En haie basse ou en couvre-sol sur un muret, fleurit dès la fin de l'hiver.</p></div>
+        </li>
+        <li class="plant" data-tags="persistant">
+          <button type="button" class="plant-row" aria-expanded="false">
+            <span class="no">05</span>
+            <span class="name">Pittosporum</span>
+            <span class="latin">Pittosporum tobira</span>
+            <span class="water" aria-label="Besoin en eau : 2 sur 3"><i class="on"><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class="on"><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class=""><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i></span>
+            <span class="plus" aria-hidden="true">+</span>
+          </button>
+          <div class="plant-more"><p>Haie dense et brillante qui résiste aux embruns, fleurs au parfum d'oranger.</p></div>
+        </li>
+        <li class="plant" data-tags="fleuri">
+          <button type="button" class="plant-row" aria-expanded="false">
+            <span class="no">06</span>
+            <span class="name">Agapanthe</span>
+            <span class="latin">Agapanthus africanus</span>
+            <span class="water" aria-label="Besoin en eau : 2 sur 3"><i class="on"><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class="on"><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i><i class=""><svg viewBox="0 0 12 16"><path d="M6 1C6 1 1 7.5 1 10.5a5 5 0 0 0 10 0C11 7.5 6 1 6 1z"/></svg></i></span>
+            <span class="plus" aria-hidden="true">+</span>
+          </button>
+          <div class="plant-more"><p>Grosses ombelles bleues en plein été, idéale le long d'une allée ou d'une piscine.</p></div>
+        </li>
+    </ul>
   </div>
 </section>
 
@@ -206,21 +257,17 @@
           <div class="ph"><img src="assets/img/real-1.jpg" alt="Allée en pas japonais et jeunes plantations, réalisée par Instinct Végétal" loading="lazy"></div>
           <figcaption class="cap">Pas japonais &amp; plantations<span>Six-Fours</span></figcaption>
         </figure>
-        <figure class="work" data-cursor="Voir">
-          <div class="ph"><img src="assets/img/allee.jpg" alt="Allée bordée de haies et de rosiers" loading="lazy"></div>
-          <figcaption class="cap">Allée &amp; bordures fleuries<span>Inspiration</span></figcaption>
+        <figure class="work wide" data-cursor="Voir">
+          <div class="ph"><img src="assets/img/terrasse-piscine.jpg" alt="Terrasse et piscine entourées de plantations" loading="lazy"></div>
+          <figcaption class="cap">Abords de piscine<span>Inspiration</span></figcaption>
         </figure>
         <figure class="work wide" data-cursor="Voir">
-          <div class="ph"><img src="assets/img/maison.jpg" alt="Jardin sec devant une maison contemporaine" loading="lazy"></div>
-          <figcaption class="cap">Jardin sec contemporain<span>Inspiration</span></figcaption>
+          <div class="ph"><img src="assets/img/pelouse.jpg" alt="Grande pelouse bordée d'arbres et de massifs" loading="lazy"></div>
+          <figcaption class="cap">Pelouse &amp; massifs<span>Inspiration</span></figcaption>
         </figure>
         <figure class="work" data-cursor="Voir">
           <div class="ph"><img src="assets/img/glycine.jpg" alt="Pergola couverte de glycine" loading="lazy"></div>
           <figcaption class="cap">Pergola végétale<span>Inspiration</span></figcaption>
-        </figure>
-        <figure class="work" data-cursor="Voir">
-          <div class="ph"><img src="assets/img/potager.jpg" alt="Potager en carrés surélevés" loading="lazy"></div>
-          <figcaption class="cap">Potager en carrés<span>Inspiration</span></figcaption>
         </figure>
         <div class="work end">
           <h3>Le prochain,<br>c'est le <em style="color:var(--terra-2)">vôtre</em>.</h3>
@@ -266,7 +313,7 @@
     </div>
     <div>
       <p class="lead" style="font-family:var(--serif);font-size:clamp(24px,2.6vw,34px);line-height:1.3;color:var(--stone)">51 clients, 51 notes à cinq étoiles. Lisez leurs avis directement sur Google, sans filtre.</p>
-      <a class="btn light" style="margin-top:30px" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=Instinct+Vegetal+397+Chemin+de+Francillon+Six-Fours-les-Plages">Lire les avis Google <span class="arrow">→</span></a>
+      <a class="btn light" style="margin-top:30px" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=Instinct+Vegetal+paysagiste+Six-Fours-les-Plages">Lire les avis Google <span class="arrow">→</span></a>
     </div>
   </div>
 </section>
@@ -277,7 +324,7 @@
     <div>
       <span class="eyebrow reveal">Zone d'intervention</span>
       <h2 class="reveal d1" style="margin-top:18px">Entre <em>mer</em><br>et collines.</h2>
-      <p class="lead reveal d2" style="margin-top:24px">Basés chemin de Francillon à Six-Fours-les-Plages, nous intervenons à Six-Fours et dans les communes proches. Votre adresse n'est pas listée ? Appelez-nous.</p>
+      <p class="lead reveal d2" style="margin-top:24px">Basés à Six-Fours-les-Plages, nous intervenons à Six-Fours et dans les communes proches. Votre adresse n'est pas listée ? Appelez-nous.</p>
       <div class="chips reveal d3">
         <span class="chip">Six-Fours-les-Plages</span><span class="chip">Le Brusc</span><span class="chip">Sanary-sur-Mer</span><span class="chip">La Seyne-sur-Mer</span><span class="chip">Ollioules</span><span class="chip">Saint-Mandrier</span><span class="chip">Bandol</span><span class="chip">Toulon</span>
       </div>
@@ -318,7 +365,7 @@
 <!-- ============ CTA ============ -->
 <section style="padding-bottom:40px">
   <div class="cta">
-    <img src="assets/img/jardin-luxuriant.jpg" alt="" data-parallax="60">
+    <img src="assets/img/lavande.jpg" alt="" data-parallax="60">
     <span class="eyebrow" style="color:var(--sage)">Devis gratuit</span>
     <h2 style="margin-top:20px">Votre jardin a un <em>potentiel</em>.</h2>
     <div class="row">
@@ -346,8 +393,8 @@
         </ul>
       </div>
       <div>
-        <h4>Adresse</h4>
-        <ul><li>397 Chem. de Francillon<br>83140 Six-Fours-les-Plages</li></ul>
+        <h4>Zone</h4>
+        <ul><li>Six-Fours-les-Plages<br>et alentours (Var)</li></ul>
       </div>
       <div>
         <h4>Navigation</h4>

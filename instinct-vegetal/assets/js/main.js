@@ -74,6 +74,7 @@
     let x = innerWidth / 2, y = innerHeight / 2, cx = x, cy = y;
     addEventListener("mousemove", e => { x = e.clientX; y = e.clientY; c.style.opacity = 1; });
     document.addEventListener("mouseleave", () => (c.style.opacity = 0));
+    addEventListener("blur", () => (c.style.opacity = 0));
     (function loop() {
       cx += (x - cx) * 0.2; cy += (y - cy) * 0.2;
       c.style.transform = `translate3d(${cx}px, ${cy}px, 0)`;
@@ -115,24 +116,17 @@
     });
   }
 
-  /* ---------- Comparateur Plan / Jardin ---------- */
-  $$(".compare").forEach(cmp => {
-    let dragging = false;
-    const set = clientX => {
-      const r = cmp.getBoundingClientRect();
-      const p = Math.min(100, Math.max(0, ((clientX - r.left) / r.width) * 100));
-      cmp.style.setProperty("--pos", p + "%");
-      cmp.setAttribute("aria-valuenow", Math.round(p));
-    };
-    cmp.addEventListener("pointerdown", e => { dragging = true; cmp.setPointerCapture(e.pointerId); set(e.clientX); });
-    cmp.addEventListener("pointermove", e => { if (dragging || e.pointerType === "mouse") set(e.clientX); });
-    cmp.addEventListener("pointerup", () => (dragging = false));
-    cmp.addEventListener("keydown", e => {
-      const cur = parseFloat(getComputedStyle(cmp).getPropertyValue("--pos")) || 50;
-      if (e.key === "ArrowLeft") cmp.style.setProperty("--pos", Math.max(0, cur - 5) + "%");
-      if (e.key === "ArrowRight") cmp.style.setProperty("--pos", Math.min(100, cur + 5) + "%");
-    });
-  });
+  /* ---------- Palette végétale : filtres + dépliage ---------- */
+  $$(".plant-row").forEach(row => row.addEventListener("click", () => {
+    const li = row.parentElement;
+    const open = li.classList.toggle("open");
+    row.setAttribute("aria-expanded", open);
+  }));
+  $$(".filter").forEach(btn => btn.addEventListener("click", () => {
+    $$(".filter").forEach(b => b.classList.toggle("active", b === btn));
+    const f = btn.dataset.f;
+    $$(".plant").forEach(p => p.classList.toggle("dim", f !== "all" && !p.dataset.tags.split(" ").includes(f)));
+  }));
 
   /* ---------- Réalisations : scroll vertical -> défilement horizontal ---------- */
   const pin = $(".works-pin");
