@@ -29,13 +29,23 @@
     burger?.setAttribute("aria-expanded", "false");
   }));
 
-  /* ---------- Apparitions au scroll ---------- */
-  const io = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+  /* ---------- Apparitions au scroll ----------
+     Tout bloc arrivé dans l'écran OU déjà dépassé (saut via le menu) est révélé. */
+  let pending = $$(".reveal, .img-reveal, .step, .reviews");
+  let ticking = false;
+  const revealCheck = () => {
+    ticking = false;
+    const limit = innerHeight * 0.9;
+    pending = pending.filter(el => {
+      if (el.getBoundingClientRect().top < limit) { el.classList.add("in"); return false; }
+      return true;
     });
-  }, { threshold: 0.18, rootMargin: "0px 0px -6% 0px" });
-  $$(".reveal, .img-reveal, .step, .reviews").forEach(el => io.observe(el));
+  };
+  const queueReveal = () => { if (!ticking) { ticking = true; requestAnimationFrame(revealCheck); } };
+  addEventListener("scroll", queueReveal, { passive: true });
+  addEventListener("resize", queueReveal);
+  addEventListener("load", queueReveal);
+  revealCheck();
 
   /* ---------- Manifeste : les mots s'allument en lisant ---------- */
   const big = $(".manifesto .big");
@@ -172,17 +182,23 @@
     let W, H, dpr, stems = [], mouseX = 0.5, t0 = performance.now(), visible = true;
     const rand = (a, b) => a + Math.random() * (b - a);
 
-    const build = () => {
+    let builtW = 0;
+    const size = () => {
       dpr = Math.min(devicePixelRatio || 1, 2);
       W = cv.clientWidth; H = cv.clientHeight;
       cv.width = W * dpr; cv.height = H * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const n = Math.round(W / 14);
+    };
+    const build = () => {
+      size();
+      if (W === builtW) return; // seule la hauteur a changé (barre d'adresse mobile)
+      builtW = W;
+      const n = Math.round(W / (W < 600 ? 18 : 14));
       stems = Array.from({ length: n }, (_, i) => {
         const edge = Math.abs(i / n - 0.5) * 2; // plus haut sur les bords
         return {
-          x: (i / n) * W + rand(-8, 8),
-          h: rand(0.08, 0.22) * H * (0.6 + edge * 0.9),
+          x: i / n + rand(-8, 8) / W,
+          h: rand(0.08, 0.22) * (0.6 + edge * 0.9),
           bend: rand(-0.25, 0.25),
           phase: rand(0, Math.PI * 2),
           delay: rand(0, 1400),
@@ -202,16 +218,17 @@
         const g = Math.min(1, Math.max(0, (t - s.delay) / 2200));
         if (g <= 0) continue;
         const e = 1 - Math.pow(1 - g, 3);
-        const sway = Math.sin(t / 1600 + s.phase) * 0.06 + wind * (s.h / H) * 1.4;
-        const len = s.h * e;
-        const tipX = s.x + (s.bend + sway) * len;
+        const sway = Math.sin(t / 1600 + s.phase) * 0.06 + wind * s.h * 1.4;
+        const len = s.h * H * e;
+        const x = s.x * W;
+        const tipX = x + (s.bend + sway) * len;
         const tipY = H - len;
-        const cX = s.x + (s.bend * 0.3 + sway * 0.4) * len;
+        const cX = x + (s.bend * 0.3 + sway * 0.4) * len;
         const cY = H - len * 0.55;
         ctx.strokeStyle = `rgba(${s.hue},${0.22 + 0.35 * e})`;
         ctx.lineWidth = s.w;
         ctx.beginPath();
-        ctx.moveTo(s.x, H);
+        ctx.moveTo(x, H);
         ctx.quadraticCurveTo(cX, cY, tipX, tipY);
         ctx.stroke();
         if (s.leaf && e > 0.85) {
