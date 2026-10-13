@@ -140,7 +140,7 @@
       const r = pin.getBoundingClientRect();
       const total = pin.offsetHeight - innerHeight;
       const p = Math.min(1, Math.max(0, -r.top / total));
-      const max = track.scrollWidth - innerWidth;
+      const max = Math.max(0, track.scrollWidth - innerWidth);
       track.style.transform = `translate3d(${-p * max}px,0,0)`;
       if (bar) bar.style.transform = `scaleX(${p})`;
       if (num) num.textContent = String(Math.round(p * 100)).padStart(2, "0");

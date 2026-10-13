@@ -8,5 +8,5 @@ Site statique (HTML/CSS/JS, aucune dépendance ni build). Ouvrir `index.html` ou
 
 ## Avant mise en ligne
 1. **Formulaire** : dans `assets/js/contact.js`, renseigner `FORM_ENDPOINT` (ex. Formspree). Sans ça, le formulaire propose d'envoyer le récapitulatif par SMS ou d'appeler.
-2. **Photos** : `real-1.jpg` / `real-2.jpg` sont recadrées depuis une capture de la fiche Google, donc en basse résolution. Les remplacer par les originaux. Les photos marquées « Inspiration » viennent d'Unsplash : les remplacer par de vrais chantiers dès que possible.
+2. **Photos** : toutes les photos actuelles viennent d'Unsplash (illustrations). Les remplacer par de vrais chantiers d'Instinct Végétal dès que possible.
 3. **Contenus à valider** avec l'entreprise : liste des services, communes desservies, horaires.
