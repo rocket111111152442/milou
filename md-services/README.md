@@ -15,7 +15,7 @@ window.MD_CONFIG = {
 ```
 
 - **Formulaire** : envoyé via [FormSubmit.co](https://formsubmit.co) (gratuit, sans compte). Au premier envoi, FormSubmit envoie un e-mail de confirmation à l'adresse configurée : il faut cliquer le lien une fois pour activer.
-- **Photos** : `assets/img/` contient les 3 photos découpées depuis la capture de la fiche Google, donc en basse résolution. Remplacer par les originaux (mêmes noms de fichiers) pour un rendu net.
+- **Photos** : `assets/img/` contient 4 photos en haute définition issues de la fiche Google de l'entreprise (avec son accord à obtenir).
 - **Horaires** : seul « ouvre à 7h30 » est connu ; compléter si besoin dans `contact.html`.
 
 ## Pages
