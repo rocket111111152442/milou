@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Générateur de démos</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0a110c">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..500,0..100,0..1;1,9..144,300..500,0..100,0..1&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .gen { padding: 60px 0 100px; }
+    .gen h1 { font-size: clamp(2.4rem, 6vw, 4.4rem); margin: 18px 0 14px; }
+    .gen .panel { padding: clamp(20px, 4vw, 36px); margin-top: 36px; }
+    .out { margin-top: 26px; padding: 16px; border-radius: 14px; border: 1px dashed var(--line); font-family: var(--mono); font-size: .82rem; word-break: break-all; color: var(--chloro); min-height: 3em; }
+    .gen-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .hint { color: var(--sand-dim); font-size: .9rem; margin-top: 10px; }
+    .message { margin-top: 30px; }
+    .message textarea { width: 100%; min-height: 220px; padding: 16px; border-radius: 14px; background: rgba(236,229,210,.03); border: 1px solid var(--line); color: var(--sand); resize: vertical; }
+  </style>
+</head>
+<body>
+  <main class="wrap gen">
+    <span class="eyebrow mono">Outil interne · non indexé</span>
+    <h1>Générateur de <em>démos</em></h1>
+    <p class="lead">Remplissez les infos d'un paysagiste (trouvées sur sa fiche Google) : vous obtenez un lien vers le site à son nom, prêt à lui envoyer.</p>
+
+    <form class="panel" id="gen" autocomplete="off">
+      <div class="fields">
+        <div class="field"><input id="nom" placeholder=" " required><label for="nom">Nom de l'entreprise *</label></div>
+        <div class="field"><input id="ville" placeholder=" " required><label for="ville">Ville *</label></div>
+        <div class="field"><input id="cp" placeholder=" "><label for="cp">Code postal</label></div>
+        <div class="field"><input id="tel" placeholder=" " type="tel"><label for="tel">Téléphone</label></div>
+        <div class="field"><input id="note" placeholder=" " inputmode="decimal"><label for="note">Note Google (ex. 4,8)</label></div>
+        <div class="field"><input id="avis" placeholder=" " inputmode="numeric"><label for="avis">Nombre d'avis</label></div>
+        <div class="field full"><input id="adresse" placeholder=" "><label for="adresse">Adresse (rue)</label></div>
+      </div>
+      <label class="consent"><input type="checkbox" id="bandeau" checked> Afficher le bandeau « Aperçu personnalisé »</label>
+
+      <div class="out" id="out">Remplissez au moins le nom et la ville.</div>
+      <div class="gen-actions">
+        <button type="button" class="btn" id="copy">Copier le lien</button>
+        <a class="btn btn-ghost" id="open" target="_blank" rel="noopener">Ouvrir l'aperçu</a>
+      </div>
+      <p class="hint" id="copied" aria-live="polite"></p>
+
+      <div class="message">
+        <span class="mono" style="color:var(--sand-dim)">Message prêt à envoyer (modifiable)</span>
+        <textarea id="msg"></textarea>
+        <div class="gen-actions"><button type="button" class="btn btn-ghost" id="copyMsg">Copier le message</button></div>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    (() => {
+      const ids = ["nom", "ville", "cp", "tel", "note", "avis", "adresse"];
+      const $ = id => document.getElementById(id);
+      const base = location.href.replace(/generateur\.html.*$/, "");
+      let link = "";
+
+      function update() {
+        const p = new URLSearchParams();
+        ids.forEach(id => { const v = $(id).value.trim(); if (v) p.set(id, v); });
+        if (!$("bandeau").checked) p.set("sans-bandeau", "1");
+        const ok = $("nom").value.trim() && $("ville").value.trim();
+        link = ok ? base + "?" + p.toString() : "";
+        $("out").textContent = link || "Remplissez au moins le nom et la ville.";
+        $("open").href = link || "#";
+        const nom = $("nom").value.trim() || "[entreprise]";
+        $("msg").value =
+`Bonjour,
+
+Je me suis permis de préparer un aperçu de site internet pour ${nom} :
+${link || "[lien]"}
+
+Il est déjà à votre nom, avec votre note Google et un formulaire de devis. Il suffirait d'y mettre vos propres photos et vos coordonnées pour qu'il soit en ligne.
+
+Si ça vous intéresse, je peux vous expliquer en 5 minutes par téléphone.
+
+Bonne journée,`;
+      }
+      ids.forEach(id => $(id).addEventListener("input", update));
+      $("bandeau").addEventListener("change", update);
+
+      const copy = (text, msg) => navigator.clipboard.writeText(text).then(
+        () => ($("copied").textContent = msg),
+        () => ($("copied").textContent = "Copie impossible : sélectionnez le texte à la main.")
+      );
+      $("copy").onclick = () => link ? copy(link, "Lien copié.") : ($("copied").textContent = "Il manque le nom ou la ville.");
+      $("copyMsg").onclick = () => copy($("msg").value, "Message copié.");
+      update();
+    })();
+  </script>
+</body>
+</html>

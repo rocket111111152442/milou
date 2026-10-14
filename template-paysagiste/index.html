@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{nom}} — Jardinier paysagiste à {{ville}}</title>
+  <meta name="description" content="{{nom}}, jardinier paysagiste à {{ville}}. Taille de haies, entretien de jardins, débroussaillage, aménagements extérieurs. Devis gratuit.">
+  <meta name="theme-color" content="#0a110c">
+  <meta name="robots" content="noindex">
+  <meta property="og:title" content="{{nom}} — Jardinier paysagiste, {{ville}}">
+  <meta property="og:description" content="Taille, entretien et aménagement de jardins à {{ville}}. {{note}}/5 sur {{avis}} avis Google.">
+  <meta property="og:image" content="assets/img/exemple-maison.jpg">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23c4f26a'/%3E%3Cpath d='M16 25V12M16 17c-4 0-6-3-6-6 4 0 6 2 6 6zm0-2c4 0 6-3 6-6-4 0-6 2-6 6z' stroke='%230a110c' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..500,0..100,0..1;1,9..144,300..500,0..100,0..1&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <div class="cursor" aria-hidden="true"></div>
+  <div class="cursor-dot" aria-hidden="true"></div>
+
+  <header class="nav" id="nav">
+    <a href="index.html" class="logo" aria-label="{{nom}}, accueil">
+      <span class="logo-mark">{{initiales}}</span> {{nom}}
+    </a>
+    <nav class="nav-links" aria-label="Navigation principale">
+      <a href="#services">Services</a>
+      <a href="#saisons">Saisons</a>
+      <a href="#realisations">Réalisations</a>
+      <a href="#avis">Avis</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    <a href="contact.html" class="btn btn-sm magnetic">Devis gratuit <span class="arrow">→</span></a>
+    <button class="nav-burger" aria-label="Ouvrir le menu" aria-expanded="false"><span></span></button>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero" id="top">
+      <video class="hero-video" autoplay muted loop playsinline preload="auto" poster="assets/video/hero-poster.jpg" aria-hidden="true">
+        <source src="assets/video/hero.webm" type="video/webm">
+        <source src="assets/video/hero.mp4" type="video/mp4">
+      </video>
+      <div class="wrap">
+        <div class="hero-hud mono">
+          <span class="live"><i></i> {{ville}} · {{cp}}</span>
+          <span>Heure locale <b data-clock>--:--</b></span>
+          <span>Météo <b data-weather>—</b></span>
+          <span data-if="avis">Google <b>{{note}} ★ · {{avis}} avis</b></span>
+        </div>
+        <h1>
+          <span class="line"><span>Des jardins</span></span>
+          <span class="line"><span>taillés pour</span></span>
+          <span class="line"><span>le <em>soleil du Sud.</em></span></span>
+        </h1>
+        <div class="hero-bottom">
+          <p class="lead">Taille de haies, entretien, débroussaillage et aménagements extérieurs. Un travail net, soigné, et un jardin qui reste beau toute l'année.</p>
+          <div class="hero-actions">
+            <a href="contact.html" class="btn magnetic">Demander un devis <span class="arrow">→</span></a>
+            <a href="tel:" data-phone-link class="btn btn-ghost magnetic">Appeler</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span>Taille de haies</span><span>Entretien de jardins</span><span>Débroussaillage</span><span>Tonte &amp; gazon</span><span>Aménagement extérieur</span><span>Évacuation des déchets verts</span>
+        <span>Taille de haies</span><span>Entretien de jardins</span><span>Débroussaillage</span><span>Tonte &amp; gazon</span><span>Aménagement extérieur</span><span>Évacuation des déchets verts</span>
+      </div>
+    </div>
+
+    <!-- ABOUT -->
+    <section class="block" id="apropos">
+      <div class="wrap about-grid">
+        <figure class="about-photo reveal-clip" style="margin:0">
+          <img src="assets/img/exemple-maison.jpg" alt="Jardin méditerranéen avec pelouse, lavande et maison provençale (photo d'exemple)">
+        </figure>
+        <div class="about-text">
+          <span class="eyebrow mono reveal">Votre jardinier local</span>
+          <h2 class="reveal" data-delay="1">Le geste précis,<br><em>la ligne nette.</em></h2>
+          <p class="lead reveal" data-delay="2">{{nom}} s'occupe des jardins de particuliers à {{ville}} et alentour. Une haie bien taillée, une pelouse régulière, des massifs dégagés : ce sont les détails qui font qu'on a envie de passer du temps dehors.</p>
+          <p class="lead reveal" data-delay="3">Ici le soleil tape, le vent souffle et la végétation pousse vite. On adapte chaque intervention au climat méditerranéen : bonnes périodes de taille, arrosage raisonné, plantes qui supportent la sécheresse.</p>
+          <div class="stats reveal" data-delay="3" data-if="avis">
+            <div class="stat"><strong data-count="{{note_num}}" data-decimals="1">0</strong><span>note Google</span></div>
+            <div class="stat"><strong data-count="{{avis}}">0</strong><span>avis clients</span></div>
+            <div class="stat"><strong>0 €</strong><span>le devis</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="block" id="services" style="padding-top:0">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow mono reveal">Services</span>
+            <h2 class="reveal" data-delay="1">Tout ce dont<br>votre jardin <em>a besoin.</em></h2>
+          </div>
+          <p class="lead reveal" data-delay="2">Une intervention ponctuelle ou un entretien régulier. On vient, on fait le travail, on repart en laissant les lieux propres.</p>
+        </div>
+
+        <div class="stack">
+          <article class="svc" style="--i:0">
+            <span class="svc-num">01</span>
+            <div>
+              <h3>Taille de haies &amp; arbustes</h3>
+              <svg class="svc-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="36" r="5"/><circle cx="24" cy="38" r="5"/><path d="M15 32L36 8M21 34l6-10M30 20L42 14"/></svg>
+            </div>
+            <div>
+              <p>Haies de laurier, photinia, pittosporum, cyprès… Taille droite ou arrondie, aux bonnes périodes pour garder une végétation dense et saine.</p>
+              <ul><li>Haies hautes</li><li>Arbustes</li><li>Taille de formation</li><li>Ramassage inclus</li></ul>
+            </div>
+          </article>
+
+          <article class="svc" style="--i:1">
+            <span class="svc-num">02</span>
+            <div>
+              <h3>Entretien de jardins</h3>
+              <svg class="svc-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 40h32M12 40V28M20 40V22M28 40V26M36 40V18"/><path d="M36 18c-3-4-1-9 4-10 0 5-1 8-4 10zM20 22c-4-2-5-7-2-10 3 3 3 7 2 10z"/></svg>
+            </div>
+            <div>
+              <p>Tonte, désherbage, nettoyage des massifs, ramassage des feuilles. En passage unique ou en contrat régulier pour ne plus y penser.</p>
+              <ul><li>Tonte</li><li>Désherbage</li><li>Massifs</li><li>Contrat à l'année</li></ul>
+            </div>
+          </article>
+
+          <article class="svc" style="--i:2">
+            <span class="svc-num">03</span>
+            <div>
+              <h3>Débroussaillage</h3>
+              <svg class="svc-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M24 6c6 8 10 13 10 20a10 10 0 0 1-20 0c0-4 2-7 4-9 0 4 2 6 4 6-1-6 0-11 2-17z"/><path d="M6 42h36"/></svg>
+            </div>
+            <div>
+              <p>Dans le Sud, le débroussaillement autour des habitations est souvent une obligation légale contre les incendies. On dégage terrains et abords pour vous mettre en règle.</p>
+              <ul><li>Terrains en friche</li><li>Abords de maison</li><li>Prévention incendie</li></ul>
+            </div>
+          </article>
+
+          <article class="svc" style="--i:3">
+            <span class="svc-num">04</span>
+            <div>
+              <h3>Aménagement extérieur</h3>
+              <svg class="svc-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 40l8-10 10 4 8-12 10 18z"/><path d="M6 40h36"/><circle cx="34" cy="10" r="4"/></svg>
+            </div>
+            <div>
+              <p>Création ou rénovation d'espaces verts : plantations méditerranéennes, massifs, gravier décoratif, bordures. Un extérieur pensé pour être beau et facile à vivre.</p>
+              <ul><li>Plantations</li><li>Massifs &amp; gravier</li><li>Bordures</li><li>Rénovation</li></ul>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- SEASONS DIAL -->
+    <section class="block seasons" id="saisons">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow mono reveal">Calendrier du jardin</span>
+            <h2 class="reveal" data-delay="1">Chaque saison,<br><em>son geste.</em></h2>
+          </div>
+          <p class="lead reveal" data-delay="2">Tournez le cadran pour voir ce qu'il faut faire dans un jardin méditerranéen à chaque période de l'année.</p>
+        </div>
+        <div class="season-grid">
+          <div>
+            <div class="dial" id="dial" role="slider" tabindex="0" aria-label="Choisir une saison" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0" aria-valuetext="Printemps">
+              <svg viewBox="-200 -200 400 400" aria-hidden="true">
+                <circle class="dial-ring" r="170"/>
+                <circle class="dial-ring" r="120" stroke-dasharray="2 6"/>
+                <g class="dial-ticks" id="ticks"></g>
+                <path class="dial-arc" id="arc"/>
+                <text class="dial-label" data-s="0" x="0" y="-188">Printemps</text>
+                <text class="dial-label" data-s="1" x="188" y="0" transform="rotate(90 188 0)">Été</text>
+                <text class="dial-label" data-s="2" x="0" y="190">Automne</text>
+                <text class="dial-label" data-s="3" x="-188" y="0" transform="rotate(-90 -188 0)">Hiver</text>
+                <g class="dial-knob" id="knob"><circle r="10"/><circle r="20"/></g>
+              </svg>
+              <div class="dial-center">
+                <div><strong id="dialMonth">Mars</strong><span class="mono" id="dialRange">Mars — Mai</span></div>
+              </div>
+            </div>
+            <p class="dial-hint mono">Glissez le point · ou flèches du clavier</p>
+          </div>
+          <div class="season-panel" id="seasonPanel" aria-live="polite">
+            <span class="eyebrow mono">Saison <span id="seasonIdx">01</span> / 04</span>
+            <h3 class="swap" id="seasonTitle">Le réveil du jardin</h3>
+            <p class="lead swap" id="seasonText"></p>
+            <ul class="season-tasks swap" id="seasonTasks"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GALLERY -->
+    <section class="block" id="realisations">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow mono reveal">Réalisations</span>
+            <h2 class="reveal" data-delay="1">Sur le terrain,<br><em>à {{ville}}.</em></h2>
+          </div>
+          <p class="lead reveal" data-delay="2">Quelques chantiers récents. Passez la souris sur les photos.</p>
+        </div>
+        <div class="gallery">
+          <figure class="shot reveal">
+            <img src="assets/img/exemple-olivier.jpg" alt="Olivier et haie taillée (photo d'exemple)" loading="lazy">
+            <span class="scan"></span><span class="corner c1"></span><span class="corner c2"></span>
+            <figcaption><b>Olivier &amp; haie</b><span class="mono">01</span></figcaption>
+          </figure>
+          <figure class="shot reveal" data-delay="1">
+            <img src="assets/img/exemple-jardin.jpg" alt="Allée, pelouse et massifs de lavande (photo d'exemple)" loading="lazy">
+            <span class="scan"></span><span class="corner c1"></span><span class="corner c2"></span>
+            <figcaption><b>Allée &amp; lavande</b><span class="mono">02</span></figcaption>
+          </figure>
+          <figure class="shot reveal" data-delay="2">
+            <img src="assets/img/exemple-maison.jpg" alt="Maison provençale et jardin entretenu (photo d'exemple)" loading="lazy">
+            <span class="scan"></span><span class="corner c1"></span><span class="corner c2"></span>
+            <figcaption><b>Jardin &amp; maison</b><span class="mono">03</span></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- REVIEWS -->
+    <section class="block" id="avis" style="padding-top:0" data-if="avis">
+      <div class="wrap">
+        <div class="reviews reveal">
+          <div>
+            <div class="score"><span data-count="{{note_num}}" data-decimals="1">0</span></div>
+            <div class="stars" aria-label="{{note}} étoiles sur 5">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7 7 .6-5.4 4.7L18.2 22 12 18.3 5.8 22l1.6-7.7L2 9.6 9 9z"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7 7 .6-5.4 4.7L18.2 22 12 18.3 5.8 22l1.6-7.7L2 9.6 9 9z"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7 7 .6-5.4 4.7L18.2 22 12 18.3 5.8 22l1.6-7.7L2 9.6 9 9z"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7 7 .6-5.4 4.7L18.2 22 12 18.3 5.8 22l1.6-7.7L2 9.6 9 9z"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7 7 .6-5.4 4.7L18.2 22 12 18.3 5.8 22l1.6-7.7L2 9.6 9 9z"/></svg>
+            </div>
+            <span class="mono" style="color:var(--sand-dim)">{{avis}} avis Google</span>
+          </div>
+          <div>
+            <span class="eyebrow mono">Ce qu'en disent les clients</span>
+            <h3 style="margin-top:18px">{{note}} sur 5, sur {{avis}} avis.</h3>
+            <p class="lead">Une note construite chantier après chantier, par de vrais clients. Lisez les avis directement sur la fiche de l'entreprise.</p>
+            <a class="btn btn-ghost magnetic" href="{{lien_google}}" target="_blank" rel="noopener">Lire les avis sur Google <span class="arrow">→</span></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROCESS -->
+    <section class="block" style="padding-top:0">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow mono reveal">Comment ça marche</span>
+            <h2 class="reveal" data-delay="1">Simple, <em>du début à la fin.</em></h2>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="step reveal"><b>01</b><h3>Vous nous contactez</h3><p>Par téléphone ou via le formulaire, en décrivant votre jardin et vos besoins.</p></div>
+          <div class="step reveal" data-delay="1"><b>02</b><h3>On passe voir</h3><p>Visite sur place pour évaluer le travail et répondre à vos questions.</p></div>
+          <div class="step reveal" data-delay="2"><b>03</b><h3>Devis gratuit</h3><p>Un prix clair, sans surprise, avant toute intervention.</p></div>
+          <div class="step reveal" data-delay="3"><b>04</b><h3>Chantier propre</h3><p>Le travail est fait, les déchets verts évacués, le jardin rendu net.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="block cta">
+      <div class="cta-orb" aria-hidden="true"></div>
+      <div class="wrap">
+        <span class="eyebrow mono reveal">Devis gratuit</span>
+        <h2 class="reveal" data-delay="1">Votre jardin mérite <em>mieux.</em></h2>
+        <a href="contact.html" class="btn magnetic reveal" data-delay="2">Parlons de votre projet <span class="arrow">→</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <a href="index.html" class="logo"><span class="logo-mark">{{initiales}}</span> {{nom}}</a>
+          <p style="color:var(--sand-dim);margin-top:16px;max-width:32ch">Jardinier paysagiste à {{ville}}. Taille, entretien et aménagement de jardins.</p>
+        </div>
+        <div>
+          <h4>Adresse</h4>
+          <p><span data-if="adresse">{{adresse}}<br></span>{{cp}} {{ville}}</p>
+        </div>
+        <div>
+          <h4>Contact</h4>
+          <ul>
+            <li><a href="tel:" data-phone-link><span data-phone></span></a></li>
+            <li><a href="contact.html">Formulaire de contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Plan du site</h4>
+          <ul>
+            <li><a href="#services">Services</a></li>
+            <li><a href="#realisations">Réalisations</a></li>
+            <li><a href="#avis">Avis</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-big" aria-hidden="true">{{nom}}</div>
+      <div class="footer-bottom">
+        <span>© <span data-year></span> {{nom}} · {{ville}}</span>
+        <span>Jardinier paysagiste · {{ville}}</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/personalize.js"></script>
+  <script src="assets/js/main.js"></script>
+  <script src="assets/js/seasons.js"></script>
+</body>
+</html>
