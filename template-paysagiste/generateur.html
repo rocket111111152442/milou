@@ -41,6 +41,7 @@
     .card.open pre { max-height: 600px; }
     .card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
     .card-actions .btn { padding: 9px 16px; font-size: .88rem; }
+    .card-actions .tel-btn { font-family: var(--mono); color: var(--chloro); border-color: rgba(196,242,106,.35); min-width: 168px; justify-content: center; }
     .card-actions label { display: inline-flex; gap: 8px; align-items: center; font-size: .88rem; color: var(--sand-dim); margin-left: auto; cursor: pointer; }
     .card-actions input { accent-color: var(--chloro); width: 18px; height: 18px; }
     .manual { margin-top: 18px; }
@@ -301,7 +302,7 @@ Cordialement,
         const msg = messageFor(r);
         const c = el("article", "card" + (r.sent ? " sent" : ""));
         const top = el("div", "card-top");
-        top.append(el("b", null, r.nom), el("span", null, [r.ville, r.tel].filter(Boolean).join(" · ")));
+        top.append(el("b", null, r.nom), el("span", null, r.ville || ""));
         const pre = el("pre", null, msg);
         const act = el("div", "card-actions");
 
@@ -313,6 +314,15 @@ Cordialement,
         const bSee = el("button", "btn btn-ghost", "Voir le message"); bSee.type = "button";
         bSee.onclick = () => { c.classList.toggle("open"); bSee.textContent = c.classList.contains("open") ? "Masquer" : "Voir le message"; };
         const aSite = el("a", "btn btn-ghost", "Ouvrir le site"); aSite.href = linkFor(r); aSite.target = "_blank"; aSite.rel = "noopener";
+        if (r.tel) {
+          const bTel = el("button", "btn btn-ghost tel-btn", r.tel); bTel.type = "button";
+          bTel.title = "Copier le numéro";
+          bTel.onclick = () => copy(r.tel).then(() => {
+            bTel.textContent = "Numéro copié ✓";
+            setTimeout(() => (bTel.textContent = r.tel), 1500);
+          });
+          act.append(bTel);
+        }
         act.append(bCopy, bSee, aSite);
         if (telDigits(r.tel)) {
           const aSms = el("a", "btn btn-ghost", "Ouvrir en SMS");
