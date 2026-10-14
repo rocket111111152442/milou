@@ -170,7 +170,7 @@ Cordialement,
       cp: ["cp", "code postal", "postal code", "zip", "code"],
       adresse: ["adresse", "address", "rue", "street"]
     };
-    const norm = s => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[_\-.]/g, " ").replace(/\s+/g, " ").trim();
+    const norm = s => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[\u2018\u2019\u02bc`\u00b4]/g, "'").replace(/[_\-.]/g, " ").replace(/\s+/g, " ").trim();
     const mapHeader = h => {
       const n = norm(h);
       for (const [k, list] of Object.entries(ALIASES)) if (list.some(a => n === a)) return k;
@@ -182,7 +182,9 @@ Cordialement,
       if (!raw.length) throw new Error("Le fichier est vide.");
       const headers = Object.keys(raw[0]);
       const map = {};
-      headers.forEach(h => { const k = mapHeader(h); if (k && !map[k]) map[k] = h; });
+      const exact = h => Object.keys(ALIASES).find(k => ALIASES[k].includes(norm(h)));
+      headers.forEach(h => { const k = exact(h); if (k && !map[k]) map[k] = h; });
+      headers.forEach(h => { if (Object.values(map).includes(h)) return; const k = mapHeader(h); if (k && !map[k]) map[k] = h; });
       if (!map.nom) throw new Error("Colonne « nom » introuvable. Colonnes lues : " + headers.join(", "));
       const seen = new Set(rows.map(r => norm(r.nom) + "|" + norm(r.ville || "")));
       let added = 0, skipped = 0;
@@ -190,6 +192,8 @@ Cordialement,
         const p = {};
         for (const k of Object.keys(ALIASES)) p[k] = map[k] ? String(r[map[k]] ?? "").trim() : "";
         if (!p.nom) return;
+        // « Draguignan / secteur » -> « Draguignan »
+        p.ville = p.ville.split("/")[0].replace(/\(.*?\)/g, "").replace(/\bsecteur\b/i, "").trim();
         // Excel enlève souvent le 0 initial des numéros : 612345678 -> 0612345678
         if (/^[1-9]\d{8}$/.test(p.tel.replace(/\s/g, ""))) p.tel = "0" + p.tel.replace(/\s/g, "");
         const key = norm(p.nom) + "|" + norm(p.ville);
@@ -203,6 +207,22 @@ Cordialement,
       return { added, skipped, cols: Object.keys(map) };
     }
 
+    // Cherche, dans chaque feuille, la première ligne qui contient une colonne « nom »
+    // (le tableau peut commencer sous un titre ou une description).
+    function sheetRows(wb) {
+      for (const name of wb.SheetNames) {
+        const grid = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: "", blankrows: false });
+        const hi = grid.slice(0, 30).findIndex(r => r.some(c => c !== "" && mapHeader(c) === "nom"));
+        if (hi === -1) continue;
+        const headers = grid[hi].map((h, i) => String(h).trim() || "colonne " + (i + 1));
+        return grid.slice(hi + 1)
+          .filter(r => r.some(c => String(c).trim() !== ""))
+          .map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ""])));
+      }
+      const first = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", blankrows: false });
+      throw new Error("Colonne « nom » introuvable dans le fichier. Premières lignes lues : " + first.slice(0, 3).map(r => r.filter(Boolean).join(" | ")).join(" / "));
+    }
+
     function readFile(file) {
       const st = $("status");
       if (typeof XLSX === "undefined") { st.className = "status err"; st.textContent = "La lecture Excel n'a pas pu se charger (connexion ?)."; return; }
@@ -210,7 +230,7 @@ Cordialement,
       reader.onload = e => {
         try {
           const wb = XLSX.read(e.target.result, { type: "array" });
-          const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+          const raw = sheetRows(wb);
           const r = importRows(raw);
           st.className = "status ok";
           st.textContent = `${r.added} prospect(s) ajouté(s)` + (r.skipped ? `, ${r.skipped} doublon(s) ignoré(s)` : "") + `. Colonnes reconnues : ${r.cols.join(", ")}.`;
