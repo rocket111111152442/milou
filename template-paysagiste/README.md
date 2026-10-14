@@ -2,11 +2,14 @@
 
 Site statique (HTML/CSS/JS, sans dépendance) qui se personnalise **par le lien**, sans redéployer.
 
-## Envoyer une démo
+## Envoyer des démos en série
 
 1. Ouvrir `generateur.html` sur le site déployé.
-2. Remplir les infos du paysagiste (fiche Google) : nom, ville, téléphone, note, nombre d'avis…
-3. Copier le lien et le message, puis les envoyer.
+2. **Étape 1** : écrire son message une fois, avec les variables `{nom}`, `{lien}`, `{ville}`, `{note}`, `{avis}`.
+3. **Étape 2** : importer un fichier Excel (`.xlsx`, `.xls` ou `.csv`), une ligne par entreprise. Un modèle est téléchargeable dans la page. Les doublons sont ignorés et le 0 initial des numéros est restauré.
+4. **Étape 3** : pour chaque prospect, « Copier le message » puis coller dans la conversation. Cocher « Envoyé » au fur et à mesure.
+
+Le message, la liste et les cases « Envoyé » sont gardés dans le navigateur (`localStorage`) : utiliser toujours le même navigateur, et « Exporter en Excel » pour garder une copie (liens et messages inclus).
 
 Exemple de lien :
 
