@@ -241,3 +241,27 @@ dbtest('défi communautaire à paliers : chaque palier atteint se récupère une
   assert.equal(h.community.claimed, 2);
   assert.equal(h.community.reached, 2);
 });
+
+dbtest('enchères : des Légendaires et des Mythiques arrivent sur le marché, avec parcimonie', async () => {
+  const { stockHighEnd } = await import('../lib/bots.js');
+  await db.run("DELETE FROM meta WHERE key LIKE 'big_drop_%'");
+  const persona = { type: 'trader', tz: 0, sleep: [3, 4], greed: 1, eye: 2, fav: null };
+  for (let k = 0; k < 3; k++) {
+    await db.run(`INSERT INTO users (username, pass_hash, created_at, bits, pack_stock, pack_anchor, is_bot, bot, bot_next_at)
+      VALUES ($1, 'x', 0, 100, 0, 0, true, $2, $3)`, ['gros' + k + Date.now(), JSON.stringify(persona), Date.now() + 3600e3]);
+  }
+  const open = async (r) => Number((await db.one(`SELECT COUNT(*) n FROM auctions a JOIN sites s ON s.id = a.site_id WHERE a.status = 'open' AND s.rarity = $1`, [r])).n);
+  const before4 = await open(4), before5 = await open(5);
+  await stockHighEnd(db, game);
+  assert.ok(await open(4) > before4 || before4 >= 6, 'une Légendaire en vente');
+  assert.ok(await open(5) > before5 || before5 >= 1, 'une Mythique en vente');
+  // Mythique en vente : 72 h, sans achat immédiat.
+  const m = await db.one(`SELECT a.* FROM auctions a JOIN sites s ON s.id = a.site_id WHERE a.status = 'open' AND s.rarity = 5 ORDER BY a.id DESC LIMIT 1`);
+  assert.equal(m.buyout, null);
+  // Pas de nouvelle Mythique créée avant 24 h même si celle-ci est vendue entre-temps.
+  await db.run("UPDATE auctions SET status = 'cancelled' WHERE id = $1", [m.id]);
+  await db.run("UPDATE cards SET status = 'owned', user_id = (SELECT id FROM users WHERE NOT is_bot LIMIT 1) WHERE id = $1", [m.card_id]);
+  const cards5 = Number((await db.one('SELECT COUNT(*) n FROM cards c JOIN sites s ON s.id = c.site_id WHERE s.rarity = 5')).n);
+  await stockHighEnd(db, game);
+  assert.equal(Number((await db.one('SELECT COUNT(*) n FROM cards c JOIN sites s ON s.id = c.site_id WHERE s.rarity = 5')).n), cards5);
+});

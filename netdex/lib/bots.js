@@ -331,13 +331,13 @@ async function considerTrade(db, game, bot, me, tradeId, tryDo) {
 async function shop(db, game, bot, me, p, tryDo) {
   const now = Date.now();
   const list = await db.all(`SELECT a.*, s.rarity, s.family, c.holo, ub.is_bot bidder_is_bot FROM auctions a JOIN sites s ON s.id = a.site_id JOIN cards c ON c.id = a.card_id
-    LEFT JOIN users ub ON ub.id = a.bidder_id
+    LEFT JOIN users ub ON ub.id = a.bidder_id LEFT JOIN users us ON us.id = a.seller_id
     WHERE a.status = 'open' AND a.seller_id != $1 AND a.ends_at > $2 AND (a.bidder_id IS NULL OR a.bidder_id != $1)
-    ORDER BY (s.family = $3) DESC, s.rarity DESC, a.ends_at ASC LIMIT 25`, [bot.id, now + 2 * MIN, p.fav || '']);
+    ORDER BY (NOT us.is_bot) DESC, (s.family = $3) DESC, s.rarity DESC, a.ends_at ASC LIMIT 40`, [bot.id, now + 2 * MIN, p.fav || '']);
   const owns = await ownedSites(db, bot.id, list.map((a) => a.site_id));
   let bids = 0;
   for (const a of list) {
-    if (bids >= 3) break;
+    if (bids >= 4) break;
     const v = valuation(p, a, owns.has(a.site_id));
     const min = game.minBid(a);
     if (min > v || min > bot.bits * 0.6) continue;
@@ -355,15 +355,65 @@ async function shop(db, game, bot, me, p, tryDo) {
 async function sell(db, game, bot, me, p, tryDo, force = false) {
   const { n: open } = await db.one("SELECT COUNT(*) n FROM auctions WHERE seller_id = $1 AND status = 'open'", [bot.id]);
   if (open >= (p.stall || 1)) return;
+  // Rarement, il se sépare d'une grosse carte (plus souvent s'il est marchand) : prix de départ raisonnable, longue durée.
+  if (rnd() < (p.type === 'trader' ? 0.08 : 0.015)) {
+    const big = await db.one(`SELECT c.id, c.holo, s.rarity, s.family FROM cards c JOIN sites s ON s.id = c.site_id
+      WHERE c.user_id = $1 AND c.status = 'owned' AND s.rarity >= 4 ORDER BY random() LIMIT 1`, [bot.id]);
+    if (big) return listBig(db, game, me, big, tryDo);
+  }
   // De préférence un doublon ; sinon une carte qu'il est prêt à lâcher (jamais sa seule Légendaire/Mythique).
   const c = await db.one(`SELECT c.id, c.holo, s.rarity, s.family FROM cards c JOIN sites s ON s.id = c.site_id
     WHERE c.user_id = $1 AND c.status = 'owned'
       AND ((SELECT COUNT(*) FROM cards d WHERE d.user_id = $1 AND d.site_id = c.site_id) > 1 OR ($2 AND s.rarity <= 3))
     ORDER BY (SELECT COUNT(*) FROM cards d WHERE d.user_id = $1 AND d.site_id = c.site_id) DESC, random() LIMIT 1`, [bot.id, force || p.type === 'trader' || rnd() < 0.5]);
   if (!c) return;
+  if (c.rarity === 0 && !c.holo && rnd() < 0.7) return; // une commune intéresse peu de monde : il préfère la recycler
   const price = Math.max(1, Math.round(valuation(p, c, true) * between(0.6, 1.25)));
   const buyout = rnd() < 0.65 ? Math.max(price + 1, Math.round(price * between(1.4, 2.4))) : null;
   return tryDo('vente', () => game.createAuction(me, { cardId: c.id, startPrice: price, buyout, hours: pick([1, 3, 3, 6, 6, 12, 24, 24, 72]) }));
+}
+
+// Prix de départ d'une grosse carte : sous le prix médian des ventes récentes de cette rareté (ou un repère si aucune vente).
+const BIG_FALLBACK = { 4: 500, 5: 2500 };
+async function bigStart(db, rarity) {
+  const r = await db.one('SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) med, COUNT(*) n FROM sales WHERE rarity = $1 AND holo = 0 AND at > $2',
+    [rarity, Date.now() - 30 * 24 * HOUR]);
+  const ref = Number(r?.n) >= 3 ? Number(r.med) : BIG_FALLBACK[rarity];
+  return Math.max(10, Math.round(ref * between(0.5, 0.8)));
+}
+async function listBig(db, game, me, card, tryDo) {
+  const start = await bigStart(db, card.rarity);
+  // Mythique : pas d'achat immédiat, l'enchère va au bout (72 h) ; Légendaire : achat immédiat possible.
+  const buyout = card.rarity >= 5 ? null : Math.round(start * between(2.5, 4));
+  return tryDo('grosse carte en vente', () => game.createAuction(me, { cardId: card.id, startPrice: start, buyout, hours: card.rarity >= 5 ? 72 : pick([24, 24, 72]) }));
+}
+
+// Grosses cartes : quand il n'y en a presque plus aux enchères, un compte qui en possède une la met en vente.
+// S'il n'y en a nulle part, une nouvelle carte arrive sur le marché via un compte animé, avec parcimonie :
+// au plus une Légendaire toutes les 2 h et une Mythique par jour, pour qu'elles restent rares.
+const BIG_TARGET = { 4: 6, 5: 1 };
+const BIG_EVERY = { 4: 2 * HOUR, 5: 24 * HOUR };
+export async function stockHighEnd(db, game) {
+  let listed = 0;
+  for (const rarity of [4, 5]) {
+    const { n } = await db.one(`SELECT COUNT(*) n FROM auctions a JOIN sites s ON s.id = a.site_id WHERE a.status = 'open' AND s.rarity = $1`, [rarity]);
+    if (n >= BIG_TARGET[rarity]) continue;
+    const tryDo = async (_l, fn) => { try { return await fn(); } catch (e) { if (!(e instanceof GameError)) throw e; } };
+    let owner = await db.one(`SELECT u.*, c.id card_id, c.holo FROM cards c JOIN sites s ON s.id = c.site_id JOIN users u ON u.id = c.user_id
+      WHERE u.is_bot AND c.status = 'owned' AND s.rarity = $1 ORDER BY random() LIMIT 1`, [rarity]);
+    if (!owner) {
+      const key = `big_drop_${rarity}`;
+      const last = Number((await db.one('SELECT value FROM meta WHERE key = $1', [key]))?.value || 0);
+      if (Date.now() - last < BIG_EVERY[rarity]) continue;
+      const u = await db.one('SELECT * FROM users WHERE is_bot ORDER BY random() LIMIT 1');
+      if (!u) continue;
+      const [card] = await db.tx((q) => game.grantCards(q, u.id, [{ siteId: game.pickIn(game.tiers[rarity]), holo: 0 }]));
+      await db.run('INSERT INTO meta (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', [key, String(Date.now())]);
+      owner = { ...u, card_id: card.cardId, holo: 0 };
+    }
+    if (await listBig(db, game, { id: owner.id, username: owner.username }, { id: owner.card_id, rarity, holo: owner.holo }, tryDo)) listed++;
+  }
+  return listed;
 }
 
 // Teneur de marché : si l'hôtel des ventes se vide, des bots y mettent des cartes (comme le feraient des joueurs actifs).
@@ -608,6 +658,7 @@ async function runPass(db, game, { now, budgetMs, batch, maxSessions, parallel, 
     }
     if (done.sessions >= maxSessions) break;
   }
+  done.big = await stockHighEnd(db, game).catch((e) => { console.error('grosses cartes', e.message); return 0; });
   done.listed = await stockMarket(db, game, Number(process.env.MARKET_TARGET) || 400).catch((e) => { console.error('market', e.message); return 0; });
   return done;
 }
