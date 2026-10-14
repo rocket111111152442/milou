@@ -5,7 +5,7 @@
 //  - Le coffre sert à prêter aux joueurs (avec intérêts) et à verser des dividendes quotidiens aux détenteurs de parts.
 //  - Bourse : chaque boutique a 1 000 parts. On les achète directement à la boutique, au prix fixé par le propriétaire ;
 //    l'argent va dans le coffre. La boutique peut racheter les parts (à un pourcentage du prix choisi par le propriétaire).
-import { GameError, QUALITIES, rollQuality } from './game.js';
+import { GameError, QUALITIES, CONFIG } from './game.js';
 
 export const SHOP_PRICE = 25_000;
 // Boutique Premium : plus chère, commission jusqu'à 40 %, et les boosters achetés chez elle gagnent +15 % de chances (une seule fois par booster).
@@ -43,7 +43,17 @@ export function createShops(db, game) {
     const o = game.packOdds(boost);
     return Object.fromEntries(Object.entries(o).map(([r, p]) => [r, +(p * 100).toPrecision(3)]));
   };
-  const packView = (p) => ({ id: p.id, quality: p.quality, qualityName: QUALITIES[p.quality].name, boost: p.boost, status: p.status, odds: odds(p.boost), createdAt: p.created_at });
+  // Chances d'avoir au moins une carte de chaque rareté dans un booster sur mesure (5 cartes tirées indépendamment).
+  const customOdds = (w) => {
+    const out = {};
+    for (let r = 2; r <= 5; r++) {
+      const p = [0, 1, 2, 3, 4, 5].filter((k) => k >= r).reduce((a, k) => a + Number(w[k] || 0), 0) / 100;
+      out[r] = +((1 - (1 - p) ** CONFIG.packSize) * 100).toPrecision(3);
+    }
+    return out;
+  };
+  const packView = (p) => ({ id: p.id, quality: p.quality, qualityName: p.odds ? p.label || 'Spécial' : QUALITIES[p.quality].name, boost: p.boost, status: p.status,
+    odds: p.odds ? customOdds(p.odds) : odds(p.boost), custom: p.odds || null, createdAt: p.created_at });
   const intIn = (v, lo, hi, msg) => { const n = Math.floor(Number(v)); if (!(n >= lo && n <= hi)) throw new GameError(msg); return n; };
   const lockUser = (q, id) => q.one('SELECT * FROM users WHERE id = $1 FOR UPDATE', [id]);
 
@@ -51,7 +61,8 @@ export function createShops(db, game) {
   async function sealPack(userId) {
     return db.tx(async (q) => {
       const u = await lockUser(q, userId);
-      const n = (await q.one("SELECT COUNT(*) n FROM sealed_packs WHERE owner_id = $1 AND status IN ('owned', 'listed')", [userId])).n;
+      // Les boosters offerts par l'admin ne comptent pas dans la limite.
+      const n = (await q.one("SELECT COUNT(*) n FROM sealed_packs WHERE owner_id = $1 AND status IN ('owned', 'listed') AND odds IS NULL", [userId])).n;
       if (n >= MAX_SEALED) throw new GameError(`Maximum ${MAX_SEALED} boosters scellés.`);
       const { boost, quality } = await game.takeNextPack(q, u); // il garde la qualité affichée sur l'accueil
       await game.consumeFreePack(q, u);
@@ -74,11 +85,34 @@ export function createShops(db, game) {
       const p = await q.one("SELECT * FROM sealed_packs WHERE id = $1 AND owner_id = $2 AND status = 'owned' FOR UPDATE", [Number(packId), userId]);
       if (!p) throw new GameError('Booster introuvable (déjà ouvert ou en vente).');
       await q.run("UPDATE sealed_packs SET status = 'opened' WHERE id = $1", [p.id]);
-      const cards = await game.drawCards(q, userId, false, u.is_bot, { pity: u.pity, boost: p.boost });
+      const cards = await game.drawCards(q, userId, false, u.is_bot, { pity: u.pity, boost: p.boost, odds: p.odds });
       return { cards, pack: packView(p) };
     });
   }
 
+
+  // Admin : offre des boosters scellés sur mesure à un joueur (hors limite de boosters scellés).
+  async function giftPacks(targetId, { count = 1, label = '', odds: w } = {}) {
+    const n = intIn(count, 1, 100, 'Nombre de boosters : 1 à 100.');
+    const clean = {};
+    let total = 0;
+    for (let r = 0; r <= 5; r++) {
+      const v = Math.round(Number(w?.[r] || 0) * 1000) / 1000;
+      if (!(v >= 0 && v <= 100)) throw new GameError('Chaque pourcentage doit être entre 0 et 100.');
+      clean[r] = v; total += v;
+    }
+    if (Math.abs(total - 100) > 0.01) throw new GameError(`Les pourcentages doivent faire 100 % au total (actuellement ${+total.toFixed(3)} %).`);
+    const name = String(label || '').replace(/\s+/g, ' ').trim().slice(0, 30) || 'Booster spécial';
+    return db.tx(async (q) => {
+      const u = await q.one('SELECT id, username FROM users WHERE id = $1', [targetId]);
+      if (!u) throw new GameError('Joueur introuvable.', 404);
+      const now = Date.now();
+      await q.run(`INSERT INTO sealed_packs (owner_id, boost, quality, created_at, odds, label)
+        SELECT $1, 1, 'standard', $2, $3, $4 FROM generate_series(1, $5)`, [u.id, now, JSON.stringify(clean), name, n]);
+      await game.notify(q, u.id, `Tu as reçu ${n} « ${name} » ! Ils t'attendent dans tes boosters scellés, sur l'accueil.`, '#/');
+      return { ok: true, count: n, username: u.username, label: name, odds: customOdds(clean) };
+    });
+  }
 
   // ---------- Boutiques ----------
   const shopSelect = `SELECT s.*, u.username owner_name,
@@ -313,6 +347,7 @@ export function createShops(db, game) {
     return db.tx(async (q) => {
       const p = await q.one("SELECT * FROM sealed_packs WHERE id = $1 AND owner_id = $2 AND status = 'owned' FOR UPDATE", [Number(body.packId), me.id]);
       if (!p) throw new GameError('Booster indisponible.');
+      if (p.odds) throw new GameError('Un booster offert ne peut pas être revendu : ouvre-le !');
       const s = await q.one('SELECT * FROM shops WHERE id = $1 FOR UPDATE', [Number(body.shopId)]);
       if (!s) throw new GameError('Boutique introuvable.', 404);
       if (!s.is_open) throw new GameError(`${s.name} est fermée pour le moment.`);
@@ -680,7 +715,7 @@ export function createShops(db, game) {
   }
 
   return {
-    sealPack, myPacks, openSealed, listShops, createShop, upgradeShop, updateShop, deposit, withdraw, deleteShop, shopDetail, listPack, cancelListing, buyListing,
+    sealPack, myPacks, openSealed, giftPacks, customOdds, listShops, createShop, upgradeShop, updateShop, deposit, withdraw, deleteShop, shopDetail, listPack, cancelListing, buyListing,
     requestLoan, respondLoan, repayLoan, myLoans, buyShares, sellShares, stock, portfolio, makeOffer, respondOffer, cancelOffer, offersFor, dailyJobs, odds,
   };
 }

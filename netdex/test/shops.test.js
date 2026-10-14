@@ -406,3 +406,30 @@ dbtest('comptes animés : ouvrent une boutique dès qu\'ils en ont les moyens, e
   assert.ok(await parts(other) > 0, 'celui qui ne veut pas de boutique investit');
   assert.equal(typeof wantsShop({ id: 1 }, { type: 'trader' }), 'boolean');
 });
+
+dbtest('admin : boosters sur mesure (pourcentages par carte), hors limite, non revendables', async () => {
+  const p = await user(0, 0), owner = await user(SHOP_PRICE);
+  const { id: shopId } = await shops.createShop(owner, { name: 'Pour revendre' });
+  await assert.rejects(shops.giftPacks(p.id, { count: 1, odds: { 4: 50 } }), /100 %/);
+  await assert.rejects(shops.giftPacks(p.id, { count: 1, odds: { 4: 150, 0: -50 } }), /entre 0 et 100/);
+  const r = await shops.giftPacks(p.id, { count: 35, label: 'Pluie de légendes', odds: { 4: 100 } });
+  assert.equal(r.count, 35);
+  assert.equal(r.odds[4], 100);
+  assert.ok(r.odds[5] === 0);
+  const mine = await shops.myPacks(p.id);
+  assert.equal(mine.items.length, 35); // au-delà de la limite de 30 : les cadeaux ne comptent pas
+  assert.equal(mine.items[0].qualityName, 'Pluie de légendes');
+  await assert.rejects(shops.listPack(p, { packId: mine.items[0].id, shopId, price: 100 }), /offert/);
+  const pityBefore = (await db.one('SELECT pity FROM users WHERE id = $1', [p.id])).pity;
+  const opened = await shops.openSealed(p.id, mine.items[0].id);
+  assert.equal(opened.cards.length, 5);
+  assert.ok(opened.cards.every((c) => c.site.rarity === 4), 'que des Légendaires');
+  assert.equal((await db.one('SELECT pity FROM users WHERE id = $1', [p.id])).pity, pityBefore);
+  // Un mélange : environ la moitié de Rares et la moitié d'Épiques sur beaucoup de cartes.
+  await shops.giftPacks(p.id, { count: 20, odds: { 2: 50, 3: 50 } });
+  const mix = (await shops.myPacks(p.id)).items.filter((x) => x.custom && x.custom[2] === 50);
+  const got = { 2: 0, 3: 0, other: 0 };
+  for (const x of mix) for (const c of (await shops.openSealed(p.id, x.id)).cards) got[c.site.rarity] !== undefined ? got[c.site.rarity]++ : got.other++;
+  assert.equal(got.other, 0);
+  assert.ok(got[2] > 25 && got[3] > 25, JSON.stringify(got));
+});

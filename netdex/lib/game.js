@@ -183,14 +183,24 @@ export async function createGame(db) {
     holo: out.filter((c) => c.holo).length,
   });
 
-  async function drawCards(q, userId, premium, isBot = false, { pity = 0, boost = 1 } = {}) {
+  // Booster sur mesure (offert par l'admin) : chaque carte suit exactement les pourcentages donnés par rareté.
+  function rollCustomTier(odds) {
+    const pool = tiers.filter((t) => (t.total > 0 || t.extra?.length) && Number(odds[t.id]) > 0);
+    if (!pool.length) return rollTier(0);
+    const sum = pool.reduce((a, t) => a + Number(odds[t.id]), 0);
+    let x = (randomInt(1_000_000_000) / 1_000_000_000) * sum;
+    for (const t of pool) { if ((x -= Number(odds[t.id])) < 0) return t; }
+    return pool[pool.length - 1];
+  }
+
+  async function drawCards(q, userId, premium, isBot = false, { pity = 0, boost = 1, odds = null } = {}) {
     const now = Date.now();
     const picks = [];
-    const pityHit = !isBot && pity >= CONFIG.pityAfter;
+    const pityHit = !odds && !isBot && pity >= CONFIG.pityAfter;
     for (let i = 0; i < CONFIG.packSize; i++) {
       const last = i === CONFIG.packSize - 1;
       // 5e carte Peu commune+ (Rare+ en premium, Épique+ quand le compteur de pitié est plein)
-      const tier = rollTier(last && pityHit ? 3 : premium ? (last ? 2 : 1) : (last ? 1 : 0), boost);
+      const tier = odds ? rollCustomTier(odds) : rollTier(last && pityHit ? 3 : premium ? (last ? 2 : 1) : (last ? 1 : 0), boost);
       picks.push({ siteId: pickIn(tier), holo: holoRoll(premium) });
     }
     const byId = await ensureSites(q, picks.map((p) => p.siteId));
@@ -219,7 +229,7 @@ export async function createGame(db) {
     await q.run('UPDATE users SET packs_opened = packs_opened + 1 WHERE id = $1', [userId]);
     if (!isBot) {
       const gotEpic = out.some((c) => c.site.rarity >= 3);
-      await q.run('UPDATE users SET pity = $1 WHERE id = $2', [gotEpic ? 0 : pity + 1, userId]);
+      if (!odds) await q.run('UPDATE users SET pity = $1 WHERE id = $2', [gotEpic ? 0 : pity + 1, userId]);
       await bump(q, userId, { packs: 1, ...pullStats(out) });
       if (pityHit) out.pity = true;
     }

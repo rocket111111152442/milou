@@ -562,6 +562,12 @@ route('GET', '/api/admin/users', admin(async ({ c, query }) => {
 }));
 
 // Offrir : bits (positif ou négatif), boosters, cartes. Cible : un joueur ou tous les humains.
+// Boosters sur mesure : l'admin choisit le pourcentage de chaque rareté par carte.
+route('POST', '/api/admin/give-packs', admin(async ({ c, body }) => {
+  const u = await c.db.one('SELECT id FROM users WHERE lower(username) = lower($1)', [String(body.username || '').trim()]);
+  if (!u) throw new GameError('Joueur introuvable.', 404);
+  return c.shops.giftPacks(u.id, body);
+}));
 route('POST', '/api/admin/give', admin(async ({ c, body, me }) => {
   const bits = Math.trunc(Number(body.bits) || 0);
   const packs = Math.max(0, Math.min(1000, Math.trunc(Number(body.packs) || 0)));

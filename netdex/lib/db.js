@@ -375,6 +375,10 @@ CREATE TABLE IF NOT EXISTS share_offers (
 CREATE INDEX IF NOT EXISTS offers_seller ON share_offers (seller_id, status);
 CREATE INDEX IF NOT EXISTS offers_buyer ON share_offers (buyer_id, status);
 CREATE INDEX IF NOT EXISTS offers_shop ON share_offers (shop_id, status);
+
+-- v10 : boosters sur mesure offerts par l'admin (pourcentage de chaque rareté par carte, et un nom).
+ALTER TABLE sealed_packs ADD COLUMN IF NOT EXISTS odds JSONB;
+ALTER TABLE sealed_packs ADD COLUMN IF NOT EXISTS label TEXT;
 `;
 
 // DB_SOURCE choisit la base parmi celles branchées sur Vercel : « supabase » (POSTGRES_URL) ou « neon » (stockage_DATABASE_URL).

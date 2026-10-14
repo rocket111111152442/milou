@@ -506,3 +506,8 @@ table.data td.num { font-family: var(--mono); text-align: right; }
 .shop-emoji { font-style: normal; }
 .danger-zone { border-color: var(--bad); margin-top: 10px; }
 .panel.how ol li { margin: 2px 0; }
+/* Booster offert par l'admin (chances sur mesure) */
+.q-gift { --qc: var(--r-mythic, #e5484d); }
+.sealed.q-gift { box-shadow: 0 0 0 1px var(--qc) inset, 0 0 18px -6px var(--qc); }
+.gift-odds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 10px; }
+@media (max-width: 560px) { .gift-odds { grid-template-columns: repeat(2, 1fr); } }

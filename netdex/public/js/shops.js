@@ -9,7 +9,7 @@ const marketTabs = (on) => `<div class="tabs"><a href="#/market"${on === 'auctio
 export { marketTabs };
 
 export function packCardHtml(p, actions = '') {
-  return `<div class="sealed q-${p.quality}" data-pack="${p.id}">
+  return `<div class="sealed ${p.custom ? 'q-gift' : `q-${p.quality}`}" data-pack="${p.id}">
     <div class="sealed-top"><span class="q-badge">${esc(p.qualityName || QUAL[p.quality])}</span>${p.boost > 1 ? `<span class="mono small">×${String(p.boost).replace('.', ',')}</span>` : ''}</div>
     <div class="sealed-logo">netdex_</div>
     ${oddsHtml(p.odds)}
@@ -23,12 +23,12 @@ export function packCardHtml(p, actions = '') {
 export async function sealedSection(el) {
   const draw = async () => {
     const d = await api('/packs/sealed');
-    el.innerHTML = `<div class="row" style="margin-bottom:8px"><b class="grow">Mes boosters scellés <span class="muted small">${d.items.length}/${d.max}</span></b>
+    el.innerHTML = `<div class="row" style="margin-bottom:8px"><b class="grow">Mes boosters scellés <span class="muted small">${d.items.filter((p) => !p.custom).length}/${d.max}</span></b>
       <button class="btn sm" data-seal ${state.me.packs.available ? '' : 'disabled'}>Garder un booster scellé</button></div>
       <p class="muted small" style="margin:0 0 10px">Garde ton prochain booster fermé avec sa qualité et ses chances : ouvre-le plus tard ou revends-le dans une boutique d'échange.</p>
       ${d.items.length ? `<div class="sealed-grid">${d.items.map((p) => packCardHtml(p, p.listing
         ? `<div class="small muted">En vente ${fmt(p.listing.price)} bits chez <a href="#/shop/${p.listing.shopId}">${esc(p.listing.shopName)}</a></div>`
-        : `<div class="row" style="gap:6px"><button class="btn primary sm" data-open-sealed="${p.id}">Ouvrir</button><button class="btn sm" data-sell-sealed="${p.id}">Vendre</button></div>`)).join('')}</div>`
+        : `<div class="row" style="gap:6px"><button class="btn primary sm" data-open-sealed="${p.id}">Ouvrir</button>${p.custom ? '<span class="small muted">Cadeau</span>' : `<button class="btn sm" data-sell-sealed="${p.id}">Vendre</button>`}</div>`)).join('')}</div>`
         : '<div class="muted small">Aucun booster scellé.</div>'}`;
   };
   await draw();

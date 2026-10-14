@@ -1052,6 +1052,15 @@ export async function viewCatalog(el) {
 // ======================================================================
 // Administration
 // ======================================================================
+// Modèles de boosters sur mesure (pourcentage par carte, de Commune [0] à Mythique [5]).
+const GIFT_PRESETS = [
+  { name: 'Normal', w: { 0: 70, 1: 24, 2: 5, 3: 0.9, 4: 0.098, 5: 0.002 } },
+  { name: 'Généreux', w: { 0: 40, 1: 30, 2: 20, 3: 8, 4: 1.8, 5: 0.2 } },
+  { name: 'Épique+', w: { 0: 0, 1: 0, 2: 0, 3: 75, 4: 22, 5: 3 } },
+  { name: 'Que des Légendaires', w: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 100, 5: 0 } },
+  { name: 'Jackpot Mythique', w: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 100 } },
+];
+
 export async function viewAdmin(el) {
   if (!state.me.user.isAdmin) { el.innerHTML = '<div class="empty"><b>Accès réservé</b></div>'; return; }
   el.innerHTML = `<div class="page-head"><h1>Administration</h1><div class="row"><button class="btn primary sm" data-open-free>Booster gratuit</button><button class="btn sm" data-open-prem>Premium gratuit</button></div></div>
@@ -1069,6 +1078,20 @@ export async function viewAdmin(el) {
       </div>
       <datalist id="adm-users"></datalist><datalist id="adm-sites"></datalist>
       <button class="btn primary">Envoyer</button>
+    </form>
+    <form class="panel" data-gift-packs style="margin-top:10px">
+      <b>Offrir des boosters sur mesure</b>
+      <p class="muted small" style="margin:4px 0 10px">Tu choisis le pourcentage de chaque rareté pour <b>chaque carte</b> (5 cartes par booster). Le joueur les reçoit fermés dans ses boosters scellés et les ouvre quand il veut. Ils ne peuvent pas être revendus en boutique.</p>
+      <div class="grid-2">
+        <label class="field"><span>Joueur</span><input type="text" name="username" placeholder="pseudo" autocomplete="off" list="adm-users"></label>
+        <div class="row" style="gap:8px"><label class="field" style="flex:1"><span>Nombre</span><input type="number" name="count" value="1" min="1" max="100"></label>
+          <label class="field" style="flex:2"><span>Nom du booster</span><input type="text" name="label" maxlength="30" placeholder="Booster spécial"></label></div>
+      </div>
+      <div class="row small" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${GIFT_PRESETS.map((p, i) => `<button type="button" class="btn sm" data-preset="${i}">${p.name}</button>`).join('')}</div>
+      <div class="gift-odds">${[5, 4, 3, 2, 1, 0].map((r) => `<label class="field"><span class="r-${r}"><span class="rtext">${RARITY[r].name}</span> (%)</span><input type="number" name="r${r}" min="0" max="100" step="0.001" value="${GIFT_PRESETS[0].w[r]}"></label>`).join('')}</div>
+      <p class="small" data-gift-sum></p>
+      <div data-gift-preview></div>
+      <button class="btn primary">Offrir</button>
     </form>
     <h2>Cartes spéciales</h2>
     <form class="panel" data-custom>
@@ -1172,6 +1195,32 @@ export async function viewAdmin(el) {
   let t;
   $('[data-uq]', el).addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => users().catch(toastErr), 200); });
   $('[data-kind]', el).addEventListener('change', () => users().catch(toastErr));
+  const gf = $('[data-gift-packs]', el);
+  const giftOdds = () => Object.fromEntries([0, 1, 2, 3, 4, 5].map((r) => [r, Number(gf[`r${r}`].value) || 0]));
+  const giftPreview = () => {
+    const w = giftOdds(), sum = Object.values(w).reduce((a, v) => a + v, 0);
+    $('[data-gift-sum]', gf).innerHTML = Math.abs(sum - 100) < 0.01 ? `Total : <b>100 %</b>` : `<span style="color:var(--bad)">Total : ${+sum.toFixed(3)} % (il faut 100 %)</span> <button type="button" class="btn sm" data-fill>Mettre le reste en Commune</button>`;
+    // Chance d'avoir au moins une carte de chaque rareté dans le booster (5 cartes).
+    const atLeast = Object.fromEntries([2, 3, 4, 5].map((r) => [r, (1 - (1 - [0, 1, 2, 3, 4, 5].filter((k) => k >= r).reduce((a, k) => a + w[k], 0) / 100) ** 5) * 100]));
+    $('[data-gift-preview]', gf).innerHTML = `<div class="muted small" style="margin-bottom:4px">Chances par booster (au moins une carte de) :</div>${oddsHtml(atLeast)}`;
+  };
+  gf.addEventListener('input', giftPreview);
+  gf.addEventListener('click', (e) => {
+    const p = e.target.closest('[data-preset]');
+    if (p) { const w = GIFT_PRESETS[Number(p.dataset.preset)].w; for (let r = 0; r <= 5; r++) gf[`r${r}`].value = w[r]; giftPreview(); }
+    if (e.target.closest('[data-fill]')) {
+      const w = giftOdds(); const rest = 100 - [1, 2, 3, 4, 5].reduce((a, r) => a + w[r], 0);
+      gf.r0.value = Math.max(0, +rest.toFixed(3)); giftPreview();
+    }
+  });
+  gf.addEventListener('submit', (e) => {
+    e.preventDefault();
+    busy($('button.primary', gf), async () => {
+      const r = await api('/admin/give-packs', { username: gf.username.value.trim(), count: Number(gf.count.value), label: gf.label.value, odds: giftOdds() });
+      toast(`${r.count} « ${r.label} » offert${r.count > 1 ? 's' : ''} à ${r.username}`, 'ok'); refreshMe();
+    });
+  });
+  giftPreview();
   const form = $('[data-give]', el);
   form.domain.addEventListener('input', () => {
     clearTimeout(t);
