@@ -17,6 +17,10 @@ window.MD_CONFIG = {
 
   requestAnimationFrame(() => document.body.classList.add("is-loaded"));
 
+  /* vidéo du hero : figée si l'utilisateur demande moins d'animations */
+  const heroVideo = document.querySelector(".hero-video");
+  if (heroVideo && reduce) { heroVideo.removeAttribute("autoplay"); heroVideo.pause(); }
+
   /* ---------- phone ---------- */
   const tel = cfg.phone.replace(/[^\d+]/g, "");
   document.querySelectorAll("[data-phone]").forEach(el => {

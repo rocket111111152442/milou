@@ -53,7 +53,10 @@
   <main>
     <!-- HERO -->
     <section class="hero" id="top">
-      <canvas id="garden" aria-hidden="true"></canvas>
+      <video class="hero-video" autoplay muted loop playsinline preload="auto" poster="assets/video/hero-poster.jpg" aria-hidden="true">
+        <source src="assets/video/hero.webm" type="video/webm">
+        <source src="assets/video/hero.mp4" type="video/mp4">
+      </video>
       <div class="wrap">
         <div class="hero-hud mono">
           <span class="live"><i></i> Six-Fours-les-Plages · 83140</span>
@@ -74,7 +77,6 @@
           </div>
         </div>
       </div>
-      <span class="hero-hint mono">Bougez la souris — le vent souffle</span>
     </section>
 
     <div class="marquee" aria-hidden="true">
@@ -233,11 +235,6 @@
             <span class="scan"></span><span class="corner c1"></span><span class="corner c2"></span>
             <figcaption><b>Abords de piscine</b><span class="mono">03</span></figcaption>
           </figure>
-          <figure class="shot reveal" data-delay="3">
-            <img src="assets/img/allee-pierre.jpg" alt="Pelouse et terrasse en pierre naturelle devant une maison provençale" loading="lazy">
-            <span class="scan"></span><span class="corner c1"></span><span class="corner c2"></span>
-            <figcaption><b>Pelouse &amp; pierre</b><span class="mono">04</span></figcaption>
-          </figure>
         </div>
       </div>
     </section>
@@ -333,7 +330,6 @@
   </footer>
 
   <script src="assets/js/main.js"></script>
-  <script src="assets/js/garden.js"></script>
   <script src="assets/js/seasons.js"></script>
 </body>
 </html>

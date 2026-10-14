@@ -20,5 +20,5 @@ window.MD_CONFIG = {
 
 ## Pages
 
-- `index.html` — accueil : hero génératif (végétation qui pousse et réagit à la souris + au vent réel via Open-Meteo), services, cadran des saisons interactif, réalisations, avis, étapes, CTA.
+- `index.html` — accueil : vidéo de fond en boucle (`assets/video/`, générée par IA : ambiance, pas une réalisation), météo réelle via Open-Meteo, services, cadran des saisons interactif, réalisations, avis, étapes, CTA.
 - `contact.html` — devis en 3 étapes, coordonnées, carte, itinéraire.
