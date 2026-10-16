@@ -8,6 +8,7 @@ fan-tour-zanzibar/
 ├── styles.css     design (couleurs en variables au début du fichier)
 ├── main.js        liens WhatsApp, menu mobile, animations, formulaire
 ├── images/        photos (WebP, 800 px et 1600 px de large)
+├── videos/        vidéo de fond du hero (MP4 H.264, sans son)
 ├── favicon.svg
 ├── robots.txt / sitemap.xml
 └── vercel.json    en-têtes de cache et de sécurité
@@ -40,11 +41,16 @@ Chaque endroit à adapter est signalé dans le code par un commentaire `À MODIF
 | Texte de présentation | section `#confiance` |
 | Excursions | une balise `<article class="card">` par excursion dans `#excursions` |
 | Photos | remplacer les fichiers dans `images/` en gardant le même nom (ou changer le `src`) |
+| Vidéo du hero | remplacer `videos/hero-coucher-soleil.mp4` et `images/hero-video-poster.webp` (première image de la vidéo) |
 | Couleurs / typographies | variables `:root` en haut de `styles.css` |
 
 ### Ajouter des tarifs ou des disponibilités plus tard
 
 Le site n'en affiche volontairement aucun. Pour en ajouter, le plus simple est une ligne `<p class="card-price">…</p>` dans la carte concernée, au-dessus du bouton.
+
+## Vidéo du hero
+
+Fournie par le client (fichier « No Copyright / Copyright Free Videos – sunset beach sea waves »). Sa licence exacte n'a pas été vérifiée : conservez la source d'origine. Résolution actuelle 640×360, un peu floue en plein écran sur grand écran ; une version 1080p serait préférable. Le son a été retiré et la vidéo est remplacée par son image fixe si le visiteur a demandé à réduire les animations.
 
 ## Photos
 
@@ -54,7 +60,6 @@ Ne pas utiliser de photos Instagram (les vôtres ou celles de clients) sans l'ac
 
 | Fichier | Source |
 |---|---|
-| hero | https://images.unsplash.com/photo-1507525428034-b723cf961d3e |
 | mnemba | https://images.unsplash.com/photo-1437622368342-7a3d73a34c8f |
 | nakupenda | https://images.unsplash.com/photo-1535262412227-85541e910204 |
 | prison-island | https://images.unsplash.com/photo-1559128010-7c1ad6e1b6a5 |

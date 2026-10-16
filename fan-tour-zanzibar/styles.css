@@ -246,17 +246,12 @@ em { font-style: italic; }
 .hero-media {
   position: absolute; inset: 0; z-index: -2;
   width: 100%; height: 100%; object-fit: cover; object-position: center 60%;
-  animation: kenburns 22s var(--ease) both;
 }
 .hero-overlay {
   position: absolute; inset: 0; z-index: -1;
   background:
     linear-gradient(180deg, rgba(6, 32, 47, .55) 0%, rgba(6, 32, 47, .05) 30%, rgba(6, 32, 47, .1) 50%, rgba(6, 32, 47, .82) 100%),
     linear-gradient(90deg, rgba(6, 32, 47, .6) 0%, rgba(6, 32, 47, .15) 60%, rgba(6, 32, 47, 0) 85%);
-}
-@keyframes kenburns {
-  from { transform: scale(1.12); }
-  to { transform: scale(1); }
 }
 .hero-content { max-width: 1200px; }
 .hero h1 {

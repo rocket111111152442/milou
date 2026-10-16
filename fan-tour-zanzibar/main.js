@@ -11,6 +11,13 @@ document.querySelectorAll("[data-wa]").forEach((el) => {
   el.href = waLink(el.dataset.wa);
 });
 
+// Vidéo du hero : image fixe (poster) si l'utilisateur préfère réduire les animations.
+const heroVideo = document.querySelector("[data-hero-video]");
+if (heroVideo && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  heroVideo.removeAttribute("autoplay");
+  heroVideo.pause();
+}
+
 // En-tête : fond opaque après le hero.
 const header = document.querySelector("[data-header]");
 const hero = document.querySelector(".hero");
