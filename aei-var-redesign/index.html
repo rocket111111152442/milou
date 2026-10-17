@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="preload" as="image" href="video/poster.webp">
+<link rel="preload" as="image" href="img/bien2.webp">
 <link rel="stylesheet" href="styles.css">
 <script type="application/ld+json">
 {
@@ -99,10 +99,12 @@
 
 <!-- HERO -->
 <section class="hero">
-  <video class="hero__video" autoplay muted loop playsinline preload="auto" poster="video/poster.webp" aria-hidden="true">
-    <source src="video/hero.webm" type="video/webm">
-    <source src="video/hero.mp4" type="video/mp4">
-  </video>
+  <div class="hero__slides" aria-hidden="true">
+    <div class="hero__slide is-active" style="background-image:url(img/bien2.webp)"></div>
+    <div class="hero__slide" style="background-image:url(img/bien3.webp)"></div>
+    <div class="hero__slide" style="background-image:url(img/bien1.webp)"></div>
+    <div class="hero__slide" style="background-image:url(img/bien7.webp)"></div>
+  </div>
   <div class="hero__veil"></div>
   <div class="hero__content container">
     <p class="eyebrow eyebrow--light reveal-hero">Agence immobilière · Six-Fours-les-Plages</p>
@@ -156,7 +158,9 @@
   </div>
 
   <div class="hero__meta container reveal-hero">
-    <button class="hero__pause" type="button" aria-label="Mettre la vidéo en pause" aria-pressed="false"><i></i><i></i></button>
+    <div class="hero__dots" role="tablist" aria-label="Diaporama">
+      <button class="is-active" aria-label="Photo 1"></button><button aria-label="Photo 2"></button><button aria-label="Photo 3"></button><button aria-label="Photo 4"></button>
+    </div>
     <a class="hero__scroll" href="#agence"><span>Découvrir</span><i></i></a>
   </div>
 </section>
@@ -526,6 +530,25 @@
     <a href="#top" class="totop" aria-label="Retour en haut">↑</a>
   </div>
 </footer>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photos du bien" hidden>
+  <div class="lb__top">
+    <div><p class="lb__title"></p><p class="lb__meta"></p></div>
+    <div class="lb__actions">
+      <a href="#contact" class="btn btn--gold btn--sm lb__cta">Demander une visite</a>
+      <button type="button" class="lb__close" aria-label="Fermer la galerie">✕</button>
+    </div>
+  </div>
+  <div class="lb__stage">
+    <button type="button" class="lb__nav lb__prev" aria-label="Photo précédente">←</button>
+    <img class="lb__img" alt="">
+    <button type="button" class="lb__nav lb__next" aria-label="Photo suivante">→</button>
+  </div>
+  <div class="lb__bottom">
+    <span class="lb__count"></span>
+    <div class="lb__thumbs"></div>
+  </div>
+</div>
 
 <div class="mobile-bar">
   <a href="tel:+33494072635">Appeler</a>

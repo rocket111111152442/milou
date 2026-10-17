@@ -29,6 +29,10 @@ async function seed() {
 
 // Chaque sauvegarde crée un nouveau fichier : pas de souci de cache CDN sur une URL réécrite
 export async function readBiens() {
+  return (await readRaw()).map(b => ({ ...b, ...cleanPhotos(b) }));
+}
+
+async function readRaw() {
   const { blobs } = await list({ prefix: DATA_PREFIX });
   if (!blobs.length) return seed();
   blobs.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
@@ -64,6 +68,15 @@ function cleanPhoto(v) {
   return '';
 }
 
+const MAX_PHOTOS = 30;
+
+// `photos` est la liste complète ; `photo` (la première) reste pour les anciennes données
+export function cleanPhotos(b) {
+  const raw = Array.isArray(b.photos) ? b.photos : b.photo ? [b.photo] : [];
+  const photos = [...new Set(raw.map(cleanPhoto).filter(Boolean))].slice(0, MAX_PHOTOS);
+  return { photo: photos[0] || '', photos };
+}
+
 export function sanitize(input) {
   if (!Array.isArray(input)) throw new Error('Liste de biens attendue');
   if (input.length > 500) throw new Error('Trop de biens');
@@ -85,7 +98,7 @@ export function sanitize(input) {
       prix: str(b.prix, 30),
       badge: BADGES.includes(b.badge) ? b.badge : '',
       vendu: Boolean(b.vendu),
-      photo: cleanPhoto(b.photo),
+      ...cleanPhotos(b),
     };
   });
 }

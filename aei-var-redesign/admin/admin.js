@@ -6,7 +6,8 @@
   let password = '';
   let biens = [];
   let editing = null; // id du bien en cours de modification, null = nouveau
-  let photoUrl = '';
+  let photos = []; // photos du bien en cours d'édition, la première est la principale
+  const MAX_PHOTOS = 30;
   let filter = 'all';
 
   const store = {
@@ -100,7 +101,7 @@
         ${b.photo ? `<img class="item__img" src="${esc(src(b.photo))}" alt="" loading="lazy">` : '<div class="item__img"></div>'}
         <div>
           <p class="item__title">${esc(b.titre)}${b.vendu ? '<span class="pill pill--sold">Vendu</span>' : b.badge ? `<span class="pill">${esc(b.badge)}</span>` : ''}</p>
-          <p class="item__meta">${esc([b.ville, b.cp].filter(Boolean).join(' · '))}${b.surface ? ` · ${esc(b.surface)} m²` : ''}</p>
+          <p class="item__meta">${esc([b.ville, b.cp].filter(Boolean).join(' · '))}${b.surface ? ` · ${esc(b.surface)} m²` : ''} · <span class="item__count">${(b.photos || []).length} photo${(b.photos || []).length > 1 ? 's' : ''}</span></p>
         </div>
         <span class="item__price">${b.vendu ? '' : b.prix ? esc(b.prix) + ' €' : '—'}</span>
         <div class="item__actions">
@@ -157,12 +158,32 @@
   const form = $('#bienForm');
   const drawer = $('#drawer');
 
-  const setPhoto = (url) => {
-    photoUrl = url || '';
-    $('#photoPreview').src = src(photoUrl);
-    $('#photoPreview').hidden = !photoUrl;
-    $('#photoEmpty').hidden = !!photoUrl;
+  const renderPhotos = () => {
+    $('#photoCount').textContent = photos.length ? `(${photos.length})` : '';
+    $('#photoGrid').innerHTML = photos.map((url, i) => `
+      <li class="thumb">
+        <img src="${esc(src(url))}" alt="Photo ${i + 1}">
+        ${i === 0 ? '<span class="thumb__main">Principale</span>' : ''}
+        <div class="thumb__tools">
+          <button type="button" data-ph="first" data-i="${i}" title="Mettre en photo principale" aria-label="Mettre en photo principale" ${i === 0 ? 'disabled' : ''}>★</button>
+          <button type="button" data-ph="left" data-i="${i}" title="Déplacer vers la gauche" aria-label="Déplacer vers la gauche" ${i === 0 ? 'disabled' : ''}>←</button>
+          <button type="button" data-ph="right" data-i="${i}" title="Déplacer vers la droite" aria-label="Déplacer vers la droite" ${i === photos.length - 1 ? 'disabled' : ''}>→</button>
+          <button type="button" class="del" data-ph="del" data-i="${i}" title="Retirer la photo" aria-label="Retirer la photo">✕</button>
+        </div>
+      </li>`).join('');
   };
+
+  $('#photoGrid').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-ph]');
+    if (!btn) return;
+    const i = +btn.dataset.i;
+    const move = (to) => photos.splice(to, 0, photos.splice(i, 1)[0]);
+    if (btn.dataset.ph === 'first') move(0);
+    if (btn.dataset.ph === 'left') move(i - 1);
+    if (btn.dataset.ph === 'right') move(i + 1);
+    if (btn.dataset.ph === 'del') photos.splice(i, 1);
+    renderPhotos();
+  });
 
   const openForm = (b = null) => {
     editing = b ? b.id : null;
@@ -174,7 +195,8 @@
       for (const k of ['titre', 'ville', 'cp', 'prix', 'region', 'surface', 'chambres', 'terrain', 'badge', 'extra']) form.elements[k].value = b[k] ?? '';
       form.elements.vendu.checked = !!b.vendu;
     }
-    setPhoto(b?.photo);
+    photos = b ? [...(b.photos?.length ? b.photos : b.photo ? [b.photo] : [])] : [];
+    renderPhotos();
     drawer.classList.add('is-open');
     drawer.setAttribute('aria-hidden', 'false');
     setTimeout(() => form.elements.titre.focus(), 300);
@@ -200,11 +222,12 @@
       if (bad) ok = false;
     }
     if (!ok) return toast('Le titre et la ville sont obligatoires', true);
-    if (!$('#photoBusy').hidden) return toast('Patientez, la photo est en cours d’envoi', true);
+    if (!$('#photoBusy').hidden) return toast('Patientez, les photos sont en cours d’envoi', true);
 
     const data = Object.fromEntries(['titre', 'ville', 'cp', 'prix', 'region', 'surface', 'chambres', 'terrain', 'badge', 'extra'].map(k => [k, form.elements[k].value.trim()]));
     data.vendu = form.elements.vendu.checked;
-    data.photo = photoUrl;
+    data.photos = [...photos];
+    data.photo = photos[0] || '';
 
     const btn = $('#saveBtn');
     btn.disabled = true;
@@ -244,28 +267,41 @@
     img.src = url;
   });
 
-  const upload = async (file) => {
-    if (!file) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return toast('Format accepté : JPEG, PNG ou WebP', true);
-    $('#photoBusy').hidden = false;
+  // envoi une par une pour rester sous la limite de taille d'une requête
+  const upload = async (files) => {
+    files = [...files].filter(f => /^image\/(jpeg|png|webp)$/.test(f.type));
+    if (!files.length) return toast('Format accepté : JPEG, PNG ou WebP', true);
+    const room = MAX_PHOTOS - photos.length;
+    if (room <= 0) return toast(`${MAX_PHOTOS} photos maximum par bien`, true);
+    if (files.length > room) { toast(`Seules ${room} photos seront ajoutées (${MAX_PHOTOS} max)`, true); files = files.slice(0, room); }
+    const busy = $('#photoBusy');
+    busy.hidden = false;
+    let ok = 0;
     try {
-      const blob = await resize(file);
-      const { url } = await api('/api/upload', { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
-      setPhoto(url);
-      toast('Photo ajoutée');
-    } catch (e) {
-      toast(e.message, true);
+      for (const [n, file] of files.entries()) {
+        busy.textContent = `Envoi de la photo ${n + 1} / ${files.length}…`;
+        try {
+          const blob = await resize(file);
+          const { url } = await api('/api/upload', { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
+          photos.push(url);
+          ok++;
+          renderPhotos();
+        } catch (e) {
+          toast(`${file.name} : ${e.message}`, true);
+        }
+      }
+      if (ok) toast(ok > 1 ? `${ok} photos ajoutées — pensez à enregistrer` : 'Photo ajoutée — pensez à enregistrer');
     } finally {
-      $('#photoBusy').hidden = true;
+      busy.hidden = true;
       $('#photoInput').value = '';
     }
   };
 
   const zone = $('#photoZone');
-  $('#photoInput').addEventListener('change', e => upload(e.target.files[0]));
+  $('#photoInput').addEventListener('change', e => upload(e.target.files));
   ['dragenter', 'dragover'].forEach(t => zone.addEventListener(t, e => { e.preventDefault(); zone.classList.add('is-drag'); }));
   ['dragleave', 'drop'].forEach(t => zone.addEventListener(t, () => zone.classList.remove('is-drag')));
-  zone.addEventListener('drop', e => { e.preventDefault(); upload(e.dataTransfer.files[0]); });
+  zone.addEventListener('drop', e => { e.preventDefault(); upload(e.dataTransfer.files); });
 
   // ---------- Démarrage ----------
   password = store.get();

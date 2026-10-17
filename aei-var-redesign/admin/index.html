@@ -67,14 +67,18 @@
     </div>
 
     <div class="drawer__body">
-      <div class="photo" id="photoZone">
-        <img id="photoPreview" alt="" hidden>
-        <div class="photo__empty" id="photoEmpty">
-          <strong>Ajouter une photo</strong>
-          <span>Glissez une image ici ou cliquez · JPEG, PNG, WebP</span>
+      <div class="gallery">
+        <div class="gallery__head">
+          <span class="gallery__label">Photos <small id="photoCount"></small></span>
+          <span class="gallery__hint">La première photo est la photo principale</span>
         </div>
-        <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp">
-        <div class="photo__busy" id="photoBusy" hidden>Envoi de la photo…</div>
+        <ul class="gallery__grid" id="photoGrid"></ul>
+        <label class="gallery__drop" id="photoZone">
+          <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" multiple>
+          <strong>+ Ajouter des photos</strong>
+          <span>Glissez-déposez ou cliquez · plusieurs à la fois · JPEG, PNG, WebP</span>
+          <span class="gallery__busy" id="photoBusy" hidden></span>
+        </label>
       </div>
 
       <label class="field"><span>Titre de l'annonce *</span><input name="titre" required maxlength="120" placeholder="Villa 5 pièces vue mer"></label>

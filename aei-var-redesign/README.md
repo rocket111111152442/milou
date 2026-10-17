@@ -45,7 +45,7 @@ Toutes les animations se coupent si le visiteur a activé `prefers-reduced-motio
 
 ## Espace d'administration (`/admin`)
 - Adresse : `/admin`. Mot de passe : variable `ADMIN_PASSWORD` dans les réglages du projet Vercel.
-- Permet d'ajouter, modifier, supprimer et réordonner les biens, et d'envoyer des photos.
+- Permet d'ajouter, modifier, supprimer et réordonner les biens, avec jusqu'à 30 photos par bien (la première est la photo principale). Sur le site, un clic sur la photo ouvre la galerie plein écran.
   Les photos sont redimensionnées à 1600 px et converties en WebP dans le navigateur avant l'envoi.
 - Les biens sont stockés dans Vercel Blob (`BLOB_READ_WRITE_TOKEN`). Les 5 dernières versions sont gardées en secours.
   Tant que rien n'a été enregistré, le site affiche `data/biens.json`.

@@ -50,22 +50,22 @@
   const navLinks = $$('.nav a');
   const sections = navLinks.map(a => $(a.getAttribute('href'))).filter(Boolean);
 
-  // ---------- Vidéo d'accueil ----------
-  const video = $('.hero__video');
-  const pauseBtn = $('.hero__pause');
-  const setPaused = (paused) => {
-    paused ? video.pause() : video.play().catch(() => {});
-    pauseBtn.setAttribute('aria-pressed', paused);
-    pauseBtn.setAttribute('aria-label', paused ? 'Lire la vidéo' : 'Mettre la vidéo en pause');
-    pauseBtn.classList.toggle('is-paused', paused);
+  // ---------- Hero slideshow ----------
+  const slides = $$('.hero__slide');
+  const dots = $$('.hero__dots button');
+  let current = 0, timer;
+  const show = (i) => {
+    slides[current].classList.remove('is-active');
+    dots[current].classList.remove('is-active');
+    current = (i + slides.length) % slides.length;
+    slides[current].classList.add('is-active');
+    void dots[current].offsetWidth; // relance l'animation de la barre
+    dots[current].classList.add('is-active');
+    clearTimeout(timer);
+    if (!reduced) timer = setTimeout(() => show(current + 1), 6000);
   };
-  pauseBtn.addEventListener('click', () => setPaused(!video.paused));
-  if (reduced) setPaused(true);
-  // inutile de décoder la vidéo quand l'accueil n'est plus à l'écran
-  new IntersectionObserver(([e]) => {
-    if (pauseBtn.classList.contains('is-paused')) return;
-    e.isIntersecting ? video.play().catch(() => {}) : video.pause();
-  }).observe(video);
+  dots.forEach((d, i) => d.addEventListener('click', () => show(i)));
+  if (!reduced) timer = setTimeout(() => show(1), 6000);
 
   // ---------- Search tabs ----------
   const tabs = $$('.search__tabs button');
@@ -155,12 +155,16 @@
     ].filter(Boolean).map(s => `<li>${s}</li>`).join('');
     const loc = [esc(b.ville), esc(b.cp)].filter(Boolean).join(' · ');
     const alt = esc(`${b.titre} ${b.ville ? 'à ' + b.ville : ''}`.trim());
-    const img = b.photo ? `<img src="${esc(b.photo)}" alt="${alt}" loading="lazy">` : '';
+    const photos = b.photos?.length ? b.photos : b.photo ? [b.photo] : [];
+    const img = photos[0] ? `<img src="${esc(photos[0])}" alt="${alt}" loading="lazy">` : '';
+    const count = photos.length > 1 ? `<span class="bien__count"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="m21 16-5-5-8 8"/></svg>${photos.length}</span>` : '';
     const badge = !b.vendu && b.badge ? `<span class="tag ${BADGE_CLASS[b.badge] || ''}">${esc(b.badge)}</span>` : '';
     const foot = b.vendu
       ? `<span class="bien__sold">Vendu par l'agence</span>`
       : `<strong>${b.prix ? esc(b.prix) + ' €' : 'Prix sur demande'}</strong><a href="#contact" class="bien__cta" aria-label="Demander une visite">→</a>`;
-    const media = b.vendu ? `<div class="bien__media">${img}</div>` : `<a href="#contact" class="bien__media">${img}${badge}</a>`;
+    const media = photos.length
+      ? `<button type="button" class="bien__media" data-gallery="${esc(b.id)}" aria-label="Voir les ${photos.length} photo${photos.length > 1 ? 's' : ''} : ${esc(b.titre)}">${img}${badge}${count}</button>`
+      : `<div class="bien__media">${badge}</div>`;
     return `<article class="bien reveal${b.vendu ? ' bien--sold' : ''}" data-cat="${b.vendu ? 'vendu' : esc(b.region)}">
       ${media}
       <div class="bien__body">
@@ -171,9 +175,11 @@
       </div>
     </article>`;
   };
+  let allBiens = [];
   const renderBiens = (list) => {
     // les biens en vente d'abord, les vendus à la fin
     const sorted = [...list].sort((a, b) => a.vendu - b.vendu);
+    allBiens = sorted;
     grid.innerHTML = sorted.map(cardHTML).join('');
     $$('.bien', grid).forEach((el, i) => { el.style.setProperty('--d', `${(i % 3) * 0.08}s`); io.observe(el); });
   };
@@ -189,6 +195,83 @@
     grid.innerHTML = '<p>Nos biens sont momentanément indisponibles. Appelez-nous au 04 94 07 26 35.</p>';
   };
   loadBiens();
+
+  // ---------- Galerie photos plein écran ----------
+  const lb = $('#lightbox');
+  const lbImg = $('.lb__img', lb);
+  let lbPhotos = [], lbIndex = 0, lbLastFocus = null;
+  const lbShow = (i, dir = 0) => {
+    lbIndex = (i + lbPhotos.length) % lbPhotos.length;
+    lbImg.classList.remove('is-in');
+    lbImg.style.setProperty('--from', `${dir * 40}px`);
+    lbImg.onload = () => requestAnimationFrame(() => lbImg.classList.add('is-in'));
+    lbImg.src = lbPhotos[lbIndex];
+    $('.lb__count', lb).textContent = `${lbIndex + 1} / ${lbPhotos.length}`;
+    $$('.lb__thumbs button', lb).forEach((t, n) => {
+      t.classList.toggle('is-active', n === lbIndex);
+      if (n === lbIndex) t.scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduced ? 'auto' : 'smooth' });
+    });
+    // précharge la suivante
+    if (lbPhotos.length > 1) new Image().src = lbPhotos[(lbIndex + 1) % lbPhotos.length];
+  };
+  const lbOpen = (b) => {
+    lbPhotos = b.photos?.length ? b.photos : [b.photo];
+    $('.lb__title', lb).textContent = b.titre;
+    $('.lb__meta', lb).textContent = [b.ville, b.vendu ? 'Vendu' : b.prix ? `${b.prix} €` : ''].filter(Boolean).join(' · ');
+    $('.lb__cta', lb).hidden = !!b.vendu;
+    $('.lb__thumbs', lb).innerHTML = lbPhotos.length > 1
+      ? lbPhotos.map((p, n) => `<button type="button" data-n="${n}" aria-label="Photo ${n + 1}"><img src="${esc(p)}" alt=""></button>`).join('')
+      : '';
+    lb.classList.toggle('is-single', lbPhotos.length < 2);
+    lbLastFocus = document.activeElement;
+    lb.hidden = false;
+    requestAnimationFrame(() => lb.classList.add('is-open'));
+    document.body.style.overflow = 'hidden';
+    lbShow(0);
+    $('.lb__close', lb).focus();
+  };
+  const lbClose = () => {
+    lb.classList.remove('is-open');
+    document.body.style.overflow = '';
+    setTimeout(() => { lb.hidden = true; lbImg.removeAttribute('src'); }, reduced ? 0 : 400);
+    lbLastFocus?.focus();
+  };
+  grid.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-gallery]');
+    if (!btn) return;
+    const b = allBiens.find(x => x.id === btn.dataset.gallery);
+    if (b) lbOpen(b);
+  });
+  $('.lb__close', lb).addEventListener('click', lbClose);
+  $('.lb__prev', lb).addEventListener('click', () => lbShow(lbIndex - 1, -1));
+  $('.lb__next', lb).addEventListener('click', () => lbShow(lbIndex + 1, 1));
+  $('.lb__thumbs', lb).addEventListener('click', (e) => {
+    const t = e.target.closest('button[data-n]');
+    if (t) lbShow(+t.dataset.n, +t.dataset.n > lbIndex ? 1 : -1);
+  });
+  $('.lb__cta', lb).addEventListener('click', lbClose);
+  lb.addEventListener('click', (e) => { if (e.target === lb || e.target.classList.contains('lb__stage')) lbClose(); });
+  addEventListener('keydown', (e) => {
+    if (lb.hidden) return;
+    if (e.key === 'Escape') lbClose();
+    if (e.key === 'ArrowRight' && lbPhotos.length > 1) lbShow(lbIndex + 1, 1);
+    if (e.key === 'ArrowLeft' && lbPhotos.length > 1) lbShow(lbIndex - 1, -1);
+    if (e.key === 'Tab') { // garde le focus dans la galerie
+      const f = $$('button:not([hidden]), a:not([hidden])', lb).filter(el => el.offsetParent);
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f.at(-1).focus(); }
+      else if (!e.shiftKey && document.activeElement === f.at(-1)) { e.preventDefault(); f[0].focus(); }
+    }
+  });
+  // balayage au doigt
+  let touchX = null;
+  $('.lb__stage', lb).addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  $('.lb__stage', lb).addEventListener('touchend', (e) => {
+    if (touchX === null || lbPhotos.length < 2) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 50) lbShow(lbIndex + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
+    touchX = null;
+  });
 
   // ---------- Filtres biens ----------
   const filterBtns = $$('.filters button');
