@@ -6,7 +6,7 @@ Maquette statique (HTML/CSS/JS, sans dépendance) d'une refonte du site de
 Ouvrir `index.html`, ou lancer `python3 -m http.server` dans ce dossier.
 
 ## Ce qui a été repris du site actuel
-- Couleurs : bleu pétrole `#0c5c6b`, brume `#acc4c5`, sable doré `#eab361`, avec le rouge bordeaux du logo pour la barre verticale.
+- Couleurs : celles du logo, bleu marine `#1e146a` et rouge bordeaux `#a3262a`.
 - Contenus : textes de présentation, services, équipe (photos, rôles, téléphones), coordonnées, 10 biens mis en avant.
 - Photos : téléchargées depuis le site actuel et converties en WebP (2,2 Mo au total).
 
