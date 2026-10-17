@@ -47,9 +47,15 @@ Toutes les animations se coupent si le visiteur a activé `prefers-reduced-motio
 - Adresse : `/admin`. Mot de passe : variable `ADMIN_PASSWORD` dans les réglages du projet Vercel.
 - Permet d'ajouter, modifier, supprimer et réordonner les biens, avec jusqu'à 30 photos par bien (la première est la photo principale). Sur le site, un clic sur la photo ouvre la galerie plein écran.
   Les photos sont redimensionnées à 1600 px et converties en WebP dans le navigateur avant l'envoi.
+- Chaque bien a sa fiche (`bien.html?id=…`) : galerie photos, chiffres clés, description, caractéristiques,
+  points forts, composition par niveau, DPE/GES, informations financières, simulateur de mensualités,
+  carte du secteur, formulaire de visite pré-rempli, partage, impression et biens similaires.
+  Toutes ces informations se remplissent dans l'admin ; une rubrique vide n'apparaît pas sur la fiche.
 - Les biens sont stockés dans Vercel Blob (`BLOB_READ_WRITE_TOKEN`). Les 5 dernières versions sont gardées en secours.
   Tant que rien n'a été enregistré, le site affiche `data/biens.json`.
 - Les modifications apparaissent sur le site immédiatement, sans redéploiement.
 - Limites : un seul mot de passe partagé, et pas de limitation de tentatives au-delà d'un délai de 0,8 s par erreur.
   Si deux personnes enregistrent en même temps, c'est la dernière sauvegarde qui est gardée.
   Supprimer un bien ne supprime pas sa photo du stockage Blob.
+- La fiche est construite dans le navigateur : Google l'indexe moins bien qu'une page générée côté serveur.
+  À prévoir pour une vraie mise en ligne (rendu serveur ou pages statiques générées).

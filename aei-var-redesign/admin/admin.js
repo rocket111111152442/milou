@@ -107,6 +107,7 @@
         <div class="item__actions">
           <button class="icon-btn" data-up="${i}" aria-label="Monter" ${i === 0 ? 'disabled' : ''}>↑</button>
           <button class="icon-btn" data-down="${i}" aria-label="Descendre" ${i === biens.length - 1 ? 'disabled' : ''}>↓</button>
+          <a class="icon-btn" href="/bien.html?id=${encodeURIComponent(b.id)}" target="_blank" rel="noopener" aria-label="Voir la fiche sur le site" title="Voir la fiche">↗</a>
           <button class="icon-btn" data-edit="${esc(b.id)}" aria-label="Modifier">✎</button>
         </div>
       </li>`).join('')
@@ -155,6 +156,10 @@
   });
 
   // ---------- Formulaire ----------
+  const FIELDS = ['titre', 'ville', 'cp', 'prix', 'region', 'surface', 'chambres', 'terrain', 'badge', 'extra',
+    'type', 'ref', 'pieces', 'sdb', 'sde', 'niveaux', 'annee', 'cuisine', 'chauffage', 'description',
+    'dpe', 'dpeKwh', 'ges', 'gesCo2', 'energieMin', 'energieMax', 'energieRef',
+    'honoraires', 'taxeFonciere', 'chargesCopro', 'lotsCopro'];
   const form = $('#bienForm');
   const drawer = $('#drawer');
 
@@ -185,6 +190,55 @@
     renderPhotos();
   });
 
+  // Points forts : liste de pastilles
+  let equipements = [];
+  const renderEq = () => {
+    $('#eqChips').innerHTML = equipements.map((e, i) => `<span class="chip">${esc(e)}<button type="button" data-eq="${i}" aria-label="Retirer ${esc(e)}">✕</button></span>`).join('');
+    $('#eqCount').textContent = equipements.length ? `(${equipements.length})` : '';
+    $$('#eqQuick button').forEach(btn => { btn.hidden = equipements.some(e => e.toLowerCase() === btn.textContent.toLowerCase()); });
+  };
+  const addEq = (v) => {
+    v = v.trim().slice(0, 40);
+    if (!v || equipements.some(e => e.toLowerCase() === v.toLowerCase()) || equipements.length >= 30) return;
+    equipements.push(v);
+    renderEq();
+  };
+  $('#eqChips').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-eq]');
+    if (btn) { equipements.splice(+btn.dataset.eq, 1); renderEq(); }
+  });
+  $('#eqInput').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    addEq(e.target.value);
+    e.target.value = '';
+  });
+  $('#eqQuick').addEventListener('click', (e) => { if (e.target.matches('button')) addEq(e.target.textContent); });
+
+  // Composition : une ligne par pièce, regroupées par niveau sur le site
+  const compoRow = (r = {}) => `<div class="compo__row">
+      <input data-k="niveau" placeholder="Niveau (ex. Rez-de-chaussée)" value="${esc(r.niveau)}" maxlength="40" list="niveaux">
+      <input data-k="piece" placeholder="Pièce (ex. Salon)" value="${esc(r.piece)}" maxlength="60">
+      <input data-k="surface" placeholder="m²" value="${esc(r.surface)}" maxlength="12" inputmode="decimal">
+      <button type="button" aria-label="Retirer la pièce">✕</button>
+    </div>`;
+  const updateCompoCount = () => {
+    const n = readCompo().length;
+    $('#compoCount').textContent = n ? `(${n})` : '';
+  };
+  const readCompo = () => $$('#compo .compo__row').map(row => Object.fromEntries($$('input', row).map(i => [i.dataset.k, i.value.trim()]))).filter(r => r.piece);
+  $('#compoAdd').addEventListener('click', () => {
+    const rows = $$('#compo .compo__row');
+    const lastLevel = rows.length ? $('input[data-k="niveau"]', rows.at(-1)).value : '';
+    $('#compo').insertAdjacentHTML('beforeend', compoRow({ niveau: lastLevel }));
+    $('#compo .compo__row:last-child input[data-k="piece"]').focus();
+  });
+  $('#compo').addEventListener('click', (e) => {
+    if (e.target.closest('button')) { e.target.closest('.compo__row').remove(); updateCompoCount(); }
+  });
+  $('#compo').addEventListener('input', updateCompoCount);
+  document.body.insertAdjacentHTML('beforeend', '<datalist id="niveaux"><option value="Sous-sol"><option value="Rez-de-chaussée"><option value="Rez-de-jardin"><option value="1er étage"><option value="2e étage"><option value="Combles"><option value="Extérieur"></datalist>');
+
   const openForm = (b = null) => {
     editing = b ? b.id : null;
     form.reset();
@@ -192,9 +246,13 @@
     $('#formTitle').textContent = b ? 'Modifier le bien' : 'Ajouter un bien';
     $('#deleteBtn').hidden = !b;
     if (b) {
-      for (const k of ['titre', 'ville', 'cp', 'prix', 'region', 'surface', 'chambres', 'terrain', 'badge', 'extra']) form.elements[k].value = b[k] ?? '';
+      for (const k of FIELDS) form.elements[k].value = b[k] ?? '';
       form.elements.vendu.checked = !!b.vendu;
     }
+    equipements = [...(b?.equipements || [])];
+    renderEq();
+    $('#compo').innerHTML = (b?.composition || []).map(compoRow).join('');
+    updateCompoCount();
     photos = b ? [...(b.photos?.length ? b.photos : b.photo ? [b.photo] : [])] : [];
     renderPhotos();
     drawer.classList.add('is-open');
@@ -224,7 +282,9 @@
     if (!ok) return toast('Le titre et la ville sont obligatoires', true);
     if (!$('#photoBusy').hidden) return toast('Patientez, les photos sont en cours d’envoi', true);
 
-    const data = Object.fromEntries(['titre', 'ville', 'cp', 'prix', 'region', 'surface', 'chambres', 'terrain', 'badge', 'extra'].map(k => [k, form.elements[k].value.trim()]));
+    const data = Object.fromEntries(FIELDS.map(k => [k, form.elements[k].value.trim()]));
+    data.equipements = [...equipements];
+    data.composition = readCompo();
     data.vendu = form.elements.vendu.checked;
     data.photos = [...photos];
     data.photo = photos[0] || '';

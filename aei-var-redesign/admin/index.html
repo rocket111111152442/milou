@@ -104,6 +104,91 @@
         <label class="field"><span>Atout mis en avant</span><input name="extra" maxlength="40" placeholder="Piscine, vue mer…"></label>
       </div>
       <label class="switch"><input type="checkbox" name="vendu"><span></span>Marquer comme vendu</label>
+
+      <details class="sect" open>
+        <summary>Détails du bien</summary>
+        <div class="sect__body">
+          <div class="row">
+            <label class="field"><span>Type</span>
+              <select name="type"><option>Maison</option><option>Villa</option><option>Appartement</option><option>Terrain</option><option>Immeuble</option><option>Local commercial</option><option>Parking</option><option>Autre</option></select>
+            </label>
+            <label class="field"><span>Référence</span><input name="ref" maxlength="30" placeholder="VM11558"></label>
+          </div>
+          <div class="row row--3">
+            <label class="field"><span>Pièces</span><input name="pieces" maxlength="10" inputmode="numeric"></label>
+            <label class="field"><span>Salles de bains</span><input name="sdb" maxlength="10" inputmode="numeric"></label>
+            <label class="field"><span>Salles d'eau</span><input name="sde" maxlength="10" inputmode="numeric"></label>
+          </div>
+          <div class="row row--3">
+            <label class="field"><span>Niveaux</span><input name="niveaux" maxlength="10" inputmode="numeric"></label>
+            <label class="field"><span>Année de construction</span><input name="annee" maxlength="10" inputmode="numeric" placeholder="1985"></label>
+            <label class="field"><span>Cuisine</span><input name="cuisine" maxlength="60" placeholder="Équipée" list="cuisines"></label>
+          </div>
+          <datalist id="cuisines"><option value="Aménagée et équipée"><option value="Équipée"><option value="Américaine équipée"><option value="Indépendante"><option value="Kitchenette"></datalist>
+          <label class="field"><span>Chauffage</span><input name="chauffage" maxlength="120" placeholder="Pompe à chaleur, chauffage au sol…"></label>
+        </div>
+      </details>
+
+      <details class="sect" open>
+        <summary>Description</summary>
+        <div class="sect__body">
+          <label class="field"><span>Texte de l'annonce</span><textarea name="description" rows="8" maxlength="6000" placeholder="Décrivez le bien : situation, pièces, atouts… Laissez une ligne vide entre les paragraphes."></textarea></label>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Points forts &amp; équipements <small id="eqCount"></small></summary>
+        <div class="sect__body">
+          <div class="chips-edit" id="eqChips"></div>
+          <div class="row">
+            <label class="field"><span>Ajouter un point fort</span><input id="eqInput" maxlength="40" placeholder="Tapez puis Entrée"></label>
+          </div>
+          <div class="quick" id="eqQuick">
+            <button type="button">Vue mer</button><button type="button">Piscine</button><button type="button">Jardin</button><button type="button">Terrasse</button><button type="button">Garage</button><button type="button">Parking</button><button type="button">Ascenseur</button><button type="button">Climatisation</button><button type="button">Cave</button><button type="button">Proche plages</button><button type="button">Proche commerces</button><button type="button">Calme</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Composition pièce par pièce <small id="compoCount"></small></summary>
+        <div class="sect__body">
+          <div class="compo" id="compo"></div>
+          <button type="button" class="btn btn--ghost btn--sm" id="compoAdd">+ Ajouter une pièce</button>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Bilan énergétique (DPE)</summary>
+        <div class="sect__body">
+          <div class="row">
+            <label class="field"><span>Classe DPE</span><select name="dpe"><option value="">Non communiqué</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></label>
+            <label class="field"><span>Consommation (kWh/m²/an)</span><input name="dpeKwh" maxlength="10" inputmode="numeric"></label>
+          </div>
+          <div class="row">
+            <label class="field"><span>Classe GES</span><select name="ges"><option value="">Non communiqué</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></label>
+            <label class="field"><span>Émissions (kg CO₂/m²/an)</span><input name="gesCo2" maxlength="10" inputmode="numeric"></label>
+          </div>
+          <div class="row row--3">
+            <label class="field"><span>Dépenses min (€/an)</span><input name="energieMin" maxlength="20" inputmode="numeric"></label>
+            <label class="field"><span>Dépenses max (€/an)</span><input name="energieMax" maxlength="20" inputmode="numeric"></label>
+            <label class="field"><span>Année de référence</span><input name="energieRef" maxlength="10" inputmode="numeric" placeholder="2021"></label>
+          </div>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Informations financières</summary>
+        <div class="sect__body">
+          <label class="field"><span>Honoraires</span><input name="honoraires" maxlength="200" list="honos" placeholder="Les honoraires d'agence sont à la charge du vendeur."></label>
+          <datalist id="honos"><option value="Les honoraires d'agence sont intégralement à la charge du vendeur."><option value="Honoraires à la charge de l'acquéreur : 5 % TTC du prix hors honoraires."></datalist>
+          <div class="row">
+            <label class="field"><span>Taxe foncière (€/an)</span><input name="taxeFonciere" maxlength="20" inputmode="numeric"></label>
+            <label class="field"><span>Charges de copro (€/an)</span><input name="chargesCopro" maxlength="20" inputmode="numeric"></label>
+          </div>
+          <label class="field field--sm"><span>Lots en copropriété</span><input name="lotsCopro" maxlength="10" inputmode="numeric"></label>
+        </div>
+      </details>
+
     </div>
 
     <div class="drawer__foot">

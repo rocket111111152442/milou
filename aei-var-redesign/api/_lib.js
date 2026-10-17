@@ -56,11 +56,23 @@ export async function writeBiens(biens) {
 const str = (v, max = 120) => String(v ?? '').trim().slice(0, max);
 const BADGES = ['', 'Nouveauté', 'Exclusivité', 'Coup de cœur', 'Prix en baisse'];
 const REGIONS = ['var', 'loiret', 'autre'];
+const TYPES = ['Maison', 'Appartement', 'Villa', 'Terrain', 'Immeuble', 'Local commercial', 'Parking', 'Autre'];
+const LETTRES = ['', 'A', 'B', 'C', 'D', 'E', 'F', 'G'];
+
+const strList = (v, maxItems, maxLen) =>
+  (Array.isArray(v) ? v : []).map(x => str(x, maxLen)).filter(Boolean).slice(0, maxItems);
+
+function cleanComposition(v) {
+  return (Array.isArray(v) ? v : [])
+    .map(r => ({ niveau: str(r?.niveau, 40), piece: str(r?.piece, 60), surface: str(r?.surface, 12) }))
+    .filter(r => r.piece)
+    .slice(0, 60);
+}
 
 // N'accepte qu'une image locale du site ou une photo hébergée sur Vercel Blob
 function cleanPhoto(v) {
   const s = str(v, 500);
-  if (/^img\/[\w.-]+\.(webp|jpe?g|png)$/i.test(s)) return s;
+  if (/^img\/(?:[\w-]+\/)*[\w.-]+\.(webp|jpe?g|png)$/i.test(s) && !s.includes('..')) return s;
   try {
     const u = new URL(s);
     if (u.protocol === 'https:' && u.hostname.endsWith('.public.blob.vercel-storage.com')) return u.href;
@@ -99,6 +111,29 @@ export function sanitize(input) {
       badge: BADGES.includes(b.badge) ? b.badge : '',
       vendu: Boolean(b.vendu),
       ...cleanPhotos(b),
+      ref: str(b.ref, 30),
+      type: TYPES.includes(b.type) ? b.type : 'Maison',
+      pieces: str(b.pieces, 10),
+      sdb: str(b.sdb, 10),
+      sde: str(b.sde, 10),
+      niveaux: str(b.niveaux, 10),
+      annee: str(b.annee, 10),
+      cuisine: str(b.cuisine, 60),
+      chauffage: str(b.chauffage, 120),
+      description: str(b.description, 6000),
+      equipements: strList(b.equipements, 30, 40),
+      composition: cleanComposition(b.composition),
+      dpe: LETTRES.includes(b.dpe) ? b.dpe : '',
+      dpeKwh: str(b.dpeKwh, 10),
+      ges: LETTRES.includes(b.ges) ? b.ges : '',
+      gesCo2: str(b.gesCo2, 10),
+      energieMin: str(b.energieMin, 20),
+      energieMax: str(b.energieMax, 20),
+      energieRef: str(b.energieRef, 10),
+      honoraires: str(b.honoraires, 200),
+      taxeFonciere: str(b.taxeFonciere, 20),
+      chargesCopro: str(b.chargesCopro, 20),
+      lotsCopro: str(b.lotsCopro, 10),
     };
   });
 }
