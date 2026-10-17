@@ -50,22 +50,22 @@
   const navLinks = $$('.nav a');
   const sections = navLinks.map(a => $(a.getAttribute('href'))).filter(Boolean);
 
-  // ---------- Hero slideshow ----------
-  const slides = $$('.hero__slide');
-  const dots = $$('.hero__dots button');
-  let current = 0, timer;
-  const show = (i) => {
-    slides[current].classList.remove('is-active');
-    dots[current].classList.remove('is-active');
-    current = (i + slides.length) % slides.length;
-    slides[current].classList.add('is-active');
-    void dots[current].offsetWidth; // relance l'animation de la barre
-    dots[current].classList.add('is-active');
-    clearTimeout(timer);
-    if (!reduced) timer = setTimeout(() => show(current + 1), 6000);
+  // ---------- Vidéo d'accueil ----------
+  const video = $('.hero__video');
+  const pauseBtn = $('.hero__pause');
+  const setPaused = (paused) => {
+    paused ? video.pause() : video.play().catch(() => {});
+    pauseBtn.setAttribute('aria-pressed', paused);
+    pauseBtn.setAttribute('aria-label', paused ? 'Lire la vidéo' : 'Mettre la vidéo en pause');
+    pauseBtn.classList.toggle('is-paused', paused);
   };
-  dots.forEach((d, i) => d.addEventListener('click', () => show(i)));
-  if (!reduced) timer = setTimeout(() => show(1), 6000);
+  pauseBtn.addEventListener('click', () => setPaused(!video.paused));
+  if (reduced) setPaused(true);
+  // inutile de décoder la vidéo quand l'accueil n'est plus à l'écran
+  new IntersectionObserver(([e]) => {
+    if (pauseBtn.classList.contains('is-paused')) return;
+    e.isIntersecting ? video.play().catch(() => {}) : video.pause();
+  }).observe(video);
 
   // ---------- Search tabs ----------
   const tabs = $$('.search__tabs button');
