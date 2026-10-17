@@ -109,7 +109,8 @@ img { display: block; max-width: 100%; }
 .drawer.is-open .drawer__panel { transform: none; }
 .drawer__head { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--line); }
 .drawer__head h2 { font-family: var(--serif); font-size: 30px; margin: 0; color: var(--navy-ink); }
-.drawer__body { flex: 1; overflow-y: auto; padding: 22px 24px; display: grid; gap: 14px; align-content: start; }
+.drawer__body { flex: 1; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+.drawer__body > * { flex: none; }
 .drawer__foot { display: flex; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--line); background: #fff; }
 .spacer { flex: 1; }
 .row { display: flex; gap: 12px; }
@@ -134,11 +135,11 @@ img { display: block; max-width: 100%; }
 .switch input:focus-visible + span { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 .toast {
-  position: fixed; left: 50%; bottom: 24px; z-index: 60; transform: translate(-50%, 150%);
+  position: fixed; left: 50%; bottom: 24px; z-index: 60; transform: translate(-50%, calc(100% + 40px)); visibility: hidden;
   padding: 12px 20px; border-radius: 999px; background: var(--navy-ink); color: #fff; font-weight: 600; font-size: 14px;
-  transition: transform .5s var(--ease); max-width: calc(100% - 32px);
+  transition: transform .5s var(--ease), visibility 0s .5s; max-width: calc(100% - 32px);
 }
-.toast.is-on { transform: translate(-50%, 0); }
+.toast.is-on { transform: translate(-50%, 0); visibility: visible; transition: transform .5s var(--ease); }
 .toast.is-error { background: var(--red); }
 
 @media (max-width: 640px) {

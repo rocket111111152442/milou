@@ -14,6 +14,8 @@
     set(v) { try { v ? sessionStorage.setItem(KEY, v) : sessionStorage.removeItem(KEY); } catch {} },
   };
 
+  // les photos d'origine sont en chemin relatif au site (img/…)
+  const src = (p) => (/^img\//.test(p || '') ? '/' + p : p || '');
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   let toastTimer;
@@ -95,7 +97,7 @@
 
     $('#list').innerHTML = rows.length ? rows.map(({ b, i }, n) => `
       <li class="item" style="animation-delay:${Math.min(n, 10) * 30}ms">
-        ${b.photo ? `<img class="item__img" src="${esc(b.photo)}" alt="" loading="lazy">` : '<div class="item__img"></div>'}
+        ${b.photo ? `<img class="item__img" src="${esc(src(b.photo))}" alt="" loading="lazy">` : '<div class="item__img"></div>'}
         <div>
           <p class="item__title">${esc(b.titre)}${b.vendu ? '<span class="pill pill--sold">Vendu</span>' : b.badge ? `<span class="pill">${esc(b.badge)}</span>` : ''}</p>
           <p class="item__meta">${esc([b.ville, b.cp].filter(Boolean).join(' · '))}${b.surface ? ` · ${esc(b.surface)} m²` : ''}</p>
@@ -157,7 +159,7 @@
 
   const setPhoto = (url) => {
     photoUrl = url || '';
-    $('#photoPreview').src = photoUrl;
+    $('#photoPreview').src = src(photoUrl);
     $('#photoPreview').hidden = !photoUrl;
     $('#photoEmpty').hidden = !!photoUrl;
   };

@@ -52,3 +52,4 @@ Toutes les animations se coupent si le visiteur a activé `prefers-reduced-motio
 - Les modifications apparaissent sur le site immédiatement, sans redéploiement.
 - Limites : un seul mot de passe partagé, et pas de limitation de tentatives au-delà d'un délai de 0,8 s par erreur.
   Si deux personnes enregistrent en même temps, c'est la dernière sauvegarde qui est gardée.
+  Supprimer un bien ne supprime pas sa photo du stockage Blob.
