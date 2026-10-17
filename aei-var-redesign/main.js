@@ -142,14 +142,61 @@
     update();
   }
 
+  // ---------- Biens (chargés depuis l'admin) ----------
+  const grid = $('#gridBiens');
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const BADGE_CLASS = { 'Exclusivité': 'tag--gold', 'Coup de cœur': 'tag--light' };
+  const cardHTML = (b) => {
+    const specs = [
+      b.surface && `${esc(b.surface)} m²`,
+      b.chambres && `${esc(b.chambres)} ch.`,
+      b.terrain && `Terrain ${esc(b.terrain)} m²`,
+      b.extra && esc(b.extra),
+    ].filter(Boolean).map(s => `<li>${s}</li>`).join('');
+    const loc = [esc(b.ville), esc(b.cp)].filter(Boolean).join(' · ');
+    const alt = esc(`${b.titre} ${b.ville ? 'à ' + b.ville : ''}`.trim());
+    const img = b.photo ? `<img src="${esc(b.photo)}" alt="${alt}" loading="lazy">` : '';
+    const badge = !b.vendu && b.badge ? `<span class="tag ${BADGE_CLASS[b.badge] || ''}">${esc(b.badge)}</span>` : '';
+    const foot = b.vendu
+      ? `<span class="bien__sold">Vendu par l'agence</span>`
+      : `<strong>${b.prix ? esc(b.prix) + ' €' : 'Prix sur demande'}</strong><a href="#contact" class="bien__cta" aria-label="Demander une visite">→</a>`;
+    const media = b.vendu ? `<div class="bien__media">${img}</div>` : `<a href="#contact" class="bien__media">${img}${badge}</a>`;
+    return `<article class="bien reveal${b.vendu ? ' bien--sold' : ''}" data-cat="${b.vendu ? 'vendu' : esc(b.region)}">
+      ${media}
+      <div class="bien__body">
+        <p class="bien__loc">${loc}</p>
+        <h3>${esc(b.titre)}</h3>
+        <ul class="bien__specs">${specs}</ul>
+        <div class="bien__foot">${foot}</div>
+      </div>
+    </article>`;
+  };
+  const renderBiens = (list) => {
+    // les biens en vente d'abord, les vendus à la fin
+    const sorted = [...list].sort((a, b) => a.vendu - b.vendu);
+    grid.innerHTML = sorted.map(cardHTML).join('');
+    $$('.bien', grid).forEach((el, i) => { el.style.setProperty('--d', `${(i % 3) * 0.08}s`); io.observe(el); });
+  };
+  const loadBiens = async () => {
+    for (const url of ['/api/biens', 'data/biens.json']) {
+      try {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (Array.isArray(data)) return renderBiens(data);
+      } catch {}
+    }
+    grid.innerHTML = '<p>Nos biens sont momentanément indisponibles. Appelez-nous au 04 94 07 26 35.</p>';
+  };
+  loadBiens();
+
   // ---------- Filtres biens ----------
   const filterBtns = $$('.filters button');
-  const biens = $$('.bien');
   filterBtns.forEach(btn => btn.addEventListener('click', () => {
     filterBtns.forEach(b => b.classList.toggle('is-active', b === btn));
     const f = btn.dataset.filter;
     let i = 0;
-    biens.forEach(card => {
+    $$('.bien', grid).forEach(card => {
       const show = f === 'all' || card.dataset.cat === f;
       card.classList.toggle('is-hidden', !show);
       if (show) {

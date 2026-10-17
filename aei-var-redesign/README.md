@@ -42,3 +42,13 @@ Je n'ai pas pu récupérer la note Google : Google bloque la lecture automatique
 apparitions au scroll en cascade, compteurs animés, parallaxe, boutons magnétiques, inclinaison 3D des cartes équipe,
 filtres de biens animés, formulaire avec étapes et validation animée.
 Toutes les animations se coupent si le visiteur a activé `prefers-reduced-motion`.
+
+## Espace d'administration (`/admin`)
+- Adresse : `/admin`. Mot de passe : variable `ADMIN_PASSWORD` dans les réglages du projet Vercel.
+- Permet d'ajouter, modifier, supprimer et réordonner les biens, et d'envoyer des photos.
+  Les photos sont redimensionnées à 1600 px et converties en WebP dans le navigateur avant l'envoi.
+- Les biens sont stockés dans Vercel Blob (`BLOB_READ_WRITE_TOKEN`). Les 5 dernières versions sont gardées en secours.
+  Tant que rien n'a été enregistré, le site affiche `data/biens.json`.
+- Les modifications apparaissent sur le site immédiatement, sans redéploiement.
+- Limites : un seul mot de passe partagé, et pas de limitation de tentatives au-delà d'un délai de 0,8 s par erreur.
+  Si deux personnes enregistrent en même temps, c'est la dernière sauvegarde qui est gardée.

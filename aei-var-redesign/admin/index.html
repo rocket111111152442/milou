@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Administration · AEI Côté Mer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<!-- Connexion -->
+<section class="login" id="login">
+  <form class="login__card" id="loginForm">
+    <div class="brand"><span class="brand__bar"></span><span><strong>A.E.I</strong><small>Administration</small></span></div>
+    <h1>Connexion</h1>
+    <p>Espace réservé à l'agence pour gérer les biens affichés sur le site.</p>
+    <label class="field"><span>Mot de passe</span><input type="password" id="password" autocomplete="current-password" required autofocus></label>
+    <p class="error" id="loginError" hidden></p>
+    <button class="btn btn--red" type="submit">Se connecter</button>
+    <a class="back" href="/">← Retour au site</a>
+  </form>
+</section>
+
+<!-- Tableau de bord -->
+<div class="app" id="app" hidden>
+  <header class="topbar">
+    <div class="brand"><span class="brand__bar"></span><span><strong>A.E.I</strong><small>Administration</small></span></div>
+    <div class="topbar__actions">
+      <a class="btn btn--ghost" href="/#biens" target="_blank" rel="noopener">Voir le site</a>
+      <button class="btn btn--ghost" id="logout">Déconnexion</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="head">
+      <div>
+        <h1>Nos biens</h1>
+        <p class="muted" id="summary">Chargement…</p>
+      </div>
+      <button class="btn btn--red" id="addBtn">+ Ajouter un bien</button>
+    </div>
+
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Rechercher une ville, un titre…" aria-label="Rechercher">
+      <div class="seg" role="tablist">
+        <button class="is-active" data-f="all">Tous</button>
+        <button data-f="vente">En vente</button>
+        <button data-f="vendu">Vendus</button>
+      </div>
+    </div>
+
+    <ul class="list" id="list"></ul>
+  </main>
+</div>
+
+<!-- Formulaire bien -->
+<div class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer__backdrop" data-close></div>
+  <form class="drawer__panel" id="bienForm" novalidate>
+    <div class="drawer__head">
+      <h2 id="formTitle">Ajouter un bien</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Fermer">✕</button>
+    </div>
+
+    <div class="drawer__body">
+      <div class="photo" id="photoZone">
+        <img id="photoPreview" alt="" hidden>
+        <div class="photo__empty" id="photoEmpty">
+          <strong>Ajouter une photo</strong>
+          <span>Glissez une image ici ou cliquez · JPEG, PNG, WebP</span>
+        </div>
+        <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp">
+        <div class="photo__busy" id="photoBusy" hidden>Envoi de la photo…</div>
+      </div>
+
+      <label class="field"><span>Titre de l'annonce *</span><input name="titre" required maxlength="120" placeholder="Villa 5 pièces vue mer"></label>
+      <div class="row">
+        <label class="field"><span>Ville *</span><input name="ville" required maxlength="60" placeholder="Six-Fours-les-Plages"></label>
+        <label class="field field--sm"><span>Code postal</span><input name="cp" maxlength="10" inputmode="numeric" placeholder="83140"></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>Prix (€)</span><input name="prix" maxlength="30" inputmode="numeric" placeholder="650 000"></label>
+        <label class="field"><span>Secteur</span>
+          <select name="region"><option value="var">Var &amp; Provence</option><option value="loiret">Loiret</option><option value="autre">Autre</option></select>
+        </label>
+      </div>
+      <div class="row row--3">
+        <label class="field"><span>Surface (m²)</span><input name="surface" maxlength="20" inputmode="decimal" placeholder="120"></label>
+        <label class="field"><span>Chambres</span><input name="chambres" maxlength="10" inputmode="numeric" placeholder="3"></label>
+        <label class="field"><span>Terrain (m²)</span><input name="terrain" maxlength="20" inputmode="decimal" placeholder="800"></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>Étiquette</span>
+          <select name="badge"><option value="">Aucune</option><option>Nouveauté</option><option>Exclusivité</option><option>Coup de cœur</option><option>Prix en baisse</option></select>
+        </label>
+        <label class="field"><span>Atout mis en avant</span><input name="extra" maxlength="40" placeholder="Piscine, vue mer…"></label>
+      </div>
+      <label class="switch"><input type="checkbox" name="vendu"><span></span>Marquer comme vendu</label>
+    </div>
+
+    <div class="drawer__foot">
+      <button type="button" class="btn btn--danger" id="deleteBtn" hidden>Supprimer</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn--ghost" data-close>Annuler</button>
+      <button type="submit" class="btn btn--red" id="saveBtn">Enregistrer</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="/admin/admin.js" defer></script>
+</body>
+</html>

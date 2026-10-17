@@ -1,0 +1,12 @@
+[
+  {"id":"ollioules-7p","titre":"Maison 7 pièces avec piscine","ville":"Ollioules","cp":"83190","region":"var","surface":"250","chambres":"5","terrain":"1 800","extra":"","prix":"1 980 000","badge":"Nouveauté","vendu":false,"photo":"img/bien2.webp"},
+  {"id":"laciotat-18p","titre":"Propriété 18 pièces, parc de 2,6 ha","ville":"La Ciotat","cp":"13600","region":"var","surface":"480","chambres":"13","terrain":"","extra":"Piscine","prix":"2 700 000","badge":"Exclusivité","vendu":false,"photo":"img/bien3.webp"},
+  {"id":"bandol-12p","titre":"Villa 12 pièces au calme","ville":"Bandol","cp":"83150","region":"var","surface":"270","chambres":"10","terrain":"1 732","extra":"","prix":"1 300 000","badge":"Nouveauté","vendu":false,"photo":"img/bien1.webp"},
+  {"id":"lancon-15p","titre":"Bastide 15 pièces, 4,5 ha","ville":"Lançon-Provence","cp":"13680","region":"var","surface":"418","chambres":"10","terrain":"45 387","extra":"","prix":"1 450 000","badge":"Nouveauté","vendu":false,"photo":"img/bien7.webp"},
+  {"id":"gien-6p","titre":"Maison 6 pièces","ville":"Gien","cp":"45500","region":"loiret","surface":"116","chambres":"5","terrain":"1 077","extra":"","prix":"227 000","badge":"Coup de cœur","vendu":false,"photo":"img/bien5.webp"},
+  {"id":"gien-5p","titre":"Maison 5 pièces","ville":"Gien","cp":"45500","region":"loiret","surface":"97","chambres":"3","terrain":"221","extra":"","prix":"137 000","badge":"Coup de cœur","vendu":false,"photo":"img/bien10.webp"},
+  {"id":"briare-5p","titre":"Maison 5 pièces","ville":"Briare","cp":"45250","region":"loiret","surface":"94","chambres":"4","terrain":"375","extra":"","prix":"86 000","badge":"Exclusivité","vendu":false,"photo":"img/bien9.webp"},
+  {"id":"briare-4p","titre":"Maison 4 pièces","ville":"Briare","cp":"45250","region":"loiret","surface":"75","chambres":"3","terrain":"177","extra":"","prix":"79 900","badge":"Coup de cœur","vendu":false,"photo":"img/bien8.webp"},
+  {"id":"sixfours-9p","titre":"Maison 9 pièces","ville":"Six-Fours-les-Plages","cp":"83140","region":"var","surface":"173","chambres":"6","terrain":"840","extra":"","prix":"","badge":"","vendu":true,"photo":"img/bien4.webp"},
+  {"id":"toulon-5p","titre":"Maison 5 pièces","ville":"Toulon","cp":"83200","region":"var","surface":"93,7","chambres":"3","terrain":"285","extra":"","prix":"","badge":"","vendu":true,"photo":"img/bien6.webp"}
+]
