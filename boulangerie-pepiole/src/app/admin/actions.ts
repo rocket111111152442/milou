@@ -10,6 +10,8 @@ import type { Settings } from "@/lib/settings";
 import { SHOP_IDS, type ShopId } from "@/lib/shops";
 import { notifyTest, removeDevice, saveDevice } from "@/lib/push";
 import type { PushSubscription } from "web-push";
+import { put } from "@vercel/blob";
+import { randomBytes } from "node:crypto";
 
 // Anti force brute : 5 essais par IP toutes les 15 minutes (mémoire de l'instance)
 const attempts = new Map<string, number[]>();
@@ -72,4 +74,19 @@ export async function subscribeDevice(subscription: PushSubscription, shops: Sho
 export async function unsubscribeDevice(endpoint: string) {
   await guard();
   await removeDevice(endpoint);
+}
+
+const PHOTO_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+/** Envoie une photo de produit (redimensionnée côté navigateur) ; renvoie son adresse publique. */
+export async function uploadPhoto(form: FormData): Promise<string> {
+  await guard();
+  const file = form.get("photo");
+  if (!(file instanceof File)) throw new Error("Aucune photo reçue");
+  const ext = PHOTO_TYPES[file.type];
+  if (!ext) throw new Error("Format accepté : JPEG, PNG ou WebP");
+  if (file.size > 4 * 1024 * 1024) throw new Error("Photo trop lourde (4 Mo maximum)");
+  const name = `${randomBytes(8).toString("hex")}.${ext}`;
+  await put(`photos/${name}`, file, { access: "private", contentType: file.type, addRandomSuffix: false });
+  return `/api/photo/${name}`;
 }

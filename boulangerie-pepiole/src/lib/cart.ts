@@ -59,7 +59,8 @@ export const useCart = create<CartState>()(
       // Écarte les produits retirés du catalogue depuis la dernière visite
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as { lines?: CartLine[]; shop?: string | null };
-        const lines = (p.lines ?? []).filter((l) => PRODUCTS_BY_ID.has(l.id));
+        // Les produits disparus du catalogue sont ignorés à l'affichage (cartDetails)
+        const lines = (p.lines ?? []).filter((l) => typeof l?.id === "string" && Number.isInteger(l.qty) && l.qty > 0);
         const shop = SHOP_IDS.find((id) => id === p.shop) ?? null;
         return { ...current, lines, shop };
       },

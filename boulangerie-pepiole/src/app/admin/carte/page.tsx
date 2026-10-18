@@ -1,9 +1,14 @@
 import { getSettingsFresh } from "@/lib/settings-store";
-import { PriceEditor } from "./PriceEditor";
+import { CatalogEditor } from "./CatalogEditor";
 
 export const metadata = { title: "Carte & prix" };
 
 export default async function AdminCartePage() {
-  const settings = await getSettingsFresh();
-  return <PriceEditor initialPrices={settings.prices} initialUnavailable={settings.unavailable} updatedAt={settings.updatedAt ?? null} />;
+  const s = await getSettingsFresh();
+  return (
+    <CatalogEditor
+      initial={{ prices: s.prices, unavailable: s.unavailable, hidden: s.hidden, custom: s.custom }}
+      updatedAt={s.updatedAt ?? null}
+    />
+  );
 }

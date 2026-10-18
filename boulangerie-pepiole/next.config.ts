@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
   },
   poweredByHeader: false,
+  // Envoi des photos de produits depuis /admin
+  experimental: { serverActions: { bodySizeLimit: "5mb" } },
 };
 
 export default nextConfig;

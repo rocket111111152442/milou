@@ -132,7 +132,7 @@ export function Checkout({ enabledShops }: { enabledShops: ShopId[] }) {
   const submit = async () => {
     setServerError(null);
     const payload = {
-      items: lines.map((l) => ({ id: l.id, qty: l.qty })),
+      items: items.map((i) => ({ id: i.product.id, qty: i.qty })),
       pickup: { shop: shopId ?? "", date: date ?? "", time: time ?? "" },
       customer,
       consent,
