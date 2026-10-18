@@ -3,7 +3,11 @@ import { SHOP_IDS } from "./shops";
 
 export const orderSchema = z.object({
   items: z
-    .array(z.object({ id: z.string().min(1).max(64), qty: z.number().int().min(1).max(50) }))
+    .array(z.object({
+        id: z.string().min(1).max(64),
+        qty: z.number().int().min(1).max(50),
+        picks: z.array(z.string().max(60)).max(6).optional(),
+      }))
     .min(1, "Votre panier est vide.")
     .max(40),
   pickup: z.object({

@@ -38,10 +38,13 @@ const LEADS = [
 
 export function ProductForm({
   initial,
+  original,
   onSave,
   onCancel,
 }: {
   initial?: CustomProduct;
+  /** Produit d'origine de la carte (l'identifiant et la catégorie de départ sont conservés) */
+  original?: boolean;
   onSave: (p: CustomProduct) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -52,6 +55,9 @@ export function ProductForm({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [lead, setLead] = useState(initial?.leadHours ?? 0);
   const [image, setImage] = useState(initial?.image);
+  const [groups, setGroups] = useState<{ label: string; options: string }[]>(() =>
+    (initial?.groups ?? []).map((g) => ({ label: g.label, options: g.options.join(", ") })),
+  );
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +95,9 @@ export function ProductForm({
         description: description.trim(),
         image,
         leadHours: lead || undefined,
+        groups: groups
+          .map((g) => ({ label: g.label.trim(), options: g.options.split(/[,\n;]/).map((o) => o.trim()).filter(Boolean) }))
+          .filter((g) => g.label && g.options.length),
       });
     } catch (err) {
       setError(`Échec de l'enregistrement : ${(err as Error).message}`);
@@ -110,7 +119,7 @@ export function ProductForm({
         className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-[2rem] bg-creme p-6 shadow-2xl sm:rounded-[2rem] sm:p-8"
         data-lenis-prevent
       >
-        <h2 className="font-display text-3xl">{initial ? "Modifier le produit" : "Nouveau produit"}</h2>
+        <h2 className="font-display text-3xl">{initial ? (original ? "Modifier ce produit de la carte" : "Modifier le produit") : "Nouveau produit"}</h2>
 
         <div className="mt-6 grid gap-5 sm:grid-cols-[180px_1fr]">
           <div>
@@ -174,6 +183,44 @@ export function ProductForm({
           <span className="mb-1 block text-sm font-semibold">Description</span>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={300} rows={3} className={`${field} h-auto py-2`} placeholder="Ce qui le rend bon, en une ou deux phrases." />
         </label>
+
+        <div className="mt-6 rounded-2xl bg-farine p-4 ring-1 ring-mie">
+          <p className="text-sm font-semibold">Choix du client (formules, menus…)</p>
+          <p className="mt-0.5 text-xs text-grege">
+            Le client choisit une option par ligne avant d&apos;ajouter au panier. Exemple : <em>Boisson</em> → Café, Thé, Chocolat chaud.
+            Séparez les options par des virgules. Laissez vide pour un produit sans choix.
+          </p>
+          <div className="mt-3 space-y-3">
+            {groups.map((g, i) => (
+              <div key={i} className="grid gap-2 rounded-xl bg-creme p-3 ring-1 ring-mie sm:grid-cols-[170px_1fr_auto] sm:items-start">
+                <input
+                  value={g.label}
+                  onChange={(e) => setGroups((s) => s.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
+                  maxLength={40}
+                  placeholder="Ex. Boisson"
+                  aria-label={`Nom du choix ${i + 1}`}
+                  className={field}
+                />
+                <textarea
+                  value={g.options}
+                  onChange={(e) => setGroups((s) => s.map((x, j) => (j === i ? { ...x, options: e.target.value } : x)))}
+                  rows={2}
+                  placeholder="Café, Thé, Chocolat chaud"
+                  aria-label={`Options du choix ${i + 1}`}
+                  className={`${field} h-auto py-2`}
+                />
+                <button type="button" onClick={() => setGroups((s) => s.filter((_, j) => j !== i))} className="h-11 rounded-full px-3 text-xs font-semibold text-red-700 transition hover:bg-red-50">
+                  Supprimer
+                </button>
+              </div>
+            ))}
+          </div>
+          {groups.length < 6 && (
+            <button type="button" onClick={() => setGroups((s) => [...s, { label: "", options: "" }])} className="mt-3 h-10 rounded-full border border-mie bg-creme px-4 text-sm font-semibold transition hover:bg-mie">
+              + Ajouter un choix
+            </button>
+          )}
+        </div>
 
         {error && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 

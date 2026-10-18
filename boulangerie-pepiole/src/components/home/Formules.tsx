@@ -3,21 +3,30 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "motion/react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { AnimatePresence } from "motion/react";
+import type { Product } from "@/lib/catalog";
+import { ChoiceDialog } from "@/components/cart/ChoiceDialog";
 import { formatPrice } from "@/lib/catalog";
 import { useSiteData } from "@/components/SettingsProvider";
 import { useCart } from "@/lib/cart";
 import { flyToCart } from "@/components/cart/FlyToCart";
 import { Reveal, SplitWords } from "@/components/ui/motion";
 
-const FORMULES = [
-  { id: "formule-ptit-dej", kicker: "Le matin", tone: "bg-dore text-torref", stamp: "Café + viennoiserie" },
-  { id: "formule-dejeuner", kicker: "Le midi", tone: "bg-olive text-creme", stamp: "Salé + boisson + douceur" },
-] as const;
+const TONES = ["bg-dore text-torref", "bg-olive text-creme", "bg-croute text-creme"];
+const KICKERS: Record<string, string> = { "formule-ptit-dej": "Le matin", "formule-dejeuner": "Le midi" };
 
 export function Formules() {
   const add = useCart((s) => s.add);
-  const { byId } = useSiteData();
+  const { products } = useSiteData();
+  const [choosing, setChoosing] = useState<Product | null>(null);
+  // Toutes les formules de la carte (celles d'origine et celles ajoutées depuis /admin), rangées par rayon « Formules »
+  const formules = products.filter((p) => p.category === "formules");
+  if (formules.length === 0) return null;
+  const addFormule = (p: Product, el: HTMLElement | null, picks?: string[]) => {
+    add(p.id, 1, picks);
+    flyToCart(el, p.image ?? "/images/pause-cafe.jpg");
+  };
   return (
     <section className="relative overflow-hidden bg-farine py-24 sm:py-36">
       <div className="mx-auto max-w-7xl px-6">
@@ -29,13 +38,17 @@ export function Formules() {
         <SplitWords as="h2" text="Une pause, à toute heure." className="mb-14 block max-w-2xl font-display text-5xl leading-[1.02] tracking-tight sm:text-7xl" />
 
         <div className="grid gap-6 lg:grid-cols-2">
-          {FORMULES.map((f, i) => {
-            const p = byId.get(f.id)!;
+          {formules.map((p, i) => {
+            const f = {
+              kicker: KICKERS[p.id] ?? "Formule",
+              tone: TONES[i % TONES.length],
+              stamp: p.groups?.length ? p.groups.map((g) => g.label).join(" + ") : (p.unit ?? ""),
+            };
             return (
-              <Reveal key={f.id} delay={i * 0.15}>
+              <Reveal key={p.id} delay={(i % 2) * 0.15}>
                 <article className="group relative overflow-hidden rounded-[2rem] bg-creme ring-1 ring-mie">
                   <div className="relative aspect-[16/10] overflow-hidden">
-                    <Image src={p.image!} alt={p.name} fill sizes="(min-width:1024px) 45vw, 100vw" className="object-cover transition-transform duration-[1.4s] ease-[var(--ease-pain)] group-hover:scale-105" />
+                    <Image src={p.image ?? "/images/pause-cafe.jpg"} alt={p.name} fill sizes="(min-width:1024px) 45vw, 100vw" className="object-cover transition-transform duration-[1.4s] ease-[var(--ease-pain)] group-hover:scale-105" />
                     <motion.div
                       className={`absolute right-5 top-5 grid h-28 w-28 place-items-center rounded-full text-center shadow-xl ${f.tone}`}
                       initial={{ rotate: -30, scale: 0 }}
@@ -55,16 +68,17 @@ export function Formules() {
                       <h3 className="font-display text-4xl tracking-tight">{p.name}</h3>
                       <p className="mt-2 max-w-sm text-cafe/70">{p.description}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        add(p.id);
-                        flyToCart(e.currentTarget, p.image);
-                      }}
-                      className="inline-flex h-12 shrink-0 items-center justify-center rounded-full bg-cafe px-6 text-sm font-semibold text-creme transition hover:bg-croute"
-                    >
-                      + Ajouter
-                    </button>
+                    {p.available === false ? (
+                      <span className="inline-flex h-12 shrink-0 items-center justify-center rounded-full bg-mie/60 px-6 text-sm font-semibold text-grege">Indisponible</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => (p.groups?.length ? setChoosing(p) : addFormule(p, e.currentTarget))}
+                        className="inline-flex h-12 shrink-0 items-center justify-center rounded-full bg-cafe px-6 text-sm font-semibold text-creme transition hover:bg-croute"
+                      >
+                        {p.groups?.length ? "Composer" : "+ Ajouter"}
+                      </button>
+                    )}
                   </div>
                 </article>
               </Reveal>
@@ -72,6 +86,9 @@ export function Formules() {
           })}
         </div>
       </div>
+      <AnimatePresence>
+        {choosing && <ChoiceDialog product={choosing} onClose={() => setChoosing(null)} onConfirm={(picks) => { addFormule(choosing, null, picks); setChoosing(null); }} />}
+      </AnimatePresence>
     </section>
   );
 }

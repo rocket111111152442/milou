@@ -1,20 +1,23 @@
 // Réglages modifiables depuis /admin (prix, disponibilités, fermetures, mise en service).
 // Ce module est partagé client / serveur : aucune dépendance serveur ici.
-import { CATEGORIES, PRODUCTS, type CategoryId, type Product } from "./catalog";
+import { CATEGORIES, PRODUCTS, type CategoryId, type Product, type ProductGroup } from "./catalog";
 import { SHOPS, type Shop, type ShopId } from "./shops";
 
-/** Produit ajouté par la boutique depuis /admin/carte. */
-export type CustomProduct = {
-  id: string;
+/** Champs modifiables d'un produit. */
+export type ProductFields = {
   name: string;
   category: CategoryId;
-  price: number;
   unit?: string;
   description: string;
   image?: string;
   /** Délai de commande minimum en heures (0 = délai standard) */
   leadHours?: number;
+  /** Choix à faire par le client (formules…) */
+  groups?: ProductGroup[];
 };
+
+/** Produit ajouté par la boutique depuis /admin/carte. */
+export type CustomProduct = ProductFields & { id: string; price: number };
 
 export type Settings = {
   /** Commandes réellement traitées pour cette boutique (sinon : mode démonstration) */
@@ -27,36 +30,55 @@ export type Settings = {
   hidden: string[];
   /** Produits ajoutés par la boutique */
   custom: CustomProduct[];
+  /** Produits d'origine modifiés par la boutique (nom, photo, description, choix…) */
+  edits: Record<string, ProductFields>;
   /** Fermetures exceptionnelles (AAAA-MM-JJ) par boutique */
   closedDates: Partial<Record<ShopId, string[]>>;
   updatedAt?: string;
 };
 
-export const DEFAULT_SETTINGS: Settings = { live: {}, prices: {}, unavailable: [], hidden: [], custom: [], closedDates: {} };
+export const DEFAULT_SETTINGS: Settings = { live: {}, prices: {}, unavailable: [], hidden: [], custom: [], edits: {}, closedDates: {} };
 
 export const CUSTOM_ID = /^perso-[a-z0-9]{6,12}$/;
 const IMAGE_PATH = /^\/(api\/photo\/[a-z0-9-]+\.(jpg|png|webp)|images\/[\w/.-]+)$/;
 const clean = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
 
+function normalizeGroups(raw: unknown): ProductGroup[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const groups = raw
+    .slice(0, 6)
+    .map((g): ProductGroup => {
+      const r = (g ?? {}) as Record<string, unknown>;
+      const options = (Array.isArray(r.options) ? r.options : []).map((o) => clean(o, 60)).filter(Boolean);
+      return { label: clean(r.label, 40), options: [...new Set(options)].slice(0, 20) };
+    })
+    .filter((g) => g.label && g.options.length > 0);
+  return groups.length ? groups : undefined;
+}
+
+function normalizeFields(r: Record<string, unknown>): ProductFields | null {
+  const name = clean(r.name, 60);
+  const category = CATEGORIES.find((c) => c.id === r.category)?.id;
+  if (!name || !category) return null;
+  const lead = Number(r.leadHours);
+  return {
+    name,
+    category,
+    unit: clean(r.unit, 30) || undefined,
+    description: clean(r.description, 300),
+    image: typeof r.image === "string" && IMAGE_PATH.test(r.image) ? r.image : undefined,
+    leadHours: Number.isInteger(lead) && lead > 0 && lead <= 168 ? lead : undefined,
+    groups: normalizeGroups(r.groups),
+  };
+}
+
 function normalizeCustom(raw: unknown): CustomProduct | null {
   const r = (raw ?? {}) as Record<string, unknown>;
   const id = typeof r.id === "string" ? r.id : "";
-  const name = clean(r.name, 60);
   const price = Number(r.price);
-  const category = CATEGORIES.find((c) => c.id === r.category)?.id;
-  if (!CUSTOM_ID.test(id) || !name || !category || !Number.isInteger(price) || price <= 0 || price >= 100_000) return null;
-  const lead = Number(r.leadHours);
-  const image = typeof r.image === "string" && IMAGE_PATH.test(r.image) ? r.image : undefined;
-  return {
-    id,
-    name,
-    category,
-    price,
-    unit: clean(r.unit, 30) || undefined,
-    description: clean(r.description, 300),
-    image,
-    leadHours: Number.isInteger(lead) && lead > 0 && lead <= 168 ? lead : undefined,
-  };
+  const fields = normalizeFields(r);
+  if (!CUSTOM_ID.test(id) || !fields || !Number.isInteger(price) || price <= 0 || price >= 100_000) return null;
+  return { id, price, ...fields };
 }
 
 export function normalizeSettings(raw: unknown): Settings {
@@ -68,6 +90,11 @@ export function normalizeSettings(raw: unknown): Settings {
     .slice(0, 200);
   const builtin = new Set(PRODUCTS.map((p) => p.id));
   const ids = new Set([...builtin, ...custom.map((p) => p.id)]);
+  const edits: Settings["edits"] = {};
+  for (const [id, v] of Object.entries(r.edits ?? {})) {
+    const f = builtin.has(id) ? normalizeFields((v ?? {}) as Record<string, unknown>) : null;
+    if (f) edits[id] = f;
+  }
   const shopIds = new Set(SHOPS.map((s) => s.id as string));
   const prices: Record<string, number> = {};
   for (const [id, v] of Object.entries(r.prices ?? {})) {
@@ -87,6 +114,7 @@ export function normalizeSettings(raw: unknown): Settings {
     unavailable: (r.unavailable ?? []).filter((id) => ids.has(id)),
     hidden: (Array.isArray(r.hidden) ? r.hidden : []).filter((id) => builtin.has(id)),
     custom,
+    edits,
     closedDates,
     updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : undefined,
   };
@@ -96,11 +124,15 @@ export function normalizeSettings(raw: unknown): Settings {
 export function applyProducts(settings: Settings): Product[] {
   const off = new Set(settings.unavailable);
   const hidden = new Set(settings.hidden);
-  const added: Product[] = settings.custom.map((c) => ({
-    ...c,
-    badges: c.leadHours ? [`Sur commande ${c.leadHours} h`] : undefined,
-  }));
-  return [...PRODUCTS.filter((p) => !hidden.has(p.id)), ...added].map((p) => ({
+  const leadBadge = (h?: number) => (h ? [`Sur commande ${h} h`] : []);
+  const added: Product[] = settings.custom.map((c) => ({ ...c, badges: leadBadge(c.leadHours).length ? leadBadge(c.leadHours) : undefined }));
+  const original = PRODUCTS.filter((p) => !hidden.has(p.id)).map((p): Product => {
+    const e = settings.edits[p.id];
+    if (!e) return p;
+    const badges = [...(p.badges ?? []).filter((b) => !b.startsWith("Sur commande")), ...leadBadge(e.leadHours)];
+    return { ...p, ...e, badges: badges.length ? badges : undefined };
+  });
+  return [...original, ...added].map((p) => ({
     ...p,
     price: settings.prices[p.id] ?? p.price,
     available: p.available !== false && !off.has(p.id),

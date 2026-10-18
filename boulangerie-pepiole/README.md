@@ -68,7 +68,7 @@ Installable comme une application (« Ajouter à l'écran d'accueil » → icôn
 | Onglet | Rôle |
 |---|---|
 | **Commandes** | commandes par jour de retrait, filtres boutique / jour / statut, statuts nouvelle → prête → retirée (ou annulée), affichage par défaut « À venir » (aujourd’hui et jours suivants) avec alerte si une nouvelle commande est masquée par les filtres, suppression définitive d'une commande (🗑), liste « À préparer » cumulée par produit, impression, actualisation chaque minute avec carillon et compteur dans l'onglet |
-| **Carte & prix** | ajouter un produit (photo, rayon, prix, format, description, délai de commande), le modifier ou le supprimer ; modifier les prix ; retirer un produit de la vente (« Momentanément indisponible ») ou de la carte |
+| **Carte & prix** | ajouter un produit (photo, rayon, prix, format, description, délai de commande, choix du client pour les formules), le modifier ou le supprimer ; modifier aussi les produits d'origine (nom, photo, description, choix) avec « Rétablir » ; modifier les prix ; retirer un produit de la vente (« Momentanément indisponible ») ou de la carte |
 | **Réglages** | notifications push sur chaque appareil, interrupteur « Commande en ligne » par boutique (test / réel), fermetures exceptionnelles, remise à zéro complète (taper « EFFACER ») |
 
 Stockage : Blob store **privé** Vercel `petrin-de-pepiole-commandes` (région Paris) :

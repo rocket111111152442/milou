@@ -7,7 +7,7 @@ export default async function AdminCartePage() {
   const s = await getSettingsFresh();
   return (
     <CatalogEditor
-      initial={{ prices: s.prices, unavailable: s.unavailable, hidden: s.hidden, custom: s.custom }}
+      initial={{ prices: s.prices, unavailable: s.unavailable, hidden: s.hidden, custom: s.custom, edits: s.edits }}
       updatedAt={s.updatedAt ?? null}
     />
   );

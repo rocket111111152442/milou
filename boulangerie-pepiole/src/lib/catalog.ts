@@ -32,6 +32,9 @@ export const CATEGORIES: Category[] = [
   { id: "formules", label: "Formules", tagline: "P'tit Déj' & déjeuner", image: "/images/pause-cafe.jpg" },
 ];
 
+/** Un choix proposé au client (ex. « Boisson » : Café, Thé…). Le client en retient une option par choix. */
+export type ProductGroup = { label: string; options: string[] };
+
 export type Product = {
   id: string;
   name: string;
@@ -41,6 +44,8 @@ export type Product = {
   description: string;
   image?: string;
   badges?: string[];
+  /** Choix à faire avant d'ajouter au panier (formules…) */
+  groups?: ProductGroup[];
   /** Délai de commande minimum en heures (sinon délai standard) */
   leadHours?: number;
   available?: boolean;
@@ -394,8 +399,12 @@ export const PRODUCTS: Product[] = [
     name: "Formule P'tit Déj'",
     category: "formules",
     price: 390,
-    description: "Une boisson chaude + une viennoiserie au choix (précisez en commentaire).",
+    description: "Une boisson chaude + une viennoiserie au choix.",
     image: "/images/pause-cafe.jpg",
+    groups: [
+      { label: "Boisson chaude", options: ["Café", "Café crème", "Chocolat chaud", "Thé"] },
+      { label: "Viennoiserie", options: ["Croissant", "Pain au chocolat", "Pain aux raisins"] },
+    ],
     featured: true,
   },
   {
@@ -405,6 +414,11 @@ export const PRODUCTS: Product[] = [
     price: 950,
     description: "Sandwich ou part de tarte salée + boisson + pâtisserie individuelle.",
     image: "/images/dejeuner.jpg",
+    groups: [
+      { label: "Salé", options: ["Sandwich jambon-beurre", "Sandwich crudités", "Part de quiche", "Part de pizza"] },
+      { label: "Boisson", options: ["Café", "Eau", "Soda", "Jus de fruits"] },
+      { label: "Douceur", options: ["Éclair au chocolat", "Éclair au caramel", "Tartelette au chocolat", "Tartelette aux fruits"] },
+    ],
     featured: true,
   },
 ];

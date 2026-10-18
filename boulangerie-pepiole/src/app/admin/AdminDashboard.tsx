@@ -146,13 +146,14 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
 
   // Liste de production : quantités à préparer pour les commandes affichées (hors annulées / retirées)
   const production = useMemo(() => {
-    const map = new Map<string, { name: string; unit: string | null; qty: number }>();
+    const map = new Map<string, { name: string; unit: string | null; options: string | null; qty: number }>();
     for (const o of visible) {
       if (o.status === "annulee" || o.status === "retiree") continue;
       for (const it of o.items) {
-        const cur = map.get(it.id) ?? { name: it.name, unit: it.unit, qty: 0 };
+        const k = `${it.id}|${it.options ?? ""}`;
+        const cur = map.get(k) ?? { name: it.name, unit: it.unit, options: it.options ?? null, qty: 0 };
         cur.qty += it.qty;
-        map.set(it.id, cur);
+        map.set(k, cur);
       }
     }
     return [...map.values()].sort((a, b) => b.qty - a.qty);
@@ -316,10 +317,11 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
                             </div>
 
                             <ul className="mt-4 grid gap-1 text-sm sm:grid-cols-2">
-                              {o.items.map((it) => (
-                                <li key={it.id}>
+                              {o.items.map((it, n) => (
+                                <li key={`${it.id}-${n}`}>
                                   <strong className="tabular-nums">{it.qty} ×</strong> {it.name}
                                   {it.unit && <span className="text-grege"> ({it.unit})</span>}
+                                  {it.options && <span className="block text-xs text-cafe/70">{it.options}</span>}
                                 </li>
                               ))}
                             </ul>
@@ -389,10 +391,11 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
               ) : (
                 <ul className="mt-4 space-y-1.5">
                   {production.map((p) => (
-                    <li key={p.name} className="flex items-baseline justify-between gap-3 border-b border-creme/10 pb-1.5">
+                    <li key={`${p.name}|${p.options}`} className="flex items-baseline justify-between gap-3 border-b border-creme/10 pb-1.5">
                       <span>
                         {p.name}
                         {p.unit && <span className="text-xs text-creme/50"> ({p.unit})</span>}
+                        {p.options && <span className="block text-xs text-creme/60 print:text-black">{p.options}</span>}
                       </span>
                       <span className="font-display text-xl tabular-nums text-dore print:text-black">{p.qty}</span>
                     </li>

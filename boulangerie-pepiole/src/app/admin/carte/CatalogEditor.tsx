@@ -4,17 +4,18 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState, useTransition } from "react";
 import { CATEGORIES, PRODUCTS, formatPrice } from "@/lib/catalog";
-import type { CustomProduct } from "@/lib/settings";
+import type { CustomProduct, ProductFields } from "@/lib/settings";
 import { updateSettings } from "../actions";
 import { ProductForm, parseEuros, toEuros } from "./ProductForm";
 
-type Initial = { prices: Record<string, number>; unavailable: string[]; hidden: string[]; custom: CustomProduct[] };
-type Row = { id: string; name: string; category: string; unit?: string; price: number; leadHours?: number; image?: string; custom?: CustomProduct };
+type Initial = { prices: Record<string, number>; unavailable: string[]; hidden: string[]; custom: CustomProduct[]; edits: Record<string, ProductFields> };
+type Row = ProductFields & { id: string; price: number; custom?: CustomProduct; edited?: boolean };
 
 const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((id) => b.has(id));
 
 export function CatalogEditor({ initial, updatedAt }: { initial: Initial; updatedAt: string | null }) {
   const [custom, setCustom] = useState(initial.custom);
+  const [edits, setEdits] = useState(initial.edits);
   const [prices, setPrices] = useState<Record<string, string>>(() =>
     Object.fromEntries(PRODUCTS.map((p) => [p.id, toEuros(initial.prices[p.id] ?? p.price)])),
   );
@@ -64,9 +65,40 @@ export function CatalogEditor({ initial, updatedAt }: { initial: Initial; update
   };
 
   const onSaveProduct = async (p: CustomProduct) => {
+    const base = PRODUCTS.find((x) => x.id === p.id);
+    if (base) {
+      // Produit d'origine : les champs modifiés sont mémorisés à part, le prix reste dans « prix modifiés »
+      const { id, price, ...fields } = p;
+      const nextEdits = { ...edits, [id]: fields };
+      const nextPrices = { ...saved.prices };
+      if (price === base.price) delete nextPrices[id];
+      else nextPrices[id] = price;
+      await updateSettings({ edits: nextEdits, prices: nextPrices });
+      setEdits(nextEdits);
+      setPrices((s) => ({ ...s, [id]: toEuros(price) }));
+      setSaved((s) => ({ ...s, prices: nextPrices }));
+      flash(true, `« ${p.name} » modifié.`);
+      setEditing(null);
+      return;
+    }
     const exists = custom.some((c) => c.id === p.id);
     await saveCustom(exists ? custom.map((c) => (c.id === p.id ? p : c)) : [...custom, p], exists ? `« ${p.name} » modifié.` : `« ${p.name} » ajouté à la carte.`);
     setEditing(null);
+  };
+
+  const restore = (id: string, name: string) => {
+    if (!confirm(`Rétablir « ${name} » tel qu'il était à l'origine (nom, photo, description, choix) ?`)) return;
+    start(async () => {
+      try {
+        const next = { ...edits };
+        delete next[id];
+        await updateSettings({ edits: next });
+        setEdits(next);
+        flash(true, `« ${name} » rétabli.`);
+      } catch (e) {
+        flash(false, `Échec : ${(e as Error).message}`);
+      }
+    });
   };
 
   const remove = (p: CustomProduct) => {
@@ -88,7 +120,7 @@ export function CatalogEditor({ initial, updatedAt }: { initial: Initial; update
       return n;
     });
 
-  const rows: Row[] = [...PRODUCTS, ...custom.map((c) => ({ ...c, custom: c }))];
+  const rows: Row[] = [...PRODUCTS.map((p): Row => ({ ...p, ...edits[p.id], edited: !!edits[p.id] })), ...custom.map((c): Row => ({ ...c, custom: c }))];
   const q = query.trim().toLowerCase();
 
   return (
@@ -129,21 +161,21 @@ export function CatalogEditor({ initial, updatedAt }: { initial: Initial; update
                 const changed = !p.custom && parseEuros(prices[p.id]) !== p.price;
                 return (
                   <li key={p.id} className={`flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap ${isHidden ? "opacity-50" : isOff ? "bg-mie/30" : ""}`}>
-                    {p.custom && (
-                      <span className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-mie">
-                        {p.image && <img src={p.image} alt="" className="h-full w-full object-cover" />}
-                      </span>
-                    )}
+                    <span className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-mie">
+                      {p.image && <img src={p.image} alt="" className="h-full w-full object-cover" />}
+                    </span>
                     <div className="min-w-0 flex-1">
                       <p className={`font-semibold ${isOff || isHidden ? "text-grege line-through" : ""}`}>
                         {p.name}
                         {p.custom && <span className="ml-2 rounded-full bg-olive/15 px-2 py-0.5 align-middle text-[11px] font-semibold text-olive">Ajouté</span>}
+                        {p.edited && <span className="ml-2 rounded-full bg-caramel/20 px-2 py-0.5 align-middle text-[11px] font-semibold text-croute">Modifié</span>}
                         {isHidden && <span className="ml-2 align-middle text-xs font-semibold no-underline">· retiré de la carte</span>}
                       </p>
                       <p className="text-xs text-grege">
                         {p.unit ? `${p.unit} · ` : ""}
                         {p.custom ? formatPrice(p.price) : `prix d'origine ${formatPrice(p.price)}`}
                         {p.leadHours ? ` · sur commande ${p.leadHours} h` : ""}
+                        {p.groups?.length ? ` · choix : ${p.groups.map((g) => g.label).join(", ")}` : ""}
                       </p>
                     </div>
 
@@ -189,6 +221,20 @@ export function CatalogEditor({ initial, updatedAt }: { initial: Initial; update
                     {!p.custom && (
                       <button
                         type="button"
+                        onClick={() => setEditing({ ...p, price: parseEuros(prices[p.id]) ?? p.price, edited: undefined } as CustomProduct)}
+                        className="h-9 rounded-full border border-mie px-4 text-xs font-semibold transition hover:bg-mie"
+                      >
+                        Modifier
+                      </button>
+                    )}
+                    {p.edited && (
+                      <button type="button" onClick={() => restore(p.id, p.name)} disabled={pending} className="text-xs font-semibold text-grege underline-offset-2 hover:text-croute hover:underline">
+                        Rétablir
+                      </button>
+                    )}
+                    {!p.custom && (
+                      <button
+                        type="button"
                         onClick={() => toggle(setHidden, p.id, !isHidden)}
                         className="text-xs font-semibold text-grege underline-offset-2 hover:text-croute hover:underline"
                       >
@@ -203,7 +249,7 @@ export function CatalogEditor({ initial, updatedAt }: { initial: Initial; update
         );
       })}
 
-      <AnimatePresence>{editing && <ProductForm key="form" initial={editing === "new" ? undefined : editing} onSave={onSaveProduct} onCancel={() => setEditing(null)} />}</AnimatePresence>
+      <AnimatePresence>{editing && <ProductForm key="form" initial={editing === "new" ? undefined : editing} original={editing !== "new" && !custom.some((c) => c.id === editing.id)} onSave={onSaveProduct} onCancel={() => setEditing(null)} />}</AnimatePresence>
 
       <AnimatePresence>
         {(dirty || message) && (

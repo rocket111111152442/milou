@@ -16,7 +16,7 @@ export type StoredOrder = {
   shop: ShopId;
   pickup: { date: string; time: string; label: string };
   customer: { firstName: string; lastName: string; phone: string; email: string; note: string };
-  items: { id: string; name: string; unit: string | null; qty: number; unitPrice: number; total: number }[];
+  items: { id: string; name: string; unit: string | null; options?: string | null; qty: number; unitPrice: number; total: number }[];
   total: number;
 };
 

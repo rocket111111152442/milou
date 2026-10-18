@@ -52,7 +52,13 @@ export async function POST(req: Request) {
   for (const item of order.items) {
     const product = catalog.get(item.id);
     if (!product || product.available === false) return fail("Un produit de votre panier n'est plus disponible.");
-    lines.push({ product, qty: item.qty, total: product.price * item.qty });
+    const groups = product.groups ?? [];
+    const picks = item.picks ?? [];
+    if (groups.length && (picks.length !== groups.length || groups.some((g, i) => !g.options.includes(picks[i])))) {
+      return fail(`Choisissez les options de « ${product.name} » dans votre panier.`);
+    }
+    const options = groups.length ? groups.map((g, i) => `${g.label} : ${picks[i]}`).join(" · ") : null;
+    lines.push({ product, qty: item.qty, total: product.price * item.qty, options });
   }
   const total = lines.reduce((s, l) => s + l.total, 0);
   const lead = leadMinutesFor(lines.map((l) => l.product.leadHours ?? 0));
@@ -77,6 +83,7 @@ export async function POST(req: Request) {
       id: l.product.id,
       name: l.product.name,
       unit: l.product.unit ?? null,
+      options: l.options,
       qty: l.qty,
       unitPrice: l.product.price / 100,
       total: l.total / 100,
@@ -134,7 +141,7 @@ export async function POST(req: Request) {
     const rows = lines
       .map(
         (l) =>
-          `<tr><td style="padding:6px 0">${l.qty} × ${escapeHtml(l.product.name)}${l.product.unit ? ` <span style="color:#8a7a68">(${escapeHtml(l.product.unit)})</span>` : ""}</td><td style="padding:6px 0;text-align:right">${formatPrice(l.total)}</td></tr>`,
+          `<tr><td style="padding:6px 0">${l.qty} × ${escapeHtml(l.product.name)}${l.product.unit ? ` <span style="color:#8a7a68">(${escapeHtml(l.product.unit)})</span>` : ""}${l.options ? `<br/><span style="color:#8a7a68;font-size:13px">${escapeHtml(l.options)}</span>` : ""}</td><td style="padding:6px 0;text-align:right">${formatPrice(l.total)}</td></tr>`,
       )
       .join("");
     const table = `<table style="width:100%;border-collapse:collapse;font-size:15px">${rows}<tr><td style="padding-top:12px;border-top:1px solid #e6d9c4"><strong>Total</strong></td><td style="padding-top:12px;border-top:1px solid #e6d9c4;text-align:right"><strong>${formatPrice(total)}</strong></td></tr></table>`;

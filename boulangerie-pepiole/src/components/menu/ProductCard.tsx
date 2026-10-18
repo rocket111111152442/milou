@@ -1,20 +1,24 @@
 "use client";
 
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
 import { formatPrice, type Product } from "@/lib/catalog";
 import { useCart } from "@/lib/cart";
 import { flyToCart } from "@/components/cart/FlyToCart";
+import { ChoiceDialog } from "@/components/cart/ChoiceDialog";
 import { ProductThumb } from "./ProductImage";
 
 export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
   const add = useCart((s) => s.add);
-  const qtyInCart = useCart((s) => s.lines.find((l) => l.id === product.id)?.qty ?? 0);
+  const qtyInCart = useCart((s) => s.lines.filter((l) => l.id === product.id).reduce((n, l) => n + l.qty, 0));
   const imgRef = useRef<HTMLDivElement>(null);
   const [added, setAdded] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const hasChoices = (product.groups?.length ?? 0) > 0;
 
-  const onAdd = () => {
-    add(product.id);
+  const onAdd = (picks?: string[]) => {
+    setChoosing(false);
+    add(product.id, 1, picks);
     flyToCart(imgRef.current, product.image);
     setAdded(true);
     setTimeout(() => setAdded(false), 1400);
@@ -70,7 +74,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
         ) : (
         <button
           type="button"
-          onClick={onAdd}
+          onClick={() => (hasChoices ? setChoosing(true) : onAdd())}
           className="relative mt-5 inline-flex h-12 items-center justify-center overflow-hidden rounded-full bg-cafe px-5 text-sm font-semibold text-creme transition-colors hover:bg-croute"
         >
           <motion.span
@@ -78,7 +82,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
             animate={added ? { y: -40, opacity: 0 } : { y: 0, opacity: 1 }}
             transition={{ duration: 0.25 }}
           >
-            <span className="text-lg leading-none">+</span> Ajouter au panier
+            <span className="text-lg leading-none">+</span> {hasChoices ? "Composer et ajouter" : "Ajouter au panier"}
           </motion.span>
           <motion.span
             className="absolute inset-0 flex items-center justify-center gap-2 bg-olive"
@@ -92,6 +96,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
         </button>
         )}
       </div>
+      <AnimatePresence>{choosing && <ChoiceDialog product={product} onClose={() => setChoosing(false)} onConfirm={(p) => onAdd(p)} />}</AnimatePresence>
     </motion.article>
   );
 }

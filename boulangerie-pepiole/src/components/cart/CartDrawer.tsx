@@ -160,9 +160,9 @@ export function CartDrawer() {
               ) : (
                 <ul className="flex flex-col gap-3">
                   <AnimatePresence initial={false}>
-                    {items.map(({ product, qty, total: lineTotal }) => (
+                    {items.map(({ key, product, qty, total: lineTotal, options, invalid }) => (
                       <motion.li
-                        key={product.id}
+                        key={key}
                         layout
                         initial={{ opacity: 0, x: 40 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -175,7 +175,7 @@ export function CartDrawer() {
                             <p className="font-display text-lg leading-tight">{product.name}</p>
                             <button
                               type="button"
-                              onClick={() => remove(product.id)}
+                              onClick={() => remove(key)}
                               className="text-grege transition hover:text-croute"
                               aria-label={`Retirer ${product.name}`}
                             >
@@ -188,8 +188,10 @@ export function CartDrawer() {
                             {formatPrice(product.price)}
                             {product.unit ? ` · ${product.unit}` : ""}
                           </p>
+                          {options && <p className="text-xs text-cafe/70">{options}</p>}
+                          {invalid && <p className="text-xs font-semibold text-red-700">Choix modifiés : retirez puis rajoutez.</p>}
                           <div className="mt-auto flex items-center justify-between pt-2">
-                            <QtyStepper value={qty} onChange={(v) => setQty(product.id, v)} label={product.name} small />
+                            <QtyStepper value={qty} onChange={(v) => setQty(key, v)} label={product.name} small />
                             <motion.span key={lineTotal} initial={{ y: -6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="font-semibold">
                               {formatPrice(lineTotal)}
                             </motion.span>

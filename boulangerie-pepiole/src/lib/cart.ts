@@ -5,7 +5,11 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { PRODUCTS_BY_ID, type Product } from "./catalog";
 import { SHOP_IDS, type ShopId } from "./shops";
 
-export type CartLine = { id: string; qty: number };
+/** `picks` : option retenue pour chaque choix du produit (formules…), dans l'ordre des choix. */
+export type CartLine = { id: string; qty: number; picks?: string[] };
+
+/** Une même formule avec des options différentes forme deux lignes distinctes. */
+export const lineKey = (l: { id: string; picks?: string[] }) => (l.picks?.length ? `${l.id}|${l.picks.join("|")}` : l.id);
 
 type CartState = {
   lines: CartLine[];
@@ -13,9 +17,9 @@ type CartState = {
   shop: ShopId | null;
   open: boolean;
   bump: number;
-  add: (id: string, qty?: number) => void;
-  setQty: (id: string, qty: number) => void;
-  remove: (id: string) => void;
+  add: (id: string, qty?: number, picks?: string[]) => void;
+  setQty: (key: string, qty: number) => void;
+  remove: (key: string) => void;
   clear: () => void;
   setShop: (shop: ShopId) => void;
   setOpen: (open: boolean) => void;
@@ -30,22 +34,23 @@ export const useCart = create<CartState>()(
       shop: null,
       open: false,
       bump: 0,
-      add: (id, qty = 1) =>
+      add: (id, qty = 1, picks) =>
         set((s) => {
-          const existing = s.lines.find((l) => l.id === id);
+          const key = lineKey({ id, picks });
+          const existing = s.lines.find((l) => lineKey(l) === key);
           const lines = existing
-            ? s.lines.map((l) => (l.id === id ? { ...l, qty: Math.min(MAX_QTY, l.qty + qty) } : l))
-            : [...s.lines, { id, qty: Math.min(MAX_QTY, qty) }];
+            ? s.lines.map((l) => (lineKey(l) === key ? { ...l, qty: Math.min(MAX_QTY, l.qty + qty) } : l))
+            : [...s.lines, { id, qty: Math.min(MAX_QTY, qty), ...(picks?.length ? { picks } : {}) }];
           return { lines, bump: s.bump + 1 };
         }),
-      setQty: (id, qty) =>
+      setQty: (key, qty) =>
         set((s) => ({
           lines:
             qty <= 0
-              ? s.lines.filter((l) => l.id !== id)
-              : s.lines.map((l) => (l.id === id ? { ...l, qty: Math.min(MAX_QTY, qty) } : l)),
+              ? s.lines.filter((l) => lineKey(l) !== key)
+              : s.lines.map((l) => (lineKey(l) === key ? { ...l, qty: Math.min(MAX_QTY, qty) } : l)),
         })),
-      remove: (id) => set((s) => ({ lines: s.lines.filter((l) => l.id !== id) })),
+      remove: (key) => set((s) => ({ lines: s.lines.filter((l) => lineKey(l) !== key) })),
       clear: () => set({ lines: [] }),
       setShop: (shop) => set({ shop }),
       setOpen: (open) => set({ open }),
@@ -60,7 +65,9 @@ export const useCart = create<CartState>()(
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as { lines?: CartLine[]; shop?: string | null };
         // Les produits disparus du catalogue sont ignorés à l'affichage (cartDetails)
-        const lines = (p.lines ?? []).filter((l) => typeof l?.id === "string" && Number.isInteger(l.qty) && l.qty > 0);
+        const lines = (p.lines ?? [])
+          .filter((l) => typeof l?.id === "string" && Number.isInteger(l.qty) && l.qty > 0)
+          .map((l) => ({ id: l.id, qty: l.qty, ...(Array.isArray(l.picks) ? { picks: l.picks.filter((x) => typeof x === "string") } : {}) }));
         const shop = SHOP_IDS.find((id) => id === p.shop) ?? null;
         return { ...current, lines, shop };
       },
@@ -72,7 +79,13 @@ export function cartDetails(lines: CartLine[], byId: Map<string, Product> = PROD
   const items = lines
     .map((l) => {
       const product = byId.get(l.id);
-      return product ? { product, qty: l.qty, total: product.price * l.qty } : null;
+      if (!product) return null;
+      const groups = product.groups ?? [];
+      const picks = l.picks ?? [];
+      // Options à rechoisir si les choix du produit ont changé depuis l'ajout au panier
+      const invalid = groups.length > 0 && (picks.length !== groups.length || groups.some((g, i) => !g.options.includes(picks[i])));
+      const options = groups.length && !invalid ? groups.map((g, i) => `${g.label} : ${picks[i]}`).join(" · ") : "";
+      return { key: lineKey(l), product, qty: l.qty, total: product.price * l.qty, picks, options, invalid };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
   const total = items.reduce((sum, i) => sum + i.total, 0);

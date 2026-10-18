@@ -83,7 +83,7 @@ export function Checkout({ enabledShops }: { enabledShops: ShopId[] }) {
   const shop = shopId ? shopById(shopId) : null;
   const demo = shopId ? !enabledShops.includes(shopId) : enabledShops.length < SHOPS.length;
   const { items, total, count, leadHours } = cartDetails(lines, byId);
-  const unavailable = items.filter((i) => i.product.available === false);
+  const unavailable = items.filter((i) => i.product.available === false || i.invalid);
   const lead = leadMinutesFor(leadHours);
 
   const [step, setStep] = useState(0);
@@ -132,7 +132,7 @@ export function Checkout({ enabledShops }: { enabledShops: ShopId[] }) {
   const submit = async () => {
     setServerError(null);
     const payload = {
-      items: items.map((i) => ({ id: i.product.id, qty: i.qty })),
+      items: items.map((i) => ({ id: i.product.id, qty: i.qty, picks: i.picks.length ? i.picks : undefined })),
       pickup: { shop: shopId ?? "", date: date ?? "", time: time ?? "" },
       customer,
       consent,
@@ -169,7 +169,7 @@ export function Checkout({ enabledShops }: { enabledShops: ShopId[] }) {
         shop: shopId!,
         date: date!,
         time: time!,
-        items: items.map((i) => ({ name: i.product.name, qty: i.qty })),
+        items: items.map((i) => ({ name: i.options ? `${i.product.name} (${i.options})` : i.product.name, qty: i.qty })),
         firstName: customer.firstName,
       });
       clear();
@@ -302,8 +302,8 @@ export function Checkout({ enabledShops }: { enabledShops: ShopId[] }) {
                   <h2 className="mb-6 font-display text-3xl">Votre panier</h2>
                   <ul className="divide-y divide-mie">
                     <AnimatePresence initial={false}>
-                      {items.map(({ product, qty, total: t }) => (
-                        <motion.li key={product.id} layout exit={{ opacity: 0, height: 0 }} className="flex items-center gap-4 py-4">
+                      {items.map(({ key, product, qty, total: t, options, invalid }) => (
+                        <motion.li key={key} layout exit={{ opacity: 0, height: 0 }} className="flex items-center gap-4 py-4">
                           <ProductThumb product={product} className="h-16 w-16 shrink-0 rounded-xl sm:h-20 sm:w-20" sizes="80px" />
                           <div className="min-w-0 flex-1">
                             <p className="font-display text-lg leading-tight">{product.name}</p>
@@ -312,11 +312,13 @@ export function Checkout({ enabledShops }: { enabledShops: ShopId[] }) {
                               {product.unit ? ` · ${product.unit}` : ""}
                               {product.leadHours ? ` · à commander ${product.leadHours} h avant` : ""}
                             </p>
-                            <button type="button" onClick={() => remove(product.id)} className="mt-1 text-xs font-semibold text-croute hover:underline">
+                            {options && <p className="text-xs text-cafe/70">{options}</p>}
+                            {invalid && <p className="text-xs font-semibold text-red-700">Les choix de cette formule ont changé : retirez-la et rajoutez-la.</p>}
+                            <button type="button" onClick={() => remove(key)} className="mt-1 text-xs font-semibold text-croute hover:underline">
                               Retirer
                             </button>
                           </div>
-                          <QtyStepper value={qty} onChange={(v) => setQty(product.id, v)} label={product.name} small />
+                          <QtyStepper value={qty} onChange={(v) => setQty(key, v)} label={product.name} small />
                           <span className="hidden w-20 text-right font-semibold sm:block">{formatPrice(t)}</span>
                         </motion.li>
                       ))}
