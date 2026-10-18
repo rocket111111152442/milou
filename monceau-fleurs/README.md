@@ -16,6 +16,8 @@ Tout se règle dans `assets/js/data.js` :
 
 - Le formulaire de contact est encore **simulé**.
 - Sans clé Stripe, le paiement reste en **mode démo** (le panier fonctionne, rien n'est débité).
+- `noindex` (meta + en-tête HTTP + robots.txt) : le site n'est pas indexé tant qu'il reste une maquette.
+- Les avis affichés se limitent à la note et au nombre d'avis Google réels (4,5/5, 749 avis) ; aucun témoignage inventé.
 
 ## Paiement & livraison (Stripe Checkout)
 
@@ -43,8 +45,7 @@ Moyens de paiement : ceux activés dans le tableau de bord Stripe (carte, **Link
 5. Activer les reçus clients : Stripe → Paramètres → E-mails clients → « Paiements réussis ».
 
 Les commandes sont aussi visibles dans Stripe → Paiements (détail : mode, date, créneau, articles, messages des cartes).
-- `noindex` (meta + en-tête HTTP + robots.txt) : le site n'est pas indexé tant qu'il reste une maquette.
-- Les avis affichés se limitent à la note et au nombre d'avis Google réels (4,5/5, 749 avis) ; aucun témoignage inventé.
+
 
 ## Tester en local
 
