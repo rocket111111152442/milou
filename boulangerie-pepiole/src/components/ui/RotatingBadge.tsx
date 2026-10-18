@@ -2,7 +2,7 @@ import { Monogram } from "./Logo";
 
 /** Macaron circulaire qui tourne lentement. */
 export function RotatingBadge({
-  text = "Pétri · Façonné · Cuit sur place · Depuis 2014 · ",
+  text = "Pétri · Façonné · Cuit sur place · Sanary · Six-Fours · ",
   className = "",
 }: {
   text?: string;

@@ -1,6 +1,6 @@
 // Les boutiques de la maison.
-// Sources : fiches Google Maps, registre SIRENE (annuaire-entreprises.data.gouv.fr),
-// Office de tourisme de Sanary-sur-Mer, MyBoulange.
+// Sources : fiches Google Maps (et leurs reprises : Bottin, Wanderlog, boulangerie.contact),
+// registre SIRENE / BODACC, Office de tourisme de Sanary-sur-Mer, MyBoulange.
 import type { Range } from "./hours";
 
 export type ShopId = "sanary" | "six-fours";
@@ -85,11 +85,11 @@ const SIX_FOURS: Shop = {
   short: "Six-Fours",
   tagline: "Boulangerie · Pâtisserie · Snacking",
   address: { street: "230 Route des Sablettes", postalCode: "83140", city: "Six-Fours-les-Plages", plusCode: "3VQ2+HJ Six-Fours-les-Plages" },
-  landmark: "Route des Sablettes, chemin Guérin",
+  landmark: "Quartier Guérin, avec terrasse et parking",
   geo: { lat: 43.0889375, lng: 5.8515625 },
   phone: { display: "04 94 74 74 38", href: "tel:+33494747438" },
   hours: {
-    0: [["06:30", "20:00"]],
+    0: [["07:00", "20:00"]],
     1: [["06:30", "20:00"]],
     2: [["06:30", "20:00"]],
     3: [["06:30", "20:00"]],
@@ -100,7 +100,7 @@ const SIX_FOURS: Shop = {
   closedDates: [],
   image: "/images/facade-six-fours.jpg",
   imageAlt: "Façade de Maison Sernesi à Six-Fours : boulangerie, pâtisserie, snacking",
-  services: ["Vente à emporter", "Accès fauteuil roulant", "Snacking"],
+  services: ["Vente à emporter", "Terrasse", "Parking", "Accès fauteuil roulant", "Titres-restaurant", "Ouvert le dimanche"],
   legal: {
     company: "MCS BOULANGERIE",
     form: "SAS (société par actions simplifiée)",

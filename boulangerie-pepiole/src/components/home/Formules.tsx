@@ -94,8 +94,8 @@ export function GateauxCta() {
           <SplitWords as="h2" text="Vos gâteaux, préparés pour vous." className="mt-3 block max-w-3xl font-display text-5xl leading-[1.02] tracking-tight sm:text-7xl" />
           <Reveal delay={0.3}>
             <p className="mt-6 max-w-xl text-lg text-creme/80">
-              Fraisier, tarte au chocolat, entremets, plateaux de viennoiseries : commandez en ligne au moins 48 h à
-              l&apos;avance et récupérez-les en boutique au créneau de votre choix.
+              Number cakes, tropézienne, fraisier, entremets, plateaux de viennoiseries : commandez en ligne 48 à 72 h
+              à l&apos;avance et récupérez-les à Sanary ou à Six-Fours, au créneau de votre choix.
             </p>
             <Link
               href="/carte?rayon=gateaux"

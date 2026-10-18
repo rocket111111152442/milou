@@ -1,7 +1,9 @@
 // Catalogue de la boutique.
-// ⚠️ Les familles de produits viennent des descriptions publiques de la boutique
-// (Office de tourisme de Sanary, MyBoulange). Les PRIX sont INDICATIFS et les photos
-// sont des photos d'illustration : à remplacer par les vrais tarifs et produits.
+// ⚠️ Les familles de produits viennent des descriptions publiques des boutiques
+// (Office de tourisme de Sanary, MyBoulange, avis Google de Maison Sernesi).
+// Seuls l'éclair et la tartelette au chocolat (2,80 €, étiquettes en vitrine à Six-Fours)
+// ont un prix relevé ; les autres PRIX sont INDICATIFS et les photos sont des photos
+// d'illustration : à remplacer par les vrais tarifs et produits.
 // Prix en centimes.
 
 export type CategoryId =
@@ -173,7 +175,7 @@ export const PRODUCTS: Product[] = [
     id: "eclair-chocolat",
     name: "Éclair au chocolat",
     category: "patisseries",
-    price: 320,
+    price: 280,
     description: "Pâte à choux garnie d'une crème intense au chocolat.",
     image: "/images/p/eclair-chocolat.jpg",
   },
@@ -181,9 +183,32 @@ export const PRODUCTS: Product[] = [
     id: "eclair-caramel",
     name: "Éclair caramel",
     category: "patisseries",
-    price: 320,
+    price: 280,
     description: "Crème au caramel et glaçage doré.",
     image: "/images/p/eclair-caramel.jpg",
+  },
+  {
+    id: "tartelette-chocolat",
+    name: "Tartelette au chocolat",
+    category: "patisseries",
+    price: 280,
+    description: "Pâte sablée et ganache fondante.",
+    image: "/images/p/tarte-chocolat.jpg",
+  },
+  {
+    id: "tropezienne",
+    name: "Tropézienne",
+    category: "patisseries",
+    price: 390,
+    description: "Brioche moelleuse au sucre perlé, garnie de crème légère. La gourmandise du Var.",
+    badges: ["Spécialité"],
+  },
+  {
+    id: "millefeuille",
+    name: "Millefeuille",
+    category: "patisseries",
+    price: 380,
+    description: "Feuilletage caramélisé et crème pâtissière vanillée.",
   },
   {
     id: "citron-meringuee",
@@ -215,6 +240,26 @@ export const PRODUCTS: Product[] = [
     badges: ["Sur commande 48 h", "Saison"],
     leadHours: 48,
     featured: true,
+  },
+  {
+    id: "tropezienne-partager",
+    name: "Tropézienne à partager",
+    category: "gateaux",
+    price: 2800,
+    unit: "6 parts",
+    description: "La grande tropézienne, pour les repas de famille et les anniversaires.",
+    badges: ["Sur commande 48 h", "Spécialité"],
+    leadHours: 48,
+  },
+  {
+    id: "number-cake",
+    name: "Number cake",
+    category: "gateaux",
+    price: 4500,
+    unit: "8 à 10 parts",
+    description: "Le gâteau en forme de chiffre ou de lettre, décoré de fruits, macarons et fleurs. Précisez le chiffre et les envies en commentaire.",
+    badges: ["Sur commande 72 h"],
+    leadHours: 72,
   },
   {
     id: "tarte-chocolat",

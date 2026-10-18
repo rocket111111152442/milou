@@ -1,6 +1,18 @@
 # Le Pétrin de Pépiole — site vitrine & commande en ligne
 
-Site de la boulangerie **Le Pétrin de Pépiole**, 1191 Route de la Gare, 83110 Sanary-sur-Mer.
+Site de la maison **Le Pétrin de Pépiole**, deux boutiques :
+
+| Boutique | Adresse | Société |
+|---|---|---|
+| Le Pétrin de Pépiole | 1191 Route de la Gare, 83110 Sanary-sur-Mer · 04 94 32 57 47 | AS BOULANGERIE (SIREN 802 932 665) |
+| Maison Sernesi | 230 Route des Sablettes, 83140 Six-Fours-les-Plages · 04 94 74 74 38 | MCS BOULANGERIE (SIREN 878 642 776) |
+
+Mêmes dirigeants pour les deux sociétés (registre SIRENE / BODACC). La fiche Google de Maison Sernesi
+s'appelait auparavant « Le Pétrin de Pépiole – Six fours ».
+
+La boulangerie « Boulangerie Pépiole » (2483 av. Président John Kennedy, Six-Fours), berceau historique du nom,
+est exploitée par une autre société (PEPIOLE SIX-FOURS, autre branche de la famille) : elle n'est volontairement
+**pas** présentée sur ce site. À n'ajouter qu'avec l'accord des deux parties.
 
 Next.js 16 (App Router) · React 19 · Tailwind CSS 4 · Motion (animations) · Lenis (défilement fluide) · Zustand (panier) · Zod · Resend.
 
@@ -27,8 +39,9 @@ npm run build      # build de production
 
 | Quoi | Fichier |
 |---|---|
-| Adresse, téléphone, Instagram, infos légales | `src/lib/site.ts` |
-| Horaires, jours de fermeture, délais de commande | `src/lib/hours.ts` |
+| Boutiques : adresse, téléphone, horaires, fermetures, société | `src/lib/shops.ts` |
+| Nom, description, Instagram, directeur de publication | `src/lib/site.ts` |
+| Délais de commande, pas des créneaux | `src/lib/hours.ts` |
 | Produits, prix, photos, rayons | `src/lib/catalog.ts` |
 | Photos | `public/images/` |
 
@@ -38,8 +51,9 @@ Sans configuration, le site est en **mode démonstration** : le parcours fonctio
 que la commande n'est pas transmise à la boutique. Pour activer la réception, définir dans Vercel
 (*Project → Settings → Environment Variables*) l'une des deux options :
 
-1. **E-mail (Resend)** : `RESEND_API_KEY`, `ORDER_EMAIL_TO` (adresse de la boutique),
-   `ORDER_EMAIL_FROM` (expéditeur sur un domaine vérifié dans Resend).
+1. **E-mail (Resend)** : `RESEND_API_KEY`, `ORDER_EMAIL_FROM` (expéditeur sur un domaine vérifié dans Resend),
+   et l'adresse qui reçoit les commandes : `ORDER_EMAIL_TO_SANARY` et `ORDER_EMAIL_TO_SIX_FOURS`
+   (une adresse par boutique), ou `ORDER_EMAIL_TO` pour tout recevoir au même endroit.
    La boutique reçoit chaque commande par e-mail, le client reçoit une confirmation s'il a donné son e-mail.
 2. **Webhook** : `ORDER_WEBHOOK_URL` — la commande est envoyée en JSON (Make, Zapier, n8n, Google Sheets,
    Discord…).
@@ -54,7 +68,8 @@ Voir `.env.example`. Le paiement se fait en boutique au retrait (pas de paiement
 - **Photos** : photos d'illustration Unsplash (licence gratuite, usage commercial autorisé). Les vraies
   photos des produits de la boutique seront nettement plus convaincantes. La photo de façade provient d'une
   capture Google Maps en basse définition.
-- **Horaires** : 6h30–19h30 du lundi au samedi, 7h–13h15 le dimanche (Google / MyBoulange). L'Office de
-  tourisme indique une fermeture à 19h15 en semaine : à confirmer.
-- **Mentions légales** : informations issues du registre SIRENE (AS BOULANGERIE, SIREN 802 932 665).
-  Capital social et directeur de la publication à faire valider par la boutique.
+- **Horaires** : Sanary 6h30–19h30 du lundi au samedi, 7h–13h15 le dimanche (Google / MyBoulange ; l'Office de
+  tourisme indique 19h15 en semaine). Six-Fours 6h30–20h du lundi au samedi, 7h–20h le dimanche (données Google
+  reprises par 3 annuaires). À confirmer avec la boutique, ainsi que les fermetures annuelles.
+- **Mentions légales** : informations issues du registre SIRENE pour les deux sociétés. Le n° de TVA de
+  MCS BOULANGERIE est calculé à partir du SIREN. À faire valider par la boutique.

@@ -6,7 +6,7 @@ import { useRef } from "react";
 import { Counter, Reveal } from "@/components/ui/motion";
 
 const TEXT =
-  "Près de la gare d'Ollioules–Sanary, nos boulangers pétrissent, façonnent et cuisent le pain sur place, chaque jour, en respectant les temps de fermentation. Une boulangerie de quartier, généreuse et sans chichis, ouverte depuis 2014.";
+  "Une histoire de famille, née dans le quartier de Pépiole, à Six-Fours. Aujourd'hui, nos boulangers pétrissent, façonnent et cuisent le pain sur place, chaque jour, en respectant les temps de fermentation : à Sanary près de la gare, et à Six-Fours chez Maison Sernesi.";
 
 function Word({ children, progress, range }: { children: string; progress: MotionValue<number>; range: [number, number] }) {
   const opacity = useTransform(progress, range, [0.16, 1]);
@@ -54,10 +54,10 @@ export function Story() {
 
           <div className="mt-16 grid grid-cols-2 gap-6 sm:grid-cols-4">
             {[
+              { value: <Counter to={2} />, suffix: "", label: "Boutiques, une même maison" },
               { value: <Counter to={7} />, suffix: "j/7", label: "Ouvert toute la semaine" },
               { value: <Counter to={6} />, suffix: "h30", label: "Premières fournées" },
-              { value: <Counter from={1990} to={2014} duration={2.4} />, suffix: "", label: "Installés à Sanary" },
-              { value: <Counter to={100} />, suffix: "%", label: "Pain pétri et cuit sur place" },
+              { value: <Counter from={1990} to={2014} duration={2.4} />, suffix: "", label: "Ouverture à Sanary" },
             ].map((s, i) => (
               <Reveal key={i} delay={i * 0.1} className="border-t border-cafe/15 pt-4">
                 <p className="font-display text-4xl text-croute sm:text-5xl">
@@ -70,15 +70,15 @@ export function Story() {
           </div>
         </div>
 
-        <div ref={imgRef} className="relative min-h-[520px] lg:col-span-5">
+        <div ref={imgRef} className="relative min-h-[460px] lg:sticky lg:top-32 lg:col-span-5 lg:self-start">
           <motion.figure
             style={{ rotate: r1, y: y1 }}
             className="absolute left-0 top-0 w-[78%] rounded-sm bg-creme p-3 pb-12 shadow-[0_30px_60px_-25px_rgba(36,22,13,0.55)]"
           >
-            <div className="relative aspect-[4/3] overflow-hidden">
-              <Image src="/images/boutique-1.jpg" alt="Étals de pains et de baguettes dans une boulangerie" fill sizes="(min-width:1024px) 30vw, 80vw" className="object-cover" />
+            <div className="relative aspect-[11/4] bg-mie overflow-hidden">
+              <Image src="/images/facade-six-fours.jpg" alt="Façade de Maison Sernesi à Six-Fours : boulangerie, pâtisserie, snacking" fill sizes="(min-width:1024px) 30vw, 80vw" className="object-cover" />
             </div>
-            <figcaption className="absolute bottom-3 left-4 font-script text-2xl text-cafe">Le fournil</figcaption>
+            <figcaption className="absolute bottom-3 left-4 font-script text-2xl text-cafe">Six-Fours · Maison Sernesi</figcaption>
           </motion.figure>
           <motion.figure
             style={{ rotate: r2, y: y2 }}
@@ -87,7 +87,7 @@ export function Story() {
             <div className="relative aspect-[27/10] overflow-hidden bg-mie">
               <Image src="/images/facade.jpg" alt="Façade de la boutique Le Pétrin de Pépiole, enseigne Artisan Boulanger" fill sizes="(min-width:1024px) 30vw, 80vw" className="object-cover" />
             </div>
-            <figcaption className="absolute bottom-3 left-4 font-script text-2xl text-cafe">1191 route de la Gare</figcaption>
+            <figcaption className="absolute bottom-3 left-4 font-script text-2xl text-cafe">Sanary · route de la Gare</figcaption>
           </motion.figure>
           <div className="absolute -right-4 top-1/3 hidden h-28 w-28 animate-float rounded-full bg-dore/90 text-center font-script text-xl leading-tight text-torref shadow-xl [--r:12deg] sm:grid sm:place-items-center">
             fait
