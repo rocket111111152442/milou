@@ -65,7 +65,7 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
   const [shop, setShop] = useState<ShopId | "toutes">("toutes");
-  const [day, setDay] = useState<DayFilter>("aujourdhui");
+  const [day, setDay] = useState<DayFilter>("avenir");
   const [status, setStatus] = useState<OrderStatus | "actives" | "toutes">("actives");
   const [today, setToday] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
@@ -73,7 +73,7 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
 
   useEffect(() => {
     setToday(parisNow().date);
-    setLastRefresh(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
+    setLastRefresh(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }));
   }, [orders]);
 
   // Nouvelle commande arrivée depuis le dernier affichage : son + compteur dans l'onglet
@@ -111,18 +111,28 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
 
   const byShop = useMemo(() => orders.filter((o) => shop === "toutes" || o.shop === shop), [orders, shop]);
 
-  const byDay = useMemo(() => {
-    if (!today) return byShop;
-    const tomorrow = addDays(today, 1);
-    return byShop.filter((o) => {
+  const inDay = useMemo(() => {
+    const tomorrow = today ? addDays(today, 1) : null;
+    return (o: StoredOrder, f: DayFilter) => {
       const d = o.pickup.date;
-      if (day === "aujourdhui") return d === today;
-      if (day === "demain") return d === tomorrow;
-      if (day === "avenir") return d >= today;
-      if (day === "passees") return d < today;
-      return true;
-    });
-  }, [byShop, day, today]);
+      if (!today || f === "toutes") return true;
+      if (f === "aujourdhui") return d === today;
+      if (f === "demain") return d === tomorrow;
+      if (f === "avenir") return d >= today;
+      return d < today;
+    };
+  }, [today]);
+
+  const byDay = useMemo(() => byShop.filter((o) => inDay(o, day)), [byShop, day, inDay]);
+
+  // Nouvelles commandes cachées par les filtres actuels : on le signale pour qu'aucune ne passe inaperçue
+  const statusShowsNew = status === "toutes" || status === "actives" || status === "nouvelle";
+  const hiddenNew = orders.filter((o) => o.status === "nouvelle" && !(statusShowsNew && (shop === "toutes" || o.shop === shop) && inDay(o, day))).length;
+  const showAll = () => {
+    setShop("toutes");
+    setDay("toutes");
+    setStatus("actives");
+  };
 
   const visible = useMemo(
     () =>
@@ -211,7 +221,7 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
             onChange={setShop}
             options={[{ id: "toutes" as const, label: "Toutes les boutiques" }, ...SHOPS.map((s) => ({ id: s.id, label: s.short }))]}
           />
-          <Pills id="day" value={day} onChange={setDay} options={DAYS} />
+          <Pills id="day" value={day} onChange={setDay} options={DAYS.map((d) => ({ ...d, count: byShop.filter((o) => o.status === "nouvelle" && inDay(o, d.id)).length || undefined }))} />
         </div>
         <div className="mt-3 print:hidden">
           <Pills
@@ -225,6 +235,19 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
             ]}
           />
         </div>
+
+        {hiddenNew > 0 && (
+          <button
+            type="button"
+            onClick={showAll}
+            className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl bg-croute px-5 py-3 text-left text-sm font-semibold text-creme shadow-lg transition hover:bg-cafe print:hidden"
+          >
+            <span>
+              🔔 {hiddenNew} nouvelle{hiddenNew > 1 ? "s" : ""} commande{hiddenNew > 1 ? "s" : ""} non affichée{hiddenNew > 1 ? "s" : ""} avec ces filtres
+            </span>
+            <span className="underline underline-offset-2">Tout afficher</span>
+          </button>
+        )}
 
         <div className="mt-8 grid gap-6 lg:grid-cols-12">
           {/* Commandes */}
