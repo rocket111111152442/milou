@@ -14,8 +14,11 @@ export function RotatingBadge({
         <defs>
           <path id="badge-circle" d="M100,100 m-78,0 a78,78 0 1,1 156,0 a78,78 0 1,1 -156,0" />
         </defs>
-        <text fontSize="15.5" letterSpacing="3.2" fill="currentColor" fontFamily="var(--font-sans)" fontWeight="700" style={{ textTransform: "uppercase" }}>
-          <textPath href="#badge-circle">{text}</textPath>
+        {/* textLength = circonférence (2π × 78) : le texte remplit exactement le cercle */}
+        <text fontSize="12.5" fill="currentColor" fontFamily="var(--font-sans)" fontWeight="700" style={{ textTransform: "uppercase" }}>
+          <textPath href="#badge-circle" textLength="488" lengthAdjust="spacing">
+            {text}
+          </textPath>
         </text>
       </svg>
       <Monogram className="h-[38%] w-[38%]" />
