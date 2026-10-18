@@ -1,0 +1,25 @@
+import { Monogram } from "./Logo";
+
+/** Macaron circulaire qui tourne lentement. */
+export function RotatingBadge({
+  text = "Pétri · Façonné · Cuit sur place · Depuis 2014 · ",
+  className = "",
+}: {
+  text?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`relative grid place-items-center ${className}`}>
+      <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full animate-spin-slow" aria-hidden="true">
+        <defs>
+          <path id="badge-circle" d="M100,100 m-78,0 a78,78 0 1,1 156,0 a78,78 0 1,1 -156,0" />
+        </defs>
+        <text fontSize="15.5" letterSpacing="3.2" fill="currentColor" fontFamily="var(--font-sans)" fontWeight="700" style={{ textTransform: "uppercase" }}>
+          <textPath href="#badge-circle">{text}</textPath>
+        </text>
+      </svg>
+      <Monogram className="h-[38%] w-[38%]" />
+      <span className="sr-only">{text}</span>
+    </div>
+  );
+}
