@@ -9,7 +9,7 @@ export const SITE = {
   city: "Sanary-sur-Mer",
   description:
     "Boulangerie artisanale près de la gare d'Ollioules–Sanary : pains de tradition, levain, viennoiseries, pâtisseries, snacking et pause café. Ouvert 7 jours sur 7. Commande en ligne et retrait en boutique.",
-  url: process.env.NEXT_PUBLIC_SITE_URL || "https://le-petrin-de-pepiole.vercel.app",
+  url: process.env.NEXT_PUBLIC_SITE_URL || "https://petrin-de-pepiole.vercel.app",
 
   address: {
     street: "1191 Route de la Gare",
