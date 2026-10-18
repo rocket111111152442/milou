@@ -2,7 +2,7 @@
 import { migrate } from './db.js';
 
 // Ordre compatible avec les clés étrangères.
-const TABLES = ['meta', 'sites', 'site_blocks', 'users', 'sessions', 'cards', 'dex', 'friends', 'trades', 'trade_items', 'auctions', 'notifications', 'events', 'sales', 'price_index', 'value_history', 'favorites', 'wishlist', 'messages', 'promo_codes', 'promo_uses', 'sealed_packs', 'shops', 'shop_listings', 'shop_loans', 'shares', 'stock_orders', 'stock_trades', 'shop_payouts', 'shop_log', 'share_offers'];
+const TABLES = ['meta', 'sites', 'site_blocks', 'users', 'sessions', 'cards', 'dex', 'friends', 'trades', 'trade_items', 'auctions', 'notifications', 'events', 'sales', 'price_index', 'value_history', 'favorites', 'wishlist', 'messages', 'promo_codes', 'promo_uses', 'sealed_packs', 'shops', 'shop_listings', 'shop_loans', 'shares', 'stock_orders', 'stock_trades', 'shop_payouts', 'shop_log', 'share_offers', 'boss_hits', 'lottery_tickets'];
 const SERIAL = ['users', 'cards', 'trades', 'auctions', 'notifications', 'events', 'sales', 'messages', 'sealed_packs', 'shops', 'shop_listings', 'shop_loans', 'stock_orders', 'stock_trades', 'shop_log', 'share_offers'];
 
 export async function copyDatabase(src, dst, { chunk = 20_000 } = {}) {

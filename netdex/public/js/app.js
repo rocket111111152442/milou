@@ -2,6 +2,7 @@ import { api, state, setMe, refreshMe, $, $$, h, esc, fmt, duration, now, cardHt
 import * as V from './views.js';
 import * as F from './fun.js';
 import * as S from './shops.js';
+import * as L from './live.js';
 
 // ---------- Thème ----------
 window.ndApplyTheme = () => {
@@ -111,6 +112,10 @@ const ROUTES = [
   [/^\/bourse$/, S.viewBourse],
   [/^\/bourse\/(\d+)$/, S.viewStock, ['id']],
   [/^\/play$/, F.viewPlay],
+  [/^\/saison$/, L.viewSeason],
+  [/^\/boss$/, L.viewBoss],
+  [/^\/loterie$/, L.viewLottery],
+  [/^\/sets$/, L.viewSets],
   [/^\/progress$/, F.viewProgress],
   [/^\/messages$/, F.viewMessages],
   [/^\/messages\/(\d+)$/, F.viewMessages, ['id']],

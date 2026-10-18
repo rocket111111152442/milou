@@ -97,6 +97,14 @@ export async function viewPlay(el, { on }) {
         <div class="progress" style="margin-top:10px"><i style="width:${pct}%"></i></div>
       </div>
 
+      <h2>Événements</h2>
+      <div class="games-grid">
+        <a class="game-tile" href="#/saison"><b>Saison</b><span>30 paliers de récompenses, nouvelle saison toutes les 2 semaines</span></a>
+        <a class="game-tile" href="#/boss"><b>Boss de la semaine</b><span>Tous les joueurs le frappent en ouvrant des boosters</span></a>
+        <a class="game-tile" href="#/loterie"><b>Loterie</b><span>Un tirage par jour, un seul gagnant rafle le jackpot</span></a>
+        <a class="game-tile" href="#/sets"><b>Collections</b><span>Complète des familles de sites pour des bonus</span></a>
+      </div>
+
       <h2>Chaque jour</h2>
       <div class="daily-grid">
         <button class="daily-tile${d.daily.chest ? ' ready' : ''}" data-chest ${d.daily.chest ? '' : 'disabled'}><span class="dt-ico">▣</span><b>Coffre</b><span>${d.daily.chest ? '1 carte Rare ou mieux' : 'Ouvert · demain'}</span></button>

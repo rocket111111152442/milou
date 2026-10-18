@@ -9,6 +9,7 @@ import { wallet, marketIndex, sitePrices, snapshotDue, snapshotIndex, siteMarket
 import { createGame, CONFIG, GameError, CUSTOM_BASE, EVENTS, weekId, QUALITIES, rollQuality } from './game.js';
 import { createFun, progression, ACHIEVEMENTS, PROFILE_COLORS } from './fun.js';
 import { createShops } from './shops.js';
+import { createLive } from './live.js';
 import { setupDatabase, setupTail } from './setup.js';
 import { runBots, seedBots, botStatus, deleteBots } from './bots.js';
 import { waitUntil } from '@vercel/functions';
@@ -25,7 +26,8 @@ export function getContext(db) {
       const d = db || createDb();
       if (!d) throw new GameError('Base de données non configurée (DATABASE_URL manquant).', 503);
       const game = await createGame(d);
-      return { db: d, game, fun: createFun(d, game), shops: createShops(d, game) };
+      const shops = createShops(d, game);
+      return { db: d, game, fun: createFun(d, game), shops, live: createLive(d, game, shops) };
     })();
     ctx.catch(() => { ctx = null; });
   }
@@ -528,13 +530,30 @@ route('POST', '/api/shops/:id/withdraw', ({ c, me, params, body }) => c.shops.wi
 route('POST', '/api/shops/:id/delete', ({ c, me, params }) => c.shops.deleteShop(me, params.id));
 route('GET', '/api/portfolio', ({ c, me }) => c.shops.portfolio(me.id));
 
+// ---------- Saison, boss, loterie, collections ----------
+route('GET', '/api/live', ({ c, me }) => c.live.summary(me.id));
+route('GET', '/api/season', ({ c, me }) => c.live.season(me.id));
+route('POST', '/api/season/claim', ({ c, me }) => c.live.claimSeason(me.id));
+route('GET', '/api/boss', ({ c, me }) => c.live.boss(me.id));
+route('POST', '/api/boss/claim', ({ c, me }) => c.live.claimBoss(me.id));
+route('GET', '/api/lottery', ({ c, me }) => c.live.lottery(me.id));
+route('POST', '/api/lottery/buy', ({ c, me, body }) => c.live.buyTickets(me.id, body.n));
+route('GET', '/api/sets', ({ c, me }) => c.live.sets(me.id));
+route('POST', '/api/sets/claim', ({ c, me, body }) => c.live.claimSet(me.id, body.family));
+
 // ---------- Administration ----------
 const admin = (fn) => async (ctx) => {
   if (!ctx.me.is_admin) throw new GameError('Réservé aux administrateurs.', 403);
   return fn(ctx);
 };
 route('POST', '/api/admin/event', admin(({ c, body }) => c.fun.setEvent(body.type || null, body.hours)));
-route('GET', '/api/admin/events', admin(({ c }) => ({ types: EVENTS, current: c.game.activeEvent() })));
+route('GET', '/api/admin/events', admin(async ({ c }) => ({ types: EVENTS, current: c.game.activeEvent(), auto: (await c.db.one("SELECT value FROM meta WHERE key = 'auto_events'"))?.value !== 'false' })));
+// Événements surprises lancés automatiquement (environ 3 par jour) : activables ou non.
+route('POST', '/api/admin/auto-events', admin(async ({ c, body }) => {
+  await c.db.run("INSERT INTO meta (key, value) VALUES ('auto_events', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [JSON.stringify(!!body.on)]);
+  return { on: !!body.on };
+}));
+
 route('GET', '/api/admin/promo', admin(({ c }) => c.fun.listPromos()));
 route('POST', '/api/admin/promo', admin(({ c, body }) => (body.delete ? c.fun.deletePromo(body.code) : c.fun.createPromo(body))));
 async function findUser(db, body) {
@@ -660,11 +679,12 @@ route('GET', '/api/cron/tick', async ({ c, req }) => {
   const budget = Math.max(5, Math.min(250, Number(new URL(req.url, 'http://x').searchParams.get('budget')) || 250));
   await c.game.settleAuctions(500).catch((e) => console.error('enchères', e.message));
   const shopJobs = await c.shops.dailyJobs().catch((e) => { console.error('boutiques', e.message); return null; });
+  const liveJobs = await c.live.jobs().catch((e) => { console.error('animations', e.message); return null; });
   await snapshotIndex(c.db).catch((e) => console.error('index', e.message));
   const snaps = await snapshotDue(c.db, c.game).catch((e) => { console.error('snapshots', e.message); return 0; });
   const a = await getAnimContext();
   const r = await runBots(a.db, a.game, { budgetMs: budget * 1000, batch: 40, force: true });
-  return { ...r, snapshots: snaps, shops: shopJobs };
+  return { ...r, snapshots: snaps, shops: shopJobs, live: liveJobs };
 }, { auth: false });
 
 route('GET', '/api/health', async () => {

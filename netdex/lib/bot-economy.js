@@ -8,6 +8,7 @@ import { CONFIG } from './game.js';
 import { TIERS, QUALITIES, WITHDRAW_PCT, loanDue } from './shops.js';
 import { dayId } from './fun.js';
 import { createBotBourse, yieldOf } from './bot-bourse.js';
+import { createLive } from './live.js';
 
 const rnd = () => randomInt(1_000_000) / 1_000_000;
 const pick = (arr) => arr[randomInt(arr.length)];
@@ -34,6 +35,7 @@ const SHOP_DESC = ['Boosters triés, prix honnêtes.', 'Que des bons boosters, v
 
 export function createBotEconomy(db, game, shops, fun) {
   const bourse = createBotBourse(db, shops);
+  const live = createLive(db, game, shops);
   // Petite enveloppe : une règle du jeu qui refuse l'action n'est pas une erreur.
   const bitsOf = async (id) => (await db.one('SELECT bits FROM users WHERE id = $1', [id])).bits;
 
@@ -47,6 +49,8 @@ export function createBotEconomy(db, game, shops, fun) {
     if (f.wheel !== day && rnd() < diligent) await tryDo('roue', () => fun.spinWheel(bot.id));
     if (f.scratch !== day && rnd() < diligent * 0.8) await tryDo('ticket', () => fun.scratch(bot.id));
     if (f.cotd !== day && rnd() < diligent) await tryDo('carte du jour', () => fun.claimCotd(bot.id));
+    // Loterie : de temps en temps quelques tickets, s'il a de la marge (le total des comptes animés est plafonné).
+    if (rnd() < 0.06 && (await bitsOf(bot.id)) > 300) await tryDo('tickets de loterie', () => live.buyTickets(bot.id, 1 + randomInt(4)));
   }
 
   // Plus ou moins : il joue quelques manches, avec son propre niveau (il connaît plus ou moins les sites).

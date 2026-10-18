@@ -511,3 +511,32 @@ table.data td.num { font-family: var(--mono); text-align: right; }
 .sealed.q-gift { box-shadow: 0 0 0 1px var(--qc) inset, 0 0 18px -6px var(--qc); }
 .gift-odds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 10px; }
 @media (max-width: 560px) { .gift-odds { grid-template-columns: repeat(2, 1fr); } }
+
+/* Saison, boss, loterie, collections */
+.live-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.live-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); text-decoration: none; }
+.live-card:hover { border-color: var(--accent); }
+.live-card .progress, .boss-panel .progress { height: 8px; border-radius: 4px; }
+.progress.hp i { background: var(--bad); transition: width .4s; }
+.ok-text { color: var(--good); }
+.live-feed .list > * { padding: 6px 0; }
+.season-track { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin-top: 12px; }
+.season-tier { display: flex; flex-direction: column; gap: 4px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font-size: 13px; }
+.season-tier.locked { opacity: .55; }
+.season-tier.ready { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.season-tier.claimed { border-color: var(--good); }
+.season-tier.claimed .small { color: var(--good); }
+.season-tier.big b { color: var(--accent); }
+.boss-panel { text-align: left; }
+.boss-face { font-size: 64px; line-height: 1; text-align: center; margin: 4px 0 12px; animation: boss-bob 2.4s ease-in-out infinite; }
+.boss-panel.dead .boss-face { filter: grayscale(1); opacity: .5; animation: none; transform: rotate(90deg); }
+@keyframes boss-bob { 50% { transform: translateY(-6px) scale(1.04); } }
+.jackpot { text-align: center; padding: 22px 14px; border-color: var(--warn); }
+.jackpot-value { font-size: clamp(34px, 9vw, 56px); font-weight: 800; color: var(--warn); line-height: 1.1; margin: 6px 0; }
+.sets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 10px; }
+.set-card.ready { border-color: var(--accent); }
+.set-steps { display: flex; gap: 6px; margin: 8px 0; }
+.set-steps span { flex: 1; text-align: center; font-size: 12px; padding: 2px 0; border: 1px solid var(--line); border-radius: 4px; color: var(--muted, inherit); }
+.set-steps span.ready { border-color: var(--accent); color: var(--accent); }
+.set-steps span.done { border-color: var(--good); color: var(--good); }
+@media (prefers-reduced-motion: reduce) { .boss-face { animation: none; } }

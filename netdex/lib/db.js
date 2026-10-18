@@ -379,6 +379,21 @@ CREATE INDEX IF NOT EXISTS offers_shop ON share_offers (shop_id, status);
 -- v10 : boosters sur mesure offerts par l'admin (pourcentage de chaque rareté par carte, et un nom).
 ALTER TABLE sealed_packs ADD COLUMN IF NOT EXISTS odds JSONB;
 ALTER TABLE sealed_packs ADD COLUMN IF NOT EXISTS label TEXT;
+
+-- v11 : boss de la semaine (dégâts par joueur) et loterie quotidienne (tickets par joueur et par jour).
+CREATE TABLE IF NOT EXISTS boss_hits (
+  week INTEGER NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  dmg BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (week, user_id)
+);
+CREATE INDEX IF NOT EXISTS boss_hits_rank ON boss_hits (week, dmg DESC);
+CREATE TABLE IF NOT EXISTS lottery_tickets (
+  day INTEGER NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  n INTEGER NOT NULL CHECK (n > 0),
+  PRIMARY KEY (day, user_id)
+);
 `;
 
 // DB_SOURCE choisit la base parmi celles branchées sur Vercel : « supabase » (POSTGRES_URL) ou « neon » (stockage_DATABASE_URL).

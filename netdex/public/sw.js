@@ -1,5 +1,5 @@
-const VERSION = 'netdex-v25';
-const SHELL = ['/', '/app.css', '/js/app.js', '/js/core.js', '/js/views.js', '/js/chart.js', '/js/fun.js', '/js/shops.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon.svg'];
+const VERSION = 'netdex-v26';
+const SHELL = ['/', '/app.css', '/js/app.js', '/js/core.js', '/js/views.js', '/js/chart.js', '/js/fun.js', '/js/shops.js', '/js/live.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon.svg'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 // Réseau d'abord : toujours la dernière version quand il y a du réseau, le cache ne sert qu'hors connexion.

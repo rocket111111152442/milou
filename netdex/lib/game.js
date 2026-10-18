@@ -28,7 +28,10 @@ export const EVENTS = {
   holo: { name: 'Heure holo', desc: 'Holo ×5 plus fréquentes' },
   luck: { name: 'Pluie de raretés', desc: 'Rare et plus ×3 plus fréquentes' },
   bits: { name: 'Bits en folie', desc: 'Bonus quotidien et roue de la fortune ×2' },
+  rage: { name: 'Rage du boss', desc: 'Tes boosters infligent ×2 dégâts au boss de la semaine' },
 };
+// Dégâts infligés au boss de la semaine par carte tirée, selon sa rareté (une holo frappe 3 fois plus fort).
+export const BOSS_DMG = [1, 3, 10, 40, 150, 600];
 const WEEK = 7 * 24 * 3600 * 1000;
 export const weekId = (t = Date.now()) => Math.floor((t - 4 * 24 * 3600 * 1000) / WEEK); // semaines du lundi au dimanche
 
@@ -227,6 +230,10 @@ export async function createGame(db) {
       if (r >= 3 || (r >= 2 && !isBot) || picks[i].holo) await logEvent(q, 'pull', userId, { siteId: picks[i].siteId, holo: picks[i].holo });
     }
     await q.run('UPDATE users SET packs_opened = packs_opened + 1 WHERE id = $1', [userId]);
+    // Boss de la semaine : chaque booster ouvert lui inflige des dégâts.
+    const dmg = out.reduce((a, c) => a + BOSS_DMG[c.site.rarity] * (c.holo ? 3 : 1), 0) * (eventIs('rage') ? 2 : 1);
+    await q.run(`INSERT INTO boss_hits (week, user_id, dmg) VALUES ($1, $2, $3)
+      ON CONFLICT (week, user_id) DO UPDATE SET dmg = boss_hits.dmg + EXCLUDED.dmg`, [weekId(), userId, dmg]);
     if (!isBot) {
       const gotEpic = out.some((c) => c.site.rarity >= 3);
       if (!odds) await q.run('UPDATE users SET pity = $1 WHERE id = $2', [gotEpic ? 0 : pity + 1, userId]);

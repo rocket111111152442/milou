@@ -5,6 +5,7 @@ import {
   modal, confirmDialog, busy, prefs, RARITY, VALUES, ICONS, favicon, siteName, power, now, isSpecial, sfx,
 } from './core.js';
 import { sealedSection, oddsHtml, marketTabs } from './shops.js';
+import { liveWidget } from './live.js';
 import { revealFx, inspectCard, shareSite, giftDialog, profileEditor, ACCENTS, PACK_BACKS, applyStyle, shortcutsHelp } from './fun.js';
 
 const rarityChips = (current, withAll = true) =>
@@ -237,6 +238,7 @@ export async function viewHome(el, { on }) {
     <a class="level-strip" href="#/play" data-level></a>
     <section class="hero" data-hero></section>
     <div class="quick-grid" style="margin-top:12px" data-quick></div>
+    <div style="margin-top:12px" data-live></div>
     <div class="panel next-pack" style="margin-top:12px" data-next-pack></div>
     <div class="panel" style="margin-top:12px" data-sealed><div class="spinner"></div></div>
     <div class="grid-2" style="margin-top:12px">
@@ -291,6 +293,7 @@ export async function viewHome(el, { on }) {
   };
   renderHero();
   on('nd:me', renderHero);
+  liveWidget($('[data-live]', el)).catch(() => {});
 
   el.addEventListener('click', (e) => {
     if (e.target.closest('[data-open-all]')) { openAllFlow(); return; }
@@ -1104,9 +1107,10 @@ export async function viewAdmin(el) {
     <h2>Événements</h2>
     <form class="panel" data-event>
       <p class="muted small" style="margin-top:0" data-event-cur></p>
-      <div class="row"><select name="type" style="flex:1;min-width:160px"><option value="holo">Heure holo (holo ×5)</option><option value="luck">Pluie de raretés (Rare+ ×3)</option><option value="bits">Bits en folie (bonus & roue ×2)</option></select>
+      <div class="row"><select name="type" style="flex:1;min-width:160px"><option value="holo">Heure holo (holo ×5)</option><option value="luck">Pluie de raretés (Rare+ ×3)</option><option value="bits">Bits en folie (bonus & roue ×2)</option><option value="rage">Rage du boss (dégâts ×2)</option></select>
         <select name="hours" style="width:auto"><option value="1">1 h</option><option value="3">3 h</option><option value="12">12 h</option><option value="24">24 h</option><option value="72">3 jours</option></select>
         <button class="btn primary">Lancer</button><button class="btn danger" type="button" data-event-stop>Arrêter</button></div>
+      <label class="row small" style="margin-top:10px"><input type="checkbox" data-auto-events> Événements surprises lancés tout seuls (environ 3 par jour, 1 h chacun)</label>
     </form>
     <h2>Codes promo</h2>
     <form class="panel" data-promo>
@@ -1162,6 +1166,7 @@ export async function viewAdmin(el) {
   };
   const events = async () => {
     const d = await api('/admin/events');
+    $('[data-auto-events]', el).checked = d.auto !== false;
     $('[data-event-cur]', el).innerHTML = d.current ? `En cours : <b>${esc(d.current.name)}</b> jusqu'à ${new Date(d.current.until).toLocaleString('fr-FR')}` : 'Aucun événement en cours.';
   };
   const promos = async () => {
@@ -1172,6 +1177,7 @@ export async function viewAdmin(el) {
   await Promise.all([overview(), users(), customs(), events(), promos()]).catch(toastErr);
   const evf = $('[data-event]', el);
   evf.addEventListener('submit', (e) => { e.preventDefault(); busy($('button', evf), async () => { await api('/admin/event', { type: evf.type.value, hours: Number(evf.hours.value) }); toast('Événement lancé', 'ok'); events(); refreshMe(); }); });
+  $('[data-auto-events]', el).addEventListener('change', (e) => api('/admin/auto-events', { on: e.target.checked }).then((r) => toast(r.on ? 'Événements surprises activés' : 'Événements surprises désactivés', 'ok')).catch(toastErr));
   $('[data-event-stop]', el).addEventListener('click', (e) => busy(e.target, async () => { await api('/admin/event', { type: null }); toast('Événement arrêté'); events(); refreshMe(); }));
   const prf = $('[data-promo]', el);
   prf.addEventListener('submit', (e) => {
