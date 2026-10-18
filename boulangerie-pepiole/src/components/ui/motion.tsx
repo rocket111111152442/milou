@@ -77,10 +77,11 @@ export function SplitLetters({ text, className, delay = 0 }: { text: string; cla
   return (
     <span className={className} aria-label={text}>
       {text.split("").map((ch, i) => (
-        <span key={i} aria-hidden="true" className="-mx-[0.22em] -my-[0.25em] inline-block overflow-hidden px-[0.22em] py-[0.25em] align-bottom">
+        <span key={i} aria-hidden="true" className="inline-block align-bottom">
+          {/* Pas de masque (overflow) : il rognait les italiques et les accents sur certains navigateurs */}
           <motion.span
             className="inline-block"
-            initial={{ y: "105%", opacity: 0 }}
+            initial={{ y: "45%", opacity: 0 }}
             animate={{ y: "0%", opacity: 1 }}
             transition={{ duration: 0.9, delay: delay + i * 0.035, ease }}
           >
