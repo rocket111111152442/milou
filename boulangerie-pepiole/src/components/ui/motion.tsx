@@ -77,7 +77,7 @@ export function SplitLetters({ text, className, delay = 0 }: { text: string; cla
   return (
     <span className={className} aria-label={text}>
       {text.split("").map((ch, i) => (
-        <span key={i} aria-hidden="true" className="-mx-[0.1em] inline-block overflow-hidden px-[0.1em] pb-[0.06em] align-bottom">
+        <span key={i} aria-hidden="true" className="-mx-[0.22em] -my-[0.25em] inline-block overflow-hidden px-[0.22em] py-[0.25em] align-bottom">
           <motion.span
             className="inline-block"
             initial={{ y: "105%", opacity: 0 }}
