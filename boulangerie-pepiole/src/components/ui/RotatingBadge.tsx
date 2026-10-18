@@ -9,7 +9,7 @@ export function RotatingBadge({
   className?: string;
 }) {
   return (
-    <div className={`relative grid place-items-center ${className}`}>
+    <div className={`relative grid h-full w-full place-items-center ${className}`}>
       <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full animate-spin-slow" aria-hidden="true">
         <defs>
           <path id="badge-circle" d="M100,100 m-78,0 a78,78 0 1,1 156,0 a78,78 0 1,1 -156,0" />
