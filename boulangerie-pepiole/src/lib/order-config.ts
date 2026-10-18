@@ -1,5 +1,6 @@
 import "server-only";
 import type { ShopId } from "./shops";
+import type { Settings } from "./settings";
 
 /** Adresse(s) qui reçoivent les commandes d'une boutique : ORDER_EMAIL_TO_SANARY, ORDER_EMAIL_TO_SIX_FOURS… sinon ORDER_EMAIL_TO. */
 export function orderEmailTo(shop: ShopId) {
@@ -8,13 +9,14 @@ export function orderEmailTo(shop: ShopId) {
 }
 
 /**
- * Vrai quand les commandes de cette boutique sont réellement traitées :
- * e-mail ou webhook configuré, ou ORDERS_LIVE=1 (la boutique suit les commandes dans /admin).
+ * Vrai quand les commandes de cette boutique sont réellement traitées : interrupteur « En service »
+ * dans /admin/reglages (ou ORDERS_LIVE=1), e-mail ou webhook configuré.
  */
-export function ordersEnabled(shop: ShopId) {
+export function ordersEnabled(shop: ShopId, settings?: Settings) {
+  const stored = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
   return Boolean(
     (process.env.RESEND_API_KEY && orderEmailTo(shop)) ||
       process.env.ORDER_WEBHOOK_URL ||
-      (process.env.ORDERS_LIVE === "1" && process.env.BLOB_READ_WRITE_TOKEN),
+      (stored && (process.env.ORDERS_LIVE === "1" || settings?.live[shop] === true)),
   );
 }

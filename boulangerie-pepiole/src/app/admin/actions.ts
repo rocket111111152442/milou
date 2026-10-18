@@ -5,6 +5,11 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { ADMIN_COOKIE, checkPassword, isAdmin, sessionToken } from "@/lib/admin-auth";
 import { ORDER_STATUSES, setOrderStatus, type OrderStatus } from "@/lib/orders-store";
+import { getSettingsFresh, saveSettings } from "@/lib/settings-store";
+import type { Settings } from "@/lib/settings";
+import { SHOP_IDS, type ShopId } from "@/lib/shops";
+import { notifyTest, removeDevice, saveDevice } from "@/lib/push";
+import type { PushSubscription } from "web-push";
 
 // Anti force brute : 5 essais par IP toutes les 15 minutes (mémoire de l'instance)
 const attempts = new Map<string, number[]>();
@@ -40,4 +45,31 @@ export async function updateStatus(orderNumber: string, status: OrderStatus) {
   if (!ORDER_STATUSES.includes(status)) throw new Error("Statut invalide");
   await setOrderStatus(orderNumber, status);
   revalidatePath("/admin");
+}
+
+// --- Réglages -----------------------------------------------------------
+
+
+async function guard() {
+  if (!(await isAdmin())) throw new Error("Non autorisé");
+}
+
+/** Modifie une partie des réglages (les autres champs sont conservés). */
+export async function updateSettings(patch: Partial<Settings>) {
+  await guard();
+  const current = await getSettingsFresh();
+  return saveSettings({ ...current, ...patch });
+}
+
+export async function subscribeDevice(subscription: PushSubscription, shops: ShopId[], label: string) {
+  await guard();
+  if (!subscription?.endpoint?.startsWith("https://")) throw new Error("Abonnement invalide");
+  const valid = shops.filter((s) => SHOP_IDS.includes(s));
+  await saveDevice({ subscription, shops: valid.length ? valid : [...SHOP_IDS], label: label.slice(0, 60), createdAt: new Date().toISOString() });
+  return notifyTest(null);
+}
+
+export async function unsubscribeDevice(endpoint: string) {
+  await guard();
+  await removeDevice(endpoint);
 }

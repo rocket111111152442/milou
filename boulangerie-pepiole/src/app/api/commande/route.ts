@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { Resend } from "resend";
 import { orderSchema, type OrderResponse } from "@/lib/order";
-import { PRODUCTS_BY_ID, formatPrice } from "@/lib/catalog";
+import { formatPrice } from "@/lib/catalog";
 import { formatDateLong, formatTime, isValidSlot, leadMinutesFor, parisNow } from "@/lib/hours";
 import { getShop } from "@/lib/shops";
+import { applyProducts, applyShop } from "@/lib/settings";
+import { getSettings } from "@/lib/settings-store";
+import { notifyNewOrder } from "@/lib/push";
 import { orderEmailTo, ordersEnabled } from "@/lib/order-config";
-import { saveOrder, storageEnabled } from "@/lib/orders-store";
+import { saveOrder, storageEnabled, type StoredOrder } from "@/lib/orders-store";
 
 export const runtime = "nodejs";
 
@@ -42,16 +45,18 @@ export async function POST(req: Request) {
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Commande invalide.");
   const order = parsed.data;
 
-  // Les prix sont recalculés côté serveur, jamais repris du navigateur.
+  // Les prix sont recalculés côté serveur (réglages /admin compris), jamais repris du navigateur.
+  const settings = await getSettings();
+  const catalog = new Map(applyProducts(settings).map((p) => [p.id, p]));
   const lines = [];
   for (const item of order.items) {
-    const product = PRODUCTS_BY_ID.get(item.id);
+    const product = catalog.get(item.id);
     if (!product || product.available === false) return fail("Un produit de votre panier n'est plus disponible.");
     lines.push({ product, qty: item.qty, total: product.price * item.qty });
   }
   const total = lines.reduce((s, l) => s + l.total, 0);
   const lead = leadMinutesFor(lines.map((l) => l.product.leadHours ?? 0));
-  const shop = getShop(order.pickup.shop);
+  const shop = applyShop(getShop(order.pickup.shop), settings);
 
   if (!isValidSlot(shop, order.pickup.date, order.pickup.time, lead)) {
     return fail("Ce créneau de retrait n'est plus disponible. Merci d'en choisir un autre.");
@@ -80,13 +85,13 @@ export async function POST(req: Request) {
     payment: "En boutique, au retrait",
   };
 
-  const live = ordersEnabled(shop.id);
+  const live = ordersEnabled(shop.id, settings);
   const errors: string[] = [];
 
   // Enregistrement pour /admin (y compris les commandes de démonstration, marquées comme telles)
   if (storageEnabled()) {
     try {
-      await saveOrder({
+      const stored: StoredOrder = {
         orderNumber,
         createdAt: payload.createdAt,
         status: "nouvelle",
@@ -96,7 +101,10 @@ export async function POST(req: Request) {
         customer: { ...c, note: c.note ?? "" },
         items: payload.items,
         total: payload.total,
-      });
+      };
+      await saveOrder(stored);
+      // Alerte les appareils des boutiques, sans retarder la réponse au client
+      after(() => notifyNewOrder(stored).catch((e) => console.warn("[push]", e)));
     } catch (e) {
       errors.push(`stockage ${(e as Error).message}`);
     }

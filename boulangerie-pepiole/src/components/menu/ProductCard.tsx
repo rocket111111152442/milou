@@ -63,6 +63,11 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           </p>
         </div>
         <p className="mt-2 flex-1 text-sm leading-relaxed text-cafe/70">{product.description}</p>
+        {product.available === false ? (
+          <p className="mt-5 inline-flex h-12 items-center justify-center rounded-full bg-mie/60 px-5 text-sm font-semibold text-grege">
+            Momentanément indisponible
+          </p>
+        ) : (
         <button
           type="button"
           onClick={onAdd}
@@ -85,6 +90,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
             ✓ Ajouté !
           </motion.span>
         </button>
+        )}
       </div>
     </motion.article>
   );

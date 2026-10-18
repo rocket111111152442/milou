@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { PRODUCTS_BY_ID } from "./catalog";
+import { PRODUCTS_BY_ID, type Product } from "./catalog";
 import { SHOP_IDS, type ShopId } from "./shops";
 
 export type CartLine = { id: string; qty: number };
@@ -67,10 +67,10 @@ export const useCart = create<CartState>()(
   ),
 );
 
-export function cartDetails(lines: CartLine[]) {
+export function cartDetails(lines: CartLine[], byId: Map<string, Product> = PRODUCTS_BY_ID) {
   const items = lines
     .map((l) => {
-      const product = PRODUCTS_BY_ID.get(l.id);
+      const product = byId.get(l.id);
       return product ? { product, qty: l.qty, total: product.price * l.qty } : null;
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);

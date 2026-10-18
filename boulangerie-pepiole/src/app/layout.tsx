@@ -3,6 +3,8 @@ import { Fraunces, Great_Vibes, Manrope } from "next/font/google";
 import "./globals.css";
 import { SITE } from "@/lib/site";
 import { SHOPS } from "@/lib/shops";
+import { getSettings } from "@/lib/settings-store";
+import { SettingsProvider } from "@/components/SettingsProvider";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -98,7 +100,8 @@ const jsonLd = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const settings = await getSettings();
   return (
     <html lang="fr" className={`${fraunces.variable} ${script.variable} ${manrope.variable}`}>
       <body className="min-h-dvh">
@@ -112,6 +115,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Aller au contenu
         </a>
+        <SettingsProvider settings={settings}>
         <SmoothScroll>
           <Preloader />
           <CartHydrator />
@@ -122,6 +126,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CartDrawer />
           <FlyLayer />
         </SmoothScroll>
+        </SettingsProvider>
       </body>
     </html>
   );

@@ -2,13 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { SHOPS, getShop, type ShopId } from "@/lib/shops";
 import { addDays, formatDateLong, formatTime, parisNow } from "@/lib/hours";
 import { formatPrice } from "@/lib/catalog";
 import type { OrderStatus, StoredOrder } from "@/lib/orders-store";
-import { Monogram } from "@/components/ui/Logo";
-import { logout, updateStatus } from "./actions";
+import { updateStatus } from "./actions";
 
 const STATUS: Record<OrderStatus, { label: string; tone: string }> = {
   nouvelle: { label: "Nouvelle", tone: "bg-dore text-torref" },
@@ -77,6 +76,33 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
     setLastRefresh(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
   }, [orders]);
 
+  // Nouvelle commande arrivée depuis le dernier affichage : son + compteur dans l'onglet
+  const known = useRef<Set<string> | null>(null);
+  const [fresh, setFresh] = useState<string[]>([]);
+  useEffect(() => {
+    const ids = orders.map((o) => o.orderNumber);
+    if (known.current) {
+      const added = ids.filter((id) => !known.current!.has(id));
+      if (added.length) {
+        setFresh((f) => [...f, ...added]);
+        chime();
+      }
+    }
+    known.current = new Set(ids);
+  }, [orders]);
+  useEffect(() => {
+    document.title = fresh.length ? `(${fresh.length}) Nouvelle commande !` : "Commandes · Le Pétrin de Pépiole";
+  }, [fresh]);
+  useEffect(() => {
+    const clear = () => document.visibilityState === "visible" && setTimeout(() => setFresh([]), 4000);
+    document.addEventListener("visibilitychange", clear);
+    window.addEventListener("focus", clear);
+    return () => {
+      document.removeEventListener("visibilitychange", clear);
+      window.removeEventListener("focus", clear);
+    };
+  }, []);
+
   // Rafraîchissement automatique toutes les minutes
   useEffect(() => {
     const id = setInterval(() => startRefresh(() => router.refresh()), 60_000);
@@ -144,15 +170,9 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
   }, [visible]);
 
   return (
-    <div className="min-h-screen bg-farine px-4 pb-24 pt-6 sm:px-8 print:bg-white print:p-0">
-      <header className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-3">
-          <Monogram className="h-11 w-11 text-croute" />
-          <div>
-            <p className="font-script text-xl leading-none text-caramel">Espace boutiques</p>
-            <h1 className="font-display text-3xl tracking-tight">Commandes</h1>
-          </div>
-        </div>
+    <div className="px-4 pb-24 pt-6 sm:px-8 print:p-0">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 print:hidden">
+        <h1 className="font-display text-3xl tracking-tight">Commandes</h1>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-grege">{refreshing ? "Actualisation…" : lastRefresh && `Mis à jour à ${lastRefresh}`}</span>
           <button
@@ -168,13 +188,8 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
           <button type="button" onClick={() => window.print()} className="inline-flex h-10 items-center rounded-full border border-mie bg-creme px-4 text-sm font-semibold transition hover:bg-mie">
             Imprimer
           </button>
-          <form action={logout}>
-            <button type="submit" className="inline-flex h-10 items-center rounded-full bg-cafe px-4 text-sm font-semibold text-creme transition hover:bg-croute">
-              Déconnexion
-            </button>
-          </form>
         </div>
-      </header>
+      </div>
 
       <div className="mx-auto mt-6 max-w-7xl">
         {SHOPS.some((s) => !liveShops.includes(s.id)) && (
@@ -184,7 +199,7 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
               .map((s) => s.short)
               .join(" et ")}{" "}
             : les clients voient un bandeau « commande de test » et ces commandes sont marquées « Test » ci-dessous. Pour
-            les recevoir pour de vrai, ajoutez <code>ORDERS_LIVE=1</code> dans Vercel.
+            les recevoir pour de vrai, activez la boutique dans <a href="/admin/reglages" className="font-semibold underline">Réglages</a>.
           </p>
         )}
         {error && <p className="mb-5 rounded-2xl bg-red-50 px-5 py-3 text-sm text-red-700">{error}</p>}
@@ -240,7 +255,7 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
                             initial={{ opacity: 0, y: 12 }}
                             animate={{ opacity: pending === o.orderNumber ? 0.5 : 1, y: 0 }}
                             exit={{ opacity: 0, height: 0 }}
-                            className={`break-inside-avoid rounded-[1.5rem] bg-creme p-5 ring-1 ring-mie print:rounded-none print:ring-0 print:border-b ${o.status === "annulee" ? "opacity-60" : ""}`}
+                            className={`break-inside-avoid rounded-[1.5rem] bg-creme p-5 ring-1 ${fresh.includes(o.orderNumber) ? "ring-2 ring-croute" : "ring-mie"} print:rounded-none print:ring-0 print:border-b ${o.status === "annulee" ? "opacity-60" : ""}`}
                           >
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="flex items-center gap-3">
@@ -350,4 +365,27 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
       </div>
     </div>
   );
+}
+
+/** Petit carillon (deux notes) joué à l'arrivée d'une commande. */
+function chime() {
+  try {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    [880, 1318.5].forEach((freq, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.22;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.4, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+      o.connect(g).connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 0.65);
+    });
+  } catch {
+    // Son bloqué par le navigateur tant qu'on n'a pas interagi avec la page
+  }
 }

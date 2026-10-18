@@ -62,21 +62,27 @@ Voir `.env.example`. Le paiement se fait en boutique au retrait (pas de paiement
 
 ## Espace boutiques : `/admin`
 
-Toutes les commandes sont enregistrées dans un Blob store **privé** Vercel (`petrin-de-pepiole-commandes`,
-région Paris, variable `BLOB_READ_WRITE_TOKEN` ajoutée automatiquement) et consultables sur `/admin`,
-protégé par le mot de passe `ADMIN_PASSWORD` (cookie de session de 30 jours, 5 essais / 15 min).
+Protégé par le mot de passe `ADMIN_PASSWORD` (cookie de session 30 jours, 5 essais / 15 min), non indexé.
+Installable comme une application (« Ajouter à l'écran d'accueil » → icône « Commandes »).
 
-- filtres par boutique, par jour (aujourd'hui, demain, à venir, passées) et par statut ;
-- statuts : nouvelle → prête → retirée, ou annulée (et « rétablir ») ;
-- liste « À préparer » : quantités cumulées par produit pour les commandes affichées ;
-- actualisation automatique chaque minute, impression.
+| Onglet | Rôle |
+|---|---|
+| **Commandes** | commandes par jour de retrait, filtres boutique / jour / statut, statuts nouvelle → prête → retirée (ou annulée), liste « À préparer » cumulée par produit, impression, actualisation chaque minute avec carillon et compteur dans l'onglet |
+| **Carte & prix** | modifier les prix, retirer un produit de la vente (« Momentanément indisponible » sur le site) |
+| **Réglages** | notifications push sur chaque appareil, interrupteur « Commande en ligne » par boutique (test / réel), fermetures exceptionnelles |
 
-Tant que le site est en mode démonstration, les commandes y apparaissent avec un badge « Test ».
-Pour passer en réel avec `/admin` seul (sans e-mail ni webhook) : `ORDERS_LIVE=1`.
+Stockage : Blob store **privé** Vercel `petrin-de-pepiole-commandes` (région Paris) :
+`commandes/*.json`, `config/reglages.json`, `push/*.json`.
+
+Variables (déjà configurées sur Vercel) : `BLOB_READ_WRITE_TOKEN`, `ADMIN_PASSWORD`,
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`. Optionnel : `ORDERS_LIVE=1` force le mode réel partout.
+
+Notifications : Android / ordinateur (Chrome, Edge, Firefox) directement ; iPhone / iPad (iOS 16.4+) après
+« Sur l'écran d'accueil » depuis Safari.
 
 ## À faire avant une mise en ligne « officielle »
 
-- **Prix** : tous les prix de `catalog.ts` sont indicatifs. À remplacer par les tarifs réels.
+- **Prix** : les prix par défaut de `catalog.ts` sont indicatifs. La boutique les corrige dans `/admin/carte`.
 - **Produits** : la liste est construite à partir des familles de produits publiées (Office de tourisme,
   MyBoulange). À ajuster avec la boutique (spécialités, produits de saison, allergènes).
 - **Photos** : photos d'illustration Unsplash (licence gratuite, usage commercial autorisé). Les vraies

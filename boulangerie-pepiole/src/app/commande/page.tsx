@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ordersEnabled } from "@/lib/order-config";
 import { SHOPS } from "@/lib/shops";
+import { getSettings } from "@/lib/settings-store";
 import { Checkout } from "@/components/order/Checkout";
 
 export const metadata: Metadata = {
@@ -11,11 +12,12 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function CommandePage() {
+export default async function CommandePage() {
+  const settings = await getSettings();
   return (
     <section className="grain relative min-h-screen bg-farine px-6 pb-32 pt-32 sm:pt-40">
       <div className="relative z-10 mx-auto max-w-6xl">
-        <Checkout enabledShops={SHOPS.filter((s) => ordersEnabled(s.id)).map((s) => s.id)} />
+        <Checkout enabledShops={SHOPS.filter((s) => ordersEnabled(s.id, settings)).map((s) => s.id)} />
       </div>
     </section>
   );

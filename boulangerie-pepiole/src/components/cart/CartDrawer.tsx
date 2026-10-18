@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useLenis } from "lenis/react";
 import { cartDetails, useCart } from "@/lib/cart";
+import { useSiteData } from "@/components/SettingsProvider";
 import { formatPrice } from "@/lib/catalog";
 import { ProductThumb } from "@/components/menu/ProductImage";
 import { QtyStepper } from "./QtyStepper";
@@ -23,7 +24,8 @@ export function FloatingCart() {
   const setOpen = useCart((s) => s.setOpen);
   const pathname = usePathname();
   const controls = useAnimationControls();
-  const { count, total } = cartDetails(lines);
+  const { byId } = useSiteData();
+  const { count, total } = cartDetails(lines, byId);
 
   useEffect(() => {
     if (bump) controls.start({ scale: [1, 1.25, 0.95, 1], rotate: [0, -8, 6, 0], transition: { duration: 0.6, delay: 0.75 } });
@@ -74,7 +76,8 @@ export function FloatingCart() {
 export function CartDrawer() {
   const hydrated = useHydrated();
   const { lines, open, setOpen, setQty, remove } = useCart();
-  const { items, total, count } = cartDetails(lines);
+  const { byId } = useSiteData();
+  const { items, total, count } = cartDetails(lines, byId);
   const lenis = useLenis();
   const pathname = usePathname();
 

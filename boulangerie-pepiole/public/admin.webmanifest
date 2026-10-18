@@ -1,0 +1,10 @@
+{
+  "name": "Commandes · Le Pétrin de Pépiole",
+  "short_name": "Commandes",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#f6efe2",
+  "theme_color": "#24160d",
+  "icons": [{ "src": "/admin-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
+}

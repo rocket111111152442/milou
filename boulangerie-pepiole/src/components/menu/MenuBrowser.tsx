@@ -2,7 +2,8 @@
 
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
-import { CATEGORIES, PRODUCTS, type CategoryId } from "@/lib/catalog";
+import { CATEGORIES, type CategoryId } from "@/lib/catalog";
+import { useSiteData } from "@/components/SettingsProvider";
 import { ProductCard } from "./ProductCard";
 import { useHeaderState } from "@/lib/ui-store";
 
@@ -15,6 +16,7 @@ function normalize(s: string) {
 export function MenuBrowser({ initial = "tout" }: { initial?: Filter }) {
   const [filter, setFilter] = useState<Filter>(initial);
   const [query, setQuery] = useState("");
+  const { products: all } = useSiteData();
   const headerHidden = useHeaderState((s) => s.hidden);
 
   useEffect(() => {
@@ -26,10 +28,10 @@ export function MenuBrowser({ initial = "tout" }: { initial?: Filter }) {
 
   const products = useMemo(() => {
     const q = normalize(query.trim());
-    return PRODUCTS.filter((p) => p.available !== false)
+    return all
       .filter((p) => filter === "tout" || p.category === filter)
       .filter((p) => !q || normalize(`${p.name} ${p.description}`).includes(q));
-  }, [filter, query]);
+  }, [all, filter, query]);
 
   const tabs: { id: Filter; label: string }[] = [{ id: "tout", label: "Tout" }, ...CATEGORIES.map((c) => ({ id: c.id, label: c.label }))];
   const current = CATEGORIES.find((c) => c.id === filter);

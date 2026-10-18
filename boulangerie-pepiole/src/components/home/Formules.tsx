@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
-import { PRODUCTS_BY_ID, formatPrice } from "@/lib/catalog";
+import { formatPrice } from "@/lib/catalog";
+import { useSiteData } from "@/components/SettingsProvider";
 import { useCart } from "@/lib/cart";
 import { flyToCart } from "@/components/cart/FlyToCart";
 import { Reveal, SplitWords } from "@/components/ui/motion";
@@ -16,6 +17,7 @@ const FORMULES = [
 
 export function Formules() {
   const add = useCart((s) => s.add);
+  const { byId } = useSiteData();
   return (
     <section className="relative overflow-hidden bg-farine py-24 sm:py-36">
       <div className="mx-auto max-w-7xl px-6">
@@ -28,7 +30,7 @@ export function Formules() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           {FORMULES.map((f, i) => {
-            const p = PRODUCTS_BY_ID.get(f.id)!;
+            const p = byId.get(f.id)!;
             return (
               <Reveal key={f.id} delay={i * 0.15}>
                 <article className="group relative overflow-hidden rounded-[2rem] bg-creme ring-1 ring-mie">

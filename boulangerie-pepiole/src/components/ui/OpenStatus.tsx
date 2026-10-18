@@ -3,17 +3,19 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { describeStatus, getOpenStatus, type OpenStatus as Status } from "@/lib/hours";
-import { SHOPS, type Shop } from "@/lib/shops";
+import type { Shop } from "@/lib/shops";
+import { useSiteData } from "@/components/SettingsProvider";
 
 /** Statut d'ouverture de chaque boutique, recalculé toutes les 30 s (côté client uniquement). */
 export function useOpenStatuses() {
+  const { shops: SHOPS } = useSiteData();
   const [statuses, setStatuses] = useState<Record<string, Status> | null>(null);
   useEffect(() => {
     const tick = () => setStatuses(Object.fromEntries(SHOPS.map((s) => [s.id, getOpenStatus(s)])));
     tick();
     const id = setInterval(tick, 30_000);
     return () => clearInterval(id);
-  }, []);
+  }, [SHOPS]);
   return statuses;
 }
 
@@ -60,12 +62,13 @@ export function OpenStatus({
 /** Statut des boutiques, qui défile de l'une à l'autre. */
 export function OpenStatusCycle({ className = "", tone = "light" }: { className?: string; tone?: "light" | "dark" }) {
   const statuses = useOpenStatuses();
+  const { shops: SHOPS } = useSiteData();
   const [i, setI] = useState(0);
   useEffect(() => {
     if (SHOPS.length < 2) return;
     const id = setInterval(() => setI((n) => (n + 1) % SHOPS.length), 3800);
     return () => clearInterval(id);
-  }, []);
+  }, [SHOPS.length]);
   const shop = SHOPS[i];
   const status = statuses?.[shop.id];
   return (

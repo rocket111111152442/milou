@@ -19,7 +19,8 @@ import {
 } from "@/lib/hours";
 import { orderSchema, type OrderResponse } from "@/lib/order";
 import Image from "next/image";
-import { SHOPS, getShop, shopLinks, type Shop, type ShopId } from "@/lib/shops";
+import { shopLinks, type Shop, type ShopId } from "@/lib/shops";
+import { useSiteData } from "@/components/SettingsProvider";
 import { ProductThumb } from "@/components/menu/ProductImage";
 import { QtyStepper } from "@/components/cart/QtyStepper";
 import { Confetti } from "./Confetti";
@@ -78,9 +79,11 @@ function icsFile(done: Done, shop: Shop) {
 export function Checkout({ enabledShops }: { enabledShops: ShopId[] }) {
   const [hydrated, setHydrated] = useState(false);
   const { lines, setQty, remove, clear, shop: shopId, setShop } = useCart();
-  const shop = shopId ? getShop(shopId) : null;
+  const { byId, shops: SHOPS, shopById } = useSiteData();
+  const shop = shopId ? shopById(shopId) : null;
   const demo = shopId ? !enabledShops.includes(shopId) : enabledShops.length < SHOPS.length;
-  const { items, total, count, leadHours } = cartDetails(lines);
+  const { items, total, count, leadHours } = cartDetails(lines, byId);
+  const unavailable = items.filter((i) => i.product.available === false);
   const lead = leadMinutesFor(leadHours);
 
   const [step, setStep] = useState(0);
@@ -319,11 +322,16 @@ export function Checkout({ enabledShops }: { enabledShops: ShopId[] }) {
                       ))}
                     </AnimatePresence>
                   </ul>
+                  {unavailable.length > 0 && (
+                    <p className="mt-6 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                      {unavailable.map((i) => i.product.name).join(", ")} : plus disponible aujourd&apos;hui. Retirez-le du panier pour continuer.
+                    </p>
+                  )}
                   <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
                     <Link href="/carte" className="inline-flex h-12 items-center justify-center rounded-full border border-mie px-6 font-semibold transition hover:bg-mie">
                       ← Continuer mes achats
                     </Link>
-                    <button type="button" onClick={() => go(1)} className="inline-flex h-12 items-center justify-center rounded-full bg-croute px-8 font-semibold text-creme transition hover:bg-cafe">
+                    <button type="button" disabled={unavailable.length > 0} onClick={() => go(1)} className="inline-flex h-12 items-center justify-center rounded-full bg-croute px-8 font-semibold text-creme transition hover:bg-cafe disabled:cursor-not-allowed disabled:opacity-40">
                       Choisir le retrait →
                     </button>
                   </div>
@@ -588,10 +596,11 @@ export function Checkout({ enabledShops }: { enabledShops: ShopId[] }) {
 }
 
 function Confirmation({ done }: { done: Done }) {
-  const shop = getShop(done.shop);
+  const { shopById } = useSiteData();
+  const shop = shopById(done.shop);
   const [ics, setIcs] = useState<string | null>(null);
   useEffect(() => {
-    const url = icsFile(done, getShop(done.shop));
+    const url = icsFile(done, shopById(done.shop));
     setIcs(url);
     return () => URL.revokeObjectURL(url);
   }, [done]);
