@@ -7,7 +7,14 @@ export function orderEmailTo(shop: ShopId) {
   return process.env[key] || process.env.ORDER_EMAIL_TO || "";
 }
 
-/** Vrai dès qu'un canal de transmission des commandes est configuré pour cette boutique. */
+/**
+ * Vrai quand les commandes de cette boutique sont réellement traitées :
+ * e-mail ou webhook configuré, ou ORDERS_LIVE=1 (la boutique suit les commandes dans /admin).
+ */
 export function ordersEnabled(shop: ShopId) {
-  return Boolean((process.env.RESEND_API_KEY && orderEmailTo(shop)) || process.env.ORDER_WEBHOOK_URL);
+  return Boolean(
+    (process.env.RESEND_API_KEY && orderEmailTo(shop)) ||
+      process.env.ORDER_WEBHOOK_URL ||
+      (process.env.ORDERS_LIVE === "1" && process.env.BLOB_READ_WRITE_TOKEN),
+  );
 }

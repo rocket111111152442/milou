@@ -28,6 +28,8 @@ export function Header() {
   useEffect(() => setMenu(false), [pathname]);
   useEffect(() => useHeaderState.getState().setHidden(hidden), [hidden]);
 
+  if (pathname.startsWith("/admin")) return null;
+
   return (
     <>
       <motion.header

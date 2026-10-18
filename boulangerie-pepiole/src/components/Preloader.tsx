@@ -2,12 +2,14 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 const ease = [0.76, 0, 0.24, 1] as const;
 
 /** Écran d'ouverture (une fois par session) : le losange se dessine, le nom lève comme une pâte. */
 export function Preloader() {
   const [show, setShow] = useState(true);
+  const pathname = usePathname();
 
   useEffect(() => {
     let seen = false;
@@ -21,11 +23,14 @@ export function Preloader() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.style.overflow = show ? "hidden" : "";
+    document.documentElement.style.overflow = show && !pathname.startsWith("/admin") ? "hidden" : "";
     return () => {
       document.documentElement.style.overflow = "";
     };
-  }, [show]);
+  }, [show, pathname]);
+
+  // Pas d'écran d'ouverture dans l'espace boutiques
+  if (pathname.startsWith("/admin")) return null;
 
   return (
     <AnimatePresence>

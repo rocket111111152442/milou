@@ -60,6 +60,20 @@ que la commande n'est pas transmise à la boutique. Pour activer la réception, 
 
 Voir `.env.example`. Le paiement se fait en boutique au retrait (pas de paiement en ligne pour l'instant).
 
+## Espace boutiques : `/admin`
+
+Toutes les commandes sont enregistrées dans un Blob store **privé** Vercel (`petrin-de-pepiole-commandes`,
+région Paris, variable `BLOB_READ_WRITE_TOKEN` ajoutée automatiquement) et consultables sur `/admin`,
+protégé par le mot de passe `ADMIN_PASSWORD` (cookie de session de 30 jours, 5 essais / 15 min).
+
+- filtres par boutique, par jour (aujourd'hui, demain, à venir, passées) et par statut ;
+- statuts : nouvelle → prête → retirée, ou annulée (et « rétablir ») ;
+- liste « À préparer » : quantités cumulées par produit pour les commandes affichées ;
+- actualisation automatique chaque minute, impression.
+
+Tant que le site est en mode démonstration, les commandes y apparaissent avec un badge « Test ».
+Pour passer en réel avec `/admin` seul (sans e-mail ni webhook) : `ORDERS_LIVE=1`.
+
 ## À faire avant une mise en ligne « officielle »
 
 - **Prix** : tous les prix de `catalog.ts` sont indicatifs. À remplacer par les tarifs réels.

@@ -5,6 +5,7 @@ import { PRODUCTS_BY_ID, formatPrice } from "@/lib/catalog";
 import { formatDateLong, formatTime, isValidSlot, leadMinutesFor, parisNow } from "@/lib/hours";
 import { getShop } from "@/lib/shops";
 import { orderEmailTo, ordersEnabled } from "@/lib/order-config";
+import { saveOrder, storageEnabled } from "@/lib/orders-store";
 
 export const runtime = "nodejs";
 
@@ -79,11 +80,31 @@ export async function POST(req: Request) {
     payment: "En boutique, au retrait",
   };
 
-  if (!ordersEnabled(shop.id)) {
-    return NextResponse.json<OrderResponse>({ ok: true, orderNumber, total, demo: true });
+  const live = ordersEnabled(shop.id);
+  const errors: string[] = [];
+
+  // Enregistrement pour /admin (y compris les commandes de démonstration, marquées comme telles)
+  if (storageEnabled()) {
+    try {
+      await saveOrder({
+        orderNumber,
+        createdAt: payload.createdAt,
+        status: "nouvelle",
+        demo: !live,
+        shop: shop.id,
+        pickup: { date: order.pickup.date, time: order.pickup.time, label: pickupLabel },
+        customer: { ...c, note: c.note ?? "" },
+        items: payload.items,
+        total: payload.total,
+      });
+    } catch (e) {
+      errors.push(`stockage ${(e as Error).message}`);
+    }
   }
 
-  const errors: string[] = [];
+  if (!live) {
+    return NextResponse.json<OrderResponse>({ ok: true, orderNumber, total, demo: true });
+  }
 
   if (process.env.ORDER_WEBHOOK_URL) {
     try {
@@ -154,7 +175,10 @@ export async function POST(req: Request) {
   }
 
   // Si aucun canal n'a fonctionné, la boutique n'a rien reçu : on le dit au client.
-  const channels = Number(Boolean(process.env.ORDER_WEBHOOK_URL)) + Number(Boolean(process.env.RESEND_API_KEY && emailTo));
+  const channels =
+    Number(Boolean(process.env.ORDER_WEBHOOK_URL)) +
+    Number(Boolean(process.env.RESEND_API_KEY && emailTo)) +
+    Number(storageEnabled());
   if (errors.length >= channels) {
     console.error("[commande] échec de transmission", orderNumber, errors);
     return fail(`La commande n'a pas pu être transmise. Appelez-nous au ${shop.phone.display}.`, 502);

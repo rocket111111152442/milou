@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
+import { usePathname } from "next/navigation";
 import { SITE } from "@/lib/site";
 import { compactHours } from "@/lib/hours";
 import { SHOPS, shopLinks } from "@/lib/shops";
@@ -13,6 +14,8 @@ export function Footer() {
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end end"] });
   const y = useTransform(scrollYProgress, [0, 1], ["35%", "0%"]);
   const opacity = useTransform(scrollYProgress, [0.2, 1], [0, 1]);
+  const pathname = usePathname();
+  if (pathname.startsWith("/admin")) return null;
 
   return (
     <footer ref={ref} className="grain relative overflow-hidden bg-torref text-creme">

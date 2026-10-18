@@ -29,7 +29,7 @@ export function FloatingCart() {
     if (bump) controls.start({ scale: [1, 1.25, 0.95, 1], rotate: [0, -8, 6, 0], transition: { duration: 0.6, delay: 0.75 } });
   }, [bump, controls]);
 
-  const hidden = !hydrated || pathname.startsWith("/commande");
+  const hidden = !hydrated || pathname.startsWith("/commande") || pathname.startsWith("/admin");
 
   return (
     <AnimatePresence>
