@@ -3,17 +3,21 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { PRODUCTS_BY_ID } from "./catalog";
+import { SHOP_IDS, type ShopId } from "./shops";
 
 export type CartLine = { id: string; qty: number };
 
 type CartState = {
   lines: CartLine[];
+  /** Boutique de retrait choisie (null tant que le client n'a pas choisi) */
+  shop: ShopId | null;
   open: boolean;
   bump: number;
   add: (id: string, qty?: number) => void;
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
   clear: () => void;
+  setShop: (shop: ShopId) => void;
   setOpen: (open: boolean) => void;
 };
 
@@ -23,6 +27,7 @@ export const useCart = create<CartState>()(
   persist(
     (set) => ({
       lines: [],
+      shop: null,
       open: false,
       bump: 0,
       add: (id, qty = 1) =>
@@ -42,6 +47,7 @@ export const useCart = create<CartState>()(
         })),
       remove: (id) => set((s) => ({ lines: s.lines.filter((l) => l.id !== id) })),
       clear: () => set({ lines: [] }),
+      setShop: (shop) => set({ shop }),
       setOpen: (open) => set({ open }),
     }),
     {
@@ -49,13 +55,13 @@ export const useCart = create<CartState>()(
       // Réhydraté après le montage (voir CartHydrator) pour éviter tout décalage SSR/client
       skipHydration: true,
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ lines: s.lines }),
+      partialize: (s) => ({ lines: s.lines, shop: s.shop }),
       // Écarte les produits retirés du catalogue depuis la dernière visite
       merge: (persisted, current) => {
-        const lines = ((persisted as { lines?: CartLine[] })?.lines ?? []).filter((l) =>
-          PRODUCTS_BY_ID.has(l.id),
-        );
-        return { ...current, lines };
+        const p = (persisted ?? {}) as { lines?: CartLine[]; shop?: string | null };
+        const lines = (p.lines ?? []).filter((l) => PRODUCTS_BY_ID.has(l.id));
+        const shop = SHOP_IDS.find((id) => id === p.shop) ?? null;
+        return { ...current, lines, shop };
       },
     },
   ),

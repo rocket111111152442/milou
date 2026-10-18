@@ -4,11 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef, useState } from "react";
-import { SITE } from "@/lib/site";
 import { FlourParticles } from "@/components/ui/FlourParticles";
 import { RotatingBadge } from "@/components/ui/RotatingBadge";
 import { Magnetic, SplitLetters } from "@/components/ui/motion";
-import { OpenStatus } from "@/components/ui/OpenStatus";
+import { OpenStatusCycle } from "@/components/ui/OpenStatus";
 import { introDelay } from "@/components/Preloader";
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -54,9 +53,9 @@ export function Hero() {
           transition={{ delay: D + 0.1, duration: 0.8 }}
           className="mb-6 flex flex-wrap items-center gap-3"
         >
-          <OpenStatus tone="dark" />
+          <OpenStatusCycle tone="dark" />
           <span className="rounded-full border border-creme/20 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-creme/80 backdrop-blur-md">
-            Sanary-sur-Mer · 7j/7
+            Sanary · Six-Fours · 7j/7
           </span>
         </motion.div>
 
@@ -81,7 +80,7 @@ export function Hero() {
             transition={{ delay: D + 0.9, duration: 0.9, ease }}
           >
             Ici, le pain est pétri, façonné et cuit sur place, chaque jour. Baguettes de tradition, levain,
-            viennoiseries et pâtisseries — à deux pas de la gare d&apos;Ollioules–Sanary.
+            viennoiseries et pâtisseries — à Sanary près de la gare, et à Six-Fours chez Maison Sernesi.
           </motion.p>
 
           <motion.div
@@ -102,14 +101,12 @@ export function Hero() {
               </Link>
             </Magnetic>
             <Magnetic>
-              <a
-                href={SITE.directionsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/#boutiques"
                 className="inline-flex h-14 items-center rounded-full border border-creme/30 px-7 font-semibold text-creme backdrop-blur-sm transition hover:bg-creme/10"
               >
-                Venir à la boutique
-              </a>
+                Nos boutiques
+              </Link>
             </Magnetic>
           </motion.div>
         </div>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SHOP_IDS } from "./shops";
 
 export const orderSchema = z.object({
   items: z
@@ -6,6 +7,7 @@ export const orderSchema = z.object({
     .min(1, "Votre panier est vide.")
     .max(40),
   pickup: z.object({
+    shop: z.enum(SHOP_IDS, { error: "Choisissez la boutique de retrait." }),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     time: z.string().regex(/^\d{2}:\d{2}$/),
   }),

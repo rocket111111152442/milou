@@ -13,11 +13,13 @@ import {
   parisNow,
   addDays,
   pickupDays,
+  rangesFor,
   slotsFor,
-  weekdayOf,
+  toMinutes,
 } from "@/lib/hours";
 import { orderSchema, type OrderResponse } from "@/lib/order";
-import { SITE } from "@/lib/site";
+import Image from "next/image";
+import { SHOPS, getShop, shopLinks, type Shop, type ShopId } from "@/lib/shops";
 import { ProductThumb } from "@/components/menu/ProductImage";
 import { QtyStepper } from "@/components/cart/QtyStepper";
 import { Confetti } from "./Confetti";
@@ -26,7 +28,7 @@ const STEPS = ["Panier", "Retrait", "Coordonnées"] as const;
 const ease = [0.22, 1, 0.36, 1] as const;
 
 type Customer = { firstName: string; lastName: string; phone: string; email: string; note: string };
-type Done = { orderNumber: string; total: number; demo: boolean; date: string; time: string; items: { name: string; qty: number }[]; firstName: string };
+type Done = { orderNumber: string; total: number; demo: boolean; shop: ShopId; date: string; time: string; items: { name: string; qty: number }[]; firstName: string };
 
 function shortDay(date: string, today: string) {
   if (date === today) return "Aujourd'hui";
@@ -43,7 +45,13 @@ function dayNumber(date: string) {
   };
 }
 
-function icsFile(done: Done) {
+/** Vrai si la boutique ferme avant 14 h ce jour-là (ex. dimanche matin). */
+function morningOnly(shop: Shop, date: string) {
+  const r = rangesFor(shop, date);
+  return r.length > 0 && toMinutes(r[r.length - 1][1]) <= 14 * 60;
+}
+
+function icsFile(done: Done, shop: Shop) {
   const [y, m, d] = done.date.split("-");
   const [hh, mm] = done.time.split(":");
   const start = `${y}${m}${d}T${hh}${mm}00`;
@@ -58,8 +66,8 @@ function icsFile(done: Done) {
     `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
     `DTSTART;TZID=Europe/Paris:${start}`,
     `DTEND;TZID=Europe/Paris:${end}`,
-    `SUMMARY:Retrait commande ${done.orderNumber} – Le Pétrin de Pépiole`,
-    `LOCATION:${SITE.address.street}\\, ${SITE.address.postalCode} ${SITE.address.city}`,
+    `SUMMARY:Retrait commande ${done.orderNumber} – ${shop.name}`,
+    `LOCATION:${shop.name}\\, ${shop.address.street}\\, ${shop.address.postalCode} ${shop.address.city}`,
     `DESCRIPTION:${done.items.map((i) => `${i.qty} × ${i.name}`).join("\\n")}`,
     "END:VEVENT",
     "END:VCALENDAR",
@@ -67,9 +75,11 @@ function icsFile(done: Done) {
   return URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/calendar" }));
 }
 
-export function Checkout({ demo }: { demo: boolean }) {
+export function Checkout({ enabledShops }: { enabledShops: ShopId[] }) {
   const [hydrated, setHydrated] = useState(false);
-  const { lines, setQty, remove, clear } = useCart();
+  const { lines, setQty, remove, clear, shop: shopId, setShop } = useCart();
+  const shop = shopId ? getShop(shopId) : null;
+  const demo = shopId ? !enabledShops.includes(shopId) : enabledShops.length < SHOPS.length;
   const { items, total, count, leadHours } = cartDetails(lines);
   const lead = leadMinutesFor(leadHours);
 
@@ -95,8 +105,8 @@ export function Checkout({ demo }: { demo: boolean }) {
   }, []);
 
   const today = parisNow(now).date;
-  const days = useMemo(() => pickupDays(lead, now), [lead, now]);
-  const slots = useMemo(() => (date ? slotsFor(date, lead, now) : []), [date, lead, now]);
+  const days = useMemo(() => (shop ? pickupDays(shop, lead, now) : []), [shop, lead, now]);
+  const slots = useMemo(() => (shop && date ? slotsFor(shop, date, lead, now) : []), [shop, date, lead, now]);
 
   // Choisit automatiquement le premier jour disponible, et invalide un créneau devenu impossible
   useEffect(() => {
@@ -120,7 +130,7 @@ export function Checkout({ demo }: { demo: boolean }) {
     setServerError(null);
     const payload = {
       items: lines.map((l) => ({ id: l.id, qty: l.qty })),
-      pickup: { date: date ?? "", time: time ?? "" },
+      pickup: { shop: shopId ?? "", date: date ?? "", time: time ?? "" },
       customer,
       consent,
       website,
@@ -133,7 +143,7 @@ export function Checkout({ demo }: { demo: boolean }) {
         if (!errs[key]) errs[key] = issue.message;
       }
       setErrors(errs);
-      if (errs["pickup.date"] || errs["pickup.time"]) go(1);
+      if (errs["pickup.shop"] || errs["pickup.date"] || errs["pickup.time"]) go(1);
       return;
     }
     setErrors({});
@@ -153,6 +163,7 @@ export function Checkout({ demo }: { demo: boolean }) {
         orderNumber: data.orderNumber,
         total: data.total,
         demo: data.demo,
+        shop: shopId!,
         date: date!,
         time: time!,
         items: items.map((i) => ({ name: i.product.name, qty: i.qty })),
@@ -161,7 +172,7 @@ export function Checkout({ demo }: { demo: boolean }) {
       clear();
       toTop();
     } catch {
-      setServerError(`Connexion impossible. Réessayez ou appelez-nous au ${SITE.phone.display}.`);
+      setServerError(`Connexion impossible. Réessayez ou appelez la boutique${shop ? ` au ${shop.phone.display}` : ""}.`);
     } finally {
       setSubmitting(false);
     }
@@ -230,10 +241,16 @@ export function Checkout({ demo }: { demo: boolean }) {
           <span aria-hidden="true">ℹ️</span>
           <p>
             <strong>Commande en ligne en cours de mise en place.</strong> Vous pouvez tester le parcours, mais la commande ne
-            sera pas encore transmise à la boutique. Pour commander dès maintenant, appelez le{" "}
-            <a href={SITE.phone.href} className="font-semibold underline">
-              {SITE.phone.display}
-            </a>
+            sera pas encore transmise à la boutique. Pour commander dès maintenant, appelez{" "}
+            {(shop ? [shop] : SHOPS).map((s, i, arr) => (
+              <span key={s.id}>
+                {i > 0 && (i === arr.length - 1 ? " ou " : ", ")}
+                {arr.length > 1 && `${s.short} : `}
+                <a href={s.phone.href} className="font-semibold underline">
+                  {s.phone.display}
+                </a>
+              </span>
+            ))}
             .
           </p>
         </motion.div>
@@ -315,7 +332,56 @@ export function Checkout({ demo }: { demo: boolean }) {
 
               {step === 1 && (
                 <div>
-                  <h2 className="font-display text-3xl">Quand passez-vous ?</h2>
+                  <h2 className="font-display text-3xl">Où passez-vous ?</h2>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Boutique de retrait">
+                    {SHOPS.map((s) => {
+                      const on = s.id === shopId;
+                      return (
+                        <motion.button
+                          key={s.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            if (s.id === shopId) return;
+                            setShop(s.id);
+                            setDate(null);
+                            setTime(null);
+                          }}
+                          className={`group relative overflow-hidden rounded-2xl text-left ring-2 transition ${on ? "ring-croute" : "ring-transparent hover:ring-sable"}`}
+                        >
+                          <div className="relative aspect-[16/6] overflow-hidden bg-mie">
+                            <Image src={s.image} alt="" fill sizes="(min-width:640px) 30vw, 90vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
+                            <div className={`absolute inset-0 transition ${on ? "bg-torref/10" : "bg-torref/35"}`} />
+                            <AnimatePresence>
+                              {on && (
+                                <motion.span
+                                  initial={{ scale: 0, rotate: -45 }}
+                                  animate={{ scale: 1, rotate: 0 }}
+                                  exit={{ scale: 0 }}
+                                  className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-croute text-sm font-bold text-creme shadow-lg"
+                                >
+                                  ✓
+                                </motion.span>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                          <div className={`p-4 transition-colors ${on ? "bg-cafe text-creme" : "bg-farine"}`}>
+                            <p className="font-display text-xl leading-tight">{s.name}</p>
+                            <p className={`text-xs ${on ? "text-creme/70" : "text-grege"}`}>
+                              {s.address.street}, {s.address.city}
+                            </p>
+                          </div>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                  {errors["pickup.shop"] && <p className="mt-3 text-sm text-red-600">Choisissez la boutique de retrait.</p>}
+
+                  {shop && (
+                  <motion.div key={shop.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease }}>
+                  <h3 className="mt-9 font-display text-2xl">Quand passez-vous ?</h3>
                   <p className="mt-2 text-sm text-cafe/70">
                     {lead > 120
                       ? `Votre panier contient des produits préparés sur commande : premier retrait possible dans ${Math.round(lead / 60)} h.`
@@ -342,7 +408,7 @@ export function Checkout({ demo }: { demo: boolean }) {
                           <span className="relative text-[11px] font-bold uppercase tracking-wide opacity-70">{shortDay(d.date, today)}</span>
                           <span className="relative font-display text-2xl leading-tight">{day}</span>
                           <span className="relative text-xs opacity-70">{month}</span>
-                          {weekdayOf(d.date) === 0 && <span className="relative mt-0.5 text-[10px] opacity-60">matin</span>}
+                          {morningOnly(shop, d.date) && <span className="relative mt-0.5 text-[10px] opacity-60">matin</span>}
                         </button>
                       );
                     })}
@@ -384,6 +450,8 @@ export function Checkout({ demo }: { demo: boolean }) {
                     </motion.div>
                   )}
                   {errors["pickup.time"] && <p className="mt-3 text-sm text-red-600">Choisissez un créneau de retrait.</p>}
+                  </motion.div>
+                  )}
 
                   <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
                     <button type="button" onClick={() => go(0)} className="inline-flex h-12 items-center justify-center rounded-full border border-mie px-6 font-semibold transition hover:bg-mie">
@@ -391,7 +459,7 @@ export function Checkout({ demo }: { demo: boolean }) {
                     </button>
                     <button
                       type="button"
-                      disabled={!date || !time}
+                      disabled={!shop || !date || !time}
                       onClick={() => go(2)}
                       className="inline-flex h-12 items-center justify-center rounded-full bg-croute px-8 font-semibold text-creme transition hover:bg-cafe disabled:cursor-not-allowed disabled:opacity-40"
                     >
@@ -497,10 +565,10 @@ export function Checkout({ demo }: { demo: boolean }) {
               </motion.span>
             </div>
             <AnimatePresence>
-              {date && time && (
+              {shop && date && time && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                   <div className="mt-5 rounded-2xl bg-creme/10 p-4 text-sm">
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-creme/50">Retrait</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-creme/50">Retrait · {shop.name}</p>
                     <p className="mt-1 font-display text-xl first-letter:uppercase">
                       {formatDateLong(date)} à {formatTime(time)}
                     </p>
@@ -509,7 +577,8 @@ export function Checkout({ demo }: { demo: boolean }) {
               )}
             </AnimatePresence>
             <p className="mt-5 text-xs leading-relaxed text-creme/60">
-              Paiement en boutique au moment du retrait. {SITE.address.street}, {SITE.address.city}.
+              Paiement en boutique au moment du retrait
+              {shop ? ` · ${shop.name}, ${shop.address.street}, ${shop.address.city}` : ""}.
             </p>
           </div>
         </aside>
@@ -519,9 +588,10 @@ export function Checkout({ demo }: { demo: boolean }) {
 }
 
 function Confirmation({ done }: { done: Done }) {
+  const shop = getShop(done.shop);
   const [ics, setIcs] = useState<string | null>(null);
   useEffect(() => {
-    const url = icsFile(done);
+    const url = icsFile(done, getShop(done.shop));
     setIcs(url);
     return () => URL.revokeObjectURL(url);
   }, [done]);
@@ -544,13 +614,15 @@ function Confirmation({ done }: { done: Done }) {
         <p className="mx-auto mt-5 max-w-lg rounded-2xl bg-dore/20 px-5 py-4 text-sm">
           La commande en ligne est en cours de mise en place : <strong>cette commande n&apos;a pas été transmise à la boutique</strong>.
           Pour commander pour de vrai, appelez le{" "}
-          <a href={SITE.phone.href} className="font-semibold underline">
-            {SITE.phone.display}
+          <a href={shop.phone.href} className="font-semibold underline">
+            {shop.phone.display}
           </a>
           .
         </p>
       ) : (
-        <p className="mx-auto mt-5 max-w-lg text-cafe/75">Elle vous attendra en boutique. Le règlement se fait sur place, au moment du retrait.</p>
+        <p className="mx-auto mt-5 max-w-lg text-cafe/75">
+          Elle vous attendra chez {shop.name}, {shop.address.street} à {shop.address.city}. Le règlement se fait sur place, au moment du retrait.
+        </p>
       )}
 
       <div className="mt-10 rounded-[2rem] bg-creme p-7 text-left ring-1 ring-mie">
@@ -560,7 +632,7 @@ function Confirmation({ done }: { done: Done }) {
             <p className="font-display text-3xl">{done.orderNumber}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-grege">Retrait</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-grege">Retrait · {shop.name}</p>
             <p className="font-display text-xl first-letter:uppercase">
               {formatDateLong(done.date)} · {formatTime(done.time)}
             </p>
@@ -582,7 +654,7 @@ function Confirmation({ done }: { done: Done }) {
             📅 Ajouter à mon agenda
           </a>
         )}
-        <a href={SITE.directionsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-12 items-center justify-center rounded-full border border-mie bg-creme px-6 font-semibold transition hover:bg-mie">
+        <a href={shopLinks(shop).directionsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-12 items-center justify-center rounded-full border border-mie bg-creme px-6 font-semibold transition hover:bg-mie">
           Itinéraire
         </a>
         <Link href="/" className="inline-flex h-12 items-center justify-center rounded-full bg-cafe px-6 font-semibold text-creme transition hover:bg-croute">

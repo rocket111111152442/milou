@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Great_Vibes, Manrope } from "next/font/google";
 import "./globals.css";
 import { SITE } from "@/lib/site";
-import { OPENING_HOURS } from "@/lib/hours";
+import { SHOPS } from "@/lib/shops";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -23,7 +23,7 @@ const manrope = Manrope({ subsets: ["latin"], variable: "--nf-manrope", display:
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: {
-    default: `${SITE.name} · Boulangerie artisanale à Sanary-sur-Mer`,
+    default: `${SITE.name} · Boulangerie artisanale à Sanary-sur-Mer et Six-Fours`,
     template: `%s · ${SITE.name}`,
   },
   description: SITE.description,
@@ -35,13 +35,15 @@ export const metadata: Metadata = {
     "baguette tradition",
     "pâtisserie Sanary",
     "boulangerie ouverte dimanche Sanary",
+    "boulangerie Six-Fours-les-Plages",
+    "Maison Sernesi",
     "gare Ollioules Sanary",
   ],
   openGraph: {
     type: "website",
     locale: "fr_FR",
     siteName: SITE.name,
-    title: `${SITE.name} · Artisan boulanger à Sanary-sur-Mer`,
+    title: `${SITE.name} · Artisan boulanger à Sanary-sur-Mer et Six-Fours`,
     description: SITE.description,
     images: [{ url: "/images/hero-croissants.jpg", width: 2000, height: 1333, alt: "Croissants dorés saupoudrés de farine" }],
   },
@@ -56,35 +58,43 @@ const dayCodes = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "Bakery",
-  name: SITE.name,
-  description: SITE.description,
-  url: SITE.url,
-  telephone: "+33494325747",
-  image: `${SITE.url}/images/facade.jpg`,
-  priceRange: "€",
-  servesCuisine: "Boulangerie, pâtisserie française",
-  address: {
-    "@type": "PostalAddress",
-    streetAddress: SITE.address.street,
-    postalCode: SITE.address.postalCode,
-    addressLocality: SITE.address.city,
-    addressRegion: "Provence-Alpes-Côte d'Azur",
-    addressCountry: "FR",
-  },
-  geo: { "@type": "GeoCoordinates", latitude: SITE.geo.lat, longitude: SITE.geo.lng },
-  sameAs: [SITE.instagram.url],
-  openingHoursSpecification: Object.entries(OPENING_HOURS).flatMap(([d, ranges]) =>
-    ranges.map(([opens, closes]) => ({
-      "@type": "OpeningHoursSpecification",
-      dayOfWeek: `https://schema.org/${dayCodes[Number(d)]}`,
-      opens,
-      closes,
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE.url}/#maison`,
+      name: SITE.name,
+      url: SITE.url,
+      logo: `${SITE.url}/icon.svg`,
+      sameAs: [SITE.instagram.url],
+    },
+    ...SHOPS.map((shop) => ({
+      "@type": "Bakery",
+      "@id": `${SITE.url}/#${shop.id}`,
+      name: `${shop.name} – ${shop.city}`,
+      parentOrganization: { "@id": `${SITE.url}/#maison` },
+      url: `${SITE.url}/#boutiques`,
+      telephone: shop.phone.href.replace("tel:", ""),
+      image: `${SITE.url}${shop.image}`,
+      priceRange: "€",
+      servesCuisine: "Boulangerie, pâtisserie française",
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: shop.address.street,
+        postalCode: shop.address.postalCode,
+        addressLocality: shop.address.city,
+        addressRegion: "Provence-Alpes-Côte d'Azur",
+        addressCountry: "FR",
+      },
+      geo: { "@type": "GeoCoordinates", latitude: shop.geo.lat, longitude: shop.geo.lng },
+      openingHoursSpecification: Object.entries(shop.hours).flatMap(([d, ranges]) =>
+        ranges.map(([opens, closes]) => ({
+          "@type": "OpeningHoursSpecification",
+          dayOfWeek: `https://schema.org/${dayCodes[Number(d)]}`,
+          opens,
+          closes,
+        })),
+      ),
     })),
-  ),
-  amenityFeature: [
-    { "@type": "LocationFeatureSpecification", name: "Parking", value: true },
-    { "@type": "LocationFeatureSpecification", name: "Accès fauteuil roulant", value: true },
   ],
 };
 

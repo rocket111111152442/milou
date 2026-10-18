@@ -68,7 +68,7 @@ export function Marquee() {
         <Row
           baseVelocity={1.5}
           className="text-sm font-extrabold uppercase tracking-[0.3em] sm:text-base"
-          items={["Pétri sur place", "Façonné à la main", "Cuit chaque jour", "Ouvert 7j/7", "Parking", "Sanary-sur-Mer"]}
+          items={["Pétri sur place", "Façonné à la main", "Cuit chaque jour", "Ouvert 7j/7", "Sanary-sur-Mer", "Six-Fours-les-Plages"]}
         />
       </div>
     </section>

@@ -3,8 +3,8 @@ import { Resend } from "resend";
 import { orderSchema, type OrderResponse } from "@/lib/order";
 import { PRODUCTS_BY_ID, formatPrice } from "@/lib/catalog";
 import { formatDateLong, formatTime, isValidSlot, leadMinutesFor, parisNow } from "@/lib/hours";
-import { SITE } from "@/lib/site";
-import { ordersEnabled } from "@/lib/order-config";
+import { getShop } from "@/lib/shops";
+import { orderEmailTo, ordersEnabled } from "@/lib/order-config";
 
 export const runtime = "nodejs";
 
@@ -50,20 +50,22 @@ export async function POST(req: Request) {
   }
   const total = lines.reduce((s, l) => s + l.total, 0);
   const lead = leadMinutesFor(lines.map((l) => l.product.leadHours ?? 0));
+  const shop = getShop(order.pickup.shop);
 
-  if (!isValidSlot(order.pickup.date, order.pickup.time, lead)) {
+  if (!isValidSlot(shop, order.pickup.date, order.pickup.time, lead)) {
     return fail("Ce créneau de retrait n'est plus disponible. Merci d'en choisir un autre.");
   }
 
   const now = parisNow();
   const orderNumber = `PP-${now.date.slice(2).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
   const pickupLabel = `${formatDateLong(order.pickup.date)} à ${formatTime(order.pickup.time)}`;
+  const shopLabel = `${shop.name} – ${shop.address.street}, ${shop.address.postalCode} ${shop.address.city}`;
   const c = order.customer;
 
   const payload = {
     orderNumber,
     createdAt: new Date().toISOString(),
-    pickup: { ...order.pickup, label: pickupLabel },
+    pickup: { ...order.pickup, label: pickupLabel, shopName: shop.name, shopAddress: shopLabel },
     customer: c,
     items: lines.map((l) => ({
       id: l.product.id,
@@ -77,7 +79,7 @@ export async function POST(req: Request) {
     payment: "En boutique, au retrait",
   };
 
-  if (!ordersEnabled()) {
+  if (!ordersEnabled(shop.id)) {
     return NextResponse.json<OrderResponse>({ ok: true, orderNumber, total, demo: true });
   }
 
@@ -96,7 +98,8 @@ export async function POST(req: Request) {
     }
   }
 
-  if (process.env.RESEND_API_KEY && process.env.ORDER_EMAIL_TO) {
+  const emailTo = orderEmailTo(shop.id);
+  if (process.env.RESEND_API_KEY && emailTo) {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const from = process.env.ORDER_EMAIL_FROM || "Le Pétrin de Pépiole <onboarding@resend.dev>";
     const rows = lines
@@ -111,6 +114,7 @@ export async function POST(req: Request) {
 
     const shopHtml = wrap(`
       <h1 style="margin:0 0 4px;font-size:22px">Nouvelle commande ${orderNumber}</h1>
+      <p style="margin:0 0 4px;color:#8a7a68">Boutique : <strong style="color:#3b2416">${escapeHtml(shop.name)} (${escapeHtml(shop.short)})</strong></p>
       <p style="margin:0 0 20px;color:#8a7a68">Retrait : <strong style="color:#b5652b">${escapeHtml(pickupLabel)}</strong></p>
       <p style="margin:0 0 16px">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)} · <a href="tel:${escapeHtml(c.phone.replace(/\s/g, ""))}">${escapeHtml(c.phone)}</a>${c.email ? ` · ${escapeHtml(c.email)}` : ""}</p>
       ${table}
@@ -120,9 +124,9 @@ export async function POST(req: Request) {
     try {
       const { error } = await resend.emails.send({
         from,
-        to: process.env.ORDER_EMAIL_TO.split(",").map((s) => s.trim()),
+        to: emailTo.split(",").map((s) => s.trim()),
         replyTo: c.email || undefined,
-        subject: `🥖 Commande ${orderNumber} — retrait ${pickupLabel}`,
+        subject: `🥖 Commande ${orderNumber} — ${shop.short} — retrait ${pickupLabel}`,
         html: shopHtml,
       });
       if (error) errors.push(`email boutique ${error.message}`);
@@ -133,14 +137,14 @@ export async function POST(req: Request) {
     if (c.email) {
       const clientHtml = wrap(`
         <h1 style="margin:0 0 8px;font-size:22px">Merci ${escapeHtml(c.firstName)} !</h1>
-        <p style="margin:0 0 20px">Votre commande <strong>${orderNumber}</strong> est bien transmise à la boutique. Elle vous attendra le <strong style="color:#b5652b">${escapeHtml(pickupLabel)}</strong>.</p>
+        <p style="margin:0 0 20px">Votre commande <strong>${orderNumber}</strong> est bien transmise à la boutique. Elle vous attendra le <strong style="color:#b5652b">${escapeHtml(pickupLabel)}</strong>, chez <strong>${escapeHtml(shopLabel)}</strong>.</p>
         ${table}
-        <p style="margin-top:20px">Règlement en boutique au moment du retrait.<br/>${SITE.name} · ${SITE.address.street}, ${SITE.address.postalCode} ${SITE.address.city} · ${SITE.phone.display}</p>`);
+        <p style="margin-top:20px">Règlement en boutique au moment du retrait.<br/>${escapeHtml(shop.name)} · ${escapeHtml(shop.phone.display)}</p>`);
       try {
         await resend.emails.send({
           from,
           to: c.email,
-          subject: `Votre commande ${orderNumber} — ${SITE.name}`,
+          subject: `Votre commande ${orderNumber} — ${shop.name}`,
           html: clientHtml,
         });
       } catch {
@@ -150,10 +154,10 @@ export async function POST(req: Request) {
   }
 
   // Si aucun canal n'a fonctionné, la boutique n'a rien reçu : on le dit au client.
-  const channels = Number(Boolean(process.env.ORDER_WEBHOOK_URL)) + Number(Boolean(process.env.RESEND_API_KEY && process.env.ORDER_EMAIL_TO));
+  const channels = Number(Boolean(process.env.ORDER_WEBHOOK_URL)) + Number(Boolean(process.env.RESEND_API_KEY && emailTo));
   if (errors.length >= channels) {
     console.error("[commande] échec de transmission", orderNumber, errors);
-    return fail(`La commande n'a pas pu être transmise. Appelez-nous au ${SITE.phone.display}.`, 502);
+    return fail(`La commande n'a pas pu être transmise. Appelez-nous au ${shop.phone.display}.`, 502);
   }
   if (errors.length) console.warn("[commande] transmission partielle", orderNumber, errors);
 

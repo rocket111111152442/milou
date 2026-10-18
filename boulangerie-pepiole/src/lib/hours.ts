@@ -5,19 +5,12 @@ export const TIME_ZONE = "Europe/Paris";
 
 export type Range = readonly [open: string, close: string];
 
-// 0 = dimanche … 6 = samedi
-export const OPENING_HOURS: Record<number, readonly Range[]> = {
-  0: [["07:00", "13:15"]],
-  1: [["06:30", "19:30"]],
-  2: [["06:30", "19:30"]],
-  3: [["06:30", "19:30"]],
-  4: [["06:30", "19:30"]],
-  5: [["06:30", "19:30"]],
-  6: [["06:30", "19:30"]],
+/** Ce dont les calculs d'horaires ont besoin (une boutique, voir shops.ts). */
+export type Schedule = {
+  /** 0 = dimanche … 6 = samedi */
+  hours: Record<number, readonly Range[]>;
+  closedDates: readonly string[];
 };
-
-// Jours de fermeture exceptionnelle (AAAA-MM-JJ), à compléter par la boutique.
-export const CLOSED_DATES: readonly string[] = [];
 
 export const DAY_NAMES = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
@@ -86,31 +79,36 @@ export function addDays(date: string, days: number) {
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
 }
 
-export function rangesFor(date: string): readonly Range[] {
-  if (CLOSED_DATES.includes(date)) return [];
-  return OPENING_HOURS[weekdayOf(date)] ?? [];
+export function rangesFor(shop: Schedule, date: string): readonly Range[] {
+  if (shop.closedDates.includes(date)) return [];
+  return shop.hours[weekdayOf(date)] ?? [];
 }
 
 export type OpenStatus =
   | { open: true; closesAt: string }
   | { open: false; opensAt: string; when: "today" | "tomorrow" | string };
 
-export function getOpenStatus(now = new Date()): OpenStatus {
+export function getOpenStatus(shop: Schedule, now = new Date()): OpenStatus {
   const p = parisNow(now);
-  for (const [o, c] of rangesFor(p.date)) {
+  for (const [o, c] of rangesFor(shop, p.date)) {
     if (p.minutes >= toMinutes(o) && p.minutes < toMinutes(c)) return { open: true, closesAt: c };
   }
-  for (const [o] of rangesFor(p.date)) {
+  for (const [o] of rangesFor(shop, p.date)) {
     if (p.minutes < toMinutes(o)) return { open: false, opensAt: o, when: "today" };
   }
   for (let i = 1; i <= 7; i++) {
     const d = addDays(p.date, i);
-    const r = rangesFor(d);
+    const r = rangesFor(shop, d);
     if (r.length) {
       return { open: false, opensAt: r[0][0], when: i === 1 ? "tomorrow" : DAY_NAMES[weekdayOf(d)].toLowerCase() };
     }
   }
   return { open: false, opensAt: "06:30", when: "bientôt" };
+}
+
+/** Plage(s) d'un jour en texte : « 6h30 – 19h30 » ou « Fermé ». */
+export function formatRanges(ranges: readonly Range[]) {
+  return ranges.map(([o, c]) => `${formatTime(o)} – ${formatTime(c)}`).join(" · ") || "Fermé";
 }
 
 export function describeStatus(s: OpenStatus) {
@@ -126,10 +124,10 @@ export function leadMinutesFor(leadHours: number[]) {
 
 export type Slot = { time: string; available: boolean };
 
-export function slotsFor(date: string, leadMinutes: number, now = new Date()): Slot[] {
+export function slotsFor(shop: Schedule, date: string, leadMinutes: number, now = new Date()): Slot[] {
   const earliest = parisNow(now).wall + leadMinutes * 60_000;
   const slots: Slot[] = [];
-  for (const [o, c] of rangesFor(date)) {
+  for (const [o, c] of rangesFor(shop, date)) {
     const start = toMinutes(o);
     const end = toMinutes(c) - LAST_SLOT_MARGIN;
     for (let m = Math.ceil(start / SLOT_STEP) * SLOT_STEP; m <= end; m += SLOT_STEP) {
@@ -140,20 +138,20 @@ export function slotsFor(date: string, leadMinutes: number, now = new Date()): S
   return slots;
 }
 
-export function pickupDays(leadMinutes: number, now = new Date()) {
+export function pickupDays(shop: Schedule, leadMinutes: number, now = new Date()) {
   const today = parisNow(now).date;
   const days: { date: string; hasSlots: boolean }[] = [];
   for (let i = 0; i < MAX_DAYS_AHEAD; i++) {
     const date = addDays(today, i);
-    days.push({ date, hasSlots: slotsFor(date, leadMinutes, now).some((s) => s.available) });
+    days.push({ date, hasSlots: slotsFor(shop, date, leadMinutes, now).some((s) => s.available) });
   }
   return days;
 }
 
-export function isValidSlot(date: string, time: string, leadMinutes: number, now = new Date()) {
+export function isValidSlot(shop: Schedule, date: string, time: string, leadMinutes: number, now = new Date()) {
   const today = parisNow(now).date;
   if (date < today || date > addDays(today, MAX_DAYS_AHEAD - 1)) return false;
-  return slotsFor(date, leadMinutes, now).some((s) => s.time === time && s.available);
+  return slotsFor(shop, date, leadMinutes, now).some((s) => s.time === time && s.available);
 }
 
 export function formatDateLong(date: string) {
@@ -164,4 +162,19 @@ export function formatDateLong(date: string) {
     month: "long",
     timeZone: "UTC",
   }).format(new Date(Date.UTC(y, mo - 1, d)));
+}
+
+const SHORT_DAYS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+
+/** Horaires regroupés : [« Lun – Sam », « 6h30 – 19h30 »], [« Dim », « 7h – 13h15 »]. Semaine commençant le lundi. */
+export function compactHours(shop: Schedule): [days: string, hours: string][] {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const groups: { from: number; to: number; text: string }[] = [];
+  for (const d of order) {
+    const text = formatRanges(shop.hours[d] ?? []);
+    const last = groups[groups.length - 1];
+    if (last && last.text === text) last.to = d;
+    else groups.push({ from: d, to: d, text });
+  }
+  return groups.map((g) => [g.from === g.to ? SHORT_DAYS[g.from] : `${SHORT_DAYS[g.from]} – ${SHORT_DAYS[g.to]}`, g.text]);
 }

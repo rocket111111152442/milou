@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SITE } from "@/lib/site";
+import { SHOPS } from "@/lib/shops";
 
 export const metadata: Metadata = {
   title: "Mentions légales & confidentialité",
@@ -25,24 +26,30 @@ export default function MentionsLegales() {
         <h1 className="mb-10 font-display text-5xl tracking-tight sm:text-6xl">Mentions légales</h1>
 
         <Block title="Éditeur du site">
-          <p>
-            <strong>{L.company}</strong>, exploitant l&apos;enseigne « {L.tradeName} »
-            <br />
-            {L.form}
-            <br />
-            Siège social : {L.headOffice}
-            <br />
-            SIREN : {L.siren} · SIRET : {L.siret}
-            <br />
-            {L.rcs}
-            <br />
-            N° TVA intracommunautaire : {L.vat}
-            <br />
-            Code NAF : {L.naf}
-            <br />
-            Téléphone : <a href={SITE.phone.href} className="underline">{SITE.phone.display}</a>
-          </p>
-          <p>Directeur de la publication : {L.publicationDirector}.</p>
+          <p>Ce site présente les boutiques suivantes, chacune exploitée par sa propre société :</p>
+          {SHOPS.map((shop) => (
+            <p key={shop.id}>
+              <strong>{shop.legal.company}</strong>, exploitant la boutique « {shop.name} » à {shop.city}
+              <br />
+              {shop.legal.form}, créée en {shop.legal.created}
+              <br />
+              Siège social : {shop.address.street}, {shop.address.postalCode} {shop.address.city}
+              <br />
+              SIREN : {shop.legal.siren} · SIRET : {shop.legal.siret}
+              <br />
+              {shop.legal.rcs}
+              <br />
+              N° TVA intracommunautaire : {shop.legal.vat}
+              <br />
+              Code NAF : 10.71C – Boulangerie et boulangerie-pâtisserie
+              <br />
+              Téléphone :{" "}
+              <a href={shop.phone.href} className="underline">
+                {shop.phone.display}
+              </a>
+            </p>
+          ))}
+          <p>Directrice de la publication : {L.publicationDirector}.</p>
         </Block>
 
         <Block title="Hébergement">
@@ -56,7 +63,7 @@ export default function MentionsLegales() {
 
         <Block title="Propriété intellectuelle">
           <p>
-            Les textes, le logo et la mise en page de ce site sont la propriété de {L.company}. Toute reproduction sans
+            Les textes, le logo et la mise en page de ce site sont la propriété de leurs éditeurs. Toute reproduction sans
             autorisation est interdite. Les photographies d&apos;illustration proviennent de la banque d&apos;images Unsplash
             (licence Unsplash) et ne représentent pas nécessairement les produits vendus en boutique.
           </p>
@@ -76,8 +83,8 @@ export default function MentionsLegales() {
           </p>
           <p>
             Conformément au RGPD, vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement,
-            d&apos;opposition et de limitation. Pour l&apos;exercer, contactez la boutique au {SITE.phone.display} ou par
-            courrier à l&apos;adresse du siège. Vous pouvez également introduire une réclamation auprès de la CNIL
+            d&apos;opposition et de limitation. Pour l&apos;exercer, contactez la boutique où vous avez commandé
+            ({SHOPS.map((s) => `${s.short} : ${s.phone.display}`).join(" ; ")}) ou écrivez à l&apos;adresse de son siège. Vous pouvez également introduire une réclamation auprès de la CNIL
             (cnil.fr).
           </p>
         </Block>

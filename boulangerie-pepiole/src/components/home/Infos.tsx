@@ -1,113 +1,156 @@
 "use client";
 
 import Image from "next/image";
-import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { SITE } from "@/lib/site";
-import { DAY_NAMES, OPENING_HOURS, formatTime, parisNow } from "@/lib/hours";
-import { OpenStatus } from "@/components/ui/OpenStatus";
+import { SHOPS, shopLinks, type ShopId } from "@/lib/shops";
+import { DAY_NAMES, formatRanges, parisNow } from "@/lib/hours";
+import { useCart } from "@/lib/cart";
+import { OpenStatus, useOpenStatuses } from "@/components/ui/OpenStatus";
 import { PhoneIcon } from "@/components/Header";
 import { Reveal, SplitWords } from "@/components/ui/motion";
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
-const SERVICES = [
-  { label: "Vente à emporter", icon: "🥖" },
-  { label: "Parking", icon: "🅿️" },
-  { label: "Accès fauteuil roulant", icon: "♿" },
-  { label: "Pause café", icon: "☕" },
-  { label: "Ouvert le dimanche", icon: "☀️" },
-];
+const ease = [0.22, 1, 0.36, 1] as const;
 
 export function Infos() {
+  const router = useRouter();
+  const setShop = useCart((s) => s.setShop);
+  const statuses = useOpenStatuses();
   const [today, setToday] = useState<number | null>(null);
+  const [active, setActive] = useState<ShopId>(SHOPS[0].id);
   const [mapActive, setMapActive] = useState(false);
   useEffect(() => setToday(parisNow().weekday), []);
 
+  const shop = SHOPS.find((s) => s.id === active)!;
+  const links = shopLinks(shop);
+
   return (
-    <section id="infos" className="grain relative scroll-mt-20 bg-farine py-24 sm:py-36">
+    <section id="boutiques" className="grain relative scroll-mt-20 bg-farine py-24 sm:py-36">
       <div className="relative z-10 mx-auto max-w-7xl px-6">
         <Reveal>
           <p className="mb-6 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.3em] text-croute">
-            <span className="h-px w-10 bg-croute" /> Infos pratiques
+            <span className="h-px w-10 bg-croute" /> Nos boutiques
           </p>
         </Reveal>
-        <SplitWords as="h2" text="On vous attend, four chaud." className="mb-14 block max-w-3xl font-display text-5xl leading-[1.02] tracking-tight sm:text-7xl" />
+        <div className="mb-12 flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+          <SplitWords as="h2" text="Deux adresses, une même maison." className="block max-w-3xl font-display text-5xl leading-[1.02] tracking-tight sm:text-7xl" />
 
-        <div className="grid gap-6 lg:grid-cols-12">
-          {/* Horaires */}
-          <Reveal className="rounded-[2rem] bg-creme p-7 ring-1 ring-mie sm:p-9 lg:col-span-5">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-display text-3xl">Horaires</h3>
-              <OpenStatus />
-            </div>
-            <ul className="space-y-1">
-              {ORDER.map((d, i) => {
-                const isToday = d === today;
+          {/* Sélecteur de boutique */}
+          <LayoutGroup>
+            <div className="flex gap-2 self-start rounded-full bg-creme p-1.5 ring-1 ring-mie lg:self-auto" role="tablist" aria-label="Choisir une boutique">
+              {SHOPS.map((s) => {
+                const on = s.id === active;
                 return (
-                  <motion.li
-                    key={d}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.1 + i * 0.06 }}
-                    className={`relative flex items-center justify-between rounded-xl px-4 py-3 ${isToday ? "text-creme" : ""}`}
+                  <button
+                    key={s.id}
+                    role="tab"
+                    aria-selected={on}
+                    aria-controls="boutique-panel"
+                    onClick={() => {
+                      setActive(s.id);
+                      setMapActive(false);
+                    }}
+                    className={`relative flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-colors ${on ? "text-creme" : "text-cafe/70 hover:text-cafe"}`}
                   >
-                    {isToday && (
-                      <motion.span layoutId="today" className="absolute inset-0 -z-0 rounded-xl bg-cafe" transition={{ type: "spring", stiffness: 300, damping: 30 }} />
-                    )}
-                    <span className="relative font-semibold">
-                      {DAY_NAMES[d]}
-                      {isToday && <span className="ml-2 text-xs font-bold uppercase tracking-wider text-dore">aujourd&apos;hui</span>}
-                    </span>
-                    <span className="relative tabular-nums">
-                      {OPENING_HOURS[d].map(([o, c]) => `${formatTime(o)} – ${formatTime(c)}`).join(" · ") || "Fermé"}
-                    </span>
-                  </motion.li>
+                    {on && <motion.span layoutId="shop-pill" className="absolute inset-0 rounded-full bg-cafe" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
+                    <span className={`relative h-2 w-2 rounded-full ${statuses?.[s.id]?.open ? "bg-emerald-400" : "bg-croute"}`} aria-hidden="true" />
+                    <span className="relative">{s.short}</span>
+                  </button>
                 );
               })}
-            </ul>
-            <p className="mt-5 text-xs text-grege">Horaires indicatifs : un doute un jour férié ? Un coup de fil suffit.</p>
-          </Reveal>
+            </div>
+          </LayoutGroup>
+        </div>
 
-          {/* Adresse + carte */}
-          <div className="grid gap-6 lg:col-span-7">
-            <Reveal delay={0.1} className="grid gap-6 sm:grid-cols-2">
-              <div className="rounded-[2rem] bg-cafe p-7 text-creme sm:p-9">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-creme/50">Adresse</p>
-                <address className="mt-3 font-display text-2xl not-italic leading-snug">
-                  {SITE.address.street}
-                  <br />
-                  {SITE.address.postalCode} {SITE.address.city}
-                </address>
-                <p className="mt-2 text-sm text-creme/60">{SITE.address.landmark}</p>
-                <a
-                  href={SITE.directionsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-6 inline-flex rounded-full bg-dore px-5 py-3 text-sm font-semibold text-torref transition hover:bg-creme"
-                >
-                  Itinéraire →
-                </a>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={shop.id}
+            id="boutique-panel"
+            role="tabpanel"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5, ease }}
+            className="grid gap-6 lg:grid-cols-12"
+          >
+            {/* Carte d'identité de la boutique */}
+            <div className="overflow-hidden rounded-[2rem] bg-cafe text-creme lg:col-span-7">
+              <div className="relative aspect-[16/7] overflow-hidden bg-torref">
+                <motion.div className="absolute inset-0" initial={{ scale: 1.15 }} animate={{ scale: 1 }} transition={{ duration: 1.4, ease }}>
+                  <Image src={shop.image} alt={shop.imageAlt} fill sizes="(min-width:1024px) 55vw, 100vw" className="object-cover" />
+                </motion.div>
+                <div className="absolute inset-0 bg-gradient-to-t from-cafe via-cafe/10 to-transparent" />
+                <span className="absolute left-5 top-5 rounded-full bg-torref/70 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-dore backdrop-blur">
+                  {shop.city}
+                </span>
               </div>
-              <div className="flex flex-col rounded-[2rem] bg-dore p-7 text-torref sm:p-9">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-torref/60">Téléphone</p>
-                <a href={SITE.phone.href} className="mt-3 font-display text-3xl hover:underline">
-                  {SITE.phone.display}
-                </a>
-                <p className="mt-2 text-sm text-torref/70">Pour une grosse commande ou une question.</p>
-                <a
-                  href={SITE.phone.href}
-                  className="mt-auto inline-flex items-center gap-2 self-start rounded-full bg-torref px-5 py-3 text-sm font-semibold text-creme transition hover:bg-cafe"
-                >
-                  <PhoneIcon className="h-4 w-4" /> Appeler
-                </a>
+              <div className="grid gap-8 p-7 sm:grid-cols-2 sm:p-9">
+                <div>
+                  <p className="font-script text-2xl text-dore">{shop.tagline}</p>
+                  <h3 className="font-display text-4xl tracking-tight">{shop.name}</h3>
+                  <OpenStatus shop={shop} tone="dark" className="mt-4" />
+                  <address className="mt-5 not-italic leading-relaxed text-creme/85">
+                    {shop.address.street}
+                    <br />
+                    {shop.address.postalCode} {shop.address.city}
+                  </address>
+                  <p className="mt-1 text-sm text-creme/55">{shop.landmark}</p>
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    <a href={shop.phone.href} className="inline-flex items-center gap-2 rounded-full bg-dore px-5 py-3 text-sm font-semibold text-torref transition hover:bg-creme">
+                      <PhoneIcon className="h-4 w-4" /> {shop.phone.display}
+                    </a>
+                    <a
+                      href={links.directionsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center rounded-full border border-creme/25 px-5 py-3 text-sm font-semibold transition hover:bg-creme/10"
+                    >
+                      Itinéraire →
+                    </a>
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-creme/50">Horaires</p>
+                  <ul className="space-y-0.5 text-sm">
+                    {ORDER.map((d, i) => {
+                      const isToday = d === today;
+                      return (
+                        <motion.li
+                          key={d}
+                          initial={{ opacity: 0, x: -14 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.15 + i * 0.05 }}
+                          className={`relative flex items-center justify-between rounded-lg px-3 py-2 ${isToday ? "text-torref" : ""}`}
+                        >
+                          {isToday && <span className="absolute inset-0 rounded-lg bg-dore" />}
+                          <span className="relative font-semibold">{DAY_NAMES[d]}</span>
+                          <span className="relative tabular-nums">{formatRanges(shop.hours[d] ?? [])}</span>
+                        </motion.li>
+                      );
+                    })}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShop(shop.id);
+                      router.push("/carte");
+                    }}
+                    className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-croute px-5 py-3.5 text-sm font-semibold text-creme transition hover:bg-creme hover:text-torref"
+                  >
+                    Commander, retrait à {shop.short} →
+                  </button>
+                </div>
               </div>
-            </Reveal>
+            </div>
 
-            <Reveal delay={0.2} className="relative min-h-[320px] overflow-hidden rounded-[2rem] ring-1 ring-mie">
+            {/* Plan */}
+            <div className="relative min-h-[360px] overflow-hidden rounded-[2rem] ring-1 ring-mie lg:col-span-5">
               <iframe
-                title="Plan d'accès au Pétrin de Pépiole"
-                src={SITE.mapEmbedUrl}
+                key={shop.id}
+                title={`Plan d'accès : ${shop.name}, ${shop.city}`}
+                src={links.mapEmbedUrl}
                 className={`absolute inset-0 h-full w-full border-0 transition duration-700 ${mapActive ? "" : "pointer-events-none grayscale-[60%] sepia-[25%]"}`}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
@@ -122,29 +165,27 @@ export function Infos() {
                   <span className="rounded-full bg-creme px-4 py-2 text-sm font-semibold text-cafe shadow">Cliquer pour explorer la carte</span>
                 </button>
               )}
-            </Reveal>
-          </div>
-        </div>
+            </div>
 
-        {/* Services */}
-        <div className="mt-6 flex flex-wrap gap-3">
-          {SERVICES.map((s, i) => (
-            <motion.span
-              key={s.label}
-              initial={{ opacity: 0, scale: 0.6 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ type: "spring", stiffness: 260, damping: 18, delay: i * 0.07 }}
-              whileHover={{ y: -4, rotate: -2 }}
-              className="inline-flex items-center gap-2 rounded-full bg-creme px-5 py-3 text-sm font-semibold ring-1 ring-mie"
-            >
-              <span aria-hidden="true">{s.icon}</span> {s.label}
-            </motion.span>
-          ))}
-          <span className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-grege line-through decoration-croute/60">
-            Livraison
-          </span>
-        </div>
+            {/* Services */}
+            <div className="flex flex-wrap gap-3 lg:col-span-12">
+              {shop.services.map((label, i) => (
+                <motion.span
+                  key={label}
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 18, delay: 0.2 + i * 0.06 }}
+                  whileHover={{ y: -4, rotate: -2 }}
+                  className="inline-flex items-center gap-2 rounded-full bg-creme px-5 py-3 text-sm font-semibold ring-1 ring-mie"
+                >
+                  {label}
+                </motion.span>
+              ))}
+              <span className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-grege line-through decoration-croute/60">Livraison</span>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+        <p className="mt-6 text-xs text-grege">Horaires indicatifs : un doute un jour férié ? Un coup de fil suffit.</p>
       </div>
 
       {/* Sanary */}
@@ -154,8 +195,8 @@ export function Infos() {
             <Image src="/images/sanary-port.jpg" alt="Le port de Sanary-sur-Mer, ses palmiers et son clocher" fill sizes="100vw" className="object-cover" />
             <div className="absolute inset-0 bg-gradient-to-r from-mer/80 via-mer/30 to-transparent" />
             <div className="absolute inset-0 flex flex-col justify-center p-8 text-creme sm:p-14">
-              <p className="font-script text-3xl text-dore sm:text-4xl">Avant la plage, après le marché</p>
-              <p className="mt-2 max-w-md font-display text-3xl leading-tight sm:text-5xl">Une baguette sous le bras, direction le port.</p>
+              <p className="font-script text-3xl text-dore sm:text-4xl">Entre Sanary et Six-Fours</p>
+              <p className="mt-2 max-w-md font-display text-3xl leading-tight sm:text-5xl">Une baguette sous le bras, direction la mer.</p>
             </div>
           </div>
         </Reveal>

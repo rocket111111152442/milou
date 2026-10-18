@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
 import { useEffect, useState } from "react";
-import { NAV, SITE } from "@/lib/site";
+import { NAV } from "@/lib/site";
+import { SHOPS } from "@/lib/shops";
 import { Logo } from "@/components/ui/Logo";
-import { OpenStatus } from "@/components/ui/OpenStatus";
+import { OpenStatus, OpenStatusCycle } from "@/components/ui/OpenStatus";
 import { useHeaderState } from "@/lib/ui-store";
 
 export function Header() {
@@ -65,17 +66,17 @@ export function Header() {
 
           <div className="flex items-center gap-2">
             <span className="hidden xl:block">
-              <OpenStatus tone={overHero ? "dark" : "light"} />
+              <OpenStatusCycle tone={overHero ? "dark" : "light"} />
             </span>
-            <a
-              href={SITE.phone.href}
+            <Link
+              href="/#boutiques"
               className={`hidden h-11 w-11 place-items-center rounded-full border transition sm:grid ${
                 overHero ? "border-creme/25 text-creme hover:bg-creme/10" : "border-mie text-cafe hover:bg-mie"
               }`}
-              aria-label={`Appeler la boutique : ${SITE.phone.display}`}
+              aria-label="Nos boutiques : adresses, horaires et téléphones"
             >
-              <PhoneIcon className="h-4 w-4" />
-            </a>
+              <PinIcon className="h-4 w-4" />
+            </Link>
             <Link
               href="/carte"
               className="hidden h-11 items-center rounded-full bg-croute px-5 text-sm font-semibold text-creme transition hover:bg-cafe sm:inline-flex"
@@ -123,19 +124,35 @@ export function Header() {
                 </motion.div>
               ))}
             </nav>
-            <motion.div className="mt-auto flex flex-col gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
-              <OpenStatus className="self-start" />
-              <a href={SITE.phone.href} className="font-display text-2xl text-croute">
-                {SITE.phone.display}
-              </a>
-              <p className="text-sm text-grege">
-                {SITE.address.street}, {SITE.address.postalCode} {SITE.address.city}
-              </p>
+            <motion.div className="mt-auto grid gap-5 sm:grid-cols-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
+              {SHOPS.map((shop) => (
+                <div key={shop.id} className="flex flex-col gap-1.5">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-grege">
+                    {shop.name} · {shop.short}
+                  </p>
+                  <OpenStatus shop={shop} className="self-start" />
+                  <a href={shop.phone.href} className="font-display text-2xl text-croute">
+                    {shop.phone.display}
+                  </a>
+                  <p className="text-sm text-grege">
+                    {shop.address.street}, {shop.address.postalCode} {shop.address.city}
+                  </p>
+                </div>
+              ))}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+export function PinIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
   );
 }
 
