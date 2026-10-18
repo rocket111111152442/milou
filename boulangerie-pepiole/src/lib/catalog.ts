@@ -28,7 +28,7 @@ export const CATEGORIES: Category[] = [
   { id: "patisseries", label: "Pâtisseries", tagline: "Fines et individuelles", image: "/images/p/tartelette-fruits.jpg" },
   { id: "gateaux", label: "Gâteaux à partager", tagline: "Entremets & tartes, sur commande", image: "/images/p/fraisier.jpg" },
   { id: "snacking", label: "Snacking", tagline: "Sandwichs, tartes salées, pizzas", image: "/images/p/sandwich-jambon.jpg" },
-  { id: "boissons", label: "Pause café", tagline: "Boissons chaudes & fraîches", image: "/images/p/cafe.jpg" },
+  { id: "boissons", label: "Boissons", tagline: "Café, thé, boissons fraîches", image: "/images/p/cafe.jpg" },
   { id: "formules", label: "Formules", tagline: "P'tit Déj' & déjeuner", image: "/images/pause-cafe.jpg" },
 ];
 
