@@ -1,8 +1,11 @@
 /* =========================================================
    Monceau Fleurs — La Seyne-sur-Mer
    Toutes les données éditables du site sont ici.
+   Ce fichier est aussi lu par le serveur (api/) : les prix
+   facturés par Stripe sont recalculés à partir d'ici.
    ========================================================= */
-window.MF = {
+(function (root) {
+const MF = {
   config: {
     shop: "Monceau Fleurs",
     city: "La Seyne-sur-Mer",
@@ -14,6 +17,13 @@ window.MF = {
     reviews: 749,
     mapsUrl: "https://www.google.com/maps/search/?api=1&query=Monceau+Fleurs+2459+Avenue+Pierre-Auguste+Renoir+83500+La+Seyne-sur-Mer",
     // Horaires : 0 = dimanche … 6 = samedi (source : fiche magasin monceaufleurs.com)
+    // Commande en ligne
+    order: {
+      deliveryCutoff: "16:00",   // après cette heure, plus de livraison le jour même
+      pickupLeadMinutes: 60,     // délai mini avant fermeture pour un retrait le jour même
+      maxDaysAhead: 60,
+      slots: ["9h – 12h", "12h – 15h", "15h – 18h", "18h – 20h"]
+    },
     hours: {
       0: ["08:30", "14:00"],
       1: ["08:30", "20:00"],
@@ -79,3 +89,6 @@ window.MF = {
     { zip: ["83000", "83100", "83200"], city: "Toulon", fee: 9.9 }
   ]
 };
+if (typeof module !== 'undefined' && module.exports) module.exports = MF;
+else root.MF = MF;
+})(typeof window !== 'undefined' ? window : globalThis);

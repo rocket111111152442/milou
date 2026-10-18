@@ -470,8 +470,19 @@
       <label><input type="radio" name="mode" value="drive"><span><svg><use href="#i-car"/></svg>Drive</span></label>
       <label><input type="radio" name="mode" value="livraison"><span><svg><use href="#i-truck"/></svg>Livraison</span></label>
     </div>
+    <div class="co">
+      <label class="field field--select co__date"><input type="date" id="coDate" required><span id="coDateLbl">Date de retrait</span></label>
+      <label class="field field--select"><select id="coSlot"></select><span>Créneau</span></label>
+      <label class="field co__zip" hidden><input id="coZip" inputmode="numeric" maxlength="5" placeholder=" "><span>Code postal de livraison</span></label>
+    </div>
+    <div class="drawer__lines">
+      <div><span>Sous-total</span><span id="cartSub">0,00 €</span></div>
+      <div id="feeRow" hidden><span id="feeLbl">Livraison</span><span id="cartFee">—</span></div>
+    </div>
     <div class="drawer__total"><span>Total</span><strong id="cartTotal">0,00 €</strong></div>
-    <button class="btn btn--primary btn--block" id="checkout"><span>Valider la commande</span><svg><use href="#i-arrow"/></svg></button>
+    <p class="co__err" id="coErr" role="alert"></p>
+    <button class="btn btn--primary btn--block" id="checkout"><span>Payer la commande</span><svg><use href="#i-arrow"/></svg></button>
+    <p class="co__secure"><svg><use href="#i-check"/></svg>Paiement sécurisé par Stripe · Carte, Link, Apple Pay, Google Pay</p>
   </div>
 </aside>
 
@@ -501,7 +512,7 @@
     <div class="success__ic"><svg><use href="#i-check"/></svg></div>
     <h3>Merci&nbsp;!</h3>
     <p id="successText"></p>
-    <p class="success__demo">Démo : dans la version finale, paiement sécurisé en ligne, confirmation par e-mail/SMS et notification instantanée à la boutique.</p>
+    <p class="success__demo" id="successDemo">Démo : le paiement en ligne n'est pas encore activé sur cette maquette. Une fois la clé Stripe ajoutée, le client paie par carte, Link, Apple Pay ou Google Pay et la boutique reçoit la commande par e-mail.</p>
     <button class="btn btn--primary" id="successClose"><span>Continuer</span></button>
   </div>
 </div>

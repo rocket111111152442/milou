@@ -398,7 +398,7 @@
       const card = e.target.closest('.card');
       if (!card) return;
       const p = D.products.find(x => x.id === card.dataset.id);
-      if (add) { e.stopPropagation(); addToCart({ key: p.id + '-classique', name: p.name, price: p.price, img: p.img, meta: 'Classique' }, card.querySelector('img')); }
+      if (add) { e.stopPropagation(); addToCart({ key: p.id + '-classique', name: p.name, price: p.price, img: p.img, meta: 'Classique', ref: { type: 'product', id: p.id, size: 'classique' } }, card.querySelector('img')); }
       else openQuick(p);
     });
     grid.addEventListener('keydown', e => {
@@ -452,7 +452,7 @@
     });
     $('#qvAdd').addEventListener('click', () => {
       const msg = $('#qvMsg').value.trim();
-      addToCart({ key: `${qv.p.id}-${qv.size.id}${msg ? '-' + Date.now() : ''}`, name: qv.p.name, price: qv.p.price + qv.size.add, img: qv.p.img, meta: qv.size.label + (msg ? ` · « ${msg} »` : '') }, $('#qvImg'));
+      addToCart({ key: `${qv.p.id}-${qv.size.id}${msg ? '-' + Date.now() : ''}`, name: qv.p.name, price: qv.p.price + qv.size.add, img: qv.p.img, meta: qv.size.label + (msg ? ` · « ${msg} »` : ''), ref: { type: 'product', id: qv.p.id, size: qv.size.id, msg } }, $('#qvImg'));
       closeModal(m);
     });
     $('#modalClose').addEventListener('click', () => closeModal(m));
@@ -470,7 +470,7 @@
   }
 
   /* ---------- Panier ---------- */
-  let cart = store.get('mf-cart') || [];
+  let cart = (store.get('mf-cart') || []).filter(i => i && i.ref);
   const saveCart = () => store.set('mf-cart', cart);
   function bumpCart() { const b = $('#cartBtn'); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
   function fly(fromEl, src) {
@@ -496,9 +496,8 @@
   }
   function renderCart() {
     const count = cart.reduce((s, i) => s + i.qty, 0);
-    const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
     $('#cartCount').textContent = count;
-    $('#cartTotal').textContent = euro(total);
+    updateTotals();
     $('#cartFoot').classList.toggle('is-empty', !cart.length);
     $('#cartItems').innerHTML = cart.length ? cart.map((i, idx) => `
       <div class="ci" data-idx="${idx}">
@@ -531,17 +530,123 @@
       if (cart[idx].qty <= 0) cart.splice(idx, 1);
       saveCart(); renderCart(); bumpCart();
     });
-    $('#checkout').addEventListener('click', () => {
+    initCheckout();
+  }
+
+  /* ---------- Commande : date, créneau, livraison, paiement Stripe ---------- */
+  const O = C.order;
+  const isoDate = d => d.toISOString().slice(0, 10);
+  const dow = iso => new Date(iso + 'T12:00:00Z').getUTCDay();
+  const slotStart = sl => +sl.match(/(\d{1,2})h/)[1] * 60;
+  function parisToday() {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    return p;
+  }
+  function slotsFor(iso, mode) {
+    const h = C.hours[dow(iso)];
+    if (!h) return [];
+    let list = O.slots.filter(sl => slotStart(sl) >= toMin(h[0]) - 60 && slotStart(sl) < toMin(h[1]));
+    if (iso === parisToday()) {
+      const now = parisNow().min;
+      const limit = mode === 'livraison' ? toMin(O.deliveryCutoff) : toMin(h[1]) - O.pickupLeadMinutes;
+      if (now >= limit) return [];
+      list = list.filter(sl => slotStart(sl) + 180 > now);
+    }
+    return list;
+  }
+  const mode = () => $('input[name="mode"]:checked').value;
+  const zoneFor = zip => D.zones.find(z => z.zip.includes(zip));
+  function firstAvailableDate(m) {
+    let d = new Date(parisToday() + 'T12:00:00Z');
+    for (let i = 0; i < 14; i++) { const iso = isoDate(d); if (slotsFor(iso, m).length) return iso; d.setUTCDate(d.getUTCDate() + 1); }
+    return parisToday();
+  }
+  function refreshSlots() {
+    const date = $('#coDate'), sel = $('#coSlot'), m = mode();
+    const keep = sel.value;
+    const list = date.value ? slotsFor(date.value, m) : [];
+    sel.innerHTML = list.length ? list.map(sl => `<option${sl === keep ? ' selected' : ''}>${sl}</option>`).join('') : '<option value="">Indisponible</option>';
+    $('#coDateLbl').textContent = m === 'livraison' ? 'Date de livraison' : 'Date de retrait';
+    $('.co__zip').hidden = m !== 'livraison';
+    updateTotals();
+  }
+  function updateTotals() {
+    const sub = cart.reduce((s, i) => s + i.qty * i.price, 0);
+    let fee = 0;
+    const live = mode() === 'livraison';
+    $('#feeRow').hidden = !live;
+    if (live) {
+      const z = zoneFor($('#coZip').value.trim());
+      fee = z ? z.fee : 0;
+      $('#feeLbl').textContent = z ? `Livraison ${z.city}` : 'Livraison';
+      $('#cartFee').textContent = z ? euro(z.fee) : 'code postal ?';
+    }
+    $('#cartSub').textContent = euro(sub);
+    $('#cartTotal').textContent = euro(sub + fee);
+  }
+  function showSuccess(text, demo) {
+    $('#successText').textContent = text;
+    $('#successDemo').hidden = !demo;
+    openModal($('#success'));
+    burst(innerWidth / 2, innerHeight / 2, 110);
+  }
+  function initCheckout() {
+    const date = $('#coDate');
+    date.min = parisToday();
+    date.max = isoDate(new Date(Date.now() + O.maxDaysAhead * 864e5));
+    date.value = firstAvailableDate(mode());
+    $$('input[name="mode"]').forEach(r => r.addEventListener('change', () => {
+      if (!slotsFor(date.value, mode()).length) date.value = firstAvailableDate(mode());
+      refreshSlots();
+    }));
+    date.addEventListener('change', refreshSlots);
+    $('#coZip').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); updateTotals(); });
+    ['#coZip', '#coDate', '#coSlot'].forEach(sel => $(sel).addEventListener('input', () => { $('#coErr').textContent = ''; }));
+    $$('input[name="mode"]').forEach(r => r.addEventListener('change', () => { $('#coErr').textContent = ''; }));
+    refreshSlots();
+
+    $('#checkout').addEventListener('click', async () => {
+      const err = $('#coErr'), btn = $('#checkout');
+      err.textContent = '';
       if (!cart.length) return;
-      const mode = $('input[name="mode"]:checked').value;
-      const labels = { boutique: 'à retirer en boutique', drive: 'à récupérer au Drive', livraison: 'en livraison' };
-      const n = cart.reduce((s, i) => s + i.qty, 0);
-      const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
-      $('#successText').textContent = `Votre commande de ${n} article${n > 1 ? 's' : ''} (${euro(total)}) ${labels[mode]} a bien été enregistrée.`;
-      cart = []; saveCart(); renderCart();
-      setDrawer(false);
-      setTimeout(() => { openModal($('#success')); burst(innerWidth / 2, innerHeight / 2, 110); }, 350);
+      const m = mode();
+      if (!$('#coSlot').value) { err.textContent = 'Aucun créneau disponible ce jour-là : choisissez une autre date.'; return; }
+      if (m === 'livraison' && !zoneFor($('#coZip').value.trim())) { err.textContent = "Indiquez un code postal de notre zone de livraison (La Seyne et communes voisines)."; return; }
+      const payload = { items: cart.map(i => ({ ref: i.ref, qty: i.qty })), mode: m, date: date.value, slot: $('#coSlot').value, zip: $('#coZip').value.trim() };
+      btn.classList.add('is-loading');
+      btn.querySelector('span').textContent = 'Redirection vers le paiement…';
+      let res, data = {};
+      try {
+        res = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        data = await res.json().catch(() => ({}));
+      } catch (e) { res = null; }
+      btn.classList.remove('is-loading');
+      btn.querySelector('span').textContent = 'Payer la commande';
+      if (res && res.ok && data.url) { location.href = data.url; return; }
+      if (!res || data.demo || res.status === 404 || res.status === 405 || res.status === 501) {
+        const labels = { boutique: 'à retirer en boutique', drive: 'à récupérer au Drive', livraison: 'en livraison' };
+        const n = cart.reduce((s, i) => s + i.qty, 0);
+        const txt = `Votre commande de ${n} article${n > 1 ? 's' : ''} (${$('#cartTotal').textContent}) ${labels[m]} le ${new Date(date.value + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}, ${$('#coSlot').value}.`;
+        cart = []; saveCart(); renderCart(); setDrawer(false);
+        setTimeout(() => showSuccess(txt, true), 350);
+        return;
+      }
+      err.textContent = data.error || 'Une erreur est survenue, réessayez.';
     });
+
+    // Retour depuis Stripe
+    const q = new URLSearchParams(location.search);
+    if (q.get('commande')) history.replaceState(null, '', location.pathname + location.hash);
+    if (q.get('commande') === 'ok' && q.get('session_id')) {
+      cart = []; saveCart(); renderCart();
+      fetch('/api/session?id=' + encodeURIComponent(q.get('session_id'))).then(r => r.json()).then(o => {
+        const labels = { boutique: 'à retirer en boutique', drive: 'à récupérer au Drive', livraison: 'livrée' };
+        const when = o.date ? ` ${labels[o.mode] || ''} le ${new Date(o.date + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}, ${o.slot}` : '';
+        setTimeout(() => showSuccess(o.paid ? `Paiement de ${euro(o.amount)} reçu. Votre commande sera${when}. Un reçu vous a été envoyé${o.email ? ' à ' + o.email : ''}.` : 'Votre paiement est en cours de traitement, vous recevrez une confirmation par e-mail.', false), 2600);
+      }).catch(() => setTimeout(() => showSuccess('Paiement reçu, merci ! Vous allez recevoir une confirmation par e-mail.', false), 2600));
+    } else if (q.get('commande') === 'annulee') {
+      setTimeout(() => { toast('Paiement annulé — votre panier est conservé'); setDrawer(true); }, 2600);
+    }
   }
 
   /* ---------- Atelier : compositeur de bouquet ---------- */
@@ -656,7 +761,7 @@
       if (!stems.length) return;
       const c = counts();
       const meta = Object.entries(c).map(([k, v]) => `${v} ${F[k].name}${v > 1 && !/s$/.test(F[k].name) ? 's' : ''}`).join(', ') + ' · ' + wrap.name;
-      addToCart({ key: 'custom-' + Date.now(), name: 'Bouquet sur-mesure', price: Math.round(total() * 100) / 100, img: null, meta }, $('#bq'));
+      addToCart({ key: 'custom-' + Date.now(), name: 'Bouquet sur-mesure', price: Math.round(total() * 100) / 100, img: null, meta, ref: { type: 'custom', flowers: c, wrap: wrap.id } }, $('#bq'));
       const r = $('#bq').getBoundingClientRect();
       burst(r.left + r.width / 2, r.top + r.height * .4, 50);
     });
