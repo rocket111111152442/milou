@@ -1,5 +1,5 @@
 import "server-only";
-import { get, list, put } from "@vercel/blob";
+import { del, get, list, put } from "@vercel/blob";
 import type { ShopId } from "./shops";
 
 // Commandes enregistrées dans le Blob store privé du projet (une commande = un fichier JSON).
@@ -62,8 +62,29 @@ export async function listOrders(limit = 300): Promise<StoredOrder[]> {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+const ORDER_NUMBER = /^PP-\d{6}-[A-Z0-9]{4}$/;
+
+/** Supprime définitivement une commande. */
+export async function deleteOrder(orderNumber: string) {
+  if (!ORDER_NUMBER.test(orderNumber)) throw new Error("Numéro de commande invalide");
+  await del(`${PREFIX}${orderNumber}.json`);
+}
+
+/** Supprime tous les fichiers d'un dossier du Blob store ; renvoie le nombre de fichiers supprimés. */
+export async function wipePrefix(prefix: string) {
+  let count = 0;
+  let cursor: string | undefined;
+  do {
+    const page = await list({ prefix, cursor, limit: 1000 });
+    if (page.blobs.length) await del(page.blobs.map((b) => b.url));
+    count += page.blobs.length;
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return count;
+}
+
 export async function setOrderStatus(orderNumber: string, status: OrderStatus) {
-  if (!/^PP-\d{6}-[A-Z0-9]{4}$/.test(orderNumber)) throw new Error("Numéro de commande invalide");
+  if (!ORDER_NUMBER.test(orderNumber)) throw new Error("Numéro de commande invalide");
   const order = await readOrder(`${PREFIX}${orderNumber}.json`);
   if (!order) throw new Error("Commande introuvable");
   await saveOrder({ ...order, status });

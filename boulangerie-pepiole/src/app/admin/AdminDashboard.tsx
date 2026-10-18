@@ -7,7 +7,7 @@ import { SHOPS, getShop, type ShopId } from "@/lib/shops";
 import { addDays, formatDateLong, formatTime, parisNow } from "@/lib/hours";
 import { formatPrice } from "@/lib/catalog";
 import type { OrderStatus, StoredOrder } from "@/lib/orders-store";
-import { updateStatus } from "./actions";
+import { deleteOrder, updateStatus } from "./actions";
 
 const STATUS: Record<OrderStatus, { label: string; tone: string }> = {
   nouvelle: { label: "Nouvelle", tone: "bg-dore text-torref" },
@@ -159,6 +159,19 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
   }, [visible]);
 
   const revenue = visible.filter((o) => o.status !== "annulee").reduce((s, o) => s + o.total, 0);
+
+  const remove = async (o: StoredOrder) => {
+    if (!confirm(`Supprimer définitivement la commande ${o.orderNumber} (${o.customer.firstName} ${o.customer.lastName}) ?\n\nElle disparaîtra de l'admin et ne pourra pas être récupérée.`)) return;
+    setPending(o.orderNumber);
+    try {
+      await deleteOrder(o.orderNumber);
+      startRefresh(() => router.refresh());
+    } catch (e) {
+      alert(`Impossible de supprimer : ${(e as Error).message}`);
+    } finally {
+      setPending(null);
+    }
+  };
 
   const change = async (orderNumber: string, next: OrderStatus) => {
     setPending(orderNumber);
@@ -344,6 +357,16 @@ export function AdminDashboard({ orders, error, liveShops }: { orders: StoredOrd
                                     Rétablir
                                   </button>
                                 )}
+                                <button
+                                  type="button"
+                                  disabled={!!pending}
+                                  onClick={() => remove(o)}
+                                  title="Supprimer définitivement"
+                                  aria-label={`Supprimer définitivement la commande ${o.orderNumber}`}
+                                  className="rounded-full px-3 py-2 text-sm text-grege transition hover:bg-red-50 hover:text-red-700"
+                                >
+                                  🗑
+                                </button>
                               </div>
                             </div>
                           </motion.li>

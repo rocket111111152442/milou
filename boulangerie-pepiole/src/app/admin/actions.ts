@@ -4,9 +4,9 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { ADMIN_COOKIE, checkPassword, isAdmin, sessionToken } from "@/lib/admin-auth";
-import { ORDER_STATUSES, setOrderStatus, type OrderStatus } from "@/lib/orders-store";
+import { ORDER_STATUSES, deleteOrder as removeOrder, setOrderStatus, wipePrefix, type OrderStatus } from "@/lib/orders-store";
 import { getSettingsFresh, saveSettings } from "@/lib/settings-store";
-import type { Settings } from "@/lib/settings";
+import { DEFAULT_SETTINGS, type Settings } from "@/lib/settings";
 import { SHOP_IDS, type ShopId } from "@/lib/shops";
 import { notifyTest, removeDevice, saveDevice } from "@/lib/push";
 import type { PushSubscription } from "web-push";
@@ -47,6 +47,22 @@ export async function updateStatus(orderNumber: string, status: OrderStatus) {
   if (!ORDER_STATUSES.includes(status)) throw new Error("Statut invalide");
   await setOrderStatus(orderNumber, status);
   revalidatePath("/admin");
+}
+
+export async function deleteOrder(orderNumber: string) {
+  if (!(await isAdmin())) throw new Error("Non autorisé");
+  await removeOrder(orderNumber);
+  revalidatePath("/admin");
+}
+
+/** Remise à zéro complète : commandes, réglages, produits ajoutés et leurs photos, appareils notifiés. */
+export async function resetAll(confirmation: string) {
+  if (!(await isAdmin())) throw new Error("Non autorisé");
+  if (confirmation !== "EFFACER") throw new Error("Confirmation incorrecte");
+  const [orders, photos, devices] = await Promise.all([wipePrefix("commandes/"), wipePrefix("photos/"), wipePrefix("push/")]);
+  await saveSettings(DEFAULT_SETTINGS);
+  revalidatePath("/admin", "layout");
+  return { orders, photos, devices };
 }
 
 // --- Réglages -----------------------------------------------------------
