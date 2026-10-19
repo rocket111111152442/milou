@@ -60,12 +60,12 @@
 <section class="biens-page container">
   <nav class="crumbs" aria-label="Fil d'Ariane"><a href="/">Accueil</a><span>›</span><span>Nos biens</span></nav>
   <h1 class="h2" id="biensTitle">Nos biens</h1>
-  <form class="filters" id="filters" novalidate>
-    <div class="filters__tabs" role="tablist" aria-label="Transaction">
+  <form class="bfilters" id="filters" novalidate>
+    <div class="bfilters__tabs" role="tablist" aria-label="Transaction">
       <button type="button" role="tab" data-transaction="vente">Acheter</button>
       <button type="button" role="tab" data-transaction="location">Louer</button>
     </div>
-    <div class="filters__grid">
+    <div class="bfilters__grid">
       <label>Recherche<input name="q" type="search" placeholder="Ville, mot-clé, référence" autocomplete="off"><button type="button" class="voice" id="voiceBtn" aria-label="Recherche vocale" hidden>🎙</button></label>
       <label>Ville<select name="ville"><option value="">Toutes</option></select></label>
       <label>Type<select name="type"><option value="">Tous</option></select></label>
@@ -75,8 +75,8 @@
       <label>Pièces min<select name="piecesMin"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
       <label>Chambres min<select name="chambresMin"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
     </div>
-    <fieldset class="filters__equip"><legend>Équipements</legend><div id="equipList"></div></fieldset>
-    <div class="filters__row">
+    <fieldset class="bfilters__equip"><legend>Équipements</legend><div id="equipList"></div></fieldset>
+    <div class="bfilters__row">
       <label class="check"><input type="checkbox" name="vv"> Avec visite virtuelle</label>
       <label class="check"><input type="checkbox" name="clos"> Inclure les biens vendus / loués</label>
       <label>Trier par<select name="sort">

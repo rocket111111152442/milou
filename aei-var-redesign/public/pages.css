@@ -72,21 +72,21 @@ mark.todo { background: #fff1c2; color: #6b4100; padding: 2px 6px; border-radius
 /* ---------- Nos biens : recherche avancée ---------- */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .biens-page { padding-top: calc(var(--header-h) + 24px); padding-bottom: 80px; }
-.filters { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin: 20px 0 14px; box-shadow: var(--shadow); }
-.filters__tabs { display: inline-flex; background: var(--mist-soft); border-radius: 999px; padding: 4px; margin-bottom: 16px; }
-.filters__tabs button { border: 0; background: none; padding: 8px 22px; border-radius: 999px; font-weight: 600; color: var(--muted); }
-.filters__tabs button.is-active { background: var(--teal); color: #fff; }
-.filters__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-.filters label { display: grid; gap: 4px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); position: relative; }
-.filters input:not([type=checkbox]), .filters select { font: inherit; font-size: 15px; text-transform: none; letter-spacing: 0; color: var(--ink); padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; width: 100%; }
-.filters .voice { position: absolute; right: 6px; bottom: 6px; border: 0; background: none; font-size: 18px; border-radius: 8px; padding: 2px 6px; }
-.filters .voice.is-on { background: var(--gold); color: #fff; }
-.filters__equip { border: 0; padding: 0; margin: 14px 0 0; }
-.filters__equip legend { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 6px; }
-.filters__equip div { display: flex; flex-wrap: wrap; gap: 6px 16px; }
-.filters .check { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 500; color: var(--ink); }
-.filters__row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 24px; margin-top: 14px; }
-.filters__row label:has(select) { min-width: 180px; }
+.bfilters { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin: 20px 0 14px; box-shadow: var(--shadow); }
+.bfilters__tabs { display: inline-flex; background: var(--mist-soft); border-radius: 999px; padding: 4px; margin-bottom: 16px; }
+.bfilters__tabs button { border: 0; background: none; padding: 8px 22px; border-radius: 999px; font-weight: 600; color: var(--muted); }
+.bfilters__tabs button.is-active { background: var(--teal); color: #fff; }
+.bfilters__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.bfilters label { display: grid; gap: 4px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); position: relative; }
+.bfilters input:not([type=checkbox]), .bfilters select { font: inherit; font-size: 15px; text-transform: none; letter-spacing: 0; color: var(--ink); padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; width: 100%; }
+.bfilters .voice { position: absolute; right: 6px; bottom: 6px; border: 0; background: none; font-size: 18px; border-radius: 8px; padding: 2px 6px; }
+.bfilters .voice.is-on { background: var(--gold); color: #fff; }
+.bfilters__equip { border: 0; padding: 0; margin: 14px 0 0; }
+.bfilters__equip legend { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.bfilters__equip div { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.bfilters .check { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 500; color: var(--ink); }
+.bfilters__row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 24px; margin-top: 14px; }
+.bfilters__row label:has(select) { min-width: 180px; }
 .empty { padding: 30px; text-align: center; color: var(--muted); }
 
 /* ---------- Barème, agences, communes ---------- */
@@ -103,3 +103,6 @@ mark.todo { background: #fff1c2; color: #6b4100; padding: 2px 6px; border-radius
 .reviews__list { display: grid; gap: 14px; }
 .reviews__list .reviews__quote { margin: 0; }
 .stars i.off { opacity: .25; }
+.bfilters { padding-bottom: 26px; margin-bottom: 36px; }
+.bfilters input[name=q] { padding-right: 38px; }
+.biens-page .search-result { margin: 0 0 20px; position: static; }
