@@ -1,145 +1,103 @@
-# Bilan — état réel de la solution (19 octobre 2026, mise à jour « parité La Boîte Immo + CRM »)
+# Bilan — Acor’Immo (19 octobre 2026)
 
-## Nouveautés de cette mise à jour
+Adaptation, pour Acor’Immo, de la solution construite pour AEI Côté Mer (dossier `../aei-var-redesign`, non modifié).
+Même architecture et mêmes fonctions ; identité, contenus et annonces remplacés. Site en ligne de démonstration :
+https://acorimmo.vercel.app (projet Vercel `acorimmo`, distinct de `aei-cote-mer`), en **noindex** tant que l’agence
+n’a pas validé.
 
-**Site public**
-- Pages de biens à adresse propre `/bien/<id>` rendues côté serveur : titre, description, balises de partage et données structurées sont dans le HTML (meilleur pour Google). L'ancien lien `bien.html?id=` redirige. Plan du site `sitemap.xml` et `robots.txt` générés.
-- Page « Nos biens » `/biens` : recherche par texte, ville, type, prix, surface, pièces, chambres, équipements, visite virtuelle, tri, biens vendus ; critères dans l'adresse (partageable) ; recherche vocale (si le navigateur la propose).
-- Pages `/immobilier/<commune>` (Six-Fours, Sanary, Ollioules, La Seyne) avec texte repris du site actuel de l'agence.
-- Fiche bien : visite virtuelle et vidéo (affichées après un clic, Matterport/YouTube/Vimeo), « à proximité », partage (Facebook, X, LinkedIn, WhatsApp, e-mail, partage du téléphone, lien), impression/PDF via le navigateur.
-- Estimation indicative après le formulaire d'estimation : surface × prix au m² **saisi par l'agence** ± marge.
-- Avis : alimentés depuis l'admin ; la note 4,7/73 vient de PagesJaunes (relevé du 17/10/2026).
-- Pages Agences et Honoraires (barèmes réels relevés sur leur site, à faire confirmer).
-- Français / anglais / allemand : traduction des pages commerciales dans le navigateur (dictionnaire `public/i18n-dict.js`), annonces traduisibles champ par champ dans l'admin. Les pages légales restent en français.
-- Mesure d'audience sans cookie, avec refus possible.
+## Ce qui a été relevé, et où (relevés du 19/10/2026)
 
-**CRM (admin)**
-- Contacts créés automatiquement à chaque demande (rapprochés par e-mail/téléphone), fiche avec notes, demandes, tâches, mandats, biens correspondants ; fusion de doublons ; suppression RGPD ; import/export CSV.
-- Demandes : assignation, issue gagnée/perdue (+ motif), vue pipeline en colonnes (glisser-déposer).
-- Tâches/rappels (+ résumé e-mail quotidien si l'e-mail est configuré).
-- Mandats : numérotation continue, jamais supprimés, alerte d'échéance.
-- Rapprochement biens ↔ acquéreurs (critères des contacts/alertes).
-- Modèles d'e-mails : envoi via Resend si configuré, sinon ouverture de la messagerie (mailto).
-- Rapports : parcours des demandes, délai médian, origine, par négociateur, biens vus vs demandes, audience.
+| Information | Source | Remarque |
+|---|---|---|
+| 4 agences : La Seyne-sur-Mer (siège, 9 bis rue Amable Lagane, 04 94 30 00 16), Six-Fours-les-Plages (39 rue de la République, 04 94 74 65 69), Sanary-sur-Mer (41 rue Jean Jaurès, 04 94 07 49 20), Toulon (15 avenue Colbert, 04 94 01 26 27) ; e-mail acorimmo@orange.fr | acorimmo.fr (pied de page, page Contact) | Le siège est à La Seyne, pas à Six-Fours |
+| Historique (2002, 2011, 2015, 2020, janvier 2025) | acorimmo.fr, page Histoire | |
+| Équipe : 23 personnes (direction, 4 agences, location), téléphones, e-mails, photos | acorimmo.fr, page Équipe | |
+| SIREN 448 929 091, SIRET du siège 448 929 091 00032, SARL, créée le 13/06/2003, gérante Adeline Boz, NAF 68.31Z | recherche-entreprises.api.gouv.fr | Le site actuel affiche « 448 929 0910 0032 » (chiffre en trop) ; l’annuaire liste 3 établissements ouverts pour 4 agences affichées |
+| Médiateur : ANM Conso, 62 rue Tiquetonne, 75002 Paris | acorimmo.fr, mentions légales | |
+| Barème d’honoraires (« en vigueur au 10 avril 2024 ») | acorimmo.fr, pages Honoraires et Gestion locative | Garantie loyers impayés : 2 % sur une page, 2,1 % sur l’autre |
+| Notes Google : Six-Fours 4,9/5 (153 avis), La Seyne 4,9 (186), Sanary 5,0 (92), Toulon 5,0 (73) | Google Maps, fiche de chaque agence | 4,9/153 confirmé pour Six-Fours ; la note de l’accueil est celle de Six-Fours, les 4 sont sur la page Agences |
+| Avis affichés (2) | Avis Google republiés par l’agence sur acorimmo.fr (5 étoiles) | Auteur abrégé ; date limitée à l’année (le site n’affiche que « il y a 2 semaines ») |
+| Textes des pages communes (La Seyne, Six-Fours, Sanary, Toulon, Saint-Mandrier) | Articles et pages de vente d’acorimmo.fr | Passages chiffrés (prix au m², volumes) volontairement retirés |
+| Couleurs #314452 (ardoise) et #d7b56d (or), logo | Feuille de style et logo d’acorimmo.fr | Version ardoise du logo dérivée de l’original pour les fonds clairs |
+| 194 annonces (183 en vente dont 20 vendues, 11 en location) | acorimmo.fr, fiches annonces | Voir « Annonces » ci-dessous |
 
-**Complément (suivi des dossiers)** : critères de recherche saisissables dans la fiche contact (pour le rapprochement interne, sans envoi d'e-mail), mandats rattachés aux biens (visibles dans la fiche du bien, création pré-remplie), agenda des visites avec compte rendu, avancement de la vente (mandat, offre, compromis, acte) en information interne jamais publiée.
+## Ce qui reste « À compléter » (affiché tel quel, surligné, dans les pages légales)
 
-**Interkab : non réalisé, et pourquoi.** Interkab est le réseau inter-cabinets de La Boîte Immo, accessible depuis son logiciel Hektor (« Interkab Connect »). Je n'ai trouvé aucune documentation ni API publique permettant à un tiers de s'y connecter ; la participation passe par un abonnement Hektor. Rien n'a été simulé dans le site. Pour y accéder, il faut demander à La Boîte Immo si un accès partenaire existe (probablement non, l'éditeur étant concurrent).
+- Capital social, n° de TVA intracommunautaire, greffe d’immatriculation (RCS).
+- Carte professionnelle (n°, mentions « Transactions » / « Gestion », CCI) : **non publiée sur le site actuel**.
+- Garantie financière (organisme, montants) et assurance RCP.
+- Détention de fonds : l’agence fait de la gestion locative, donc détient a priori des fonds pour le compte de tiers ; à préciser.
+- Horaires : le site actuel n’en donne pas ; Google Maps (sans compte) n’affiche que le lundi (9 h – 12 h, 14 h – 18 h).
+  La page Espace client affiche « À compléter » à la place des horaires ; l’accueil ne les affiche pas.
 
-**Ce que cette mise à jour ne fait PAS (à dire clairement à un client)**
-- Pas de synchronisation avec Hektor/La Boîte Immo ni diffusion vers SeLoger/Leboncoin : pas d'API publique, flux CSV/XML sur demande auprès de l'éditeur.
-- Pas d'estimation instantanée de type PriceHubble/Meilleurs Agents : seulement un calcul sur vos propres prix au m². Sans prix saisi, aucun chiffre n'est affiché.
-- Pas de production de visites virtuelles (seulement leur affichage) ; le format d'intégration Matterport n'est pas confirmé par leur documentation officielle.
-- Pas d'import automatique des avis Google/Immodvisor : saisie manuelle.
-- Pas de recherche par rayon/carte, pas d'avatar IA.
-- Traductions : faites dans le navigateur, donc non indexées par Google (pas de pages /en, /de) ; la qualité de la traduction des textes commerciaux n'a pas été relue par un natif.
-- Registre des mandats : outil de suivi interne, il ne remplace pas le registre réglementaire.
-- Mesure d'audience sans cookie : exemption de consentement non validée par un juriste ; à faire vérifier.
-- Les contacts importés par CSV n'ont pas donné leur accord pour les alertes e-mail.
-- Données CRM stockées en fichiers JSON : suffisant pour une agence, à migrer vers une base au-delà de quelques milliers de contacts.
+## Annonces
 
+- 194 annonces reprises avec titre, description, prix, surfaces, pièces, chambres, salles d’eau/bain, année, cuisine,
+  chauffage, DPE/GES (lettre et valeur, d’après l’image affichée par le site), équipements, taxe foncière, charges,
+  visite virtuelle Previsite, exclusivité, statut (disponible / sous compromis / vendu). Honoraires : seulement la mention
+  affichée par l’annonce (« à la charge du vendeur » pour 131 ventes ; 52 annonces de vente n’en affichent aucune).
+- Photos : 8 maximum par bien (3 pour les vendus), redimensionnées en WebP 1 600 px (≈ 1 300 photos, ≈ 210 Mo).
+  Les photos d’origine portent le filigrane Acor’Immo.
+- Ajustements faits à l’import (et pourquoi) :
+  - charges de copropriété : le site affiche des charges **mensuelles**, le modèle les attend **par an** → multipliées par 12 ;
+  - 5 places de parking classées « maison » sur le site d’origine → type « Parking » (détecté d’après le titre) ;
+  - 1 annonce (AVAP10005945) sans commune → « La Seyne-sur-Mer », reprise de son titre (« LA SEYNE CENTRE ») ;
+  - 1 terrain annoncé « à Solliès-Toucas » dans son titre mais situé « Cuers » dans ses données : laissé tel quel ;
+  - fonds de commerce → type « Autre » (le modèle n’a pas de type dédié) ; l’étage et le « secteur » ne sont pas repris.
+- Non repris : les 6 locations saisonnières (prix à la nuit, que le modèle ne gère pas).
+- C’est un **instantané** du 19/10/2026 : prix et disponibilités évolueront sur le site actuel sans être répercutés ici.
+  Relancer `scripts/import/` met à jour (voir README), mais il n’existe pas de synchronisation automatique.
 
-## Ce qui est réellement fonctionnel (testé en production)
+## Ce qui fonctionne et a été testé
 
-- **Connexion et comptes :**
-  - comptes nominatifs avec 3 rôles ;
-  - premier compte créé depuis les variables d'environnement ;
-  - mot de passe provisoire obligatoirement changé (imposé par le serveur) ;
-  - verrouillage après 5 échecs ;
-  - déconnexion des autres sessions au changement de mot de passe ;
-  - création, désactivation et réinitialisation des comptes par un administrateur.
-- **Biens :**
-  - ajout, modification, suppression, ordre d'affichage ;
-  - jusqu'à 30 photos, redimensionnées automatiquement ;
-  - adresse privée ;
-  - statut (disponible, sous compromis, vendu, loué) ;
-  - vente ou location ;
-  - publié ou masqué ;
-  - étiquettes ;
-  - filtres par ville, prix, type, statut et publication.
-- **Site public :**
-  - recherche de l'accueil réellement filtrante ;
-  - fiches détaillées ;
-  - favoris ;
-  - statistique « biens en ligne » calculée sur les vrais biens.
-- **Demandes :**
-  - réception des demandes de contact, d'achat, de location, de gestion, de visite, d'estimation (avec photos), de rendez-vous et d'alerte ;
-  - validation côté navigateur et côté serveur ;
-  - consentement enregistré ;
-  - anti-robot ;
-  - code de suivi remis au client ;
-  - statuts, notes internes et historique ;
-  - export CSV compatible Excel ;
-  - suppression définitive (droit à l'effacement).
-- **Espace client :**
-  - favoris ;
-  - suivi d'une demande (code + e-mail ou téléphone) ;
-  - inscription aux alertes ;
-  - demande de rendez-vous (dates passées et week-ends refusés).
-- **Tableau de bord :**
-  - biens publiés et masqués ;
-  - demandes à traiter, demandes sur 30 jours, estimations ;
-  - demandes par semaine, par type ;
-  - biens par statut ;
-  - dernières demandes.
-- **Sauvegardes :**
-  - sauvegarde quotidienne automatique, conservée 30 jours ;
-  - téléchargement d'une sauvegarde complète ;
-  - restauration des biens.
-- **Sécurité :**
-  - données clients dans un stockage privé ;
-  - code serveur non exposé ;
-  - en-têtes de sécurité (CSP, HSTS…) ;
-  - polices hébergées sur le site ;
-  - carte Google chargée uniquement sur accord.
-- **Pages légales :**
-  - mentions légales, confidentialité, cookies, barème des honoraires ;
-  - générées depuis `config/agence.js`.
+Tests automatisés (Playwright, Chromium) sur le serveur local (`STORAGE=fs`), bureau 1440 px et mobile (iPhone 13),
+avec lecture des captures d’écran : 87 vérifications, toutes réussies après corrections.
 
-## Ce qui utilise encore des données de démonstration ou provisoires
+- **Site** : accueil (sélection de 9 biens, filtres vente/location/vendus), recherche depuis l’accueil, page `/biens`
+  (filtres type/ville/prix/surface/pièces/chambres/équipements, tri), fiches `/bien/<id>` rendues côté serveur avec
+  photos et galerie, visite virtuelle (Previsite, chargée après clic), partage, impression, simulateur de mensualités,
+  pages communes, Agences, Honoraires, Mentions, Espace client ; FR/EN/DE (accueil vérifié en anglais et en allemand) ;
+  aucune image cassée et aucun défilement horizontal sur les pages testées.
+- **Formulaires** : contact, estimation en 4 étapes (aucune fourchette affichée : aucun prix au m² saisi), demande de visite,
+  favoris, suivi d’une demande par code, alerte e-mail (enregistrée), demande de rendez-vous.
+- **Admin** : connexion avec changement imposé du mot de passe provisoire, tableau de bord, biens (liste, édition,
+  photos, enregistrement répercuté sur le site), demandes + pipeline, contacts créés automatiquement, critères de recherche
+  et biens correspondants, modèles d’e-mails proposés, tâches, mandat rattaché à un bien, agenda des visites, rapports,
+  communes & avis (contenu initial Acor’Immo), création d’un utilisateur, admin sur mobile.
+- **Production** : voir la section « Vérifications en production » ci-dessous.
 
-- **Les 10 biens :**
-  - repris du site actuel de l'agence (aei-var.com) le 13 octobre 2026 ;
-  - ce sont de vraies annonces, mais figées à cette date : prix, statuts et disponibilités ont pu changer ;
-  - seule la villa de Bandol a une fiche complète.
-- **Textes et équipe de l'accueil :**
-  - repris du site actuel ;
-  - la note « 4,7/5 sur 73 avis » vient de PagesJaunes et ces avis datent de 2021.
-- **Compte administrateur :** l'identifiant `admin@aei-cote-mer.fr` est provisoire. Créez des comptes nominatifs avec de vraies adresses e-mail.
-- **Mentions légales, honoraires, confidentialité :** les informations inconnues sont surlignées « À compléter » (carte T, garant, assurance, médiateur, capital, TVA, barème).
-- **Fichier de test résiduel :** une photo de test envoyée lors des essais reste dans le stockage (non rattachée à un bien, sans incidence).
+## Ce qui est encore de la démonstration
 
-## Ce qui nécessite un service externe (« à connecter »)
+- Les annonces sont un instantané (voir plus haut) ; les comptes rendus, mandats, contacts, tâches de l’admin sont vides.
+- Le compte administrateur est provisoire (identifiant `admin@acorimmo.fr`, mot de passe provisoire consultable dans Vercel,
+  à changer à la première connexion). Créer ensuite des comptes nominatifs.
+- Les visuels d’accueil : panorama de la rade et villa issus du site actuel, deux photos d’annonces (avec filigrane).
 
-| Fonction | Service prévu | État | Pour l'activer |
-|---|---|---|---|
-| Accusés de réception, notification de l'agence, mot de passe oublié, envoi des alertes | Resend (API documentée) | Code prêt, **désactivé** | Compte Resend, domaine vérifié, puis `RESEND_API_KEY`, `EMAIL_FROM` et `NOTIFY_EMAIL` dans Vercel |
-| Synchronisation avec le logiciel de transaction | Inconnu (dépend de l'agence) | API générique prête (`/api/v1`), **désactivée** | Documentation officielle du logiciel, écriture du connecteur, `SYNC_API_KEY` |
-| Base de données (si fort volume) | PostgreSQL (ex. Neon via Vercel) | Non nécessaire au démarrage | Réécrire `lib/storage.js` au-delà de quelques milliers de demandes |
+## Ce qui dépend d’un service externe
 
-Sans e-mail configuré, le mot de passe oublié ne fonctionne pas par e-mail : un administrateur doit réinitialiser le mot de passe depuis « Utilisateurs ». Si le propriétaire perd le sien, il faut intervenir dans le stockage.
+| Fonction | Service | État |
+|---|---|---|
+| E-mails (accusés de réception, notifications, alertes, mot de passe oublié) | Resend | **Désactivé** : pas de compte. Les demandes sont enregistrées, aucun e-mail ne part. |
+| Stockage des données et photos | Vercel Blob privé (`acorimmo-donnees`) | Actif |
+| Diffusion SeLoger / Leboncoin, réseau Interkab | Logiciel de l’agence (La Boîte Immo / Hektor, ou autre) | **Non réalisé** : pas d’API publique |
+| Synchronisation avec le logiciel de l’agence | API générique `/api/v1` | Utilisée pour l’import initial puis **désactivée** (variable retirée de la production) |
+| Carte | Google Maps (après accord du visiteur) | Actif |
+| Visite virtuelle | Previsite (après clic) | Actif ; intégration constatée techniquement possible, conditions d’utilisation non vérifiées |
 
-## À vérifier avant de vendre cette solution à une agence
+## Limites à rappeler
 
-1. **Légal :**
-   - compléter toutes les mentions « À compléter » avec l'agence ;
-   - afficher le vrai barème d'honoraires (obligatoire) ;
-   - faire relire les pages légales par un professionnel du droit ;
-   - signer un contrat de sous-traitance RGPD avec l'agence (vous hébergez ses données clients).
-2. **Annonces :**
-   - savoir quel logiciel l'agence utilise et s'il permet un export documenté ;
-   - sans cela, l'agence devra saisir ses biens deux fois ;
-   - attention aussi aux portails (SeLoger, Leboncoin…) qui sont alimentés par ce logiciel, pas par le site.
-3. **E-mails :** activer Resend avec le domaine de l'agence, sinon aucune confirmation ne part et les alertes ne sont pas envoyées.
-4. **Nom de domaine :** brancher le domaine de l'agence, puis retirer la balise `noindex` des pages publiques pour le référencement.
-5. **Référencement (SEO) :**
-   - les fiches de biens sont désormais rendues côté serveur ; le site reste en « noindex » tant que `indexable` n'est pas passé à `true` dans `config/agence.js` (puis `node scripts/build-pages.mjs`) ;
-   - le contenu du reste de la fiche (description, caractéristiques) est affiché par JavaScript.
-6. **Sécurité :**
-   - créer des comptes nominatifs et supprimer le compte provisoire ;
-   - changer les mots de passe communiqués par écrit ;
-   - activer l'authentification à deux facteurs du compte Vercel ;
-   - supprimer l'ancien store public et la variable `BLOB_OLD_PUBLIC_READ_WRITE_TOKEN` une fois la migration validée.
-7. **Volume :** la solution actuelle (stockage fichiers) convient à une agence de taille normale. Au-delà de quelques milliers de demandes, passer à une base de données.
-8. **Forfait Vercel :** le forfait gratuit (Hobby) est réservé à un usage non commercial. Pour un client payant, il faut le forfait Pro.
-9. **Maintenance :** prévoir qui corrige les problèmes, met à jour les dépendances et répond à l'agence (contrat de maintenance).
+- Pas de diffusion vers SeLoger/Leboncoin ni Interkab (réseaux de La Boîte Immo/Hektor, pas d’API publique).
+- Pas d’estimation instantanée type PriceHubble : seulement une fourchette si l’agence saisit ses prix au m² (aucun aujourd’hui).
+- E-mails désactivés sans compte Resend et domaine vérifié.
+- Traductions faites dans le navigateur (non indexées) ; textes EN/DE ajoutés pour Acor’Immo non relus par un natif ;
+  les annonces restent en français tant que l’agence ne les traduit pas dans l’admin.
+- Titres d’annonces repris tels quels (beaucoup en majuscules).
+- Les fonctions serveur sont en région Paris (cdg1) ; le stockage aussi.
+- Forfait Vercel Hobby : réservé à un usage non commercial. Pour un client payant, forfait Pro.
+
+## Invérifiable depuis ici
+
+- Exactitude actuelle des informations du site actuel (barème « au 10 avril 2024 », équipe, prix des annonces).
+- Statut légal complet (carte T/G, garantie, assurance) : aucune source publique consultée ne les donne.
+- Avis Google : seules les notes et le nombre d’avis ont pu être relus ; le détail des avis demande un compte Google.
+- Droits d’usage des photos (annonces, équipe, visuels) : ce sont celles de l’agence, à faire confirmer avant mise en ligne réelle.

@@ -95,15 +95,15 @@ for (const b of [...biens].reverse()) {
   n++;
   try {
     const limit = b.statut === 'vendu' || b.statut === 'loue' ? MAX_VENDUS : MAX;
-    const photos = [];
-    for (const url of (b._photosSource || []).slice(0, limit)) {
+    // Photos d'un même bien envoyées en parallèle (ordre conservé) ; les biens restent traités un par un
+    const photos = (await Promise.all((b._photosSource || []).slice(0, limit).map(async (url) => {
       try {
         const { name, buf } = await preparePhoto(url);
         if (API) await api('PUT', `/v1/photos/${name}`, buf, 'image/webp');
         else await local.storage.writeBuffer(`photos/${name}`, buf, 'image/webp');
-        photos.push(`/api/media/photos/${name}`);
-      } catch (e) { errors.push(`${b.ref} photo ${url} : ${e.message}`); }
-    }
+        return `/api/media/photos/${name}`;
+      } catch (e) { errors.push(`${b.ref} photo ${url} : ${e.message}`); return null; }
+    }))).filter(Boolean);
     nbPhotos += photos.length;
     const bien = Object.fromEntries(Object.entries(b).filter(([k]) => !k.startsWith('_')));
     bien.photos = photos;
