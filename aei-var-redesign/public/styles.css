@@ -684,3 +684,17 @@ button.bien__media { width: 100%; padding: 0; border: 0; background: var(--mist-
 .indicative strong { display: block; font-family: var(--serif); font-size: 32px; color: var(--teal); }
 .indicative__label { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .indicative__note { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+
+/* Sélecteur de langue : pastille discrète, flèche dessinée */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lang { display: inline-block; margin-right: 6px; }
+.lang__select {
+  appearance: none; -webkit-appearance: none; font: inherit; font-size: 13px; font-weight: 600; letter-spacing: .02em;
+  color: inherit; cursor: pointer; padding: 7px 28px 7px 14px; border-radius: 999px;
+  border: 1px solid currentColor; background-color: transparent; opacity: .85;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center; transition: opacity .2s, border-color .2s;
+}
+.lang__select:hover, .lang__select:focus-visible { opacity: 1; outline: none; border-color: var(--gold); }
+.lang__select option { color: #16282c; background: #fff; }
+@media (max-width: 900px) { .lang { margin-right: 2px; } .lang__select { padding: 6px 24px 6px 10px; } }

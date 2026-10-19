@@ -88,10 +88,6 @@ mark.todo { background: #fff1c2; color: #6b4100; padding: 2px 6px; border-radius
 .filters__row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 24px; margin-top: 14px; }
 .filters__row label:has(select) { min-width: 180px; }
 .empty { padding: 30px; text-align: center; color: var(--muted); }
-.lang__select { font: inherit; font-size: 13px; border: 1px solid var(--line); background: transparent; color: inherit; border-radius: 8px; padding: 6px 8px; cursor: pointer; }
-.header .lang__select { color: inherit; }
-.header:not(.is-solid) .lang__select option { color: #16282c; }
-.lang { display: inline-block; margin-right: 8px; }
 
 /* ---------- Barème, agences, communes ---------- */
 .bareme { margin: 28px 0; }
