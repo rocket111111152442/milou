@@ -389,3 +389,27 @@ a.tile:hover { box-shadow: 0 16px 30px -20px rgba(14, 10, 54, .35); transform: t
   .inline-form { grid-template-columns: 1fr; }
   .lead-photos { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ---------- CRM ---------- */
+.seg { display: inline-flex; background: var(--soft); border-radius: 999px; padding: 3px; }
+.seg button { border: 0; background: none; padding: 7px 16px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg button.is-active { background: var(--navy); color: #fff; }
+.kanban { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+.kanban__col { background: var(--soft); border-radius: 16px; padding: 12px; min-height: 200px; }
+.kanban__col h2 { font-size: 14px; margin: 0 0 10px; }
+.kanban__col h2 small { color: var(--muted); }
+.kanban__card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; display: grid; gap: 2px; cursor: grab; font-size: 13px; }
+.kanban__card small, .kanban__card span { color: var(--muted); }
+.assign { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.dlg-form { display: grid; gap: 10px; }
+.dlg-form input, .dlg-form select, .dlg-form textarea { width: 100%; font: inherit; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.task { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.task.is-late strong { color: var(--red); }
+.task.is-done strong { text-decoration: line-through; color: var(--muted); }
+.tabs-bar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.bars { display: grid; gap: 6px; }
+.bars div { display: grid; grid-template-columns: 160px 1fr 50px; gap: 8px; align-items: center; font-size: 13px; }
+.bars i { display: block; height: 10px; background: var(--navy); border-radius: 5px; }
+.row-edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+@media (max-width: 900px) { .kanban { grid-template-columns: repeat(4, 240px); } .assign { grid-template-columns: 1fr; } }

@@ -63,6 +63,7 @@ window.AEIForms = (() => {
         website: form.elements.website?.value || '',
         startedAt: opened.get(form) || Date.now() - 5000,
         source: location.pathname + location.hash,
+        origine: (() => { try { return document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, '') : ''; } catch { return ''; } })(),
       }),
     });
     const data = await res.json().catch(() => ({}));

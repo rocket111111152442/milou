@@ -23,13 +23,14 @@
       <span class="logo__txt"><strong>A.E.I</strong><small>Côté Mer</small></span>
     </a>
     <nav class="nav" aria-label="Navigation principale">
-      <a href="/#biens">Acheter</a>
+      <a href="/biens">Acheter</a>
       <a href="/#estimation">Vendre</a>
       <a href="/#services">Louer &amp; gérer</a>
       <a href="/#agence">L'agence</a>
       <a href="/#contact">Contact</a>
     </nav>
     <div class="header__actions">
+      <div class="lang" data-lang-switch></div>
       <a class="header__fav" href="/espace-client.html" aria-label="Espace client et favoris"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.5-9 9-9 9z"/></svg><b data-fav-count hidden></b></a>
       <a class="header__phone" href="tel:+33494072635">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
@@ -43,7 +44,7 @@
 
 <div class="mobile-menu" aria-hidden="true">
   <nav>
-    <a href="/#biens">Acheter</a>
+    <a href="/biens">Acheter</a>
     <a href="/#estimation">Vendre</a>
     <a href="/#services">Louer &amp; gérer</a>
     <a href="/#agence">L'agence</a>
@@ -71,7 +72,7 @@
     <li><strong>Favoris</strong> : enregistrés uniquement dans votre navigateur ; ils ne nous sont jamais transmis.</li>
     <li><strong>Preuve de consentement</strong> : date et texte de l’accord donné lors de l’envoi d’un formulaire.</li>
   </ul>
-  <p>Nous ne collectons pas de données de navigation à des fins de mesure d’audience ou de publicité.</p>
+  <p>Nous ne collectons aucune donnée de navigation à des fins publicitaires. Nous comptons seulement, de façon anonyme et sans cookie, les pages vues (page, domaine d’origine, langue) : voir la page <a href="/cookies.html">Cookies</a>, où vous pouvez vous y opposer.</p>
 
   <h2>Finalités et bases légales</h2>
   <ul>
@@ -91,6 +92,8 @@
   <ul>
     <li>Demandes et échanges : 36 mois après le dernier contact, puis suppression automatique.</li>
     <li>Alertes e-mail : jusqu’à votre désinscription.</li>
+    <li>Fiche contact (gestion de la relation client) : 36 mois après le dernier contact, puis suppression.</li>
+    <li>Compteurs de pages vues anonymes : 13 mois.</li>
     <li>Sauvegardes techniques : 30 jours.</li>
   </ul>
 
@@ -116,11 +119,11 @@
     </div>
     <div>
       <h4>Navigation</h4>
-      <a href="/#biens">Nos biens</a><a href="/#estimation">Estimation</a><a href="/#services">Location &amp; gestion</a><a href="/#equipe">L'équipe</a><a href="/espace-client.html">Espace client</a>
+      <a href="/biens">Nos biens</a><a href="/#estimation">Estimation</a><a href="/#services">Location &amp; gestion</a><a href="/#equipe">L'équipe</a><a href="/espace-client.html">Espace client</a>
     </div>
     <div>
       <h4>Nos agences</h4>
-      <span>Six-Fours-les-Plages</span><span>Saint-Maximin</span><span>Loiret</span>
+      <a href="/agences.html">Six-Fours-les-Plages</a><a href="/agences.html">Saint-Maximin</a><a href="/agences.html">Loiret</a>
     </div>
     <div>
       <h4>Informations</h4>
@@ -134,8 +137,12 @@
 </footer>
 <!-- /layout:footer -->
 
+<script src="/i18n-dict.js" defer></script>
+<script src="/i18n.js" defer></script>
+<script src="/stats.js" defer></script>
 <script src="/favoris.js" defer></script>
 <script src="/forms.js" defer></script>
+<script src="/filters.js" defer></script>
 <script src="/cards.js" defer></script>
 <script src="/page.js" defer></script>
 

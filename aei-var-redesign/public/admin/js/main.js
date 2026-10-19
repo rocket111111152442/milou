@@ -7,8 +7,13 @@ import demandes from './views/demandes.js';
 import utilisateurs from './views/utilisateurs.js';
 import integrations from './views/integrations.js';
 import compte from './views/compte.js';
+import contacts from './views/contacts.js';
+import taches from './views/taches.js';
+import mandats from './views/mandats.js';
+import rapports from './views/rapports.js';
+import contenu from './views/contenu.js';
 
-const VIEWS = { 'tableau-de-bord': dashboard, biens, demandes, utilisateurs, integrations, compte };
+const VIEWS = { 'tableau-de-bord': dashboard, biens, demandes, contacts, taches, mandats, rapports, contenu, utilisateurs, integrations, compte };
 export const session = { user: null, emailEnabled: false };
 
 // ---------- Écrans de connexion ----------
@@ -128,6 +133,10 @@ export async function refreshNewCount() {
     const b = $('#newCount');
     b.textContent = demandes.nouvelles;
     b.hidden = !demandes.nouvelles;
+    const a = await api('/admin/alertes');
+    const t = $('#taskCount');
+    t.textContent = a.tachesEnRetard;
+    t.hidden = !a.tachesEnRetard;
   } catch {}
 }
 setInterval(() => { if (session.user && !document.hidden) refreshNewCount(); }, 60000);

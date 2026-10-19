@@ -678,3 +678,9 @@ button.bien__media { width: 100%; padding: 0; border: 0; background: var(--mist-
 .map__consent p { max-width: 460px; margin: 0; }
 .map__consent a { color: var(--mist); text-decoration: underline; }
 .map:has(.map__consent) { filter: none; }
+
+/* Estimation indicative (page de confirmation) */
+.indicative { margin: 18px auto 0; max-width: 520px; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); color: var(--ink); text-align: center; }
+.indicative strong { display: block; font-family: var(--serif); font-size: 32px; color: var(--teal); }
+.indicative__label { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.indicative__note { margin: 8px 0 0; font-size: 13px; color: var(--muted); }

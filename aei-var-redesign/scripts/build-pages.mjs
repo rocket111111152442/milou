@@ -29,6 +29,7 @@ const val = (path) => {
 };
 const fill = (tpl) => tpl.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, k) => val(k));
 
+const robots = agence.indexable ? '<meta name="robots" content="index, follow">' : '<meta name="robots" content="noindex, nofollow">';
 const shell = ({ title, description, body, scripts = '' }) => `<!doctype html>
 <html lang="fr">
 <head>
@@ -37,7 +38,7 @@ const shell = ({ title, description, body, scripts = '' }) => `<!doctype html>
 <title>${esc(title)} | ${esc(agence.nomCourt)}</title>
 <meta name="description" content="${esc(description)}">
 <meta name="theme-color" content="#1e146a">
-<meta name="robots" content="noindex, nofollow">
+${robots}
 <link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/bien.css">
@@ -54,8 +55,12 @@ ${body}
 
 ${footer}
 
+<script src="/i18n-dict.js" defer></script>
+<script src="/i18n.js" defer></script>
+<script src="/stats.js" defer></script>
 <script src="/favoris.js" defer></script>
 <script src="/forms.js" defer></script>
+<script src="/filters.js" defer></script>
 <script src="/cards.js" defer></script>
 <script src="/page.js" defer></script>
 ${scripts}
@@ -65,7 +70,7 @@ ${scripts}
 
 // 1. Pages générées depuis les gabarits
 const dir = join(ROOT, 'scripts/pages');
-for (const file of (await readdir(dir)).filter(f => f.endsWith('.html'))) {
+for (const file of (await readdir(dir)).filter(f => f.endsWith('.html') && !f.endsWith('.tpl.html'))) {
   const raw = await readFile(join(dir, file), 'utf8');
   const meta = Object.fromEntries([...raw.matchAll(/^<!--\s*(\w+):\s*(.*?)\s*-->$/gm)].map(m => [m[1], m[2]]));
   const body = fill(raw.replace(/^<!--\s*\w+:.*-->\n/gm, ''));
@@ -73,10 +78,22 @@ for (const file of (await readdir(dir)).filter(f => f.endsWith('.html'))) {
   console.log('Page générée :', file);
 }
 
-// 2. En-tête et pied de page synchronisés dans les pages écrites à la main
-for (const file of ['bien.html']) {
-  let html = await readFile(join(PUB, file), 'utf8');
-  html = html.replace(/<!-- layout:header -->[\s\S]*?<!-- \/layout:header -->/, header).replace(/<!-- layout:footer -->[\s\S]*?<!-- \/layout:footer -->/, footer);
-  await writeFile(join(PUB, file), html);
-  console.log('Mise en page synchronisée :', file);
+// 2. Gabarits utilisés par le rendu serveur (lib/ssr.js) : l'en-tête et le pied de page y sont inclus
+const absolutize = (html) => html.replace(/(href|src)="(?!https?:|\/|#|tel:|mailto:|data:)([^"]+)"/g, '$1="/$2"');
+const tpl = async (name) => {
+  const raw = await readFile(join(dir, name), 'utf8');
+  const html = raw.replace(/<!-- layout:header -->[\s\S]*?<!-- \/layout:header -->/, header).replace(/<!-- layout:footer -->[\s\S]*?<!-- \/layout:footer -->/, footer);
+  return absolutize(html).replace('<meta name="robots" content="noindex, nofollow">', robots);
+};
+const templates = { bien: await tpl('bien.tpl.html'), ville: await tpl('ville.tpl.html') };
+await writeFile(join(ROOT, 'lib/templates.generated.js'), `// Fichier généré par scripts/build-pages.mjs — ne pas modifier\nexport default ${JSON.stringify(templates)};\n`);
+await writeFile(join(ROOT, 'lib/layout.generated.js'), `// Fichier généré par scripts/build-pages.mjs — ne pas modifier\nexport const header = ${JSON.stringify(header)};\nexport const footer = ${JSON.stringify(footer)};\nexport const robots = ${JSON.stringify(robots)};\n`);
+console.log('Gabarits générés : lib/templates.generated.js, lib/layout.generated.js');
+
+// 3. Pages dynamiques (.page.mjs) : exportent { title, description, script?, body(agence) }
+for (const file of (await readdir(dir)).filter(f => f.endsWith('.page.mjs'))) {
+  const mod = await import(join(dir, file));
+  const out = file.replace('.page.mjs', '.html');
+  await writeFile(join(PUB, out), shell({ title: mod.title, description: mod.description, body: mod.body(agence, esc), scripts: mod.script ? `<script src="${mod.script}" defer></script>` : '' }));
+  console.log('Page générée :', out);
 }

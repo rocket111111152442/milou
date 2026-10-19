@@ -15,6 +15,10 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   try {
+    // Mêmes réécritures que vercel.json pour les pages rendues côté serveur
+    const rewrites = [[/^\/bien\/([\w-]+)$/, m => `/api/ssr/bien/${m[1]}`], [/^\/immobilier\/([\w-]+)$/, m => `/api/ssr/ville/${m[1]}`], [/^\/sitemap\.xml$/, () => '/api/ssr/sitemap'], [/^\/robots\.txt$/, () => '/api/ssr/robots'], [/^\/biens$/, () => '/biens.html']];
+    for (const [re, to] of rewrites) { const m = url.pathname.match(re); if (m) { const t = to(m); if (t.startsWith('/api/')) url.pathname = t; else { url.pathname = t; } break; } }
+    if (url.pathname === '/bien.html') { res.writeHead(301, { location: url.searchParams.get('id') ? `/bien/${url.searchParams.get('id')}` : '/biens' }); return res.end(); }
     if (url.pathname.startsWith('/api/')) {
       const chunks = [];
       for await (const c of req) chunks.push(c);

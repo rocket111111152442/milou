@@ -20,7 +20,7 @@ export const CONSENT_TEXT = 'J’accepte que mes données soient utilisées par 
 
 const str = (v, max = 200) => String(v ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim().slice(0, max);
 const EMAIL_RE = /^[^\s@<>()[\],;:"]{1,64}@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i;
-const normPhone = (s) => s.replace(/[\s.\-()]/g, '');
+export const normPhone = (s) => s.replace(/[\s.\-()]/g, '');
 const PHONE_RE = /^(\+33|0033|0)[1-9]\d{8}$|^\+\d{8,15}$/;
 
 export function validEmail(e) { return EMAIL_RE.test(e) && e.length <= 160; }
@@ -80,6 +80,7 @@ export function sanitizeLead(input) {
     bienTitre: str(input.bienTitre, 120),
     details,
     source: str(input.source, 80),
+    origine: str(input.origine, 60).replace(/[^\w.-]/g, ''),
   };
 }
 

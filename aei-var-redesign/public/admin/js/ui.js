@@ -74,3 +74,20 @@ export function setBusy(btn, busy, label) {
 
 export function openDrawer(el) { el.classList.add('is-open'); el.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
 export function closeDrawer(el) { el.classList.remove('is-open'); el.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
+
+// Fenêtre avec formulaire : renvoie les valeurs saisies (objet) ou null si annulée. `fields` : [{name,label,type,value,options,required}]
+export async function formDialog({ title, fields, submit = 'Enregistrer', intro = '' }) {
+  const input = (f) => {
+    const v = f.value ?? '';
+    if (f.type === 'select') return `<select name="${f.name}">${f.options.map(([k, l]) => `<option value="${esc(k)}"${String(k) === String(v) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+    if (f.type === 'textarea') return `<textarea name="${f.name}" rows="4">${esc(v)}</textarea>`;
+    return `<input name="${f.name}" type="${f.type || 'text'}" value="${esc(v)}"${f.required ? ' required' : ''}${f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''}>`;
+  };
+  const html = `${intro ? `<p>${esc(intro)}</p>` : ''}<form id="dlgForm" class="dlg-form">${fields.map(f => `<label class="field"><span>${esc(f.label)}</span>${input(f)}</label>`).join('')}</form>`;
+  const p = modal({ title, html, actions: [{ label: 'Annuler', value: false }, { label: submit, value: true, primary: true }] });
+  const form = document.getElementById('dlgForm');
+  form.querySelector('input,select,textarea')?.focus();
+  const ok = await p;
+  if (!ok) return null;
+  return Object.fromEntries(new FormData(form));
+}

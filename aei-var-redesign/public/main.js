@@ -48,7 +48,7 @@
   $$('.mobile-menu a').forEach(a => a.addEventListener('click', () => toggleMenu(false)));
 
   const navLinks = $$('.nav a');
-  const sections = navLinks.map(a => $(a.getAttribute('href'))).filter(Boolean);
+  const sections = navLinks.map(a => a.getAttribute('href')).filter(h => /^#[\w-]+$/.test(h)).map(h => $(h)).filter(Boolean);
 
   // ---------- Hero slideshow ----------
   const slides = $$('.hero__slide');
@@ -146,7 +146,7 @@
 
   // ---------- Biens (chargés depuis l'admin) ----------
   const grid = $('#gridBiens');
-  const { cardHTML, isClosed } = window.AEICards;
+  const { cardHTML, isClosed, esc } = window.AEICards;
   let allBiens = [];
   const renderBiens = (list) => {
     // les biens disponibles d'abord, les vendus / loués à la fin
@@ -281,6 +281,20 @@
     if (b) { estPhotos.splice(+b.dataset.rm, 1); renderEstPhotos(); }
   });
 
+  // Fourchette indicative = surface × prix au m² saisi par l'agence pour la commune (aucun chiffre si l'agence n'en a pas saisi)
+  async function showIndicative(body) {
+    try {
+      const r = await fetch('/api/estimation/indicative', { method: 'POST', headers: { 'content-type': 'application/json', 'x-requested-with': 'aei' }, body: JSON.stringify(body) });
+      const { indicative: i } = await r.json();
+      if (!i) return;
+      const eur = (n) => n.toLocaleString('fr-FR') + '\u00a0€';
+      const box = document.createElement('div');
+      box.className = 'indicative';
+      box.innerHTML = `<p class="indicative__label">Fourchette indicative pour ${esc(i.commune)}</p><strong>${eur(i.basse)} – ${eur(i.haute)}</strong><p class="indicative__note">Calcul automatique : surface × ${eur(i.prixM2)}/m² (prix moyen retenu par l'agence${i.source ? ` – ${esc(i.source)}` : ''}${i.date ? `, ${i.date.split('-').reverse().join('/')}` : ''}), à ± ${i.marge}\u00a0%. Estimation indicative, non contractuelle : seule une visite permet d'établir un avis de valeur fiable.</p>`;
+      $('.wizard__msg', wiz).after(box);
+    } catch { /* l'estimation indicative est facultative */ }
+  }
+
   async function sendEstimation() {
     const F = window.AEIForms;
     const errs = F.checkContact(wiz, { requireTel: true });
@@ -307,6 +321,7 @@
       bar.style.width = '100%';
       $('.wizard__msg', wiz).innerHTML = F.confirmation(r.code, r.emailSent);
       $('.wizard__done', wiz).hidden = false;
+      showIndicative({ type: wiz.querySelector('input[name="bien"]:checked')?.value, ville: wiz.ville.value, surface: wiz.surface.value });
     } catch (e) {
       // Une erreur de champ renvoie à l'étape concernée
       const bad = wiz.querySelector('.is-error');
@@ -353,26 +368,35 @@
     box.innerHTML = `<iframe title="Plan d'accès" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?q=${encodeURIComponent(box.dataset.map)}&output=embed"></iframe>`;
   });
 
-  // ---------- Recherche hero : filtre réellement les biens ----------
-  const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const toNum = (s) => Number(String(s || '').replace(/\s/g, '').replace(',', '.')) || 0;
+  // ---------- Recherche hero : ouvre la page « Nos biens » avec les critères choisis ----------
   const searchForm = $('.search');
-  const result = $('#searchResult');
   searchForm.addEventListener('submit', e => {
     e.preventDefault();
-    const types = searchForm.type.value ? searchForm.type.value.split('|') : [];
-    const ville = norm(searchForm.ville.value.trim());
-    const budget = Number(searchForm.budget.value) || 0;
-    const found = allBiens.filter(b => !isClosed(b) &&
-      (b.transaction || 'vente') === searchTransaction &&
-      (!types.length || types.includes(b.type)) &&
-      (!ville || norm(b.ville).includes(ville)) &&
-      (!budget || (toNum(b.prix) && toNum(b.prix) <= budget)));
-    filterBtns.forEach(x => x.classList.toggle('is-active', x.dataset.filter === 'all'));
-    renderBiens(found);
-    result.innerHTML = `${found.length} bien${found.length > 1 ? 's' : ''} ${searchTransaction === 'location' ? 'à louer' : 'à vendre'} correspond${found.length > 1 ? 'ent' : ''} à votre recherche. <button type="button" class="linkish">Voir tous les biens</button>`;
-    result.hidden = false;
-    $('button', result).addEventListener('click', () => { result.hidden = true; searchForm.reset(); renderBiens(allBiens); });
-    $('#biens').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+    const p = new URLSearchParams();
+    if (searchTransaction === 'location') p.set('transaction', 'location');
+    if (searchForm.type.value) p.set('type', searchForm.type.value);
+    if (searchForm.ville.value.trim()) p.set('q', searchForm.ville.value.trim());
+    if (searchForm.budget.value) p.set('prixMax', searchForm.budget.value);
+    location.href = '/biens' + (p.toString() ? `?${p}` : '');
   });
+
+  // ---------- Avis clients : uniquement ceux saisis par l'agence, avec leur source ----------
+  fetch('/api/avis').then(r => r.json()).then(({ global, avis }) => {
+    if (!global) return;
+    const note = global.note;
+    $('#statAvis').hidden = false;
+    $('#statNote').dataset.to = note;
+    $('#statAvisLabel').textContent = `sur ${global.nombre} avis clients*`;
+    $('#statFoot').hidden = false;
+    $('#statFoot').textContent = `* ${global.source}${global.releveLe ? `, relevé le ${global.releveLe.split('-').reverse().join('/')}` : ''}.`;
+    $('#avisNote').dataset.to = note;
+    $('#avisStars').innerHTML = [1, 2, 3, 4, 5].map(n => `<i class="${n <= Math.floor(note) ? '' : n - note < 1 && n - note > 0 && note % 1 >= .5 ? 'half' : 'off'}"></i>`).join('');
+    $('#avisStars').setAttribute('aria-label', `Note ${String(note).replace('.', ',')} sur 5`);
+    $('#avisSub').textContent = `${global.nombre} avis · source : ${global.source}`;
+    if (global.url) $('#avisLink').href = global.url;
+    $('#avisList').innerHTML = avis.slice(0, 3).map(a => `<blockquote class="reviews__quote"><p>« ${esc(a.texte)} »</p><footer>${esc(a.auteur)}${a.date ? ` · ${esc(a.date.slice(0, 4))}` : ''} · ${esc(a.source)}</footer></blockquote>`).join('');
+    $('#avis').hidden = false;
+    $$('#statAvis .count, #avis .count').forEach(el => countIO.observe(el));
+    $$('#avis .reveal').forEach(el => el.classList.add('is-in'));
+  }).catch(() => {});
 })();

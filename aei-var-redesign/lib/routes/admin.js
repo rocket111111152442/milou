@@ -96,7 +96,7 @@ async function listLeadsRoute({ request }) {
 
 async function patchLead({ request, params }) {
   const user = await requireUser(request);
-  const { status, note } = await readBody(request, 10_000);
+  const { status, note, assigneId, issue, motifPerte } = await readBody(request, 10_000);
   const now = new Date().toISOString();
   const lead = await updateLead(params.id, (l) => {
     if (status !== undefined) {
@@ -109,6 +109,18 @@ async function patchLead({ request, params }) {
       if (!text) throw new HttpError(400, 'Note vide');
       l.notes.push({ at: now, by: user.name, text });
     }
+    if (assigneId !== undefined) {
+      const a = String(assigneId).slice(0, 60);
+      if (a !== (l.assigneId || '')) l.history.push({ at: now, by: user.name, action: a ? 'Demande assignée' : 'Assignation retirée' });
+      l.assigneId = a;
+    }
+    if (issue !== undefined) {
+      if (!['', 'gagne', 'perdu'].includes(issue)) throw new HttpError(400, 'Issue invalide');
+      if (issue !== (l.issue || '')) l.history.push({ at: now, by: user.name, action: issue === 'gagne' ? 'Issue : gagnée' : issue === 'perdu' ? 'Issue : perdue' : 'Issue retirée' });
+      l.issue = issue;
+      if (issue && l.status !== 'termine') { l.history.push({ at: now, by: user.name, action: `Statut : ${STATUSES.termine}` }); l.status = 'termine'; }
+    }
+    if (motifPerte !== undefined) l.motifPerte = String(motifPerte).trim().slice(0, 200);
     l.updatedAt = now;
     return l;
   });

@@ -5,7 +5,7 @@ import { $, $$, esc, toast, src, toNumber, confirmDialog, showFieldErrors, setBu
 const FIELDS = ['titre', 'ville', 'cp', 'adresse', 'prix', 'region', 'transaction', 'statut', 'surface', 'chambres', 'terrain', 'badge', 'extra',
   'type', 'ref', 'pieces', 'sdb', 'sde', 'niveaux', 'annee', 'cuisine', 'chauffage', 'description',
   'dpe', 'dpeKwh', 'ges', 'gesCo2', 'energieMin', 'energieMax', 'energieRef',
-  'honoraires', 'taxeFonciere', 'chargesCopro', 'lotsCopro'];
+  'honoraires', 'taxeFonciere', 'chargesCopro', 'lotsCopro', 'visiteVirtuelle', 'video', 'titreEn', 'titreDe', 'descriptionEn', 'descriptionDe', 'negociateurId'];
 const STATUT_CLASS = { disponible: 'pill--ok', 'sous-compromis': 'pill--warn', vendu: 'pill--sold', loue: 'pill--sold' };
 const MAX_PHOTOS = 30;
 
@@ -115,6 +115,25 @@ const updatePrixLabel = () => {
   $('#prixLabel').textContent = loc ? 'Loyer mensuel CC (€)' : 'Prix (€)';
 };
 
+let team = null;
+async function fillTeam(form, b) {
+  const sel = form.elements.negociateurId;
+  try {
+    team ||= (await api('/admin/equipe')).equipe;
+    sel.innerHTML = '<option value="">Non assigné</option>' + team.map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+    sel.value = b?.negociateurId || '';
+  } catch { /* liste indisponible */ }
+  const box = $('#acqBox');
+  box.textContent = '';
+  if (!b) return;
+  try {
+    const { contacts } = await api(`/admin/biens/${encodeURIComponent(b.id)}/acquereurs`);
+    box.innerHTML = contacts.length
+      ? `<strong>${contacts.length} contact${contacts.length > 1 ? 's' : ''} recherche${contacts.length > 1 ? 'nt' : ''} ce type de bien :</strong><ul>${contacts.map(c => `<li><a href="#contacts/${esc(c.id)}">${esc(c.nom)}</a> ${esc(c.tel || c.email)}</li>`).join('')}</ul>`
+      : 'Aucun contact enregistré ne correspond à ce bien (critères saisis dans les fiches contacts / alertes).';
+  } catch { /* facultatif */ }
+}
+
 function openForm(b = null) {
   const form = $('#bienForm');
   editing = b ? b.id : null;
@@ -128,6 +147,8 @@ function openForm(b = null) {
   } else {
     form.elements.publie.checked = true;
   }
+  form.elements.quartierTxt.value = (b?.quartier || []).map(q => q.distance ? `${q.label} | ${q.distance}` : q.label).join('\n');
+  fillTeam(form, b);
   updatePrixLabel();
   equipements = [...(b?.equipements || [])];
   renderEq();
@@ -157,6 +178,7 @@ async function submitForm(e) {
   if (!$('#photoBusy').hidden) return toast('Patientez, les photos sont en cours d’envoi', true);
 
   const data = Object.fromEntries(FIELDS.map(k => [k, form.elements[k]?.value.trim() ?? '']));
+  data.quartier = form.elements.quartierTxt.value.split('\n').map(l => l.trim()).filter(Boolean).map(l => { const [label, distance] = l.split('|').map(x => x.trim()); return { label, distance: distance || '' }; });
   data.publie = form.elements.publie.checked;
   data.equipements = [...equipements];
   data.composition = readCompo();

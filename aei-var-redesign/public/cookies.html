@@ -23,13 +23,14 @@
       <span class="logo__txt"><strong>A.E.I</strong><small>Côté Mer</small></span>
     </a>
     <nav class="nav" aria-label="Navigation principale">
-      <a href="/#biens">Acheter</a>
+      <a href="/biens">Acheter</a>
       <a href="/#estimation">Vendre</a>
       <a href="/#services">Louer &amp; gérer</a>
       <a href="/#agence">L'agence</a>
       <a href="/#contact">Contact</a>
     </nav>
     <div class="header__actions">
+      <div class="lang" data-lang-switch></div>
       <a class="header__fav" href="/espace-client.html" aria-label="Espace client et favoris"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.5-9 9-9 9z"/></svg><b data-fav-count hidden></b></a>
       <a class="header__phone" href="tel:+33494072635">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
@@ -43,7 +44,7 @@
 
 <div class="mobile-menu" aria-hidden="true">
   <nav>
-    <a href="/#biens">Acheter</a>
+    <a href="/biens">Acheter</a>
     <a href="/#estimation">Vendre</a>
     <a href="/#services">Louer &amp; gérer</a>
     <a href="/#agence">L'agence</a>
@@ -59,7 +60,7 @@
 <article class="container legal">
   <nav class="crumbs" aria-label="Fil d'Ariane"><a href="/">Accueil</a><span>›</span><span>Cookies</span></nav>
   <h1 class="h2">Cookies et traceurs</h1>
-  <p class="legal__lead">Ce site n’utilise ni cookie publicitaire, ni outil de mesure d’audience. C’est pourquoi aucun bandeau de consentement ne s’affiche.</p>
+  <p class="legal__lead">Ce site n’utilise ni cookie publicitaire, ni outil de suivi publicitaire. Il compte uniquement des pages vues de façon anonyme, sans cookie (voir ci-dessous). C’est pourquoi aucun bandeau de consentement ne s’affiche.</p>
 
   <h2>Ce qui est utilisé</h2>
   <table class="legal__table">
@@ -70,8 +71,14 @@
     </tbody>
   </table>
 
+  <h2>Mesure d’audience sans cookie</h2>
+  <p>Pour savoir quelles pages sont consultées, le site compte chaque page vue de façon anonyme : page visitée, site d’origine (nom de domaine seulement), langue. <strong>Aucun cookie, aucun identifiant, aucune adresse IP conservée</strong> : il n’est pas possible de reconnaître un visiteur d’une page à l’autre. Les compteurs sont agrégés par jour et conservés 13 mois. Ce dispositif est limité à la mesure de fréquentation du site et n’est pas recoupé avec d’autres données.</p>
+  <p>Vous pouvez vous y opposer à tout moment : <button type="button" class="linkish" id="statsOptOut">Désactiver la mesure d’audience sur cet appareil</button> <span id="statsOptOutState" role="status"></span>. Elle est aussi désactivée automatiquement si votre navigateur envoie le signal « Do Not Track ».</p>
+
   <h2>Contenus tiers chargés à votre demande</h2>
   <p>Les cartes sont fournies par Google Maps. Elles ne se chargent que si vous cliquez sur « Afficher la carte ». Google peut alors déposer ses propres cookies, régis par sa politique de confidentialité (<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a>).</p>
+  <p>Il en va de même des visites virtuelles (Matterport) et des vidéos (YouTube en mode sans cookie, Vimeo) intégrées à certaines annonces : elles ne se chargent qu’après votre clic sur « Lancer ». Le fournisseur peut alors déposer ses propres cookies.</p>
+  <p>La recherche vocale (bouton micro de la page « Nos biens ») utilise la reconnaissance vocale de votre navigateur. Selon le navigateur (notamment Chrome), l’audio est traité par les serveurs de son éditeur. Ce site n’enregistre ni l’audio ni sa transcription : seul le texte reconnu est placé dans le champ de recherche. La fonction ne s’active qu’à votre clic.</p>
   <p>Les polices de caractères sont hébergées sur ce site : aucune donnée n’est transmise à un service de polices externe.</p>
 
   <h2>Gérer ou supprimer</h2>
@@ -89,11 +96,11 @@
     </div>
     <div>
       <h4>Navigation</h4>
-      <a href="/#biens">Nos biens</a><a href="/#estimation">Estimation</a><a href="/#services">Location &amp; gestion</a><a href="/#equipe">L'équipe</a><a href="/espace-client.html">Espace client</a>
+      <a href="/biens">Nos biens</a><a href="/#estimation">Estimation</a><a href="/#services">Location &amp; gestion</a><a href="/#equipe">L'équipe</a><a href="/espace-client.html">Espace client</a>
     </div>
     <div>
       <h4>Nos agences</h4>
-      <span>Six-Fours-les-Plages</span><span>Saint-Maximin</span><span>Loiret</span>
+      <a href="/agences.html">Six-Fours-les-Plages</a><a href="/agences.html">Saint-Maximin</a><a href="/agences.html">Loiret</a>
     </div>
     <div>
       <h4>Informations</h4>
@@ -107,8 +114,12 @@
 </footer>
 <!-- /layout:footer -->
 
+<script src="/i18n-dict.js" defer></script>
+<script src="/i18n.js" defer></script>
+<script src="/stats.js" defer></script>
 <script src="/favoris.js" defer></script>
 <script src="/forms.js" defer></script>
+<script src="/filters.js" defer></script>
 <script src="/cards.js" defer></script>
 <script src="/page.js" defer></script>
 

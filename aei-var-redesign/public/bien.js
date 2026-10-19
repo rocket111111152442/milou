@@ -1,7 +1,7 @@
 (() => {
   const $ = (s, c = document) => c.querySelector(s);
   const $$ = (s, c = document) => [...c.querySelectorAll(s)];
-  const { esc, cardHTML, isClosed } = window.AEICards;
+  const { esc, cardHTML, isClosed, localized } = window.AEICards;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const f = (name) => $(`[data-f="${name}"]`);
   const block = (name) => $(`[data-block="${name}"]`);
@@ -77,11 +77,11 @@
     const prix = b.vendu ? closedLabel : b.prix ? `${b.prix} €${loc ? ' / mois' : ''}` : 'Prix sur demande';
     const where = [b.ville, b.cp && `(${b.cp})`].filter(Boolean).join(' ');
 
-    document.title = `${b.titre} – ${b.ville} | AEI Côté Mer`;
-    $('meta[name="description"]').setAttribute('content', `${b.type || 'Bien'} à ${b.ville}${b.surface ? `, ${b.surface} m²` : ''}${b.prix && !b.vendu ? `, ${b.prix} €` : ''}. ${String(b.description || '').slice(0, 120)}`);
+    const titre = localized(b, 'titre'), descr = localized(b, 'description');
+    document.title = `${titre} – ${b.ville} | AEI Côté Mer`;
 
     f('crumb').textContent = b.ville;
-    f('titre').textContent = b.titre;
+    f('titre').textContent = titre;
     f('loc').textContent = [b.type, where].filter(Boolean).join(' · ');
     f('prix').textContent = prix;
     f('prix').classList.toggle('is-sold', !!b.vendu);
@@ -122,8 +122,8 @@
 
     // Description repliée si longue
     const desc = f('description');
-    desc.innerHTML = paragraphs(b.description || '');
-    block('description').hidden = !b.description;
+    desc.innerHTML = paragraphs(descr);
+    block('description').hidden = !descr;
     requestAnimationFrame(() => {
       if (desc.scrollHeight > 420) {
         desc.classList.add('is-clamped');
@@ -220,6 +220,35 @@
       compute();
     }
 
+    // Visite virtuelle et vidéo : intégrées seulement après un clic (le fournisseur peut déposer des cookies)
+    const EMBEDS = [
+      [/^https:\/\/my\.matterport\.com\/show\/?/, 'Matterport', (u) => u.href],
+      [/^https:\/\/(www\.)?youtube\.com\/watch/, 'YouTube', (u) => `https://www.youtube-nocookie.com/embed/${u.searchParams.get('v')}`],
+      [/^https:\/\/youtu\.be\//, 'YouTube', (u) => `https://www.youtube-nocookie.com/embed${u.pathname}`],
+      [/^https:\/\/(www\.)?youtube-nocookie\.com\/embed\//, 'YouTube', (u) => u.href],
+      [/^https:\/\/vimeo\.com\/\d+/, 'Vimeo', (u) => `https://player.vimeo.com/video${u.pathname}`],
+      [/^https:\/\/player\.vimeo\.com\/video\//, 'Vimeo', (u) => u.href],
+    ];
+    const embed = (name, url, label) => {
+      const box = f(name);
+      if (!url) { block(name).hidden = true; return; }
+      block(name).hidden = false;
+      let u; try { u = new URL(url); } catch { block(name).hidden = true; return; }
+      const hit = EMBEDS.find(([re]) => re.test(u.href));
+      if (!hit) { box.innerHTML = `<a class="btn btn--teal" href="${esc(u.href)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`; return; }
+      box.innerHTML = `<div class="map-consent"><p>${label} fournie par ${hit[1]}, qui peut déposer des cookies.</p><button type="button" class="btn btn--teal btn--sm">Lancer</button> <a class="linkish" href="${esc(u.href)}" target="_blank" rel="noopener noreferrer">Ouvrir sur ${hit[1]} ↗</a></div>`;
+      $('button', box).addEventListener('click', () => {
+        box.innerHTML = `<iframe title="${label}" loading="lazy" allowfullscreen referrerpolicy="no-referrer" allow="fullscreen; xr-spatial-tracking" src="${esc(hit[2](u))}"></iframe>`;
+      });
+    };
+    embed('visite', b.visiteVirtuelle, 'Visite virtuelle');
+    embed('video', b.video, 'Vidéo du bien');
+
+    // Commodités à proximité saisies par l'agence
+    const prox = f('proximite');
+    prox.innerHTML = (b.quartier || []).map(q => `<li>${esc(q.label)}${q.distance ? `<span>${esc(q.distance)}</span>` : ''}</li>`).join('');
+    prox.hidden = !b.quartier?.length;
+
     // Carte du secteur (commune, pas l'adresse exacte)
     // Chargée seulement à la demande : Google Maps dépose des cookies
     if (b.ville) {
@@ -266,6 +295,15 @@
 
     // Partage
     const url = location.href;
+    const enc = encodeURIComponent;
+    $('[data-share="facebook"]').href = `https://www.facebook.com/sharer/sharer.php?u=${enc(url)}`;
+    $('[data-share="x"]').href = `https://twitter.com/intent/tweet?url=${enc(url)}&text=${enc(b.titre)}`;
+    $('[data-share="linkedin"]').href = `https://www.linkedin.com/sharing/share-offsite/?url=${enc(url)}`;
+    if (navigator.share) {
+      const nat = $('[data-share="native"]');
+      nat.hidden = false;
+      nat.addEventListener('click', () => navigator.share({ title: b.titre, url }).catch(() => {}));
+    }
     $('[data-share="whatsapp"]').href = `https://wa.me/?text=${encodeURIComponent(`${b.titre} – ${url}`)}`;
     $('[data-share="mail"]').href = `mailto:?subject=${encodeURIComponent(b.titre)}&body=${encodeURIComponent(`Ce bien pourrait vous intéresser : ${url}`)}`;
     $('[data-share="print"]').addEventListener('click', () => print());
@@ -278,28 +316,6 @@
     const similar = [...others.filter(x => x.region === b.region), ...others.filter(x => x.region !== b.region)].slice(0, 3);
     f('similaires').innerHTML = similar.map(cardHTML).join('');
     block('similaires').hidden = !similar.length;
-
-    // Données structurées pour les moteurs de recherche
-    const ld = document.createElement('script');
-    ld.type = 'application/ld+json';
-    ld.textContent = JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'Offer',
-      name: b.titre,
-      description: b.description,
-      image: photos.map(p => new URL(p, location.href).href),
-      price: price || undefined,
-      priceCurrency: 'EUR',
-      availability: b.vendu ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
-      seller: { '@type': 'RealEstateAgent', name: 'Agence Européenne Immobilière – Côté Mer', telephone: '+33494072635' },
-      itemOffered: {
-        '@type': b.type === 'Appartement' ? 'Apartment' : 'SingleFamilyResidence',
-        address: { '@type': 'PostalAddress', addressLocality: b.ville, postalCode: b.cp, addressCountry: 'FR' },
-        floorSize: b.surface ? { '@type': 'QuantitativeValue', value: num(b.surface), unitCode: 'MTK' } : undefined,
-        numberOfRooms: num(b.pieces) || undefined,
-      },
-    });
-    document.head.appendChild(ld);
 
     $('#ficheLoading').hidden = true;
     $('#fiche').hidden = false;
@@ -325,7 +341,12 @@
   };
 
   const load = async () => {
-    const id = new URLSearchParams(location.search).get('id');
+    // Fiche rendue par le serveur : le bien et la liste sont déjà dans la page
+    const embedded = $('#bien-data');
+    if (embedded) {
+      try { const { bien, all } = JSON.parse(embedded.textContent); return render(bien, all); } catch { /* repli ci-dessous */ }
+    }
+    const id = decodeURIComponent(location.pathname.split('/').pop() || '') || new URLSearchParams(location.search).get('id');
     if (!id) return missing();
     try {
       const res = await fetch('/api/biens');

@@ -7,6 +7,10 @@ import { sanitizeLead, createLead, TYPES, STATUSES, matchesTracking, findByCode,
 import { readBuffer, writeBuffer, moveKey } from '../storage.js';
 import { sendEmail, emailEnabled, layout } from '../email.js';
 import agence from '../../config/agence.js';
+import { publicAvis } from '../avis.js';
+import { readCommunes, indicative } from '../communes.js';
+import { recordHit } from '../stats.js';
+import { upsertFromLead } from '../crm.js';
 
 const PUBLIC_CACHE = { 'cache-control': 'public, max-age=0, s-maxage=30, stale-while-revalidate=300' };
 
@@ -75,6 +79,10 @@ async function submitLead({ request }) {
     if (photos.length) await updateLead(lead.id, l => ({ ...l, photos }));
   }
 
+  // Fiche contact (CRM) et assignation automatique au négociateur du bien
+  const contactId = await upsertFromLead(lead).catch(e => { console.error('CRM', e); return null; });
+  const nego = clean.bienId ? (await readBiens()).find(b => b.id === clean.bienId)?.negociateurId : '';
+  if (contactId || nego) await updateLead(lead.id, l => ({ ...l, contactId: contactId || '', assigneId: nego || '' }));
   await notify(lead, request).catch(e => console.error('Notification échouée', e));
   return json({ ok: true, code: lead.code, emailSent: emailEnabled() && Boolean(lead.email) });
 }
@@ -141,7 +149,33 @@ async function media({ params }) {
   return new Response(buf, { headers: { 'content-type': img?.type || 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' } });
 }
 
+// ---------- Avis, communes, estimation indicative, mesure d'audience ----------
+async function avis() { return json(await publicAvis(), 200, PUBLIC_CACHE); }
+
+async function communesList() {
+  const { communes } = await readCommunes();
+  return json(communes.map(c => ({ slug: c.slug, nom: c.nom })), 200, PUBLIC_CACHE);
+}
+
+async function estimationIndicative({ request }) {
+  await rateLimit('indicative', clientIp(request), 30, 3600);
+  const { type, ville, surface } = await readBody(request, 2000);
+  const r = await indicative({ typeBien: String(type || ''), ville: String(ville || ''), surface });
+  return json({ indicative: r });
+}
+
+async function statsHit({ request }) {
+  await rateLimit('hit', clientIp(request), 240, 3600);
+  const { path, referrer, lang } = await readBody(request, 1000);
+  await recordHit({ path, referrer, lang, userAgent: request.headers.get('user-agent') });
+  return new Response(null, { status: 204 });
+}
+
 export default [
+  ['GET', '/avis', avis],
+  ['GET', '/communes', communesList],
+  ['POST', '/estimation/indicative', estimationIndicative],
+  ['POST', '/stats/hit', statsHit],
   ['GET', '/biens', listPublic],
   ['GET', '/biens/:id', getPublic],
   ['GET', '/config', config],

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nos biens à vendre et à louer | AEI Côté Mer</title>
+<meta name="description" content="Recherchez parmi tous les biens de l'agence : maisons, villas, appartements, terrains. Filtres par ville, prix, surface, pièces, équipements.">
+<meta name="theme-color" content="#1e146a">
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/bien.css">
+<link rel="stylesheet" href="/pages.css">
+</head>
+<body class="page-bien page-simple">
+<div class="progress" aria-hidden="true"></div>
+
+<!-- layout:header -->
+<header class="header" id="top">
+  <div class="header__inner container">
+    <a class="logo" href="/" aria-label="AEI Côté Mer — accueil">
+      <span class="logo__bar"></span>
+      <span class="logo__txt"><strong>A.E.I</strong><small>Côté Mer</small></span>
+    </a>
+    <nav class="nav" aria-label="Navigation principale">
+      <a href="/biens">Acheter</a>
+      <a href="/#estimation">Vendre</a>
+      <a href="/#services">Louer &amp; gérer</a>
+      <a href="/#agence">L'agence</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+    <div class="header__actions">
+      <div class="lang" data-lang-switch></div>
+      <a class="header__fav" href="/espace-client.html" aria-label="Espace client et favoris"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.5-9 9-9 9z"/></svg><b data-fav-count hidden></b></a>
+      <a class="header__phone" href="tel:+33494072635">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+        04 94 07 26 35
+      </a>
+      <a class="btn btn--gold btn--sm magnetic" href="/#estimation">Estimer mon bien</a>
+      <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false"><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-menu" aria-hidden="true">
+  <nav>
+    <a href="/biens">Acheter</a>
+    <a href="/#estimation">Vendre</a>
+    <a href="/#services">Louer &amp; gérer</a>
+    <a href="/#agence">L'agence</a>
+    <a href="/#contact">Contact</a>
+    <a href="/espace-client.html">Espace client</a>
+  </nav>
+  <a class="btn btn--gold" href="tel:+33494072635">Appeler l'agence</a>
+</div>
+
+<!-- /layout:header -->
+
+<main id="main">
+<section class="biens-page container">
+  <nav class="crumbs" aria-label="Fil d'Ariane"><a href="/">Accueil</a><span>›</span><span>Nos biens</span></nav>
+  <h1 class="h2" id="biensTitle">Nos biens</h1>
+  <form class="filters" id="filters" novalidate>
+    <div class="filters__tabs" role="tablist" aria-label="Transaction">
+      <button type="button" role="tab" data-transaction="vente">Acheter</button>
+      <button type="button" role="tab" data-transaction="location">Louer</button>
+    </div>
+    <div class="filters__grid">
+      <label>Recherche<input name="q" type="search" placeholder="Ville, mot-clé, référence" autocomplete="off"><button type="button" class="voice" id="voiceBtn" aria-label="Recherche vocale" hidden>🎙</button></label>
+      <label>Ville<select name="ville"><option value="">Toutes</option></select></label>
+      <label>Type<select name="type"><option value="">Tous</option></select></label>
+      <label>Prix min<input name="prixMin" inputmode="numeric" placeholder="€"></label>
+      <label>Prix max<input name="prixMax" inputmode="numeric" placeholder="€"></label>
+      <label>Surface min<input name="surfMin" inputmode="numeric" placeholder="m²"></label>
+      <label>Pièces min<select name="piecesMin"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+      <label>Chambres min<select name="chambresMin"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+    </div>
+    <fieldset class="filters__equip"><legend>Équipements</legend><div id="equipList"></div></fieldset>
+    <div class="filters__row">
+      <label class="check"><input type="checkbox" name="vv"> Avec visite virtuelle</label>
+      <label class="check"><input type="checkbox" name="clos"> Inclure les biens vendus / loués</label>
+      <label>Trier par<select name="sort">
+        <option value="recent">Plus récents</option><option value="ancien">Plus anciens</option>
+        <option value="prix-asc">Prix croissant</option><option value="prix-desc">Prix décroissant</option>
+        <option value="surface-desc">Surface décroissante</option><option value="surface-asc">Surface croissante</option>
+      </select></label>
+      <button type="button" class="btn btn--outline btn--sm" id="resetBtn">Réinitialiser</button>
+    </div>
+  </form>
+  <p class="search-result" id="count" role="status"></p>
+  <div class="grid-biens" id="results"></div>
+  <p class="empty" id="empty" hidden>Aucun bien ne correspond à votre recherche. <a href="/#alertes">Créez une alerte</a> pour être prévenu(e) dès qu'un bien correspondant est publié.</p>
+</section>
+
+</main>
+
+<!-- layout:footer -->
+<footer class="footer">
+  <div class="container footer__grid">
+    <div>
+      <a class="logo logo--light" href="/"><span class="logo__bar"></span><span class="logo__txt"><strong>A.E.I</strong><small>Côté Mer</small></span></a>
+      <p>Agence Européenne Immobilière – Côté Mer.<br>Transaction, estimation, location et gestion sur le littoral varois.</p>
+    </div>
+    <div>
+      <h4>Navigation</h4>
+      <a href="/biens">Nos biens</a><a href="/#estimation">Estimation</a><a href="/#services">Location &amp; gestion</a><a href="/#equipe">L'équipe</a><a href="/espace-client.html">Espace client</a>
+    </div>
+    <div>
+      <h4>Nos agences</h4>
+      <a href="/agences.html">Six-Fours-les-Plages</a><a href="/agences.html">Saint-Maximin</a><a href="/agences.html">Loiret</a>
+    </div>
+    <div>
+      <h4>Informations</h4>
+      <a href="/honoraires.html">Nos honoraires</a><a href="/mentions-legales.html">Mentions légales</a><a href="/confidentialite.html">Confidentialité &amp; RGPD</a><a href="/cookies.html">Cookies</a>
+    </div>
+  </div>
+  <div class="container footer__bottom">
+    <span>© <span id="year">2026</span> AEI Côté Mer · Tous droits réservés</span>
+    <a href="#top" class="totop" aria-label="Retour en haut">↑</a>
+  </div>
+</footer>
+<!-- /layout:footer -->
+
+<script src="/i18n-dict.js" defer></script>
+<script src="/i18n.js" defer></script>
+<script src="/stats.js" defer></script>
+<script src="/favoris.js" defer></script>
+<script src="/forms.js" defer></script>
+<script src="/filters.js" defer></script>
+<script src="/cards.js" defer></script>
+<script src="/page.js" defer></script>
+<script src="/biens.js" defer></script>
+</body>
+</html>

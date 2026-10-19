@@ -66,13 +66,14 @@
       <span class="logo__txt"><strong>A.E.I</strong><small>Côté Mer</small></span>
     </a>
     <nav class="nav" aria-label="Navigation principale">
-      <a href="#biens">Acheter</a>
+      <a href="/biens">Acheter</a>
       <a href="#estimation">Vendre</a>
       <a href="#services">Louer &amp; gérer</a>
       <a href="#agence">L'agence</a>
       <a href="#contact">Contact</a>
     </nav>
     <div class="header__actions">
+      <div class="lang" data-lang-switch></div>
       <a class="header__fav" href="/espace-client.html" aria-label="Espace client et favoris"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.5-9 9-9 9z"/></svg><b data-fav-count hidden></b></a>
       <a class="header__phone" href="tel:+33494072635">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
@@ -86,7 +87,7 @@
 
 <div class="mobile-menu" aria-hidden="true">
   <nav>
-    <a href="#biens">Acheter</a>
+    <a href="/biens">Acheter</a>
     <a href="#estimation">Vendre</a>
     <a href="#services">Louer &amp; gérer</a>
     <a href="#agence">L'agence</a>
@@ -117,7 +118,7 @@
     </h1>
     <p class="hero__lead reveal-hero">Achat, vente, estimation et gestion locative sur le littoral ouest varois. Une équipe locale qui prend le temps de comprendre votre projet.</p>
 
-    <form class="search reveal-hero" action="#biens" aria-label="Rechercher un bien">
+    <form class="search reveal-hero" action="/biens" aria-label="Rechercher un bien">
       <div class="search__tabs" role="tablist">
         <button type="button" class="is-active" role="tab" aria-selected="true" data-transaction="vente">Acheter</button>
         <button type="button" role="tab" aria-selected="false" data-transaction="location">Louer</button>
@@ -194,9 +195,9 @@
       <div class="stats reveal">
         <div class="stat"><strong class="count" data-to="0" id="statBiens">0</strong><span>biens actuellement en ligne</span></div>
         <div class="stat"><strong class="count" data-to="3">0</strong><span>agences en France</span></div>
-        <div class="stat"><strong><span class="count" data-to="4.7" data-dec="1">0</span><small>/5</small></strong><span>sur 73 avis clients*</span></div>
+        <div class="stat" id="statAvis" hidden><strong><span class="count" id="statNote" data-to="0" data-dec="1">0</span><small>/5</small></strong><span id="statAvisLabel">avis clients</span></div>
       </div>
-      <p class="footnote reveal">* Avis publiés sur PagesJaunes.</p>
+      <p class="footnote reveal" id="statFoot" hidden></p>
     </div>
   </div>
 </section>
@@ -214,7 +215,7 @@
         <svg class="service__icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M6 22 24 8l18 14"/><path d="M11 19v21h26V19"/><path d="M20 40V28h8v12"/></svg>
         <h3>Transaction</h3>
         <p>Appartement, villa ou propriété vue mer : une sélection rigoureuse, sans visites inutiles, pour une acquisition simple et sécurisée.</p>
-        <a href="#biens" class="link-arrow">Voir les biens</a>
+        <a href="/biens" class="link-arrow">Voir tous les biens</a>
       </article>
       <article class="service reveal">
         <span class="service__num">02</span>
@@ -407,20 +408,17 @@
   </div>
 </section>
 
-<!-- AVIS -->
-<section class="section reviews">
+<!-- AVIS : alimenté par l'admin (Avis clients) ; masqué tant que l'agence n'a rien saisi -->
+<section class="section reviews" id="avis" hidden>
   <div class="container reviews__grid">
     <div class="reviews__score reveal">
-      <strong><span class="count" data-to="4.7" data-dec="1">0</span><small>/5</small></strong>
-      <div class="stars" aria-label="Note 4,7 sur 5"><i></i><i></i><i></i><i></i><i class="half"></i></div>
-      <p>73 avis clients · 100&nbsp;% de notes à 4 ou 5 étoiles</p>
+      <strong><span class="count" id="avisNote" data-to="0" data-dec="1">0</span><small>/5</small></strong>
+      <div class="stars" id="avisStars"></div>
+      <p id="avisSub"></p>
     </div>
-    <blockquote class="reviews__quote reveal">
-      <p>« Très bonne agence. Très professionnelle. »</p>
-      <footer>Avis client vérifié</footer>
-    </blockquote>
+    <div class="reviews__list reveal" id="avisList"></div>
     <div class="reviews__cta reveal">
-      <a class="btn btn--outline" href="https://www.google.com/search?q=Agence+Europ%C3%A9enne+Immobili%C3%A8re+C%C3%B4t%C3%A9+Mer+Six-Fours+avis" target="_blank" rel="noopener">Lire les avis Google</a>
+      <a class="btn btn--outline" id="avisLink" href="https://www.google.com/search?q=Agence+Europ%C3%A9enne+Immobili%C3%A8re+C%C3%B4t%C3%A9+Mer+Six-Fours+avis" target="_blank" rel="noopener">Lire les avis en ligne</a>
     </div>
   </div>
 </section>
@@ -433,12 +431,12 @@
       <h2 class="h2 reveal">Le littoral ouest varois, <em>quartier par quartier</em>.</h2>
     </div>
     <div class="areas__grid">
-      <a class="area reveal" href="#biens"><span>Six-Fours-les-Plages</span><small>Le Brusc · Le Rayolet · Reynier</small></a>
-      <a class="area reveal" href="#biens"><span>Sanary-sur-Mer</span><small>Port · Portissol · Beaucours</small></a>
-      <a class="area reveal" href="#biens"><span>Ollioules</span><small>Centre · Gorges · Quiez</small></a>
-      <a class="area reveal" href="#biens"><span>La Seyne-sur-Mer</span><small>Tamaris · Les Sablettes · Mar-Vivo</small></a>
-      <a class="area reveal" href="#biens"><span>Bandol</span><small>Centre · Renécros · Capelan</small></a>
-      <a class="area reveal" href="#biens"><span>Toulon Ouest</span><small>Le Mourillon · Saint-Jean-du-Var</small></a>
+      <a class="area reveal" href="/immobilier/six-fours-les-plages"><span>Six-Fours-les-Plages</span><small>Le Brusc · Le Rayolet · Reynier</small></a>
+      <a class="area reveal" href="/immobilier/sanary-sur-mer"><span>Sanary-sur-Mer</span><small>Port · Portissol · Beaucours</small></a>
+      <a class="area reveal" href="/immobilier/ollioules"><span>Ollioules</span><small>Centre · Gorges · Quiez</small></a>
+      <a class="area reveal" href="/immobilier/la-seyne-sur-mer"><span>La Seyne-sur-Mer</span><small>Tamaris · Les Sablettes · Mar-Vivo</small></a>
+      <a class="area reveal" href="/biens?q=Bandol"><span>Bandol</span><small>Centre · Renécros · Capelan</small></a>
+      <a class="area reveal" href="/biens?q=Toulon"><span>Toulon Ouest</span><small>Le Mourillon · Saint-Jean-du-Var</small></a>
     </div>
   </div>
 </section>
@@ -531,11 +529,11 @@
     </div>
     <div>
       <h4>Navigation</h4>
-      <a href="#biens">Nos biens</a><a href="#estimation">Estimation</a><a href="#services">Location &amp; gestion</a><a href="#equipe">L'équipe</a><a href="/espace-client.html">Espace client</a>
+      <a href="/biens">Nos biens</a><a href="#estimation">Estimation</a><a href="#services">Location &amp; gestion</a><a href="#equipe">L'équipe</a><a href="/espace-client.html">Espace client</a>
     </div>
     <div>
       <h4>Nos agences</h4>
-      <span>Six-Fours-les-Plages</span><span>Saint-Maximin</span><span>Loiret</span>
+      <a href="/agences.html">Six-Fours-les-Plages</a><a href="/agences.html">Saint-Maximin</a><a href="/agences.html">Loiret</a>
     </div>
     <div>
       <h4>Informations</h4>
@@ -554,8 +552,12 @@
   <a href="#estimation" class="is-gold">Estimer mon bien</a>
 </div>
 
+<script src="i18n-dict.js" defer></script>
+<script src="i18n.js" defer></script>
+<script src="stats.js" defer></script>
 <script src="favoris.js" defer></script>
 <script src="forms.js" defer></script>
+<script src="filters.js" defer></script>
 <script src="cards.js" defer></script>
 <script src="main.js" defer></script>
 </body>

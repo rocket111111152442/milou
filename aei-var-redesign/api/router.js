@@ -7,9 +7,11 @@ import publicRoutes from '../lib/routes/public.js';
 import adminRoutes from '../lib/routes/admin.js';
 import syncRoutes from '../lib/routes/sync.js';
 import cronRoutes from '../lib/routes/cron.js';
+import ssrRoutes from '../lib/routes/ssr.js';
+import crmRoutes from '../lib/routes/crm.js';
 
 // Chaque route : [méthode, motif, gestionnaire]. Les :params sont extraits du chemin.
-const ROUTES = [...publicRoutes, ...authRoutes, ...adminRoutes, ...syncRoutes, ...cronRoutes].map(([method, pattern, handler, opts = {}]) => {
+const ROUTES = [...publicRoutes, ...authRoutes, ...adminRoutes, ...syncRoutes, ...cronRoutes, ...ssrRoutes, ...crmRoutes].map(([method, pattern, handler, opts = {}]) => {
   const keys = [];
   const re = new RegExp('^' + pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$');
   return { method, re, keys, handler, opts };

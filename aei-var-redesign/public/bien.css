@@ -204,3 +204,17 @@ a.bien__media { cursor: pointer; }
 .vf-ok p { margin: 6px 0 0; }
 .vf-ok .track-code { background: #fff; }
 .vf-ok .track-code a { color: var(--teal); }
+
+/* ---------- Visite virtuelle, vidéo, proximité ---------- */
+.embed { border-radius: var(--radius); overflow: hidden; background: var(--mist-soft); min-height: 120px; }
+.embed iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; display: block; }
+.embed .map-consent { min-height: 220px; }
+.proximite { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 20px; }
+.proximite li { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); padding: 6px 0; }
+.proximite span { color: var(--muted); }
+.bien__vv { position: absolute; left: 12px; bottom: 12px; background: rgba(14, 10, 54, .8); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; letter-spacing: .04em; }
+.share svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+.print-only { display: none; }
+@media print { .print-only { display: block !important; margin-top: 24px; font-size: 12px; } }
+.fiche__main, .fiche__side { min-width: 0; }

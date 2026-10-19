@@ -66,6 +66,11 @@
       <a href="#tableau-de-bord" data-nav="tableau-de-bord"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Tableau de bord</a>
       <a href="#biens" data-nav="biens"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>Biens</a>
       <a href="#demandes" data-nav="demandes"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg>Demandes <b class="side__count" id="newCount" hidden></b></a>
+      <a href="#contacts" data-nav="contacts"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>Contacts</a>
+      <a href="#taches" data-nav="taches"><svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg>Tâches <b class="side__count" id="taskCount" hidden></b></a>
+      <a href="#mandats" data-nav="mandats" data-roles="owner,admin"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Mandats</a>
+      <a href="#rapports" data-nav="rapports" data-roles="owner,admin"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Rapports &amp; audience</a>
+      <a href="#contenu" data-nav="contenu" data-roles="owner,admin"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 10h10M4 15h16M4 20h8"/></svg>Communes &amp; avis</a>
       <a href="#utilisateurs" data-nav="utilisateurs" data-roles="owner,admin"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg>Utilisateurs</a>
       <a href="#integrations" data-nav="integrations"><svg viewBox="0 0 24 24"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/></svg>Intégrations &amp; sauvegardes</a>
       <a href="#compte" data-nav="compte"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Mon compte</a>
@@ -193,6 +198,35 @@
         <div class="sect__body">
           <div class="compo" id="compo"></div>
           <button type="button" class="btn btn--ghost btn--sm" id="compoAdd">+ Ajouter une pièce</button>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Visite virtuelle, vidéo &amp; proximité</summary>
+        <div class="sect__body">
+          <label class="field"><span>Lien de visite virtuelle (https)</span><input name="visiteVirtuelle" type="url" maxlength="300" placeholder="https://my.matterport.com/show/?m=…"></label>
+          <label class="field"><span>Lien vidéo (YouTube, Vimeo ou autre, https)</span><input name="video" type="url" maxlength="300" placeholder="https://www.youtube.com/watch?v=…"></label>
+          <label class="field"><span>À proximité (une ligne par élément : « libellé | distance »)</span><textarea name="quartierTxt" rows="4" placeholder="École primaire | 300 m&#10;Plage | 5 min à pied&#10;Commerces | 200 m"></textarea></label>
+          <p class="muted">La visite virtuelle doit être réalisée par un prestataire (Matterport, etc.) : le site se contente de l’afficher.</p>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Traductions (facultatif)</summary>
+        <div class="sect__body">
+          <label class="field"><span>Titre en anglais</span><input name="titreEn" maxlength="120"></label>
+          <label class="field"><span>Description en anglais</span><textarea name="descriptionEn" rows="4" maxlength="6000"></textarea></label>
+          <label class="field"><span>Titre en allemand</span><input name="titreDe" maxlength="120"></label>
+          <label class="field"><span>Description en allemand</span><textarea name="descriptionDe" rows="4" maxlength="6000"></textarea></label>
+          <p class="muted">Sans traduction, le visiteur voit le texte français.</p>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Suivi interne</summary>
+        <div class="sect__body">
+          <label class="field"><span>Négociateur en charge</span><select name="negociateurId"><option value="">Non assigné</option></select></label>
+          <div id="acqBox" class="muted"></div>
         </div>
       </details>
 

@@ -30,6 +30,23 @@ function cleanPhoto(v) {
   return '';
 }
 
+// Lien externe (visite virtuelle, vidéo) : https uniquement, sans identifiants intégrés
+function cleanUrl(v) {
+  const s = str(v, 300);
+  if (!s) return '';
+  let u;
+  try { u = new URL(s); } catch { throw new HttpError(400, `Lien invalide : « ${s} »`); }
+  if (u.protocol !== 'https:' || u.username || u.password) throw new HttpError(400, 'Le lien doit commencer par https://');
+  return u.href;
+}
+
+function cleanQuartier(v) {
+  return (Array.isArray(v) ? v : [])
+    .map(r => ({ label: str(r?.label, 50), distance: str(r?.distance, 20) }))
+    .filter(r => r.label)
+    .slice(0, 14);
+}
+
 function cleanComposition(v) {
   return (Array.isArray(v) ? v : [])
     .map(r => ({ niveau: str(r?.niveau, 40), piece: str(r?.piece, 60), surface: str(r?.surface, 12) }))
@@ -93,6 +110,13 @@ export function sanitizeBien(b, previous = null) {
     energieMin: numStr(b.energieMin),
     energieMax: numStr(b.energieMax),
     energieRef: numStr(b.energieRef, 10),
+    visiteVirtuelle: cleanUrl(b.visiteVirtuelle),
+    video: cleanUrl(b.video),
+    quartier: cleanQuartier(b.quartier),
+    // Traductions facultatives (le français sert de repli)
+    titreEn: str(b.titreEn), titreDe: str(b.titreDe),
+    descriptionEn: str(b.descriptionEn, 6000), descriptionDe: str(b.descriptionDe, 6000),
+    negociateurId: str(b.negociateurId, 60),
     honoraires: str(b.honoraires, 200),
     taxeFonciere: numStr(b.taxeFonciere),
     chargesCopro: numStr(b.chargesCopro),
@@ -128,7 +152,7 @@ export async function writeBiens(list, etag) {
 export const slug = (s) => String(s || 'bien').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'bien';
 
 // Version publique : biens publiés uniquement, sans les champs internes
-const PRIVATE_FIELDS = ['adresse', 'externalRef', 'source', 'createdAt', 'updatedAt'];
+const PRIVATE_FIELDS = ['adresse', 'externalRef', 'source', 'createdAt', 'updatedAt', 'negociateurId', 'createdBy', 'updatedBy', 'mandatId'];
 export function publicBien(b) {
   const out = { ...b, statutLabel: STATUTS[b.statut], vendu: b.statut === 'vendu' || b.statut === 'loue' };
   PRIVATE_FIELDS.forEach(k => delete out[k]);
