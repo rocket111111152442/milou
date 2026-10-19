@@ -5,7 +5,7 @@ import { $, $$, esc, toast, src, toNumber, confirmDialog, showFieldErrors, setBu
 const FIELDS = ['titre', 'ville', 'cp', 'adresse', 'prix', 'region', 'transaction', 'statut', 'surface', 'chambres', 'terrain', 'badge', 'extra',
   'type', 'ref', 'pieces', 'sdb', 'sde', 'niveaux', 'annee', 'cuisine', 'chauffage', 'description',
   'dpe', 'dpeKwh', 'ges', 'gesCo2', 'energieMin', 'energieMax', 'energieRef',
-  'honoraires', 'taxeFonciere', 'chargesCopro', 'lotsCopro', 'visiteVirtuelle', 'video', 'titreEn', 'titreDe', 'descriptionEn', 'descriptionDe', 'negociateurId'];
+  'honoraires', 'taxeFonciere', 'chargesCopro', 'lotsCopro', 'visiteVirtuelle', 'video', 'titreEn', 'titreDe', 'descriptionEn', 'descriptionDe', 'negociateurId', 'etapeVente', 'dateCompromis', 'dateActe', 'acquereurId'];
 const STATUT_CLASS = { disponible: 'pill--ok', 'sous-compromis': 'pill--warn', vendu: 'pill--sold', loue: 'pill--sold' };
 const MAX_PHOTOS = 30;
 
@@ -41,7 +41,7 @@ function renderList() {
         <p class="item__title">${esc(b.titre)}</p>
         <p class="item__meta">${esc([b.type, b.ville, b.cp].filter(Boolean).join(' · '))}${b.surface ? ` · ${esc(b.surface)} m²` : ''} · ${photos.length} photo${photos.length > 1 ? 's' : ''}${b.ref ? ` · réf. ${esc(b.ref)}` : ''}</p>
         <p class="item__pills">
-          <span class="pill ${STATUT_CLASS[b.statut] || ''}">${esc(meta.statuts[b.statut] || b.statut)}</span>
+          <span class="pill ${STATUT_CLASS[b.statut] || ''}">${esc(meta.statuts[b.statut] || b.statut)}</span>${b.etapeVente ? `<span class="pill">${esc({ mandat: 'Mandat signé', offre: 'Offre reçue', compromis: 'Compromis signé', acte: 'Acte signé' }[b.etapeVente])}</span>` : ''}
           ${b.transaction === 'location' ? '<span class="pill">Location</span>' : ''}
           ${b.badge ? `<span class="pill">${esc(b.badge)}</span>` : ''}
           ${b.publie ? '' : '<span class="pill pill--muted">Masqué</span>'}
@@ -125,7 +125,20 @@ async function fillTeam(form, b) {
   } catch { /* liste indisponible */ }
   const box = $('#acqBox');
   box.textContent = '';
+  const mb = $('#mandatBox');
+  mb.innerHTML = '';
+  try {
+    const cs = (await api('/admin/contacts')).contacts;
+    const as = form.elements.acquereurId;
+    as.innerHTML = '<option value="">—</option>' + cs.map(c => `<option value="${esc(c.id)}">${esc(c.nom)}</option>`).join('');
+    as.value = b?.acquereurId || '';
+  } catch { /* facultatif */ }
   if (!b) return;
+  try {
+    const { mandats, types, statuts } = await api('/admin/mandats');
+    const mine = mandats.filter(m => m.bienId === b.id);
+    mb.innerHTML = `<strong>Mandats de ce bien :</strong> ${mine.length ? `<ul>${mine.map(m => `<li><a href="#mandats">${esc(m.numero)}</a> – ${esc(types[m.type])} (${esc(statuts[m.statut])})${m.dateFin ? ' jusqu’au ' + esc(m.dateFin.split('-').reverse().join('/')) : ''}</li>`).join('')}</ul>` : 'aucun.'} ${['owner', 'admin'].includes(session.user.role) ? `<a href="#mandats/nouveau/${esc(b.id)}" class="linkish">+ Enregistrer un mandat</a>` : ''}`;
+  } catch { /* facultatif */ }
   try {
     const { contacts } = await api(`/admin/biens/${encodeURIComponent(b.id)}/acquereurs`);
     box.innerHTML = contacts.length

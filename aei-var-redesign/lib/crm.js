@@ -7,7 +7,7 @@ import { validEmail, normPhone, TYPES as LEAD_TYPES, STATUSES } from './leads.js
 import { toNumber } from './biens.js';
 import agence from '../config/agence.js';
 
-const CK = 'crm/contacts.json', TK = 'crm/tasks.json', MK = 'crm/mandats.json', EK = 'crm/modeles.json';
+const VK = 'crm/visites.json', CK = 'crm/contacts.json', TK = 'crm/tasks.json', MK = 'crm/mandats.json', EK = 'crm/modeles.json';
 const str = (v, max = 200) => String(v ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim().slice(0, max);
 const id = (p) => `${p}${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
 const now = () => new Date().toISOString();
@@ -353,3 +353,30 @@ export function buildReport({ leads, biens, users, audience, days = 90 }) {
     biens: biensStats, audience: audience ? { total: audience.total, langs: audience.langs, refs: audience.refs } : null,
   };
 }
+
+// ---------- Visites (agenda) ----------
+export const VISITE_STATUTS = { prevue: 'Prévue', effectuee: 'Effectuée', annulee: 'Annulée' };
+export const readVisites = () => readJSON(VK, []);
+
+export async function saveVisite(input, by, existingId = null) {
+  let out;
+  await updateJSON(VK, [], (list) => {
+    const i = existingId ? list.findIndex(v => v.id === existingId) : -1;
+    if (existingId && i < 0) throw new HttpError(404, 'Visite introuvable');
+    const prev = i >= 0 ? list[i] : null;
+    const date = str(input.date, 10), heure = str(input.heure, 5);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new HttpError(400, 'Date au format AAAA-MM-JJ');
+    if (heure && !/^([01]\d|2[0-3]):[0-5]\d$/.test(heure)) throw new HttpError(400, 'Heure au format HH:MM');
+    if (!input.bienId && !str(input.lieu, 160)) throw new HttpError(400, 'Choisissez un bien ou indiquez un lieu');
+    const v = {
+      id: prev?.id || id('V'), date, heure, bienId: str(input.bienId, 60), lieu: str(input.lieu, 160), contactId: str(input.contactId, 60),
+      assigneId: str(input.assigneId, 60), statut: VISITE_STATUTS[input.statut] ? input.statut : prev?.statut || 'prevue',
+      retour: str(input.retour, 1000), createdAt: prev?.createdAt || now(), createdBy: prev?.createdBy || by,
+    };
+    if (i >= 0) list[i] = v; else list.push(v);
+    out = v;
+    return list;
+  });
+  return out;
+}
+export const deleteVisite = (vid) => updateJSON(VK, [], (l) => l.filter(v => v.id !== vid));

@@ -67,6 +67,7 @@
       <a href="#biens" data-nav="biens"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>Biens</a>
       <a href="#demandes" data-nav="demandes"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg>Demandes <b class="side__count" id="newCount" hidden></b></a>
       <a href="#contacts" data-nav="contacts"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>Contacts</a>
+      <a href="#agenda" data-nav="agenda"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Agenda des visites <b class="side__count" id="visitCount" hidden></b></a>
       <a href="#taches" data-nav="taches"><svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg>Tâches <b class="side__count" id="taskCount" hidden></b></a>
       <a href="#mandats" data-nav="mandats" data-roles="owner,admin"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Mandats</a>
       <a href="#rapports" data-nav="rapports" data-roles="owner,admin"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Rapports &amp; audience</a>
@@ -226,6 +227,11 @@
         <summary>Suivi interne</summary>
         <div class="sect__body">
           <label class="field"><span>Négociateur en charge</span><select name="negociateurId"><option value="">Non assigné</option></select></label>
+          <label class="field"><span>Avancement de la vente</span><select name="etapeVente"><option value="">Aucun</option><option value="mandat">Mandat signé</option><option value="offre">Offre reçue</option><option value="compromis">Compromis signé</option><option value="acte">Acte signé</option></select></label>
+          <label class="field"><span>Date du compromis</span><input name="dateCompromis" type="date"></label>
+          <label class="field"><span>Date de l'acte</span><input name="dateActe" type="date"></label>
+          <label class="field"><span>Acquéreur (contact)</span><select name="acquereurId"><option value="">—</option></select></label>
+          <div id="mandatBox" class="muted"></div>
           <div id="acqBox" class="muted"></div>
         </div>
       </details>

@@ -22,6 +22,10 @@
 - Modèles d'e-mails : envoi via Resend si configuré, sinon ouverture de la messagerie (mailto).
 - Rapports : parcours des demandes, délai médian, origine, par négociateur, biens vus vs demandes, audience.
 
+**Complément (suivi des dossiers)** : critères de recherche saisissables dans la fiche contact (pour le rapprochement interne, sans envoi d'e-mail), mandats rattachés aux biens (visibles dans la fiche du bien, création pré-remplie), agenda des visites avec compte rendu, avancement de la vente (mandat, offre, compromis, acte) en information interne jamais publiée.
+
+**Interkab : non réalisé, et pourquoi.** Interkab est le réseau inter-cabinets de La Boîte Immo, accessible depuis son logiciel Hektor (« Interkab Connect »). Je n'ai trouvé aucune documentation ni API publique permettant à un tiers de s'y connecter ; la participation passe par un abonnement Hektor. Rien n'a été simulé dans le site. Pour y accéder, il faut demander à La Boîte Immo si un accès partenaire existe (probablement non, l'éditeur étant concurrent).
+
 **Ce que cette mise à jour ne fait PAS (à dire clairement à un client)**
 - Pas de synchronisation avec Hektor/La Boîte Immo ni diffusion vers SeLoger/Leboncoin : pas d'API publique, flux CSV/XML sur demande auprès de l'éditeur.
 - Pas d'estimation instantanée de type PriceHubble/Meilleurs Agents : seulement un calcul sur vos propres prix au m². Sans prix saisi, aucun chiffre n'est affiché.

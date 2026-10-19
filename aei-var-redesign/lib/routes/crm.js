@@ -9,7 +9,7 @@ import { audience } from '../stats.js';
 import {
   CONTACT_TYPES, MANDAT_TYPES, MANDAT_STATUTS, listContacts, saveContact, addContactNote, mergeContacts, deleteContact,
   contactsCSV, importContacts, readTasks, saveTask, deleteTask, readMandats, saveMandat, mandatsToExpire,
-  contactsForBien, biensForContact, readModeles, writeModeles, renderModele, buildReport,
+  VISITE_STATUTS, readVisites, saveVisite, deleteVisite, contactsForBien, biensForContact, readModeles, writeModeles, renderModele, buildReport,
 } from '../crm.js';
 import { sendEmail, emailEnabled, layout } from '../email.js';
 import agence from '../../config/agence.js';
@@ -28,7 +28,7 @@ const listContactsRoute = async ({ request }) => {
 };
 const getContact = async ({ request, params }) => {
   await requireUser(request);
-  const [contacts, leads, tasks, mandats, biens] = await Promise.all([listContacts(), listLeads(), readTasks(), readMandats(), readBiens()]);
+  const [contacts, leads, tasks, mandats, biens, visites] = await Promise.all([listContacts(), listLeads(), readTasks(), readMandats(), readBiens(), readVisites()]);
   const c = contacts.find(x => x.id === params.id);
   if (!c) throw new HttpError(404, 'Contact introuvable');
   return json({
@@ -36,6 +36,7 @@ const getContact = async ({ request, params }) => {
     demandes: leads.filter(l => c.leadIds.includes(l.id)).map(l => ({ id: l.id, type: l.type, status: l.status, bienTitre: l.bienTitre, createdAt: l.createdAt, issue: l.issue || '' })),
     taches: tasks.filter(t => t.contactId === c.id),
     mandats: mandats.filter(m => m.contactId === c.id),
+    visites: visites.filter(v => v.contactId === c.id).map(v => ({ ...v, statutLabel: VISITE_STATUTS[v.statut], titreBien: biens.find(b => b.id === v.bienId)?.titre || '' })),
     biensCorrespondants: c.criteres ? biensForContact(c, biens).slice(0, 12).map(b => ({ id: b.id, titre: b.titre, ville: b.ville, prix: b.prix })) : [],
   });
 };
@@ -64,6 +65,12 @@ const listMandats = async ({ request }) => {
 };
 const createMandat = async ({ request }) => { const u = await requireUser(request, ADMINS); return json({ mandat: await saveMandat(await readBody(request, 5000), u.email) }, 201); };
 const updateMandat = async ({ request, params }) => { const u = await requireUser(request, ADMINS); return json({ mandat: await saveMandat(await readBody(request, 5000), u.email, params.id) }); };
+
+// ---------- Visites ----------
+const listVisites = async ({ request }) => { await requireUser(request); return json({ visites: await readVisites(), statuts: VISITE_STATUTS }); };
+const createVisite = async ({ request }) => { const u = await requireUser(request); const b = await readBody(request, 5000); return json({ visite: await saveVisite({ ...b, assigneId: b.assigneId || u.id }, u.name) }, 201); };
+const updateVisite = async ({ request, params }) => { const u = await requireUser(request); return json({ visite: await saveVisite(await readBody(request, 5000), u.name, params.id) }); };
+const removeVisite = async ({ request, params }) => { await requireUser(request); await deleteVisite(params.id); return json({ ok: true }); };
 
 // ---------- Rapprochement bien → acquéreurs ----------
 const matchBien = async ({ request, params }) => {
@@ -114,7 +121,8 @@ const alertes = async ({ request }) => {
   const [tasks, mandats] = await Promise.all([readTasks(), readMandats()]);
   const today = new Date().toISOString().slice(0, 10);
   const mine = tasks.filter(t => !t.fait && t.echeance && t.echeance <= today && (u.role !== 'agent' || t.assigneId === u.id));
-  return json({ tachesEnRetard: mine.length, mandatsAEcheance: mandatsToExpire(mandats).length });
+  const visites = (await readVisites()).filter(v => v.statut === 'prevue' && v.date === today && (u.role !== 'agent' || v.assigneId === u.id));
+  return json({ tachesEnRetard: mine.length, mandatsAEcheance: mandatsToExpire(mandats).length, visitesAujourdhui: visites.length });
 };
 
 export default [
@@ -135,6 +143,10 @@ export default [
   ['GET', '/admin/mandats', listMandats],
   ['POST', '/admin/mandats', createMandat],
   ['PUT', '/admin/mandats/:id', updateMandat],
+  ['GET', '/admin/visites', listVisites],
+  ['POST', '/admin/visites', createVisite],
+  ['PUT', '/admin/visites/:id', updateVisite],
+  ['DELETE', '/admin/visites/:id', removeVisite],
   ['GET', '/admin/biens/:id/acquereurs', matchBien],
   ['GET', '/admin/modeles', getModeles],
   ['PUT', '/admin/modeles', putModeles],

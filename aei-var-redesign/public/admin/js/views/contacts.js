@@ -22,12 +22,25 @@ const contactFields = (c = {}) => [
   { name: 'tel', label: 'Téléphone', value: c.tel },
   { name: 'email', label: 'E-mail', type: 'email', value: c.email },
   { name: 'type', label: 'Profil principal', type: 'select', value: c.types?.[0] || '', options: [['', '—'], ...Object.entries(types)] },
+  { name: 'c_transaction', label: 'Recherche : achat ou location', type: 'select', value: c.criteres?.transaction || 'vente', options: [['vente', 'Achat'], ['location', 'Location']] },
+  { name: 'c_types', label: 'Recherche : types de bien (séparés par des virgules)', value: (c.criteres?.types || []).join(', '), placeholder: 'Maison, Villa' },
+  { name: 'c_villes', label: 'Recherche : villes (séparées par des virgules)', value: (c.criteres?.villes || []).join(', '), placeholder: 'Six-Fours-les-Plages, Sanary-sur-Mer' },
+  { name: 'c_budgetMax', label: 'Recherche : budget maximum (€)', value: c.criteres?.budgetMax },
+  { name: 'c_surfaceMin', label: 'Recherche : surface minimum (m²)', value: c.criteres?.surfaceMin },
+  { name: 'c_chambresMin', label: 'Recherche : chambres minimum', value: c.criteres?.chambresMin },
 ];
+
+// Les critères servent uniquement au rapprochement interne : les saisir ne déclenche AUCUN envoi d'e-mail au contact
+const withCriteres = (v) => {
+  const list = (x) => String(x || '').split(',').map(t => t.trim()).filter(Boolean);
+  const any = v.c_types || v.c_villes || v.c_budgetMax || v.c_surfaceMin || v.c_chambresMin;
+  return { ...v, criteres: any ? { transaction: v.c_transaction, types: list(v.c_types), villes: list(v.c_villes), budgetMax: v.c_budgetMax, surfaceMin: v.c_surfaceMin, chambresMin: v.c_chambresMin } : null };
+};
 
 async function newContact() {
   const v = await formDialog({ title: 'Nouveau contact', fields: contactFields() });
   if (!v) return;
-  try { const { contact } = await api('/admin/contacts', { method: 'POST', body: { ...v, types: v.type ? [v.type] : [] } }); toast('Contact créé'); location.hash = `#contacts/${contact.id}`; } catch (e) { toast(e.message, true); }
+  try { const { contact } = await api('/admin/contacts', { method: 'POST', body: { ...withCriteres(v), types: v.type ? [v.type] : [] } }); toast('Contact créé'); location.hash = `#contacts/${contact.id}`; } catch (e) { toast(e.message, true); }
 }
 
 async function importCsv() {
@@ -69,6 +82,8 @@ async function detail(el, id) {
       <div class="card"><h2>Biens qui pourraient l’intéresser</h2>${d.biensCorrespondants.length ? `<ul>${d.biensCorrespondants.map(b => `<li><a href="#biens">${esc(b.titre)}</a> – ${esc(b.ville)} ${b.prix ? esc(b.prix) + ' €' : ''}</li>`).join('')}</ul>` : '<p class="muted">Aucun (ou critères de recherche non renseignés).</p>'}</div>
       <div class="card"><h2>Demandes (${d.demandes.length})</h2>${d.demandes.map(l => `<p><a href="#demandes/${esc(l.id)}">${esc(l.type)}${l.bienTitre ? ' – ' + esc(l.bienTitre) : ''}</a> <small class="muted">${esc(fmtDate(l.createdAt, false))}</small></p>`).join('') || '<p class="muted">Aucune.</p>'}
         <h3>Tâches</h3>${d.taches.map(t => `<p class="${t.fait ? 'muted' : ''}">${t.fait ? '✔' : '○'} ${esc(t.titre)} <small>${esc(t.echeance)}</small></p>`).join('') || '<p class="muted">Aucune.</p>'}
+        <h3>Visites</h3>${(d.visites || []).map(v => `<p>${esc(v.date.split('-').reverse().join('/'))} ${esc(v.heure)} – ${esc(v.titreBien || v.lieu || '')} <small class="muted">(${esc(v.statutLabel)})</small></p>`).join('') || '<p class="muted">Aucune.</p>'}
+        <button class="btn btn--ghost btn--sm" id="cVisit">+ Visite</button>
         <button class="btn btn--ghost btn--sm" id="cTask">+ Rappel</button>
         ${d.mandats.length ? `<h3>Mandats</h3>${d.mandats.map(m => `<p>${esc(m.numero)} – ${esc(m.type)}</p>`).join('')}` : ''}</div>
       <div class="card"><h2>Notes</h2><ul class="notes">${c.notes.map(n => `<li><p>${esc(n.text).replace(/\n/g, '<br>')}</p><small>${esc(n.by)} · ${esc(fmtDate(n.at))}</small></li>`).join('') || '<li class="muted">Aucune note.</li>'}</ul>
@@ -78,7 +93,17 @@ async function detail(el, id) {
   $('#cEdit').addEventListener('click', async () => {
     const v = await formDialog({ title: 'Modifier le contact', fields: contactFields(c) });
     if (!v) return;
-    try { await api(`/admin/contacts/${id}`, { method: 'PUT', body: { ...c, ...v, types: v.type ? [v.type, ...c.types.filter(t => t !== v.type)] : c.types } }); toast('Contact mis à jour'); detail(el, id); } catch (er) { toast(er.message, true); }
+    try { await api(`/admin/contacts/${id}`, { method: 'PUT', body: { ...c, ...withCriteres(v), types: v.type ? [v.type, ...c.types.filter(t => t !== v.type)] : c.types } }); toast('Contact mis à jour'); detail(el, id); } catch (er) { toast(er.message, true); }
+  });
+  $('#cVisit').addEventListener('click', async () => {
+    const biens = (await api('/admin/biens')).biens.filter(b => b.publie);
+    const v = await formDialog({ title: 'Planifier une visite', fields: [
+      { name: 'bienId', label: 'Bien', type: 'select', options: biens.map(b => [b.id, `${b.titre} (${b.ville})`]) },
+      { name: 'date', label: 'Date', type: 'date', value: new Date(Date.now() + 864e5).toISOString().slice(0, 10), required: true },
+      { name: 'heure', label: 'Heure', type: 'time' },
+    ] });
+    if (!v) return;
+    try { await api('/admin/visites', { method: 'POST', body: { ...v, contactId: id } }); toast('Visite planifiée'); detail(el, id); } catch (er) { toast(er.message, true); }
   });
   $('#cTask').addEventListener('click', async () => {
     const v = await formDialog({ title: 'Nouveau rappel', fields: [{ name: 'titre', label: 'À faire', required: true }, { name: 'echeance', label: 'Échéance', type: 'date', value: new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10) }] });

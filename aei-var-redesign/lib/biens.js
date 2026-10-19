@@ -9,6 +9,7 @@ export const TRANSACTIONS = { vente: 'Vente', location: 'Location' };
 export const TYPES = ['Maison', 'Villa', 'Appartement', 'Terrain', 'Immeuble', 'Local commercial', 'Parking', 'Autre'];
 export const BADGES = ['', 'Nouveauté', 'Exclusivité', 'Coup de cœur', 'Prix en baisse'];
 const REGIONS = ['var', 'loiret', 'autre'];
+export const ETAPES = { '': 'Aucune', mandat: 'Mandat signé', offre: 'Offre reçue', compromis: 'Compromis signé', acte: 'Acte signé' };
 const LETTRES = ['', 'A', 'B', 'C', 'D', 'E', 'F', 'G'];
 const MAX_PHOTOS = 30;
 
@@ -117,6 +118,11 @@ export function sanitizeBien(b, previous = null) {
     titreEn: str(b.titreEn), titreDe: str(b.titreDe),
     descriptionEn: str(b.descriptionEn, 6000), descriptionDe: str(b.descriptionDe, 6000),
     negociateurId: str(b.negociateurId, 60),
+    // Suivi interne de la vente (jamais publié)
+    etapeVente: ETAPES[b.etapeVente] !== undefined ? b.etapeVente : '',
+    dateCompromis: /^\d{4}-\d{2}-\d{2}$/.test(b.dateCompromis || '') ? b.dateCompromis : '',
+    dateActe: /^\d{4}-\d{2}-\d{2}$/.test(b.dateActe || '') ? b.dateActe : '',
+    acquereurId: str(b.acquereurId, 60),
     honoraires: str(b.honoraires, 200),
     taxeFonciere: numStr(b.taxeFonciere),
     chargesCopro: numStr(b.chargesCopro),
@@ -152,7 +158,7 @@ export async function writeBiens(list, etag) {
 export const slug = (s) => String(s || 'bien').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'bien';
 
 // Version publique : biens publiés uniquement, sans les champs internes
-const PRIVATE_FIELDS = ['adresse', 'externalRef', 'source', 'createdAt', 'updatedAt', 'negociateurId', 'createdBy', 'updatedBy', 'mandatId'];
+const PRIVATE_FIELDS = ['adresse', 'externalRef', 'source', 'createdAt', 'updatedAt', 'negociateurId', 'etapeVente', 'dateCompromis', 'dateActe', 'acquereurId', 'createdBy', 'updatedBy', 'mandatId'];
 export function publicBien(b) {
   const out = { ...b, statutLabel: STATUTS[b.statut], vendu: b.statut === 'vendu' || b.statut === 'loue' };
   PRIVATE_FIELDS.forEach(k => delete out[k]);

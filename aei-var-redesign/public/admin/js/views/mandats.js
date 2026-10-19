@@ -18,10 +18,11 @@ const fields = (m = {}) => [
 ];
 
 async function edit(m) {
-  const v = await formDialog({ title: m ? `Mandat ${m.numero}` : 'Nouveau mandat', fields: fields(m || {}) });
+  const isNew = !m || m.__new;
+  const v = await formDialog({ title: isNew ? 'Nouveau mandat' : `Mandat ${m.numero}`, fields: fields(m || {}) });
   if (!v) return;
   const mandantNom = contacts.find(c => c.id === v.contactId)?.nom || m?.mandantNom || '';
-  try { await api(m ? `/admin/mandats/${m.id}` : '/admin/mandats', { method: m ? 'PUT' : 'POST', body: { ...v, mandantNom } }); toast('Mandat enregistré'); await show(); } catch (e) { toast(e.message, true); }
+  try { await api(isNew ? '/admin/mandats' : `/admin/mandats/${m.id}`, { method: isNew ? 'POST' : 'PUT', body: { ...v, mandantNom } }); toast('Mandat enregistré'); await show(); } catch (e) { toast(e.message, true); }
 }
 
 let root;
@@ -39,11 +40,12 @@ async function show() {
 }
 
 export default {
-  async render(el) {
+  async render(el, rest) {
     root = el;
     [biens, contacts] = await Promise.all([api('/admin/biens').then(r => r.biens), api('/admin/contacts').then(r => r.contacts)]);
     el.innerHTML = `<div class="head"><div><h1>Mandats</h1><p class="muted">Suivi interne des mandats : numérotation continue, aucun mandat supprimable (annulez-le). Ce suivi ne remplace pas le registre des mandats réglementaire de l’agence ni les mandats signés.</p></div><button class="btn btn--red" id="mNew">+ Nouveau mandat</button></div><div id="mList"></div>`;
     $('#mNew').addEventListener('click', () => edit(null));
     await show();
+    if (rest?.[0] === 'nouveau' && rest[1]) { history.replaceState(null, '', '#mandats'); edit({ bienId: rest[1], __new: true }); }
   },
 };

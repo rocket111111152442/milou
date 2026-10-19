@@ -8,7 +8,7 @@ import { listLeads, updateLead, deleteLead } from '../leads.js';
 import { readUsers, publicUser } from '../auth.js';
 import { sendEmail, emailEnabled, layout } from '../email.js';
 import agence from '../../config/agence.js';
-import { purgeOldContacts, readContacts, readTasks, readMandats } from '../crm.js';
+import { purgeOldContacts, readContacts, readTasks, readMandats, readVisites } from '../crm.js';
 import { purgeOld as purgeStats } from '../stats.js';
 
 function requireCron(request) {
@@ -24,7 +24,7 @@ const daysAgo = (d) => Date.now() - d * 864e5;
 async function backup(biens, leads) {
   const users = (await readUsers()).map(publicUser);
   const date = new Date().toISOString().slice(0, 10);
-  const crm = { contacts: await readContacts(), taches: await readTasks(), mandats: await readMandats() };
+  const crm = { contacts: await readContacts(), taches: await readTasks(), mandats: await readMandats(), visites: await readVisites() };
   await writeJSON(`backups/${date}.json`, { createdAt: new Date().toISOString(), biens, leads, users, crm });
   const old = (await listKeys('backups/')).filter(b => b.uploadedAt < daysAgo(agence.conservation.sauvegardesJours)).map(b => b.key);
   if (old.length) await removeKeys(old);

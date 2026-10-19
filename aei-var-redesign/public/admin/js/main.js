@@ -12,8 +12,9 @@ import taches from './views/taches.js';
 import mandats from './views/mandats.js';
 import rapports from './views/rapports.js';
 import contenu from './views/contenu.js';
+import agenda from './views/agenda.js';
 
-const VIEWS = { 'tableau-de-bord': dashboard, biens, demandes, contacts, taches, mandats, rapports, contenu, utilisateurs, integrations, compte };
+const VIEWS = { 'tableau-de-bord': dashboard, biens, demandes, contacts, agenda, taches, mandats, rapports, contenu, utilisateurs, integrations, compte };
 export const session = { user: null, emailEnabled: false };
 
 // ---------- Écrans de connexion ----------
@@ -137,6 +138,9 @@ export async function refreshNewCount() {
     const t = $('#taskCount');
     t.textContent = a.tachesEnRetard;
     t.hidden = !a.tachesEnRetard;
+    const vc = $('#visitCount');
+    vc.textContent = a.visitesAujourdhui;
+    vc.hidden = !a.visitesAujourdhui;
   } catch {}
 }
 setInterval(() => { if (session.user && !document.hidden) refreshNewCount(); }, 60000);
