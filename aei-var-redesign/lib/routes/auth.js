@@ -53,12 +53,12 @@ async function logout() {
 }
 
 async function me({ request }) {
-  const user = await requireUser(request);
+  const user = await requireUser(request, undefined, { allowMustChange: true });
   return json({ user: publicUser(user), emailEnabled: emailEnabled() });
 }
 
 async function changePassword({ request }) {
-  const user = await requireUser(request);
+  const user = await requireUser(request, undefined, { allowMustChange: true });
   const { current, next } = await readBody(request, 5000);
   if (!(await verifyPassword(current, user.hash))) throw new HttpError(400, 'Mot de passe actuel incorrect');
   checkPasswordStrength(next);

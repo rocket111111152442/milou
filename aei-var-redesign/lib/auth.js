@@ -60,7 +60,7 @@ export function sessionCookie(user, request) {
 export const clearCookie = () => `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`;
 
 // Retourne l'utilisateur connecté, ou lève 401
-export async function requireUser(request, roles = ROLES) {
+export async function requireUser(request, roles = ROLES, { allowMustChange = false } = {}) {
   const raw = parseCookies(request)[COOKIE];
   if (!raw) throw new HttpError(401, 'Connexion requise');
   const [payload, sig] = raw.split('.');
@@ -71,6 +71,8 @@ export async function requireUser(request, roles = ROLES) {
   if (!data.exp || data.exp < Date.now()) throw new HttpError(401, 'Session expirée, reconnectez-vous');
   const user = (await readUsers()).find(u => u.id === data.uid);
   if (!user || user.disabled || (user.sessionVersion || 0) !== data.v) throw new HttpError(401, 'Session expirée, reconnectez-vous');
+  // Un mot de passe provisoire doit être changé avant toute autre action, y compris via l'API
+  if (user.mustChange && !allowMustChange) throw new HttpError(403, 'Changez d’abord votre mot de passe provisoire');
   if (!roles.includes(user.role)) throw new HttpError(403, 'Vous n’avez pas les droits pour cette action');
   return user;
 }
