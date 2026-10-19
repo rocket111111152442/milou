@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     // Démonstration : pas d'indexation tant que le site n'a pas son propre domaine
     robots: { index: false, follow: false },
     manifest: `${base}/manifest.webmanifest`,
-    icons: { icon: `${base}/icon.png`, apple: `${base}/icon.png` },
+    icons: { icon: `${base}/app-icon`, apple: `${base}/app-icon` },
     openGraph: { type: "website", locale: "fr_FR", siteName: tenant.name, title: tenant.name, description: copy.siteDescription },
   };
 }

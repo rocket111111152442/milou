@@ -17,7 +17,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ slug: stri
       display: "standalone",
       background_color: v.farine,
       theme_color: v.torref,
-      icons: [{ src: `/s/${slug}/icon.png`, sizes: "192x192", type: "image/png" }],
+      icons: [{ src: `/s/${slug}/app-icon`, sizes: "192x192", type: "image/png" }],
     },
     { headers: { "Content-Type": "application/manifest+json" } },
   );

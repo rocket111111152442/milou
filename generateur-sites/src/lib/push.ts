@@ -81,7 +81,7 @@ export async function notifyNewOrder(slug: string, shopShort: string, order: Sto
       title: `${order.demo ? "[Test] " : ""}Nouvelle commande · ${shopShort}`,
       body: `${order.customer.firstName} ${order.customer.lastName} — ${count} article${count > 1 ? "s" : ""}, retrait ${formatDateLong(order.pickup.date)} à ${formatTime(order.pickup.time)}`,
       url: `/s/${slug}/admin`,
-      icon: `/s/${slug}/icon.png`,
+      icon: `/s/${slug}/app-icon`,
       tag: order.orderNumber,
     },
     order.shop,
@@ -89,5 +89,5 @@ export async function notifyNewOrder(slug: string, shopShort: string, order: Sto
 }
 
 export async function notifyTest(slug: string, shop: ShopId | null) {
-  return send(slug, { title: "Notifications activées ✓", body: "Vous serez prévenu à chaque nouvelle commande.", url: `/s/${slug}/admin`, icon: `/s/${slug}/icon.png`, tag: "test" }, shop);
+  return send(slug, { title: "Notifications activées ✓", body: "Vous serez prévenu à chaque nouvelle commande.", url: `/s/${slug}/admin`, icon: `/s/${slug}/app-icon`, tag: "test" }, shop);
 }
