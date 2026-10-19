@@ -58,6 +58,7 @@
 
 <div class="progress" aria-hidden="true"></div>
 
+<!-- layout:header -->
 <header class="header" id="top">
   <div class="header__inner container">
     <a class="logo" href="#top" aria-label="AEI Côté Mer — accueil">
@@ -72,6 +73,7 @@
       <a href="#contact">Contact</a>
     </nav>
     <div class="header__actions">
+      <a class="header__fav" href="/espace-client.html" aria-label="Espace client et favoris"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.5-9 9-9 9z"/></svg><b data-fav-count hidden></b></a>
       <a class="header__phone" href="tel:+33494072635">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
         04 94 07 26 35
@@ -89,10 +91,12 @@
     <a href="#services">Louer &amp; gérer</a>
     <a href="#agence">L'agence</a>
     <a href="#contact">Contact</a>
+    <a href="/espace-client.html">Espace client</a>
   </nav>
   <a class="btn btn--gold" href="tel:+33494072635">Appeler l'agence</a>
 </div>
 
+<!-- /layout:header -->
 <main>
 
 <!-- HERO -->
@@ -115,19 +119,19 @@
 
     <form class="search reveal-hero" action="#biens" aria-label="Rechercher un bien">
       <div class="search__tabs" role="tablist">
-        <button type="button" class="is-active" role="tab" aria-selected="true">Acheter</button>
-        <button type="button" role="tab" aria-selected="false">Louer</button>
+        <button type="button" class="is-active" role="tab" aria-selected="true" data-transaction="vente">Acheter</button>
+        <button type="button" role="tab" aria-selected="false" data-transaction="location">Louer</button>
         <span class="search__pill"></span>
       </div>
       <div class="search__fields">
         <label class="field">
           <span>Type de bien</span>
           <select name="type">
-            <option>Tous les biens</option>
-            <option>Maison / Villa</option>
-            <option>Appartement</option>
-            <option>Terrain</option>
-            <option>Immeuble</option>
+            <option value="">Tous les biens</option>
+            <option value="Maison|Villa">Maison / Villa</option>
+            <option value="Appartement">Appartement</option>
+            <option value="Terrain">Terrain</option>
+            <option value="Immeuble|Local commercial">Immeuble / local</option>
           </select>
         </label>
         <label class="field">
@@ -140,11 +144,11 @@
         <label class="field">
           <span>Budget max</span>
           <select name="budget">
-            <option>Sans limite</option>
-            <option>300 000 €</option>
-            <option>500 000 €</option>
-            <option>800 000 €</option>
-            <option>1 500 000 €</option>
+            <option value="">Sans limite</option>
+            <option value="300000">300 000 €</option>
+            <option value="500000">500 000 €</option>
+            <option value="800000">800 000 €</option>
+            <option value="1500000">1 500 000 €</option>
           </select>
         </label>
         <button class="btn btn--teal search__submit" type="submit">
@@ -188,7 +192,7 @@
       <p class="reveal">Acheter, vendre ou faire estimer un bien demande bien plus que des données chiffrées. L'Agence Européenne Immobilière – Côté Mer vous guide à chaque étape, avec sérieux, écoute et transparence.</p>
       <p class="reveal">Installés avenue Joseph Raynaud à Six-Fours, nous intervenons à Sanary-sur-Mer, Ollioules, La Seyne-sur-Mer et dans tout le Var, avec des agences sœurs à Saint-Maximin et dans le Loiret.</p>
       <div class="stats reveal">
-        <div class="stat"><strong class="count" data-to="153">0</strong><span>biens en portefeuille</span></div>
+        <div class="stat"><strong class="count" data-to="0" id="statBiens">0</strong><span>biens actuellement en ligne</span></div>
         <div class="stat"><strong class="count" data-to="3">0</strong><span>agences en France</span></div>
         <div class="stat"><strong><span class="count" data-to="4.7" data-dec="1">0</span><small>/5</small></strong><span>sur 73 avis clients*</span></div>
       </div>
@@ -253,10 +257,11 @@
       </div>
     </div>
 
+    <p class="search-result" id="searchResult" hidden></p>
     <div class="grid-biens" id="gridBiens" aria-live="polite"></div>
 
     <div class="center reveal">
-      <a href="#contact" class="btn btn--outline magnetic">Consulter nos 153 biens</a>
+      <a href="/espace-client.html#alertes" class="btn btn--outline magnetic">Créer une alerte e-mail</a>
     </div>
   </div>
 </section>
@@ -268,7 +273,7 @@
     <div class="estimate__intro">
       <p class="eyebrow eyebrow--light reveal">Vous êtes vendeur ?</p>
       <h2 class="h2 h2--light reveal">Combien vaut <em>votre bien</em> aujourd'hui&nbsp;?</h2>
-      <p class="reveal">Un avis de valeur gratuit, établi par un professionnel du secteur, à partir des ventes réelles de votre quartier. Réponse sous 48&nbsp;h ouvrées.</p>
+      <p class="reveal">Un avis de valeur gratuit, établi par un professionnel du secteur, à partir des ventes réelles de votre quartier. Un négociateur vous recontacte pour convenir d’une visite.</p>
       <ul class="checks reveal">
         <li>Gratuit et sans engagement</li>
         <li>Visite sur place par un négociateur</li>
@@ -292,8 +297,9 @@
 
       <fieldset class="wizard__step" data-step="2">
         <legend>Où se situe-t-il&nbsp;?</legend>
-        <label class="field field--dark"><span>Adresse ou commune</span><input name="adresse" type="text" placeholder="Ex. Six-Fours-les-Plages" required></label>
-        <label class="field field--dark"><span>Surface habitable (m²)</span><input name="surface" type="number" min="1" placeholder="Ex. 120" required></label>
+        <label class="field field--dark"><span>Ville *</span><input name="ville" type="text" placeholder="Ex. Six-Fours-les-Plages" autocomplete="address-level2" required maxlength="80"></label>
+        <label class="field field--dark"><span>Adresse <small>(facultatif)</small></span><input name="adresse" type="text" placeholder="Ex. 12 chemin des Pins" autocomplete="street-address" maxlength="160"></label>
+        <label class="field field--dark"><span>Surface habitable (m²) *</span><input name="surface" type="number" min="1" max="99999" inputmode="numeric" placeholder="Ex. 120" required></label>
       </fieldset>
 
       <fieldset class="wizard__step" data-step="3">
@@ -313,24 +319,30 @@
           <label><input type="checkbox" name="atouts" value="Garage"><span>Garage</span></label>
           <label><input type="checkbox" name="atouts" value="Terrasse"><span>Terrasse</span></label>
         </div>
+        <div class="wphotos">
+          <label class="wphotos__add"><input type="file" accept="image/jpeg,image/png,image/webp" multiple id="estPhotos"><span>+ Ajouter des photos <small>(facultatif, 8 max)</small></span></label>
+          <ul class="wphotos__list" id="estPhotoList"></ul>
+        </div>
       </fieldset>
 
       <fieldset class="wizard__step" data-step="4">
         <legend>Où vous envoyer l'estimation&nbsp;?</legend>
-        <label class="field field--dark"><span>Nom</span><input name="nom" type="text" autocomplete="name" required></label>
+        <label class="field field--dark"><span>Nom *</span><input name="nom" type="text" autocomplete="name" required maxlength="100"></label>
         <div class="row2">
-          <label class="field field--dark"><span>Téléphone</span><input name="tel" type="tel" autocomplete="tel" required></label>
-          <label class="field field--dark"><span>E-mail</span><input name="email" type="email" autocomplete="email" required></label>
+          <label class="field field--dark"><span>Téléphone *</span><input name="tel" type="tel" autocomplete="tel" required maxlength="30"></label>
+          <label class="field field--dark"><span>E-mail</span><input name="email" type="email" autocomplete="email" maxlength="160"></label>
         </div>
-        <label class="consent"><input type="checkbox" required> J'accepte d'être recontacté(e) par l'agence au sujet de ma demande.</label>
+        <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
+        <label class="consent"><input type="checkbox" name="consent" required> J’accepte que mes données soient utilisées par l’agence pour traiter ma demande, conformément à la <a href="/confidentialite.html" target="_blank">politique de confidentialité</a>.</label>
       </fieldset>
 
       <div class="wizard__done" hidden>
         <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/><path d="m15 27 7 7 15-15"/></svg>
         <h3>Merci, c'est noté&nbsp;!</h3>
-        <p>Un négociateur vous rappelle sous 48&nbsp;h ouvrées pour convenir d'une visite.</p>
+        <div class="wizard__msg"></div>
       </div>
 
+      <p class="form-error" role="alert" hidden></p>
       <div class="wizard__nav">
         <button type="button" class="btn btn--ghost" data-prev disabled>Retour</button>
         <button type="button" class="btn btn--gold" data-next>Continuer</button>
@@ -484,26 +496,33 @@
     </div>
     <form class="contact__form reveal" id="contactForm" novalidate>
       <div class="row2">
-        <label class="field field--dark"><span>Nom</span><input type="text" name="nom" autocomplete="name" required></label>
-        <label class="field field--dark"><span>Téléphone</span><input type="tel" name="tel" autocomplete="tel" required></label>
+        <label class="field field--dark"><span>Nom *</span><input type="text" name="nom" autocomplete="name" required maxlength="100"></label>
+        <label class="field field--dark"><span>Téléphone</span><input type="tel" name="tel" autocomplete="tel" maxlength="30"></label>
       </div>
-      <label class="field field--dark"><span>E-mail</span><input type="email" name="email" autocomplete="email" required></label>
+      <label class="field field--dark"><span>E-mail</span><input type="email" name="email" autocomplete="email" maxlength="160"></label>
       <label class="field field--dark"><span>Votre projet</span>
-        <select name="projet"><option>Acheter</option><option>Vendre</option><option>Louer</option><option>Faire gérer mon bien</option><option>Autre</option></select>
+        <select name="projet"><option value="achat">Acheter</option><option value="contact|Vendre">Vendre</option><option value="location">Louer</option><option value="gestion">Faire gérer mon bien</option><option value="contact|Autre">Autre</option></select>
       </label>
-      <label class="field field--dark"><span>Message</span><textarea name="message" rows="4"></textarea></label>
+      <label class="field field--dark"><span>Message</span><textarea name="message" rows="4" maxlength="3000"></textarea></label>
+      <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
+      <label class="consent consent--light"><input type="checkbox" name="consent" required> J’accepte que mes données soient utilisées par l’agence pour traiter ma demande, conformément à la <a href="/confidentialite.html" target="_blank">politique de confidentialité</a>.</label>
       <button class="btn btn--gold magnetic" type="submit">Envoyer ma demande</button>
-      <p class="form-ok" hidden>Merci&nbsp;! Votre message a bien été envoyé.</p>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="form-ok" role="status" hidden></div>
     </form>
   </div>
-  <div class="map reveal">
-    <iframe title="Plan d'accès à l'agence" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
-      src="https://www.google.com/maps?q=175+avenue+Joseph+Raynaud+83140+Six-Fours-les-Plages&output=embed"></iframe>
+  <div class="map reveal" data-map="175 avenue Joseph Raynaud 83140 Six-Fours-les-Plages">
+    <div class="map__consent">
+      <p>La carte est fournie par Google Maps, qui peut déposer des cookies et collecter des données de navigation.</p>
+      <button type="button" class="btn btn--gold btn--sm" data-map-load>Afficher la carte</button>
+      <a href="https://www.google.com/maps/search/?api=1&amp;query=175+avenue+Joseph+Raynaud+83140+Six-Fours-les-Plages" target="_blank" rel="noopener">Ouvrir dans Google Maps ↗</a>
+    </div>
   </div>
 </section>
 
 </main>
 
+<!-- layout:footer -->
 <footer class="footer">
   <div class="container footer__grid">
     <div>
@@ -512,7 +531,7 @@
     </div>
     <div>
       <h4>Navigation</h4>
-      <a href="#biens">Nos biens</a><a href="#estimation">Estimation</a><a href="#services">Location &amp; gestion</a><a href="#equipe">L'équipe</a>
+      <a href="#biens">Nos biens</a><a href="#estimation">Estimation</a><a href="#services">Location &amp; gestion</a><a href="#equipe">L'équipe</a><a href="/espace-client.html">Espace client</a>
     </div>
     <div>
       <h4>Nos agences</h4>
@@ -520,7 +539,7 @@
     </div>
     <div>
       <h4>Informations</h4>
-      <a href="#">Nos honoraires</a><a href="#">Mentions légales</a><a href="#">Politique RGPD</a><a href="#">Cookies</a>
+      <a href="/honoraires.html">Nos honoraires</a><a href="/mentions-legales.html">Mentions légales</a><a href="/confidentialite.html">Confidentialité &amp; RGPD</a><a href="/cookies.html">Cookies</a>
     </div>
   </div>
   <div class="container footer__bottom">
@@ -528,12 +547,15 @@
     <a href="#top" class="totop" aria-label="Retour en haut">↑</a>
   </div>
 </footer>
+<!-- /layout:footer -->
 
 <div class="mobile-bar">
   <a href="tel:+33494072635">Appeler</a>
   <a href="#estimation" class="is-gold">Estimer mon bien</a>
 </div>
 
+<script src="favoris.js" defer></script>
+<script src="forms.js" defer></script>
 <script src="cards.js" defer></script>
 <script src="main.js" defer></script>
 </body>

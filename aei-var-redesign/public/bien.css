@@ -145,8 +145,8 @@
 .vf.is-error { border-color: var(--gold); }
 .vf span { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .vf input, .vf textarea { border: 0; outline: none; background: transparent; font: inherit; font-size: 15px; color: var(--ink); padding: 0; resize: vertical; }
-.vf-consent { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--muted); }
-.vf-consent input { margin-top: 3px; accent-color: var(--gold); }
+.vf-consent { display: block; position: relative; padding-left: 24px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.vf-consent input { position: absolute; left: 0; top: 2px; margin: 0; accent-color: var(--gold); }
 .visit-form .btn { width: 100%; }
 .vf-ok { margin: 4px 0 0; text-align: center; font-weight: 600; color: var(--teal); }
 .share { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
@@ -189,3 +189,18 @@ a.bien__media { cursor: pointer; }
   .block { break-inside: avoid; }
   .contact-card { box-shadow: none; }
 }
+
+/* Favori, statuts, carte sur accord, erreurs du formulaire */
+.fiche__titlerow { display: flex; align-items: flex-start; gap: 14px; }
+.fav--inline { position: static; flex: none; margin-top: 8px; }
+.tag--rent { position: static; }
+.map-consent { height: 100%; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px; text-align: center; color: var(--muted); font-size: 14px; }
+.map-consent p { margin: 0; max-width: 420px; }
+.vf .err, .vf-consent .err { color: #b3261e; }
+.vf.is-error { border-color: #b3261e !important; }
+.vf-consent.is-error { color: #b3261e; }
+.vf-err { margin: 0; padding: 10px 14px; border-radius: 12px; background: #fdecec; color: #8c1d18; font-size: 14px; font-weight: 600; }
+.vf-ok { padding: 14px 16px; border-radius: 14px; background: var(--mist-soft); color: var(--teal-ink); font-size: 14px; }
+.vf-ok p { margin: 6px 0 0; }
+.vf-ok .track-code { background: #fff; }
+.vf-ok .track-code a { color: var(--teal); }

@@ -74,8 +74,10 @@
     pill.style.width = btn.offsetWidth + 'px';
     pill.style.transform = `translateX(${btn.offsetLeft - 4}px)`;
   };
+  let searchTransaction = 'vente';
   tabs.forEach(b => b.addEventListener('click', () => {
     tabs.forEach(t => { t.classList.toggle('is-active', t === b); t.setAttribute('aria-selected', t === b); });
+    searchTransaction = b.dataset.transaction;
     movePill(b);
   }));
   requestAnimationFrame(() => movePill($('.search__tabs .is-active')));
@@ -144,23 +146,28 @@
 
   // ---------- Biens (chargés depuis l'admin) ----------
   const grid = $('#gridBiens');
-  const { cardHTML } = window.AEICards;
+  const { cardHTML, isClosed } = window.AEICards;
+  let allBiens = [];
   const renderBiens = (list) => {
-    // les biens en vente d'abord, les vendus à la fin
-    const sorted = [...list].sort((a, b) => a.vendu - b.vendu);
-    grid.innerHTML = sorted.map(cardHTML).join('');
+    // les biens disponibles d'abord, les vendus / loués à la fin
+    const sorted = [...list].sort((a, b) => isClosed(a) - isClosed(b));
+    grid.innerHTML = sorted.length ? sorted.map(cardHTML).join('') : '<p class="grid-empty">Aucun bien ne correspond à votre recherche pour le moment. <a href="/espace-client.html#alertes">Créez une alerte</a> pour être prévenu(e) dès qu’un bien est publié.</p>';
     $$('.bien', grid).forEach((el, i) => { el.style.setProperty('--d', `${(i % 3) * 0.08}s`); io.observe(el); });
   };
   const loadBiens = async () => {
-    for (const url of ['/api/biens', 'data/biens.json']) {
-      try {
-        const res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) continue;
-        const data = await res.json();
-        if (Array.isArray(data)) return renderBiens(data);
-      } catch {}
+    try {
+      const res = await fetch('/api/biens');
+      if (!res.ok) throw new Error();
+      allBiens = await res.json();
+      renderBiens(allBiens);
+      // Statistique réelle : nombre de biens disponibles en ligne
+      const n = allBiens.filter(b => !isClosed(b)).length;
+      const stat = $('#statBiens');
+      stat.dataset.to = n; // si le compteur n'a pas encore défilé, il s'animera jusqu'à n
+      stat.textContent = n;
+    } catch {
+      grid.innerHTML = '<p class="grid-empty">Nos biens sont momentanément indisponibles. Appelez-nous au 04 94 07 26 35.</p>';
     }
-    grid.innerHTML = '<p>Nos biens sont momentanément indisponibles. Appelez-nous au 04 94 07 26 35.</p>';
   };
   loadBiens();
 
@@ -245,30 +252,127 @@
   $$('input[name="bien"]', wiz).forEach(r => r.addEventListener('change', () => setTimeout(() => step === 0 && goStep(1), 350)));
   prev.addEventListener('click', () => step > 0 && goStep(step - 1));
   next.addEventListener('click', () => {
+    // Dernière étape : la validation détaillée (avec messages) est faite par sendEstimation
+    if (step === steps.length - 1) return sendEstimation();
     if (!validate(steps[step])) return;
     if (step < steps.length - 1) return goStep(step + 1);
-    // TODO : brancher sur l'outil de l'agence (CRM, Formspree, e-mail…)
-    steps.forEach(s => s.classList.remove('is-active'));
-    $('.wizard__nav', wiz).remove();
-    $('.wizard__count', wiz).hidden = true;
-    bar.style.width = '100%';
-    $('.wizard__done', wiz).hidden = false;
+    sendEstimation();
   });
+
+  // Photos facultatives jointes à l'estimation
+  const estPhotos = [];
+  const photoList = $('#estPhotoList');
+  const renderEstPhotos = () => {
+    photoList.innerHTML = estPhotos.map((p, i) => `<li><img src="${p.preview}" alt="Photo ${i + 1}"><button type="button" data-rm="${i}" aria-label="Retirer la photo ${i + 1}">✕</button></li>`).join('');
+  };
+  $('#estPhotos').addEventListener('change', async (e) => {
+    const files = [...e.target.files].slice(0, 8 - estPhotos.length);
+    e.target.value = '';
+    for (const file of files) {
+      const item = { preview: URL.createObjectURL(file), up: null };
+      estPhotos.push(item);
+      renderEstPhotos();
+      try { item.up = await window.AEIForms.uploadPhoto(file); }
+      catch (err) { estPhotos.splice(estPhotos.indexOf(item), 1); renderEstPhotos(); alert(`${file.name} : ${err.message}`); }
+    }
+  });
+  photoList.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rm]');
+    if (b) { estPhotos.splice(+b.dataset.rm, 1); renderEstPhotos(); }
+  });
+
+  async function sendEstimation() {
+    const F = window.AEIForms;
+    const errs = F.checkContact(wiz, { requireTel: true });
+    if (!F.showErrors(wiz, errs)) return;
+    const err = $('.form-error', wiz);
+    err.hidden = true;
+    next.disabled = true;
+    next.textContent = 'Envoi…';
+    try {
+      const r = await F.submit(wiz, {
+        type: 'estimation',
+        nom: wiz.nom.value, tel: wiz.tel.value, email: wiz.email.value,
+        details: {
+          typeBien: wiz.querySelector('input[name="bien"]:checked')?.value,
+          ville: wiz.ville.value, adresse: wiz.adresse.value, surface: wiz.surface.value,
+          pieces: wiz.pieces.value, etat: wiz.etat.value,
+          atouts: $$('input[name="atouts"]:checked', wiz).map(c => c.value),
+        },
+        photos: estPhotos.filter(p => p.up).map(p => p.up),
+      });
+      steps.forEach(s => s.classList.remove('is-active'));
+      $('.wizard__nav', wiz).remove();
+      $('.wizard__count', wiz).hidden = true;
+      bar.style.width = '100%';
+      $('.wizard__msg', wiz).innerHTML = F.confirmation(r.code, r.emailSent);
+      $('.wizard__done', wiz).hidden = false;
+    } catch (e) {
+      // Une erreur de champ renvoie à l'étape concernée
+      const bad = wiz.querySelector('.is-error');
+      const stepEl = bad?.closest('.wizard__step');
+      if (stepEl) goStep(steps.indexOf(stepEl));
+      err.textContent = e.message;
+      err.hidden = false;
+      next.disabled = false;
+      next.textContent = 'Recevoir mon estimation';
+    }
+  }
   wiz.addEventListener('submit', e => e.preventDefault());
 
   // ---------- Formulaire de contact ----------
   const cf = $('#contactForm');
-  cf.addEventListener('submit', e => {
+  cf.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!validate(cf)) return;
-    // TODO : brancher sur l'outil de l'agence (CRM, Formspree, e-mail…)
-    $('.form-ok', cf).hidden = false;
-    cf.reset();
+    const F = window.AEIForms;
+    if (!F.showErrors(cf, F.checkContact(cf))) return;
+    const btn = $('button[type=submit]', cf);
+    const err = $('.form-error', cf);
+    err.hidden = true;
+    btn.disabled = true;
+    const [type, projet] = cf.projet.value.split('|');
+    try {
+      const r = await F.submit(cf, { type, projet: projet || cf.projet.selectedOptions[0].textContent, nom: cf.nom.value, tel: cf.tel.value, email: cf.email.value, message: cf.message.value });
+      const ok = $('.form-ok', cf);
+      ok.innerHTML = '<strong>Merci, votre message a bien été envoyé.</strong>' + F.confirmation(r.code, r.emailSent);
+      ok.hidden = false;
+      cf.reset();
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
   });
 
-  // ---------- Recherche hero -> filtre biens ----------
-  $('.search').addEventListener('submit', e => {
+  // ---------- Carte : chargée seulement après accord (Google dépose des cookies) ----------
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-map-load]');
+    if (!b) return;
+    const box = b.closest('[data-map]');
+    box.innerHTML = `<iframe title="Plan d'accès" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?q=${encodeURIComponent(box.dataset.map)}&output=embed"></iframe>`;
+  });
+
+  // ---------- Recherche hero : filtre réellement les biens ----------
+  const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const toNum = (s) => Number(String(s || '').replace(/\s/g, '').replace(',', '.')) || 0;
+  const searchForm = $('.search');
+  const result = $('#searchResult');
+  searchForm.addEventListener('submit', e => {
     e.preventDefault();
+    const types = searchForm.type.value ? searchForm.type.value.split('|') : [];
+    const ville = norm(searchForm.ville.value.trim());
+    const budget = Number(searchForm.budget.value) || 0;
+    const found = allBiens.filter(b => !isClosed(b) &&
+      (b.transaction || 'vente') === searchTransaction &&
+      (!types.length || types.includes(b.type)) &&
+      (!ville || norm(b.ville).includes(ville)) &&
+      (!budget || (toNum(b.prix) && toNum(b.prix) <= budget)));
+    filterBtns.forEach(x => x.classList.toggle('is-active', x.dataset.filter === 'all'));
+    renderBiens(found);
+    result.innerHTML = `${found.length} bien${found.length > 1 ? 's' : ''} ${searchTransaction === 'location' ? 'à louer' : 'à vendre'} correspond${found.length > 1 ? 'ent' : ''} à votre recherche. <button type="button" class="linkish">Voir tous les biens</button>`;
+    result.hidden = false;
+    $('button', result).addEventListener('click', () => { result.hidden = true; searchForm.reset(); renderBiens(allBiens); });
     $('#biens').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
   });
 })();

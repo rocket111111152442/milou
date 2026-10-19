@@ -1,7 +1,7 @@
 (() => {
   const $ = (s, c = document) => c.querySelector(s);
   const $$ = (s, c = document) => [...c.querySelectorAll(s)];
-  const { esc, cardHTML } = window.AEICards;
+  const { esc, cardHTML, isClosed } = window.AEICards;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const f = (name) => $(`[data-f="${name}"]`);
   const block = (name) => $(`[data-block="${name}"]`);
@@ -71,7 +71,10 @@
 
   const render = (b, all) => {
     const photos = b.photos?.length ? b.photos : b.photo ? [b.photo] : [];
-    const prix = b.vendu ? 'Vendu' : b.prix ? `${b.prix} €` : 'Prix sur demande';
+    const loc = b.transaction === 'location';
+    b.vendu = isClosed(b); // vendu ou loué : plus disponible
+    const closedLabel = b.statut === 'loue' ? 'Loué' : 'Vendu';
+    const prix = b.vendu ? closedLabel : b.prix ? `${b.prix} €${loc ? ' / mois' : ''}` : 'Prix sur demande';
     const where = [b.ville, b.cp && `(${b.cp})`].filter(Boolean).join(' ');
 
     document.title = `${b.titre} – ${b.ville} | AEI Côté Mer`;
@@ -85,9 +88,12 @@
     f('ref').textContent = b.ref ? `Réf. ${b.ref}` : '';
     f('prixSide').textContent = b.vendu ? '' : prix;
     const tags = [];
-    if (b.vendu) tags.push('<span class="tag tag--sold">Vendu</span>');
+    if (b.vendu) tags.push(`<span class="tag tag--sold">${closedLabel}</span>`);
+    else if (b.statut === 'sous-compromis') tags.push('<span class="tag tag--warn">Sous compromis</span>');
     else if (b.badge) tags.push(`<span class="tag ${b.badge === 'Exclusivité' ? 'tag--gold' : b.badge === 'Coup de cœur' ? 'tag--light' : ''}">${esc(b.badge)}</span>`);
+    if (loc && !b.vendu) tags.push('<span class="tag tag--rent">À louer</span>');
     f('tags').innerHTML = tags.join('');
+    if (window.AEIFav && !b.vendu) f('favSlot').innerHTML = window.AEIFav.button(b.id, b.titre).replace('class="fav', 'class="fav fav--inline');
 
     // Mosaïque : jusqu'à 5 photos, la galerie complète au clic
     const shown = photos.slice(0, 5);
@@ -177,7 +183,7 @@
     }
 
     const fin = [
-      row('Prix de vente', b.vendu ? 'Vendu' : b.prix && `${esc(b.prix)} €`),
+      row(loc ? 'Loyer mensuel charges comprises' : 'Prix de vente', b.vendu ? closedLabel : b.prix && `${esc(b.prix)} €`),
       row('Taxe foncière annuelle', b.taxeFonciere && `${esc(b.taxeFonciere)} €`),
       row('Charges de copropriété annuelles', b.chargesCopro && `${esc(b.chargesCopro)} €`),
       row('Nombre de lots en copropriété', esc(b.lotsCopro)),
@@ -188,7 +194,7 @@
     // Simulateur de prêt
     const simu = $('#simu');
     const price = num(b.prix);
-    block('simulateur').hidden = b.vendu || !price;
+    block('simulateur').hidden = b.vendu || loc || !price;
     if (price) {
       simu.prix.value = fmt(price);
       simu.apport.value = fmt(price * 0.1);
@@ -215,8 +221,14 @@
     }
 
     // Carte du secteur (commune, pas l'adresse exacte)
+    // Chargée seulement à la demande : Google Maps dépose des cookies
     if (b.ville) {
-      f('map').innerHTML = `<iframe title="Carte du secteur : ${esc(b.ville)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?q=${encodeURIComponent(`${b.ville} ${b.cp || ''} France`)}&z=13&output=embed"></iframe>`;
+      const q = `${b.ville} ${b.cp || ''} France`;
+      const mapBox = f('map');
+      mapBox.innerHTML = `<div class="map-consent"><p>Carte du secteur de ${esc(b.ville)} fournie par Google Maps, qui peut déposer des cookies.</p><button type="button" class="btn btn--teal btn--sm">Afficher la carte</button></div>`;
+      $('button', mapBox).addEventListener('click', () => {
+        mapBox.innerHTML = `<iframe title="Carte du secteur : ${esc(b.ville)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?q=${encodeURIComponent(q)}&z=13&output=embed"></iframe>`;
+      });
     } else block('quartier').hidden = true;
 
     // Formulaire pré-rempli
@@ -225,18 +237,31 @@
       ? `Bonjour, je souhaite vendre un bien similaire à « ${b.titre} » (${b.ville}). Pouvez-vous me recontacter ?`
       : `Bonjour, je suis intéressé(e) par le bien « ${b.titre} » à ${b.ville}${b.ref ? ` (réf. ${b.ref})` : ''} et souhaite organiser une visite.`;
     form.querySelector('button[type=submit]').textContent = b.vendu ? 'Faire estimer mon bien' : 'Demander une visite';
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      let ok = true;
-      $$('input[required]', form).forEach(inp => {
-        const valid = inp.type === 'checkbox' ? inp.checked : inp.value.trim() !== '';
-        inp.closest('.vf')?.classList.toggle('is-error', !valid);
-        if (!valid) ok = false;
-      });
-      if (!ok) return;
-      // TODO : brancher sur l'outil de l'agence (CRM, Formspree, e-mail…)
-      $('.vf-ok', form).hidden = false;
-      $$('input:not([type=checkbox])', form).forEach(i => { i.value = ''; });
+      const F = window.AEIForms;
+      if (!F.showErrors(form, F.checkContact(form, { requireTel: true }))) return;
+      const btn = form.querySelector('button[type=submit]');
+      const err = $('.vf-err', form);
+      err.hidden = true;
+      btn.disabled = true;
+      try {
+        const r = await F.submit(form, {
+          type: b.vendu ? 'contact' : 'visite',
+          projet: b.vendu ? 'Vendre un bien similaire' : '',
+          bienId: b.id,
+          nom: form.nom.value, tel: form.tel.value, email: form.email.value, message: form.message.value,
+        });
+        const ok = $('.vf-ok', form);
+        ok.innerHTML = '<strong>Merci, votre demande est envoyée.</strong>' + F.confirmation(r.code, r.emailSent);
+        ok.hidden = false;
+        $$('input:not([type=checkbox]):not([name=website])', form).forEach(i => { i.value = ''; });
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.hidden = false;
+      } finally {
+        btn.disabled = false;
+      }
     });
 
     // Partage
@@ -249,7 +274,7 @@
     });
 
     // Biens similaires : même secteur d'abord, en vente uniquement
-    const others = all.filter(x => x.id !== b.id && !x.vendu);
+    const others = all.filter(x => x.id !== b.id && !isClosed(x) && (x.transaction || 'vente') === (b.transaction || 'vente'));
     const similar = [...others.filter(x => x.region === b.region), ...others.filter(x => x.region !== b.region)].slice(0, 3);
     f('similaires').innerHTML = similar.map(cardHTML).join('');
     block('similaires').hidden = !similar.length;
@@ -302,17 +327,15 @@
   const load = async () => {
     const id = new URLSearchParams(location.search).get('id');
     if (!id) return missing();
-    for (const url of ['/api/biens', 'data/biens.json']) {
-      try {
-        const res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) continue;
-        const all = await res.json();
-        if (!Array.isArray(all)) continue;
-        const b = all.find(x => x.id === id);
-        return b ? render(b, all) : missing();
-      } catch {}
+    try {
+      const res = await fetch('/api/biens');
+      if (!res.ok) throw new Error();
+      const all = await res.json();
+      const b = all.find(x => x.id === id);
+      return b ? render(b, all) : missing();
+    } catch {
+      missing();
     }
-    missing();
   };
   load();
 })();

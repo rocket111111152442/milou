@@ -52,7 +52,7 @@ async function submitLead({ request }) {
   const body = await readBody(request, 30_000);
   // Pièges à robots : champ caché rempli, ou formulaire envoyé trop vite
   if (body.website) return json({ ok: true, code: null });
-  if (typeof body.startedAt === 'number' && Date.now() - body.startedAt < 2500) throw new HttpError(400, 'Merci de vérifier le formulaire avant l’envoi');
+  if (typeof body.startedAt === 'number' && Date.now() - body.startedAt < 1500) throw new HttpError(400, 'Merci de vérifier le formulaire avant l’envoi');
   await rateLimit('lead', clientIp(request), 8, 3600);
 
   const clean = sanitizeLead(body);
