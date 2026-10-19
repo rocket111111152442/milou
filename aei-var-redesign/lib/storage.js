@@ -3,7 +3,7 @@
 //
 // - Production : Vercel Blob en accès PRIVÉ (BLOB_READ_WRITE_TOKEN).
 // - Développement / tests : fichiers dans .data/ (STORAGE=fs).
-import { put, get, list, del, head } from '@vercel/blob';
+import { put, get, list, del, head, BlobNotFoundError, BlobPreconditionFailedError } from '@vercel/blob';
 import { mkdir, readFile, writeFile, rm, readdir, stat, rename } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -70,12 +70,14 @@ const streamToBuffer = async (stream) => Buffer.from(await new Response(stream).
 
 const blobAdapter = {
   async getBuffer(key) {
-    const res = await get(safeKey(key), { access: 'private', useCache: false });
+    let res;
+    try { res = await get(safeKey(key), { access: 'private', useCache: false }); }
+    catch (e) { if (e instanceof BlobNotFoundError || /not.?found|does not exist/i.test(e?.message)) return null; throw e; }
     if (!res || res.statusCode !== 200) return null;
     return streamToBuffer(res.stream);
   },
   async etag(key) {
-    try { return (await head(safeKey(key))).etag; } catch (e) { if (e?.name === 'BlobNotFoundError' || /not.?found/i.test(e?.message)) return null; throw e; }
+    try { return (await head(safeKey(key))).etag; } catch (e) { if (e instanceof BlobNotFoundError || /not.?found|does not exist/i.test(e?.message)) return null; throw e; }
   },
   async put(key, body, { ifMatch, contentType } = {}) {
     const opts = { access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: contentType || 'application/json', cacheControlMaxAge: 60 };
@@ -84,7 +86,7 @@ const blobAdapter = {
     try {
       await put(safeKey(key), body, opts);
     } catch (e) {
-      if (e?.name === 'BlobPreconditionFailedError' || /precondition|already exists/i.test(e?.message)) throw new ConflictError();
+      if (e instanceof BlobPreconditionFailedError || /precondition|already exists/i.test(e?.message)) throw new ConflictError();
       throw e;
     }
   },
