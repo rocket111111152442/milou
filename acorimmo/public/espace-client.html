@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espace client | Acor’Immo</title>
+<meta name="description" content="Vos biens favoris, le suivi de vos demandes, vos alertes e-mail et la prise de rendez-vous.">
+<meta name="theme-color" content="#314452">
+<link rel="icon" type="image/png" href="/img/favicon.png">
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/bien.css">
+<link rel="stylesheet" href="/pages.css">
+</head>
+<body class="page-bien page-simple">
+<div class="progress" aria-hidden="true"></div>
+
+<!-- layout:header -->
+<header class="header" id="top">
+  <div class="header__inner container">
+    <a class="logo" href="/" aria-label="Acor’Immo — accueil">
+      <img class="logo__img logo__img--light" src="img/logo-clair.png" alt="Acor’Immo" width="279" height="125">
+      <img class="logo__img logo__img--dark" src="img/logo-sombre.png" alt="" width="279" height="125">
+    </a>
+    <nav class="nav" aria-label="Navigation principale">
+      <a href="/biens">Acheter</a>
+      <a href="/#estimation">Vendre</a>
+      <a href="/#services">Louer &amp; gérer</a>
+      <a href="/#agence">L'agence</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+    <div class="header__actions">
+      <div class="lang" data-lang-switch></div>
+      <a class="header__fav" href="/espace-client.html" aria-label="Espace client et favoris"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.5-9 9-9 9z"/></svg><b data-fav-count hidden></b></a>
+      <a class="header__phone" href="tel:+33494300016">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+        04 94 30 00 16
+      </a>
+      <a class="btn btn--gold btn--sm magnetic" href="/#estimation">Estimer mon bien</a>
+      <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false"><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-menu" aria-hidden="true">
+  <nav>
+    <a href="/biens">Acheter</a>
+    <a href="/#estimation">Vendre</a>
+    <a href="/#services">Louer &amp; gérer</a>
+    <a href="/#agence">L'agence</a>
+    <a href="/#contact">Contact</a>
+    <a href="/espace-client.html">Espace client</a>
+  </nav>
+  <a class="btn btn--gold" href="/agences.html">Appeler une agence</a>
+</div>
+
+<!-- /layout:header -->
+
+<main id="main">
+<section class="container client">
+  <nav class="crumbs" aria-label="Fil d'Ariane"><a href="/">Accueil</a><span>›</span><span>Espace client</span></nav>
+  <h1 class="h2">Votre <em>espace client</em></h1>
+  <p class="client__lead">Retrouvez vos coups de cœur, suivez l’avancement de vos demandes, recevez nos nouveaux biens par e-mail et prenez rendez-vous avec l’agence. Aucun compte n’est nécessaire.</p>
+
+  <div class="tabs" role="tablist" aria-label="Rubriques de l'espace client">
+    <button role="tab" id="tab-favoris" aria-controls="favoris" aria-selected="true">Mes favoris <b data-fav-count hidden></b></button>
+    <button role="tab" id="tab-suivi" aria-controls="suivi" aria-selected="false">Suivre une demande</button>
+    <button role="tab" id="tab-alertes" aria-controls="alertes" aria-selected="false">Alertes e-mail</button>
+    <button role="tab" id="tab-rdv" aria-controls="rdv" aria-selected="false">Prendre rendez-vous</button>
+  </div>
+
+  <div class="panel" id="favoris" role="tabpanel" aria-labelledby="tab-favoris">
+    <p class="panel__intro">Vos favoris sont enregistrés uniquement sur cet appareil, dans ce navigateur. Cliquez sur le cœur d’une annonce pour l’ajouter.</p>
+    <div class="grid-biens" id="favGrid" aria-live="polite"></div>
+  </div>
+
+  <div class="panel" id="suivi" role="tabpanel" aria-labelledby="tab-suivi" hidden>
+    <p class="panel__intro">Saisissez le code de suivi reçu après l’envoi de votre demande, ainsi que l’e-mail ou le téléphone indiqué dans le formulaire.</p>
+    <form class="client-form" id="trackForm" novalidate>
+      <label class="field"><span>Code de suivi</span><input name="code" required maxlength="8" autocomplete="off" placeholder="Ex. ZK8E4TJG" class="code-input"></label>
+      <label class="field"><span>E-mail ou téléphone</span><input name="contact" required maxlength="160" autocomplete="email"></label>
+      <button class="btn btn--teal" type="submit">Voir l’état de ma demande</button>
+      <p class="form-msg" role="status" hidden></p>
+    </form>
+    <div class="track-result" id="trackResult" hidden></div>
+  </div>
+
+  <div class="panel" id="alertes" role="tabpanel" aria-labelledby="tab-alertes" hidden>
+    <p class="panel__intro">Recevez un e-mail dès qu’un bien correspondant à vos critères est publié. Désinscription en un clic dans chaque e-mail.</p>
+    <p class="notice" id="alertNotice" hidden></p>
+    <form class="client-form client-form--grid" id="alertForm" novalidate>
+      <label class="field"><span>Projet</span><select name="transaction"><option value="vente">Acheter</option><option value="location">Louer</option></select></label>
+      <label class="field"><span>Type de bien</span><select name="typeBien"><option value="">Tous</option><option>Maison</option><option>Villa</option><option>Appartement</option><option>Terrain</option></select></label>
+      <label class="field"><span>Ville ou secteur</span><input name="ville" maxlength="80" placeholder="Ex. Sanary-sur-Mer"></label>
+      <label class="field"><span>Budget maximum (€)</span><input name="budgetMax" type="number" min="0" step="1000" inputmode="numeric"></label>
+      <label class="field"><span>Surface minimum (m²)</span><input name="surfaceMin" type="number" min="0" inputmode="numeric"></label>
+      <label class="field"><span>Votre e-mail *</span><input name="email" type="email" required maxlength="160" autocomplete="email"></label>
+      <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
+      <label class="consent consent--dark full"><input type="checkbox" name="consent" required> J’accepte de recevoir par e-mail les nouveaux biens correspondant à ma recherche et que mes données soient traitées conformément à la <a href="/confidentialite.html" target="_blank">politique de confidentialité</a>.</label>
+      <button class="btn btn--teal full" type="submit">Créer mon alerte</button>
+      <p class="form-msg full" role="status" hidden></p>
+    </form>
+  </div>
+
+  <div class="panel" id="rdv" role="tabpanel" aria-labelledby="tab-rdv" hidden>
+    <p class="panel__intro">Choisissez une date et un créneau : l’agence vous confirme le rendez-vous par téléphone ou par e-mail. Agence ouverte <mark class="todo">À compléter (Google Maps indique le lundi 9h – 12h et 14h – 18h pour les quatre agences, relevé du 19/10/2026)</mark>.</p>
+    <form class="client-form client-form--grid" id="rdvForm" novalidate>
+      <label class="field"><span>Motif</span><select name="motif"><option>Estimation de mon bien</option><option>Projet d’achat</option><option>Visite d’un bien</option><option>Location ou gestion</option><option>Autre</option></select></label>
+      <label class="field"><span>Date souhaitée *</span><input name="date" type="date" required></label>
+      <label class="field"><span>Créneau</span><select name="creneau"><option>Matin (9h – 12h)</option><option>Après-midi (14h – 18h30)</option><option>Indifférent</option></select></label>
+      <label class="field"><span>Nom *</span><input name="nom" required maxlength="100" autocomplete="name"></label>
+      <label class="field"><span>Téléphone *</span><input name="tel" type="tel" required maxlength="30" autocomplete="tel"></label>
+      <label class="field"><span>E-mail</span><input name="email" type="email" maxlength="160" autocomplete="email"></label>
+      <label class="field full"><span>Précisions</span><textarea name="message" rows="3" maxlength="3000"></textarea></label>
+      <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
+      <label class="consent consent--dark full"><input type="checkbox" name="consent" required> J’accepte que mes données soient utilisées par l’agence pour traiter ma demande, conformément à la <a href="/confidentialite.html" target="_blank">politique de confidentialité</a>.</label>
+      <button class="btn btn--teal full" type="submit">Demander ce rendez-vous</button>
+      <p class="form-msg full" role="status" hidden></p>
+    </form>
+  </div>
+</section>
+
+</main>
+
+<!-- layout:footer -->
+<footer class="footer">
+  <div class="container footer__grid">
+    <div>
+      <a class="logo logo--light" href="/"><img class="logo__img" src="img/logo-clair.png" alt="Acor’Immo" width="279" height="125"></a>
+      <p>Vendez, achetez, louez.<br>Transaction, location et gestion locative dans le Var depuis 2002.</p>
+    </div>
+    <div>
+      <h4>Navigation</h4>
+      <a href="/biens">Nos biens</a><a href="/#estimation">Estimation</a><a href="/#services">Location &amp; gestion</a><a href="/#equipe">L'équipe</a><a href="/espace-client.html">Espace client</a>
+    </div>
+    <div>
+      <h4>Nos agences</h4>
+      <a href="/agences.html">La Seyne-sur-Mer</a><a href="/agences.html">Six-Fours-les-Plages</a><a href="/agences.html">Sanary-sur-Mer</a><a href="/agences.html">Toulon</a>
+    </div>
+    <div>
+      <h4>Informations</h4>
+      <a href="/honoraires.html">Nos honoraires</a><a href="/mentions-legales.html">Mentions légales</a><a href="/confidentialite.html">Confidentialité &amp; RGPD</a><a href="/cookies.html">Cookies</a>
+    </div>
+  </div>
+  <div class="container footer__bottom">
+    <span>© <span id="year">2026</span> Acor’Immo · Tous droits réservés</span>
+    <a href="#top" class="totop" aria-label="Retour en haut">↑</a>
+  </div>
+</footer>
+<!-- /layout:footer -->
+
+<script src="/i18n-dict.js" defer></script>
+<script src="/i18n.js" defer></script>
+<script src="/stats.js" defer></script>
+<script src="/favoris.js" defer></script>
+<script src="/forms.js" defer></script>
+<script src="/filters.js" defer></script>
+<script src="/cards.js" defer></script>
+<script src="/page.js" defer></script>
+<script src="/espace-client.js" defer></script>
+</body>
+</html>

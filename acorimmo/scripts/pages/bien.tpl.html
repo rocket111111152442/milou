@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bien à vendre | {{nomCourt}}</title>
+<meta name="description" content="Découvrez ce bien proposé par {{nom}}.">
+<meta name="theme-color" content="#314452">
+<link rel="icon" type="image/png" href="/img/favicon.png">
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="bien.css">
+</head>
+<body class="page-bien">
+
+<div class="progress" aria-hidden="true"></div>
+
+<!-- layout:header -->
+<header class="header" id="top">
+  <div class="header__inner container">
+    <a class="logo" href="/" aria-label="AEI Côté Mer — accueil">
+      <span class="logo__bar"></span>
+      <span class="logo__txt"><strong>A.E.I</strong><small>Côté Mer</small></span>
+    </a>
+    <nav class="nav" aria-label="Navigation principale">
+      <a href="/#biens">Acheter</a>
+      <a href="/#estimation">Vendre</a>
+      <a href="/#services">Louer &amp; gérer</a>
+      <a href="/#agence">L'agence</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+    <div class="header__actions">
+      <a class="header__fav" href="/espace-client.html" aria-label="Espace client et favoris"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.5-9 9-9 9z"/></svg><b data-fav-count hidden></b></a>
+      <a class="header__phone" href="tel:+33494072635">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+        04 94 07 26 35
+      </a>
+      <a class="btn btn--gold btn--sm magnetic" href="/#estimation">Estimer mon bien</a>
+      <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false"><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-menu" aria-hidden="true">
+  <nav>
+    <a href="/#biens">Acheter</a>
+    <a href="/#estimation">Vendre</a>
+    <a href="/#services">Louer &amp; gérer</a>
+    <a href="/#agence">L'agence</a>
+    <a href="/#contact">Contact</a>
+    <a href="/espace-client.html">Espace client</a>
+  </nav>
+  <a class="btn btn--gold" href="tel:+33494072635">Appeler l'agence</a>
+</div>
+
+<!-- /layout:header -->
+<main id="main">
+  <div class="container fiche-loading" id="ficheLoading">
+    <div class="skeleton skeleton--title"></div>
+    <div class="skeleton skeleton--gallery"></div>
+  </div>
+
+  <div class="container fiche-missing" id="ficheMissing" hidden>
+    <p class="eyebrow">Bien introuvable</p>
+    <h1 class="h2">Ce bien n'est plus disponible.</h1>
+    <p>Il a peut-être été vendu ou retiré de la vente. Découvrez nos autres biens.</p>
+    <a class="btn btn--teal" href="/#biens">Voir nos biens</a>
+  </div>
+
+  <article class="fiche" id="fiche" hidden>
+    <div class="container">
+      <nav class="crumbs" aria-label="Fil d'Ariane">
+        <a href="/">Accueil</a><span>›</span><a href="/#biens">Nos biens</a><span>›</span><span data-f="crumb"></span>
+      </nav>
+
+      <header class="fiche__head">
+        <div>
+          <div class="fiche__tags" data-f="tags"></div>
+          <div class="fiche__titlerow"><h1 class="fiche__title" data-f="titre"></h1><span data-f="favSlot"></span></div>
+          <p class="fiche__loc" data-f="loc"></p>
+        </div>
+        <div class="fiche__price">
+          <strong data-f="prix"></strong>
+          <span data-f="ref"></span>
+        </div>
+      </header>
+
+      <div class="mosaic" data-f="mosaic"></div>
+
+      <ul class="facts" data-f="facts"></ul>
+    </div>
+
+    <div class="container fiche__grid">
+      <div class="fiche__main">
+        <section class="block" data-block="description">
+          <h2 class="block__title">Description</h2>
+          <div class="desc" data-f="description"></div>
+          <button type="button" class="desc__more" hidden>Lire la suite</button>
+        </section>
+
+        <section class="block" data-block="visite" hidden>
+          <h2 class="block__title">Visite virtuelle</h2>
+          <div class="embed" data-f="visite"></div>
+        </section>
+
+        <section class="block" data-block="video" hidden>
+          <h2 class="block__title">Vidéo</h2>
+          <div class="embed" data-f="video"></div>
+        </section>
+
+        <section class="block" data-block="caracteristiques">
+          <h2 class="block__title">Caractéristiques</h2>
+          <dl class="specs" data-f="specs"></dl>
+        </section>
+
+        <section class="block" data-block="equipements">
+          <h2 class="block__title">Points forts &amp; équipements</h2>
+          <ul class="chips" data-f="equipements"></ul>
+        </section>
+
+        <section class="block" data-block="composition">
+          <h2 class="block__title">Composition</h2>
+          <div class="levels" data-f="composition"></div>
+        </section>
+
+        <section class="block" data-block="energie">
+          <h2 class="block__title">Bilan énergétique</h2>
+          <div class="energy" data-f="energie"></div>
+        </section>
+
+        <section class="block" data-block="financier">
+          <h2 class="block__title">Informations financières</h2>
+          <dl class="specs specs--fin" data-f="financier"></dl>
+        </section>
+
+        <section class="block" data-block="simulateur">
+          <h2 class="block__title">Calcul des mensualités</h2>
+          <form class="simu" id="simu">
+            <label class="simu__field"><span>Prix du bien</span><input type="text" inputmode="numeric" name="prix"><b>€</b></label>
+            <label class="simu__field"><span>Apport personnel</span><input type="text" inputmode="numeric" name="apport"><b>€</b></label>
+            <label class="simu__field"><span>Durée</span>
+              <select name="duree"><option value="15">15 ans</option><option value="20" selected>20 ans</option><option value="25">25 ans</option></select>
+            </label>
+            <label class="simu__field"><span>Taux d'emprunt</span><input type="text" inputmode="decimal" name="taux" value="3,5"><b>%</b></label>
+            <div class="simu__result">
+              <span>Mensualité estimée</span>
+              <strong><span id="simuOut">—</span> €<small>/mois</small></strong>
+              <em>Hors assurance · simulation non contractuelle</em>
+            </div>
+          </form>
+        </section>
+
+        <section class="block" data-block="quartier">
+          <h2 class="block__title">Autour du bien</h2>
+          <ul class="proximite" data-f="proximite" hidden></ul>
+          <div class="fiche__map" data-f="map"></div>
+        </section>
+      </div>
+
+      <aside class="fiche__side">
+        <div class="contact-card" id="contact">
+          <p class="contact-card__price" data-f="prixSide"></p>
+          <h2>Ce bien vous intéresse&nbsp;?</h2>
+          <p class="contact-card__agency">{{nomCourt}} · <a href="/agences.html">nos agences</a></p>
+          <a class="btn btn--teal contact-card__call" href="tel:{{telephoneLien}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+            {{telephone}}
+          </a>
+          <form class="visit-form" id="visitForm" novalidate>
+            <label class="vf"><span>Nom et prénom *</span><input name="nom" autocomplete="name" required maxlength="100"></label>
+            <label class="vf"><span>Téléphone *</span><input name="tel" type="tel" autocomplete="tel" required maxlength="30"></label>
+            <label class="vf"><span>E-mail</span><input name="email" type="email" autocomplete="email" maxlength="160"></label>
+            <label class="vf"><span>Message</span><textarea name="message" rows="4" maxlength="3000"></textarea></label>
+            <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
+            <label class="vf-consent"><input type="checkbox" name="consent" required> J’accepte que mes données soient utilisées par l’agence pour traiter ma demande, conformément à la <a href="/confidentialite.html" target="_blank">politique de confidentialité</a>.</label>
+            <button class="btn btn--gold" type="submit">Demander une visite</button>
+            <p class="vf-err" role="alert" hidden></p>
+            <div class="vf-ok" role="status" hidden></div>
+          </form>
+          <div class="share">
+            <span>Partager</span>
+            <button type="button" data-share="copy" aria-label="Copier le lien">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+            </button>
+            <a data-share="whatsapp" target="_blank" rel="noopener" aria-label="Partager sur WhatsApp">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 9.5c.3 2 2.5 4.3 4.6 4.6l1.2-1.1 1.7.8c-.2 1-1 1.7-2 1.7C11 15.5 8.5 13 8.5 9.5c0-1 .8-1.8 1.7-2l.8 1.7z"/></svg>
+            </a>
+            <a data-share="facebook" target="_blank" rel="noopener noreferrer" aria-label="Partager sur Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v3H7v4h3v6h4v-6h3l1-4h-4V8z"/></svg></a>
+            <a data-share="x" target="_blank" rel="noopener noreferrer" aria-label="Partager sur X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4 4 20"/></svg></a>
+            <a data-share="linkedin" target="_blank" rel="noopener noreferrer" aria-label="Partager sur LinkedIn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v10M5 5v1M10 19V9m0 4a4 4 0 0 1 8 0v6"/></svg></a>
+            <button type="button" data-share="native" aria-label="Partager" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="m8.2 10.8 7.6-3.6M8.2 13.2l7.6 3.6"/></svg></button>
+            <a data-share="mail" aria-label="Partager par e-mail">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+            </a>
+            <button type="button" data-share="print" aria-label="Imprimer la fiche">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <section class="section similar" data-block="similaires">
+      <div class="container">
+        <p class="eyebrow reveal">À découvrir aussi</p>
+        <h2 class="h2 reveal">Des biens <em>similaires</em>.</h2>
+        <div class="grid-biens" data-f="similaires"></div>
+      </div>
+    </section>
+    <div class="print-only container">
+      <p><strong>{{nom}}</strong> · {{adresse}}, {{codePostal}} {{ville}} · {{telephone}} · {{email}}</p>
+      <p class="specs__note">Document non contractuel. Honoraires : voir le barème affiché en agence et sur le site.</p>
+    </div>
+  </article>
+</main>
+
+<!-- layout:footer -->
+<footer class="footer">
+  <div class="container footer__grid">
+    <div>
+      <a class="logo logo--light" href="/"><span class="logo__bar"></span><span class="logo__txt"><strong>A.E.I</strong><small>Côté Mer</small></span></a>
+      <p>Agence Européenne Immobilière – Côté Mer.<br>Transaction, estimation, location et gestion sur le littoral varois.</p>
+    </div>
+    <div>
+      <h4>Navigation</h4>
+      <a href="/#biens">Nos biens</a><a href="/#estimation">Estimation</a><a href="/#services">Location &amp; gestion</a><a href="/#equipe">L'équipe</a><a href="/espace-client.html">Espace client</a>
+    </div>
+    <div>
+      <h4>Nos agences</h4>
+      <span>Six-Fours-les-Plages</span><span>Saint-Maximin</span><span>Loiret</span>
+    </div>
+    <div>
+      <h4>Informations</h4>
+      <a href="/honoraires.html">Nos honoraires</a><a href="/mentions-legales.html">Mentions légales</a><a href="/confidentialite.html">Confidentialité &amp; RGPD</a><a href="/cookies.html">Cookies</a>
+    </div>
+  </div>
+  <div class="container footer__bottom">
+    <span>© <span id="year">2026</span> AEI Côté Mer · Tous droits réservés</span>
+    <a href="#top" class="totop" aria-label="Retour en haut">↑</a>
+  </div>
+</footer>
+<!-- /layout:footer -->
+
+<div class="mobile-bar">
+  <a href="tel:+33494072635">Appeler</a>
+  <a href="#contact" class="is-gold">Demander une visite</a>
+</div>
+
+<script src="i18n-dict.js" defer></script>
+<script src="i18n.js" defer></script>
+<script src="stats.js" defer></script>
+<script src="favoris.js" defer></script>
+<script src="forms.js" defer></script>
+<script src="cards.js" defer></script>
+<script src="gallery.js" defer></script>
+<script src="bien.js" defer></script>
+</body>
+</html>

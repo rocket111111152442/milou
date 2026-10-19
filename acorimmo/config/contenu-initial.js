@@ -1,0 +1,30 @@
+// Contenu de départ des pages communes et des avis, utilisé tant que l'agence n'a rien enregistré dans l'admin
+// (Communes & avis). Relevé le 19/10/2026 sur le site actuel de l'agence (acorimmo.fr) : textes repris de ses
+// articles et pages de vente, sans les passages chiffrés sur le marché. Aucun prix au m² : l'estimation indicative
+// reste désactivée tant que l'agence n'en a pas saisi. Pour une autre agence : vider ces deux listes.
+const slug = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const C = [
+  ['La Seyne-sur-Mer', '83500', 'Centre-ville, Porte Marine, Les Sablettes, Tamaris',
+    'C’est en 2002, au cœur de La Seyne-sur-Mer, que l’aventure Acor’Immo a commencé, dans une petite agence de 20 m² située entre l’église et le port. En 2011, l’agence s’est installée dans les locaux historiques de « La Maison Bleue », rue Lagane.\n\nSitué en bord de rade, face à Toulon, le quartier de Porte Marine est l’un des plus récents projets d’aménagement urbain de la ville. Construit sur d’anciennes friches industrielles, il a été pensé comme une vitrine moderne, offrant à la fois logements neufs, commerces, espaces publics et services de proximité.\n\nL’un des grands points forts de Porte Marine est sa connectivité. Grâce aux bateaux-bus, il est possible de rejoindre Toulon en une dizaine de minutes seulement, évitant ainsi les embouteillages. Côté loisirs, les habitants profitent de la promenade en front de mer, d’équipements sportifs et de la proximité des Sablettes, l’une des plus belles plages de la région.'],
+  ['Six-Fours-les-Plages', '83140', 'Le Brusc, Les Lônes, La Mascotte, le Gaou',
+    'Notre agence de Six-Fours-les-Plages, ouverte en 2015, est installée dans une maison de village au charme provençal, face au cinéma et à proximité des écoles.\n\nEntre criques naturelles, port pittoresque et art de vivre méditerranéen, Le Brusc est un quartier prisé de Six-Fours-les-Plages, parfait pour vivre à l’année ou investir dans un bien d’exception. À deux pas des îles des Embiez, ce havre de paix séduit familles, retraités et télétravailleurs.\n\nCe quartier de Six-Fours-les-Plages, préservé et authentique, vit au rythme des marchés, des apéritifs en terrasse et des balades sur la presqu’île du Gaou. Le marché immobilier du Brusc est dynamique, recherché et sélectif. La rareté des biens disponibles, notamment avec vue mer ou jardin, explique la tension constante de l’offre.'],
+  ['Sanary-sur-Mer', '83110', 'Port, Beaucours, Lançon, Portissol',
+    'Notre agence de Sanary, ouverte en 2020 entre le port et le marché, occupe les murs d’une agence immobilière présente depuis les années 30.\n\nNichée entre Bandol et Six-Fours-les-Plages, Sanary-sur-Mer séduit par son authenticité, sa lumière méditerranéenne et son art de vivre. À taille humaine mais dynamique, cette ville du littoral varois attire familles, retraités, actifs en quête de tranquillité et investisseurs.\n\nSanary cultive une identité unique, entre village provençal animé et station balnéaire discrète. Son port bordé de pointus traditionnels, ses placettes ombragées et ses ruelles commerçantes offrent une atmosphère chaleureuse. Le marché hebdomadaire, souvent classé parmi les plus beaux de France, incarne cette douceur de vivre.'],
+  ['Toulon', '83000', 'Le Mourillon, Cap Brun, Pont-du-Las, Saint-Jean-du-Var, Siblas, La Rode, Mont Faron, La Serinette',
+    'Vous recherchez une maison ou une villa à vendre à Toulon ? Acor’Immo vous propose une sélection de biens immobiliers à vendre dans les quartiers les plus recherchés de Toulon : Le Mourillon, Siblas, La Rode, Pont du Las, ou encore Saint-Jean du Var. Que vous cherchiez une maison de ville, une villa avec jardin ou un bien avec vue mer, nous vous accompagnons dans toutes les étapes de votre projet immobilier à Toulon.\n\nDepuis janvier 2025, notre agence de Toulon vous accueille avenue Colbert, à deux pas de l’Opéra et de la place de la Liberté, dans un bâtiment haussmannien.\n\nDu charme maritime du Mourillon au standing discret du Cap Brun, en passant par le potentiel du Pont-du-Las ou la tranquillité du Faron, chaque quartier toulonnais a ses atouts.'],
+  ['Saint-Mandrier-sur-Mer', '83430', 'Pin Rolland, Marégau',
+    'Le quartier de Pin Rolland-Marégau, à Saint-Mandrier-sur-Mer, offre un cadre naturel privilégié qui séduit depuis toujours. Entre sentiers bordés de pins, plages accessibles à pied et ambiance résidentielle sereine, il incarne parfaitement la douceur de vivre méditerranéenne.\n\nSitué entre forêt de pins et rivage méditerranéen, le quartier attire autant les vendeurs que les acheteurs désireux d’un cadre paisible et valorisé.'],
+];
+
+export const communes = { marge: 10, communes: C.map(([nom, cp, quartiers, intro]) => ({ slug: slug(nom), nom, cp, quartiers, intro, prixM2Maison: '', prixM2Appartement: '', source: '', date: '' })) };
+
+// Note globale : fiche Google de l'agence de Six-Fours-les-Plages (les trois autres agences ont leur propre fiche,
+// notes reprises sur la page « Nos agences »). Avis : seuls ceux que l'agence republie sur son site, avec 5 étoiles
+// et un texte ; l'auteur est abrégé.
+export const avis = {
+  agregat: { note: 4.9, nombre: 153, source: 'Google – agence de Six-Fours-les-Plages', url: 'https://www.google.com/maps/search/?api=1&query=Acor%27immo%2039%20rue%20de%20la%20R%C3%A9publique%20Six-Fours-les-Plages', releveLe: '2026-10-19' },
+  avis: [
+    { id: 'g-pascal-c', auteur: 'Pascal C.', note: 5, texte: 'Consulté pour un avis de valeur de ma propriété, un jeune et dynamique duo m’a réalisé un dossier complet, accompagné de toutes les explications nécessaires. Particulièrement satisfait pour cet excellent travail. Un grand merci pour leur disponibilité et leur professionnalisme.', date: '2026', source: 'Google (repris sur acorimmo.fr)', url: '', publie: true },
+    { id: 'g-franck-e', auteur: 'Franck E.', note: 5, texte: 'Excellente agence', date: '2026', source: 'Google (repris sur acorimmo.fr)', url: '', publie: true },
+  ],
+};

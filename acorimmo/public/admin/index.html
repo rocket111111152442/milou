@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Administration · Acor’Immo</title>
+<link rel="icon" type="image/png" href="/img/favicon.png">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<!-- Écrans d'authentification -->
+<section class="login" id="auth" hidden>
+  <div class="login__card">
+    <div class="brand"><span class="brand__bar"></span><span><strong>Acor’Immo</strong><small>Administration</small></span></div>
+
+    <form id="loginForm" class="auth-view" novalidate>
+      <h1>Connexion</h1>
+      <p>Espace réservé à l'équipe de l'agence.</p>
+      <label class="field"><span>E-mail</span><input type="email" name="email" autocomplete="username" required></label>
+      <label class="field"><span>Mot de passe</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <p class="error" role="alert" hidden></p>
+      <button class="btn btn--red" type="submit">Se connecter</button>
+      <button class="linkish" type="button" data-auth="forgot">Mot de passe oublié ?</button>
+    </form>
+
+    <form id="forgotForm" class="auth-view" novalidate hidden>
+      <h1>Mot de passe oublié</h1>
+      <p>Indiquez votre e-mail : vous recevrez un lien pour choisir un nouveau mot de passe.</p>
+      <label class="field"><span>E-mail</span><input type="email" name="email" autocomplete="username" required></label>
+      <p class="error" role="alert" hidden></p>
+      <p class="ok" role="status" hidden></p>
+      <button class="btn btn--red" type="submit">Envoyer le lien</button>
+      <button class="linkish" type="button" data-auth="login">← Retour à la connexion</button>
+    </form>
+
+    <form id="resetForm" class="auth-view" novalidate hidden>
+      <h1>Nouveau mot de passe</h1>
+      <p>Au moins 10 caractères, avec des lettres et des chiffres.</p>
+      <label class="field"><span>Nouveau mot de passe</span><input type="password" name="password" autocomplete="new-password" required minlength="10"></label>
+      <label class="field"><span>Confirmation</span><input type="password" name="confirm" autocomplete="new-password" required></label>
+      <p class="error" role="alert" hidden></p>
+      <button class="btn btn--red" type="submit">Enregistrer</button>
+    </form>
+
+    <form id="mustChangeForm" class="auth-view" novalidate hidden>
+      <h1>Choisissez votre mot de passe</h1>
+      <p>Pour votre sécurité, remplacez le mot de passe provisoire avant de continuer.</p>
+      <label class="field"><span>Mot de passe actuel (provisoire)</span><input type="password" name="current" autocomplete="current-password" required></label>
+      <label class="field"><span>Nouveau mot de passe</span><input type="password" name="next" autocomplete="new-password" required minlength="10"></label>
+      <label class="field"><span>Confirmation</span><input type="password" name="confirm" autocomplete="new-password" required></label>
+      <p class="error" role="alert" hidden></p>
+      <button class="btn btn--red" type="submit">Enregistrer et continuer</button>
+    </form>
+
+    <a class="back" href="/">← Retour au site</a>
+  </div>
+</section>
+
+<!-- Application -->
+<div class="app" id="app" hidden>
+  <aside class="side" id="side">
+    <div class="brand"><span class="brand__bar"></span><span><strong>Acor’Immo</strong><small>Administration</small></span></div>
+    <nav class="side__nav" aria-label="Menu de l'administration">
+      <a href="#tableau-de-bord" data-nav="tableau-de-bord"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Tableau de bord</a>
+      <a href="#biens" data-nav="biens"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>Biens</a>
+      <a href="#demandes" data-nav="demandes"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg>Demandes <b class="side__count" id="newCount" hidden></b></a>
+      <a href="#contacts" data-nav="contacts"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>Contacts</a>
+      <a href="#agenda" data-nav="agenda"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Agenda des visites <b class="side__count" id="visitCount" hidden></b></a>
+      <a href="#taches" data-nav="taches"><svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg>Tâches <b class="side__count" id="taskCount" hidden></b></a>
+      <a href="#mandats" data-nav="mandats" data-roles="owner,admin"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Mandats</a>
+      <a href="#rapports" data-nav="rapports" data-roles="owner,admin"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Rapports &amp; audience</a>
+      <a href="#contenu" data-nav="contenu" data-roles="owner,admin"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 10h10M4 15h16M4 20h8"/></svg>Communes &amp; avis</a>
+      <a href="#utilisateurs" data-nav="utilisateurs" data-roles="owner,admin"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg>Utilisateurs</a>
+      <a href="#integrations" data-nav="integrations"><svg viewBox="0 0 24 24"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/></svg>Intégrations &amp; sauvegardes</a>
+      <a href="#compte" data-nav="compte"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Mon compte</a>
+    </nav>
+    <div class="side__foot">
+      <p class="side__user" id="whoami"></p>
+      <a class="btn btn--ghost btn--sm" href="/" target="_blank" rel="noopener">Voir le site ↗</a>
+      <button class="btn btn--ghost btn--sm" id="logout" type="button">Déconnexion</button>
+    </div>
+  </aside>
+  <div class="side__backdrop" id="sideBackdrop"></div>
+
+  <div class="main">
+    <header class="mtop">
+      <button class="icon-btn" id="menuBtn" aria-label="Ouvrir le menu" type="button">☰</button>
+      <div class="brand"><span class="brand__bar"></span><span><strong>Acor’Immo</strong><small>Administration</small></span></div>
+    </header>
+    <main class="wrap" id="view" tabindex="-1"></main>
+  </div>
+</div>
+
+<!-- Formulaire bien -->
+<div class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer__backdrop" data-close></div>
+  <form class="drawer__panel" id="bienForm" novalidate>
+    <div class="drawer__head">
+      <h2 id="formTitle">Ajouter un bien</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Fermer">✕</button>
+    </div>
+
+    <div class="drawer__body">
+      <div class="gallery">
+        <div class="gallery__head">
+          <span class="gallery__label">Photos <small id="photoCount"></small></span>
+          <span class="gallery__hint">La première photo est la photo principale</span>
+        </div>
+        <ul class="gallery__grid" id="photoGrid"></ul>
+        <label class="gallery__drop" id="photoZone">
+          <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" multiple>
+          <strong>+ Ajouter des photos</strong>
+          <span>Glissez-déposez ou cliquez · plusieurs à la fois · JPEG, PNG, WebP</span>
+          <span class="gallery__busy" id="photoBusy" hidden></span>
+        </label>
+      </div>
+
+      <label class="field"><span>Titre de l'annonce *</span><input name="titre" required maxlength="120" placeholder="Villa 5 pièces vue mer"></label>
+      <div class="row">
+        <label class="field"><span>Ville *</span><input name="ville" required maxlength="60" placeholder="Six-Fours-les-Plages"></label>
+        <label class="field field--sm"><span>Code postal</span><input name="cp" maxlength="10" inputmode="numeric" placeholder="83140"></label>
+      </div>
+      <label class="field"><span>Adresse du bien <small>(interne, jamais affichée sur le site)</small></span><input name="adresse" maxlength="160" autocomplete="off" placeholder="12 chemin des Pins"></label>
+      <div class="row row--3">
+        <label class="field"><span>Transaction</span>
+          <select name="transaction"><option value="vente">Vente</option><option value="location">Location</option></select>
+        </label>
+        <label class="field"><span>Statut</span>
+          <select name="statut"><option value="disponible">Disponible</option><option value="sous-compromis">Sous compromis</option><option value="vendu">Vendu</option><option value="loue">Loué</option></select>
+        </label>
+        <label class="field"><span id="prixLabel">Prix (€)</span><input name="prix" maxlength="30" inputmode="numeric" placeholder="650 000"></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>Secteur</span>
+          <select name="region"><option value="var">Var</option><option value="autre">Autre</option></select>
+        </label>
+      </div>
+      <div class="row row--3">
+        <label class="field"><span>Surface (m²)</span><input name="surface" maxlength="20" inputmode="decimal" placeholder="120"></label>
+        <label class="field"><span>Chambres</span><input name="chambres" maxlength="10" inputmode="numeric" placeholder="3"></label>
+        <label class="field"><span>Terrain (m²)</span><input name="terrain" maxlength="20" inputmode="decimal" placeholder="800"></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>Étiquette</span>
+          <select name="badge"><option value="">Aucune</option><option>Nouveauté</option><option>Exclusivité</option><option>Coup de cœur</option><option>Prix en baisse</option></select>
+        </label>
+        <label class="field"><span>Atout mis en avant</span><input name="extra" maxlength="40" placeholder="Piscine, vue mer…"></label>
+      </div>
+      <label class="switch"><input type="checkbox" name="publie" checked><span></span>Publié sur le site <small class="muted">(décocher pour masquer le bien sans le supprimer)</small></label>
+
+      <details class="sect" open>
+        <summary>Détails du bien</summary>
+        <div class="sect__body">
+          <div class="row">
+            <label class="field"><span>Type</span>
+              <select name="type"><option>Maison</option><option>Villa</option><option>Appartement</option><option>Terrain</option><option>Immeuble</option><option>Local commercial</option><option>Parking</option><option>Autre</option></select>
+            </label>
+            <label class="field"><span>Référence</span><input name="ref" maxlength="30" placeholder="VM11558"></label>
+          </div>
+          <div class="row row--3">
+            <label class="field"><span>Pièces</span><input name="pieces" maxlength="10" inputmode="numeric"></label>
+            <label class="field"><span>Salles de bains</span><input name="sdb" maxlength="10" inputmode="numeric"></label>
+            <label class="field"><span>Salles d'eau</span><input name="sde" maxlength="10" inputmode="numeric"></label>
+          </div>
+          <div class="row row--3">
+            <label class="field"><span>Niveaux</span><input name="niveaux" maxlength="10" inputmode="numeric"></label>
+            <label class="field"><span>Année de construction</span><input name="annee" maxlength="10" inputmode="numeric" placeholder="1985"></label>
+            <label class="field"><span>Cuisine</span><input name="cuisine" maxlength="60" placeholder="Équipée" list="cuisines"></label>
+          </div>
+          <datalist id="cuisines"><option value="Aménagée et équipée"><option value="Équipée"><option value="Américaine équipée"><option value="Indépendante"><option value="Kitchenette"></datalist>
+          <label class="field"><span>Chauffage</span><input name="chauffage" maxlength="120" placeholder="Pompe à chaleur, chauffage au sol…"></label>
+        </div>
+      </details>
+
+      <details class="sect" open>
+        <summary>Description</summary>
+        <div class="sect__body">
+          <label class="field"><span>Texte de l'annonce</span><textarea name="description" rows="8" maxlength="6000" placeholder="Décrivez le bien : situation, pièces, atouts… Laissez une ligne vide entre les paragraphes."></textarea></label>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Points forts &amp; équipements <small id="eqCount"></small></summary>
+        <div class="sect__body">
+          <div class="chips-edit" id="eqChips"></div>
+          <div class="row">
+            <label class="field"><span>Ajouter un point fort</span><input id="eqInput" maxlength="40" placeholder="Tapez puis Entrée"></label>
+          </div>
+          <div class="quick" id="eqQuick">
+            <button type="button">Vue mer</button><button type="button">Piscine</button><button type="button">Jardin</button><button type="button">Terrasse</button><button type="button">Garage</button><button type="button">Parking</button><button type="button">Ascenseur</button><button type="button">Climatisation</button><button type="button">Cave</button><button type="button">Proche plages</button><button type="button">Proche commerces</button><button type="button">Calme</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Composition pièce par pièce <small id="compoCount"></small></summary>
+        <div class="sect__body">
+          <div class="compo" id="compo"></div>
+          <button type="button" class="btn btn--ghost btn--sm" id="compoAdd">+ Ajouter une pièce</button>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Visite virtuelle, vidéo &amp; proximité</summary>
+        <div class="sect__body">
+          <label class="field"><span>Lien de visite virtuelle (https)</span><input name="visiteVirtuelle" type="url" maxlength="300" placeholder="https://my.matterport.com/show/?m=…"></label>
+          <label class="field"><span>Lien vidéo (YouTube, Vimeo ou autre, https)</span><input name="video" type="url" maxlength="300" placeholder="https://www.youtube.com/watch?v=…"></label>
+          <label class="field"><span>À proximité (une ligne par élément : « libellé | distance »)</span><textarea name="quartierTxt" rows="4" placeholder="École primaire | 300 m&#10;Plage | 5 min à pied&#10;Commerces | 200 m"></textarea></label>
+          <p class="muted">La visite virtuelle doit être réalisée par un prestataire (Matterport, etc.) : le site se contente de l’afficher.</p>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Traductions (facultatif)</summary>
+        <div class="sect__body">
+          <label class="field"><span>Titre en anglais</span><input name="titreEn" maxlength="120"></label>
+          <label class="field"><span>Description en anglais</span><textarea name="descriptionEn" rows="4" maxlength="6000"></textarea></label>
+          <label class="field"><span>Titre en allemand</span><input name="titreDe" maxlength="120"></label>
+          <label class="field"><span>Description en allemand</span><textarea name="descriptionDe" rows="4" maxlength="6000"></textarea></label>
+          <p class="muted">Sans traduction, le visiteur voit le texte français.</p>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Suivi interne</summary>
+        <div class="sect__body">
+          <label class="field"><span>Négociateur en charge</span><select name="negociateurId"><option value="">Non assigné</option></select></label>
+          <label class="field"><span>Avancement de la vente</span><select name="etapeVente"><option value="">Aucun</option><option value="mandat">Mandat signé</option><option value="offre">Offre reçue</option><option value="compromis">Compromis signé</option><option value="acte">Acte signé</option></select></label>
+          <label class="field"><span>Date du compromis</span><input name="dateCompromis" type="date"></label>
+          <label class="field"><span>Date de l'acte</span><input name="dateActe" type="date"></label>
+          <label class="field"><span>Acquéreur (contact)</span><select name="acquereurId"><option value="">—</option></select></label>
+          <div id="mandatBox" class="muted"></div>
+          <div id="acqBox" class="muted"></div>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Bilan énergétique (DPE)</summary>
+        <div class="sect__body">
+          <div class="row">
+            <label class="field"><span>Classe DPE</span><select name="dpe"><option value="">Non communiqué</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></label>
+            <label class="field"><span>Consommation (kWh/m²/an)</span><input name="dpeKwh" maxlength="10" inputmode="numeric"></label>
+          </div>
+          <div class="row">
+            <label class="field"><span>Classe GES</span><select name="ges"><option value="">Non communiqué</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></label>
+            <label class="field"><span>Émissions (kg CO₂/m²/an)</span><input name="gesCo2" maxlength="10" inputmode="numeric"></label>
+          </div>
+          <div class="row row--3">
+            <label class="field"><span>Dépenses min (€/an)</span><input name="energieMin" maxlength="20" inputmode="numeric"></label>
+            <label class="field"><span>Dépenses max (€/an)</span><input name="energieMax" maxlength="20" inputmode="numeric"></label>
+            <label class="field"><span>Année de référence</span><input name="energieRef" maxlength="10" inputmode="numeric" placeholder="2021"></label>
+          </div>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Informations financières</summary>
+        <div class="sect__body">
+          <label class="field"><span>Honoraires</span><input name="honoraires" maxlength="200" list="honos" placeholder="Les honoraires d'agence sont à la charge du vendeur."></label>
+          <datalist id="honos"><option value="Les honoraires d'agence sont intégralement à la charge du vendeur."><option value="Honoraires à la charge de l'acquéreur : 5 % TTC du prix hors honoraires."></datalist>
+          <div class="row">
+            <label class="field"><span>Taxe foncière (€/an)</span><input name="taxeFonciere" maxlength="20" inputmode="numeric"></label>
+            <label class="field"><span>Charges de copro (€/an)</span><input name="chargesCopro" maxlength="20" inputmode="numeric"></label>
+          </div>
+          <label class="field field--sm"><span>Lots en copropriété</span><input name="lotsCopro" maxlength="10" inputmode="numeric"></label>
+        </div>
+      </details>
+
+    </div>
+
+    <div class="drawer__foot">
+      <button type="button" class="btn btn--danger" id="deleteBtn" hidden>Supprimer</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn--ghost" data-close>Annuler</button>
+      <button type="submit" class="btn btn--red" id="saveBtn">Enregistrer</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody"></div>
+    <div class="modal__actions" id="modalActions"></div>
+  </div>
+</div>
+
+<div class="drawer" id="leadDrawer" aria-hidden="true">
+  <div class="drawer__backdrop" data-close></div>
+  <div class="drawer__panel" id="leadPanel"></div>
+</div>
+
+<script type="module" src="/admin/js/main.js"></script>
+</body>
+</html>
