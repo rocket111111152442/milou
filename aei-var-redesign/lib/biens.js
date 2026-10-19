@@ -159,8 +159,12 @@ export const slug = (s) => String(s || 'bien').toLowerCase().normalize('NFD').re
 
 // Version publique : biens publiés uniquement, sans les champs internes
 const PRIVATE_FIELDS = ['adresse', 'externalRef', 'source', 'createdAt', 'updatedAt', 'negociateurId', 'etapeVente', 'dateCompromis', 'dateActe', 'acquereurId', 'createdBy', 'updatedBy', 'mandatId'];
+// Les photos d'origine du site sont stockées en chemin relatif (img/…) : on les rend absolues, car les fiches sont servies depuis /bien/<id>
+const absPhoto = (p) => (/^img\//.test(p || '') ? '/' + p : p);
 export function publicBien(b) {
   const out = { ...b, statutLabel: STATUTS[b.statut], vendu: b.statut === 'vendu' || b.statut === 'loue' };
+  if (out.photo) out.photo = absPhoto(out.photo);
+  if (Array.isArray(out.photos)) out.photos = out.photos.map(absPhoto);
   PRIVATE_FIELDS.forEach(k => delete out[k]);
   return out;
 }
