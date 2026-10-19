@@ -84,3 +84,11 @@ Après une modification de `config/agence.js` ou de l'en-tête et du pied de pag
 5. Nouveau projet Vercel, nouveau store Blob privé, nouvelles variables.
 
 Limite actuelle : les textes de l'accueil sont écrits dans le HTML et non dans la config. Une agence = une copie du dossier.
+
+
+## Ajouts « parité + CRM »
+
+- Rendu serveur : `lib/ssr.js` (gabarits générés par `node scripts/build-pages.mjs` dans `lib/*.generated.js` — à relancer après toute modification de `scripts/pages/*` ou de l'en-tête/pied de page de `public/index.html`, puis committer les fichiers générés).
+- Contenu initial des communes et des avis : `config/contenu-initial.js` (utilisé tant que rien n'est enregistré dans l'admin).
+- CRM : `lib/crm.js`, routes `lib/routes/crm.js`, vues `public/admin/js/views/{contacts,taches,mandats,rapports,contenu}.js`.
+- Traductions : `public/i18n.js` + `public/i18n-dict.js` (clé = texte français exact).

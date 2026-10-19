@@ -1,4 +1,39 @@
-# Bilan — état réel de la solution (19 octobre 2026)
+# Bilan — état réel de la solution (19 octobre 2026, mise à jour « parité La Boîte Immo + CRM »)
+
+## Nouveautés de cette mise à jour
+
+**Site public**
+- Pages de biens à adresse propre `/bien/<id>` rendues côté serveur : titre, description, balises de partage et données structurées sont dans le HTML (meilleur pour Google). L'ancien lien `bien.html?id=` redirige. Plan du site `sitemap.xml` et `robots.txt` générés.
+- Page « Nos biens » `/biens` : recherche par texte, ville, type, prix, surface, pièces, chambres, équipements, visite virtuelle, tri, biens vendus ; critères dans l'adresse (partageable) ; recherche vocale (si le navigateur la propose).
+- Pages `/immobilier/<commune>` (Six-Fours, Sanary, Ollioules, La Seyne) avec texte repris du site actuel de l'agence.
+- Fiche bien : visite virtuelle et vidéo (affichées après un clic, Matterport/YouTube/Vimeo), « à proximité », partage (Facebook, X, LinkedIn, WhatsApp, e-mail, partage du téléphone, lien), impression/PDF via le navigateur.
+- Estimation indicative après le formulaire d'estimation : surface × prix au m² **saisi par l'agence** ± marge.
+- Avis : alimentés depuis l'admin ; la note 4,7/73 vient de PagesJaunes (relevé du 17/10/2026).
+- Pages Agences et Honoraires (barèmes réels relevés sur leur site, à faire confirmer).
+- Français / anglais / allemand : traduction des pages commerciales dans le navigateur (dictionnaire `public/i18n-dict.js`), annonces traduisibles champ par champ dans l'admin. Les pages légales restent en français.
+- Mesure d'audience sans cookie, avec refus possible.
+
+**CRM (admin)**
+- Contacts créés automatiquement à chaque demande (rapprochés par e-mail/téléphone), fiche avec notes, demandes, tâches, mandats, biens correspondants ; fusion de doublons ; suppression RGPD ; import/export CSV.
+- Demandes : assignation, issue gagnée/perdue (+ motif), vue pipeline en colonnes (glisser-déposer).
+- Tâches/rappels (+ résumé e-mail quotidien si l'e-mail est configuré).
+- Mandats : numérotation continue, jamais supprimés, alerte d'échéance.
+- Rapprochement biens ↔ acquéreurs (critères des contacts/alertes).
+- Modèles d'e-mails : envoi via Resend si configuré, sinon ouverture de la messagerie (mailto).
+- Rapports : parcours des demandes, délai médian, origine, par négociateur, biens vus vs demandes, audience.
+
+**Ce que cette mise à jour ne fait PAS (à dire clairement à un client)**
+- Pas de synchronisation avec Hektor/La Boîte Immo ni diffusion vers SeLoger/Leboncoin : pas d'API publique, flux CSV/XML sur demande auprès de l'éditeur.
+- Pas d'estimation instantanée de type PriceHubble/Meilleurs Agents : seulement un calcul sur vos propres prix au m². Sans prix saisi, aucun chiffre n'est affiché.
+- Pas de production de visites virtuelles (seulement leur affichage) ; le format d'intégration Matterport n'est pas confirmé par leur documentation officielle.
+- Pas d'import automatique des avis Google/Immodvisor : saisie manuelle.
+- Pas de recherche par rayon/carte, pas d'avatar IA.
+- Traductions : faites dans le navigateur, donc non indexées par Google (pas de pages /en, /de) ; la qualité de la traduction des textes commerciaux n'a pas été relue par un natif.
+- Registre des mandats : outil de suivi interne, il ne remplace pas le registre réglementaire.
+- Mesure d'audience sans cookie : exemption de consentement non validée par un juriste ; à faire vérifier.
+- Les contacts importés par CSV n'ont pas donné leur accord pour les alertes e-mail.
+- Données CRM stockées en fichiers JSON : suffisant pour une agence, à migrer vers une base au-delà de quelques milliers de contacts.
+
 
 ## Ce qui est réellement fonctionnel (testé en production)
 
@@ -94,8 +129,8 @@ Sans e-mail configuré, le mot de passe oublié ne fonctionne pas par e-mail : u
 3. **E-mails :** activer Resend avec le domaine de l'agence, sinon aucune confirmation ne part et les alertes ne sont pas envoyées.
 4. **Nom de domaine :** brancher le domaine de l'agence, puis retirer la balise `noindex` des pages publiques pour le référencement.
 5. **Référencement (SEO) :**
-   - les fiches de biens sont construites dans le navigateur, ce que Google indexe moins bien que des pages générées côté serveur ;
-   - à prévoir pour un site qui doit bien se positionner.
+   - les fiches de biens sont désormais rendues côté serveur ; le site reste en « noindex » tant que `indexable` n'est pas passé à `true` dans `config/agence.js` (puis `node scripts/build-pages.mjs`) ;
+   - le contenu du reste de la fiche (description, caractéristiques) est affiché par JavaScript.
 6. **Sécurité :**
    - créer des comptes nominatifs et supprimer le compte provisoire ;
    - changer les mots de passe communiqués par écrit ;

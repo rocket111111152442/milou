@@ -1,10 +1,7 @@
-// Initialise les pages communes et l'avis agrégé avec les textes publiés par l'agence sur son site actuel (aei-var.com, relevés le 19/10/2026).
-// Aucun prix au m² n'est renseigné : l'agence doit les saisir (admin > Communes & avis) pour activer l'estimation indicative.
-// Usage : node scripts/seed-contenu.mjs   (n'écrase rien si des données existent déjà)
-import { readCommunes, writeCommunes } from '../lib/communes.js';
-import { readAvis, writeAvis } from '../lib/avis.js';
-import { slug } from '../lib/biens.js';
-
+// Contenu de départ des pages communes et des avis (textes publiés par l'agence sur son site actuel, relevés le 19/10/2026).
+// Utilisé tant que l'agence n'a rien enregistré dans l'admin (Communes & avis). Aucun prix au m² : l'estimation indicative
+// reste désactivée tant que l'agence n'en a pas saisi. Pour une autre agence : vider ces deux listes.
+const slug = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const C = [
   ['Six-Fours-les-Plages', '83140', 'Le Brusc, Les Lônes, la Coudoulière',
     'Vous êtes propriétaire à Six-Fours-les-Plages et souhaitez connaître la valeur réelle de votre bien immobilier ? Notre agence vous propose une estimation immobilière précise et personnalisée, tenant compte des spécificités du marché local.\n\nQue vous envisagiez de vendre un appartement avec vue mer, une maison provençale ou un terrain constructible, notre équipe vous accompagne avec rigueur. À Six-Fours-les-Plages, les prix au m² peuvent varier selon les quartiers : Le Brusc, Les Lônes, la Coudoulière… C’est pourquoi nous réalisons une analyse détaillée, basée sur les biens comparables récemment vendus, les tendances actuelles et les atouts de votre bien.\n\nNotre objectif est de vous fournir un avis de valeur fiable, pour vendre rapidement et au bon prix.'],
@@ -16,16 +13,9 @@ const C = [
     'Vous possédez un bien à La Seyne-sur-Mer et souhaitez en connaître la valeur réelle ? Que ce soit dans le cadre d’un projet de vente, de succession ou simplement pour faire le point sur votre patrimoine, l’Agence Européenne Immobilière vous propose une estimation immobilière fiable et sans engagement.\n\nGrâce à notre expertise terrain, nous analysons les spécificités de votre bien (localisation, état, prestations) tout en tenant compte du prix moyen au m² dans votre quartier, des transactions récentes et des tendances du marché local. Du centre-ville aux quartiers résidentiels comme Mar Vivo ou Balaguier, chaque secteur a ses particularités.'],
 ];
 
-const cur = await readCommunes();
-if (!cur.communes.length) {
-  await writeCommunes({ marge: 10, communes: C.map(([nom, cp, quartiers, intro]) => ({ slug: slug(nom), nom, cp, quartiers, intro, prixM2Maison: '', prixM2Appartement: '', source: '', date: '' })) });
-  console.log('Communes initialisées');
-}
-const av = await readAvis();
-if (!av.agregat && !av.avis.length) {
-  await writeAvis({
-    agregat: { note: 4.7, nombre: 73, source: 'PagesJaunes', url: '', releveLe: '2026-10-17' },
-    avis: [{ id: 'a-site-actuel', auteur: 'Client', note: 5, texte: 'Très bonne agence. Très professionnelle.', date: '', source: 'Site actuel de l’agence', url: '', publie: true }],
-  });
-  console.log('Avis initialisés');
-}
+export const communes = { marge: 10, communes: C.map(([nom, cp, quartiers, intro]) => ({ slug: slug(nom), nom, cp, quartiers, intro, prixM2Maison: '', prixM2Appartement: '', source: '', date: '' })) };
+
+export const avis = {
+  agregat: { note: 4.7, nombre: 73, source: 'PagesJaunes', url: '', releveLe: '2026-10-17' },
+  avis: [{ id: 'a-site-actuel', auteur: 'Client', note: 5, texte: 'Très bonne agence. Très professionnelle.', date: '', source: 'Site actuel de l’agence', url: '', publie: true }],
+};

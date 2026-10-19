@@ -1,6 +1,7 @@
 // Avis clients saisis par l'agence (aucun avis n'est généré ni modifié par le site).
 import { readJSON, updateJSON } from './storage.js';
 import { HttpError } from './http.js';
+import { avis as INITIAL } from '../config/contenu-initial.js';
 
 const KEY = 'data/avis.json';
 const EMPTY = { agregat: null, avis: [] };
@@ -36,7 +37,7 @@ export function sanitizeAvis(input) {
   return { agregat, avis };
 }
 
-export const readAvis = async () => ({ ...EMPTY, ...(await readJSON(KEY, EMPTY)) });
+export const readAvis = async () => ({ ...EMPTY, ...((await readJSON(KEY, null)) || INITIAL) });
 export const writeAvis = (data) => updateJSON(KEY, EMPTY, () => data);
 
 // Vue publique : avis publiés + note globale (saisie ou calculée à partir des avis publiés)

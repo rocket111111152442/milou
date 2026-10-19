@@ -3,6 +3,7 @@
 import { readJSON, updateJSON } from './storage.js';
 import { HttpError } from './http.js';
 import { slug } from './biens.js';
+import { communes as INITIAL } from '../config/contenu-initial.js';
 
 const KEY = 'data/communes.json';
 const EMPTY = { marge: 10, communes: [] };
@@ -47,7 +48,8 @@ export function sanitizeCommunes(input) {
   };
 }
 
-export const readCommunes = async () => ({ ...EMPTY, ...(await readJSON(KEY, EMPTY)) });
+// Tant que l'agence n'a rien enregistré, le contenu de départ (config/contenu-initial.js) est utilisé
+export const readCommunes = async () => ({ ...EMPTY, ...((await readJSON(KEY, null)) || INITIAL) });
 export const writeCommunes = (data) => updateJSON(KEY, EMPTY, () => data);
 
 const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
