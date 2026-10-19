@@ -413,3 +413,8 @@ a.tile:hover { box-shadow: 0 16px 30px -20px rgba(14, 10, 54, .35); transform: t
 .bars i { display: block; height: 10px; background: var(--navy); border-radius: 5px; }
 .row-edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 @media (max-width: 900px) { .kanban { grid-template-columns: repeat(4, 240px); } .assign { grid-template-columns: 1fr; } }
+
+/* Fiche contact : formulaire d'e-mail type lisible, liens aux couleurs de l'admin */
+#mailForm { display: grid; grid-template-columns: 1fr; gap: 10px; align-items: stretch; }
+#mailForm select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font: inherit; background: #fff; }
+#view a:not(.btn):not(.icon-btn):not(.linkish) { color: var(--navy); text-decoration-color: rgba(30, 20, 106, .35); }
