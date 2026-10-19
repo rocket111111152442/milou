@@ -89,6 +89,18 @@ Après une modification de `config/agence.js` ou de l'en-tête et du pied de pag
 Limite actuelle : les textes de l'accueil sont écrits dans le HTML et non dans la config. Une agence = une copie du dossier.
 
 
+## Tests
+
+```bash
+# Tests de bout en bout avec captures (Playwright requis : npm i -D playwright, ou installation globale)
+BASE=http://localhost:3000 OUT=/tmp/captures ADMIN_EMAIL=… ADMIN_PASSWORD=… NEW_PASSWORD=… node scripts/tests/e2e.mjs all
+# Vérifications en lecture seule d'un site en ligne (pages, redirections, 401, noindex, en-têtes)
+bash scripts/tests/verif-production.sh https://acorimmo.vercel.app
+```
+
+`e2e.mjs public` est en lecture seule ; `forms` et `admin` créent des données (à lancer en local). Regarder les captures :
+certains défauts (conflits de styles, photos absentes) ne se voient que là.
+
 ## Import des annonces (Acor’Immo)
 
 ```bash

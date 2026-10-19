@@ -50,8 +50,13 @@ n’a pas validé.
 
 ## Ce qui fonctionne et a été testé
 
-Tests automatisés (Playwright, Chromium) sur le serveur local (`STORAGE=fs`), bureau 1440 px et mobile (iPhone 13),
-avec lecture des captures d’écran : 87 vérifications, toutes réussies après corrections.
+Tests automatisés (Playwright, Chromium ; `scripts/tests/e2e.mjs`) sur le serveur local (`STORAGE=fs`), bureau 1440 px
+et mobile (iPhone 13), avec lecture des captures d’écran : 87 vérifications (62 site, 8 formulaires, 17 admin), toutes
+réussies. Défauts trouvés et corrigés en cours de route grâce aux tests et aux captures : charges mensuelles affichées
+comme annuelles, places de parking typées « maison », filtre « Équipements » pollué par l’étage, accueil qui chargeait
+les 194 biens, fiche bien de 450 Ko (tout le catalogue embarqué), garage en tête de la sélection d’accueil, avis long
+trop haut. Trois échecs venaient du script de test lui-même (défilement trop rapide, sélecteurs d’onglets, vignettes
+volontairement masquées sur mobile) et ont été corrigés dans le script.
 
 - **Site** : accueil (sélection de 9 biens, filtres vente/location/vendus), recherche depuis l’accueil, page `/biens`
   (filtres type/ville/prix/surface/pièces/chambres/équipements, tri), fiches `/bien/<id>` rendues côté serveur avec
@@ -65,6 +70,24 @@ avec lecture des captures d’écran : 87 vérifications, toutes réussies aprè
   et biens correspondants, modèles d’e-mails proposés, tâches, mandat rattaché à un bien, agenda des visites, rapports,
   communes & avis (contenu initial Acor’Immo), création d’un utilisateur, admin sur mobile.
 - **Production** : voir la section « Vérifications en production » ci-dessous.
+
+## Vérifications en production (https://acorimmo.vercel.app, 19/10/2026)
+
+- `scripts/tests/verif-production.sh` : 37/37 — 17 pages en 200 (accueil, `/biens`, fiche, 5 communes, pages légales,
+  espace client, admin, sitemap, robots), bien inconnu en 404, `bien.html?id=` et `bien.html` redirigés en 301,
+  API admin et `/api/auth/me` en 401 sans session, écriture admin sans origine refusée (403), API de synchronisation
+  fermée (503), noindex (balise, `robots.txt`, `X-Robots-Tag` sur l’admin), CSP, HSTS, X-Frame-Options, photo servie
+  en WebP depuis le stockage privé, aucun champ privé (adresse, référence externe, avancement de vente) dans l’API publique,
+  194 biens publiés.
+- Tests Playwright « public » (lecture seule) sur la production : 62/62, bureau et mobile.
+- Non testé en production, volontairement : envoi de formulaires et connexion admin (la première connexion impose
+  le changement du mot de passe provisoire, qui doit rester celui de l’agence).
+- Fonctions serveur en région Paris (cdg1), stockage Blob privé `acorimmo-donnees` en cdg1 (≈ 1 300 photos, ≈ 210 Mo).
+- Variables : `SESSION_SECRET`, `CRON_SECRET` (type « sensible »), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (lisibles dans Vercel
+  par le propriétaire du projet), `ADMIN_NAME`, `SITE_URL`, `BLOB_READ_WRITE_TOKEN` (créée par le store).
+  `SYNC_API_KEY` a servi à l’import puis a été retirée de la production (valeur remplacée par une valeur aléatoire
+  non conservée) : l’API `/api/v1` répond 503.
+- Le projet Vercel `aei-cote-mer` n’a pas été modifié (aucun déploiement déclenché).
 
 ## Ce qui est encore de la démonstration
 
