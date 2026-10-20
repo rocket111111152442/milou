@@ -31,7 +31,7 @@ test("listes, tableaux, citations et marqueur d'appel à l'action", () => {
   assert.match(html, /<ul><li>un<\/li><li>deux<\/li><\/ul>/);
   assert.match(html, /<ol><li>premier<\/li><li>second<\/li><\/ol>/);
   assert.match(html, /<th scope="col" role="columnheader">A<\/th>/);
-  assert.match(html, /<td role="cell" data-label="B">5 200 €<\/td>/);
+  assert.match(html, /<td role="cell" data-label="B">5\u00a0200\u00a0€<\/td>/);
   assert.match(html, /<blockquote><p>note<\/p><\/blockquote>/);
   assert.ok(html.includes(ctaToken));
 });
@@ -43,7 +43,7 @@ test("liens, gras et italique en ligne", () => {
 });
 
 test("typographie française sur le texte, jamais dans les balises", () => {
-  assert.equal(frenchTypography("Prix : 349 € ?"), "Prix : 349 € ?");
+  assert.equal(frenchTypography("Prix : 349 € ?"), "Prix\u00a0: 349\u00a0€\u00a0?");
   assert.equal(frenchTypography('<a href="/x?a=1 :">ok</a>'), '<a href="/x?a=1 :">ok</a>');
   assert.equal(slugify("Combien coûte l’hébergement ?"), "combien-coute-l-hebergement");
 });

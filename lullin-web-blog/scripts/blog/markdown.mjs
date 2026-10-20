@@ -19,7 +19,7 @@ export function escapeHtml(value) {
 export function slugify(text) {
   return text
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[’'"]/g, " ")
     .replace(/[^a-z0-9]+/g, "-")
@@ -35,10 +35,10 @@ export function frenchTypography(html) {
     .map((part) => {
       if (part.startsWith("<")) return part;
       return part
-        .replace(/ ([:;!?»])/g, " $1")
-        .replace(/« /g, "« ")
-        .replace(/(\d) (\d{3})(?!\d)/g, "$1 $2")
-        .replace(/(\d) (€|%|HT\b|TTC\b|ans?\b|mois\b|pages?\b)/g, "$1 $2");
+        .replace(/ ([:;!?»])/g, "\u00a0$1")
+        .replace(/« /g, "«\u00a0")
+        .replace(/(\d) (\d{3})(?!\d)/g, "$1\u00a0$2")
+        .replace(/(\d) (€|%|HT\b|TTC\b|ans?\b|mois\b|pages?\b)/g, "$1\u00a0$2");
     })
     .join("");
 }

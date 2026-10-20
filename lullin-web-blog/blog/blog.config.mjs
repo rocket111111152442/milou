@@ -26,8 +26,8 @@ export default {
       "Prix, contenu, obligations, visibilité sur Google : des guides concrets et sourcés pour les artisans, commerçants, indépendants et petites entreprises qui veulent un site utile, sans jargon.",
   },
 
-  // Mêmes liens que l'en-tête, le menu mobile et le pied de page du site React,
-  // avec « Blog » en plus. À garder alignés avec src/App.tsx.
+  // Mêmes liens, dans le même ordre, que l'en-tête, le menu mobile et le pied
+  // de page du site React (src/App.tsx, tableau navigation + liens ajoutés).
   navigation: [
     { label: "Expertises", href: "/services" },
     { label: "Réalisations", href: "/realisations" },
@@ -40,9 +40,9 @@ export default {
     { label: "Réalisations", href: "/realisations" },
     { label: "L’agence", href: "/a-propos" },
     { label: "Offres", href: "/offres" },
+    { label: "Blog", href: "/blog" },
     { label: "Notre méthode", href: "/methode" },
     { label: "Questions fréquentes", href: "/faq" },
-    { label: "Blog", href: "/blog" },
     { label: "Devenir partenaire", href: "/partenaires" },
     { label: "Parlons de votre projet", href: "/contact" },
   ],
@@ -51,18 +51,19 @@ export default {
     { label: "Réalisations", href: "/realisations" },
     { label: "L’agence", href: "/a-propos" },
     { label: "Offres", href: "/offres" },
+    { label: "Blog", href: "/blog" },
     { label: "Méthode", href: "/methode" },
     { label: "FAQ", href: "/faq" },
-    { label: "Blog", href: "/blog" },
     { label: "Partenaires", href: "/partenaires" },
     { label: "Contact", href: "/contact" },
   ],
 
-  // Même mesure d'audience que src/consent.tsx : Google Analytics n'est chargé
-  // qu'après « Accepter », et le choix est partagé avec le reste du site via la
-  // même clé de stockage. Mettre gaMeasurementId à "" pour ne rien charger.
+  // Mesure d'audience Google Analytics, désactivée tant que le site lui-même
+  // ne la charge pas (la page de confidentialité annonce « aucun cookie de
+  // suivi »). Pour l'activer avec src/consent.tsx, mettre "G-QLDMCG36NE" :
+  // le blog la chargera alors seulement après « Accepter », avec la même clé.
   analytics: {
-    gaMeasurementId: "G-QLDMCG36NE",
+    gaMeasurementId: "",
     consentStorageKey: "lw-consent",
     acceptedValue: "accepte",
     refusedValue: "refuse",
