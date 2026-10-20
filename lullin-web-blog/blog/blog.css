@@ -1,0 +1,124 @@
+/* Styles propres au blog. Tout le reste (couleurs, polices, en-tête, pied de
+   page, boutons, bandeau de contact) vient de la feuille de style du site.
+   Ce fichier est minifié et intégré dans chaque page par build-blog.mjs. */
+
+[hidden] { display: none !important; }
+
+/* Article */
+.blog-article { max-width: 1240px; padding-block: 56px 96px; }
+.blog-breadcrumb ol { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 40px; padding: 0; list-style: none; color: var(--muted); font-size: 12px; }
+.blog-breadcrumb li + li::before { content: "/"; margin-right: 10px; color: var(--accent); }
+.blog-breadcrumb a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #ffffff40; }
+.blog-breadcrumb a:hover { color: var(--accent); }
+.blog-article-head { padding-bottom: 40px; border-bottom: 1px solid var(--line); }
+.blog-article-head h1 { max-width: 1000px; font-size: clamp(40px, 5.4vw, 76px); line-height: 1.04; text-wrap: balance; }
+.blog-meta { margin-top: 28px; color: var(--muted); font-size: 13px; }
+.blog-article-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; margin-top: 48px; }
+
+.blog-toc { padding: 20px 24px; border: 1px solid var(--line); background: var(--surface); }
+.blog-toc > summary { display: flex; justify-content: space-between; align-items: center; min-height: 24px; color: var(--muted); font-size: 11px; letter-spacing: .095em; text-transform: uppercase; list-style: none; cursor: pointer; }
+.blog-toc > summary::-webkit-details-marker { display: none; }
+.blog-toc > summary::after { content: "+"; color: var(--accent); font-family: var(--heading); font-size: 20px; line-height: 1; }
+.blog-toc[open] > summary::after { content: "−"; }
+.blog-toc[open] > summary { margin-bottom: 10px; }
+.blog-toc > summary:hover { color: var(--paper); }
+.blog-toc ol { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; counter-reset: toc; }
+.blog-toc li { counter-increment: toc; }
+.blog-toc a { display: flex; gap: 12px; padding: 7px 0; color: #d3d5cb; font-size: 13px; line-height: 1.5; }
+.blog-toc a::before { content: counter(toc, decimal-leading-zero); padding-top: 1px; color: var(--accent); font-family: var(--heading); font-size: 11px; }
+.blog-toc a:hover { color: var(--accent); }
+
+.blog-content { min-width: 0; max-width: 720px; }
+.blog-content > * + * { margin-top: 22px; }
+.blog-content p, .blog-content li { color: var(--muted); font-size: 17px; line-height: 1.8; }
+.blog-content strong { color: var(--paper); font-weight: 600; }
+.blog-content a { color: var(--paper); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.blog-content a:hover { color: var(--accent); }
+.blog-content h2 { margin-top: 64px; font-size: clamp(30px, 3.2vw, 42px); line-height: 1.12; scroll-margin-top: 110px; }
+.blog-content h3 { margin-top: 40px; font-size: clamp(21px, 2vw, 25px); letter-spacing: -.03em; line-height: 1.25; scroll-margin-top: 110px; }
+.blog-content h2 + *, .blog-content h3 + * { margin-top: 16px; }
+.blog-content ul, .blog-content ol { display: grid; gap: 10px; padding: 0; list-style: none; }
+.blog-content ul > li { position: relative; padding-left: 24px; }
+.blog-content ul > li::before { content: ""; position: absolute; top: calc(.9em - 3px); left: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.blog-content ol { counter-reset: item; }
+.blog-content ol > li { position: relative; padding-left: 38px; counter-increment: item; }
+.blog-content ol > li::before { content: counter(item); position: absolute; top: 3px; left: 0; display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid var(--line); border-radius: 50%; color: var(--accent); font-family: var(--heading); font-size: 12px; line-height: 1; }
+.blog-content blockquote { margin-inline: 0; padding: 4px 0 4px 22px; border-left: 2px solid var(--accent); }
+.blog-content code { padding: 2px 6px; background: var(--surface); font-size: .9em; }
+
+.blog-table { overflow-x: auto; border: 1px solid var(--line); }
+.blog-content table { width: 100%; min-width: 540px; border-collapse: collapse; font-size: 15px; }
+.blog-content th { padding: 14px 16px; background: var(--surface); color: var(--paper); font-size: 13px; font-weight: 600; text-align: left; vertical-align: bottom; }
+.blog-content td { padding: 14px 16px; border-top: 1px solid var(--line); color: var(--muted); line-height: 1.6; vertical-align: top; }
+.blog-content td:first-child { color: var(--paper); }
+
+.blog-content .blog-cta { margin-block: 44px; padding: 30px; border: 1px solid #d2fd7940; background: linear-gradient(135deg, #d2fd7914, transparent 60%), var(--surface); }
+.blog-content .blog-cta p { color: var(--paper); font-size: 18px; line-height: 1.6; }
+.blog-content .blog-cta .action { margin-top: 22px; color: var(--bg); text-decoration: none; }
+
+/* Liste d'articles et « À lire aussi » */
+.blog-list { padding-block: 56px 110px; }
+.blog-related { padding-block: 0 100px; }
+.blog-related > h2 { margin-bottom: 36px; font-size: clamp(34px, 3.6vw, 52px); }
+.blog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 24px; }
+.blog-card > a { display: flex; flex-direction: column; height: 100%; padding: 32px; border: 1px solid var(--line); background: var(--surface); transition: border-color .3s, transform .4s var(--ease); }
+.blog-card > a:hover { border-color: var(--accent); transform: translateY(-3px); }
+.blog-card-meta { color: var(--accent); font-size: 11px; letter-spacing: .095em; text-transform: uppercase; }
+.blog-card h2, .blog-card h3 { margin-top: 18px; font-size: clamp(26px, 2.4vw, 34px); line-height: 1.14; }
+.blog-card p:not(.blog-card-meta) { margin-top: 16px; color: var(--muted); font-size: 15px; }
+.blog-card-more { display: inline-flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 28px; font-size: 14px; }
+.blog-card > a:hover .blog-card-more { color: var(--accent); }
+
+.mobile-menu nav > a[aria-current] { color: var(--accent); }
+
+/* Consentement à la mesure d'audience */
+.blog-consent { position: fixed; z-index: 60; right: 16px; bottom: 16px; left: 16px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px 26px; max-width: 760px; margin-inline: auto; padding: 18px 20px; border: 1px solid #ffffff38; background: var(--surface); box-shadow: 0 20px 50px #0009; }
+.blog-consent p { flex: 1 1 320px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.blog-consent a { color: var(--paper); text-decoration: underline; text-underline-offset: 3px; }
+.blog-consent div { display: flex; gap: 10px; }
+.blog-consent button { min-height: 44px; padding: 0 22px; border: 1px solid #c3c6b57a; border-radius: 30px; background: transparent; font-size: 13px; transition: color .25s, background .25s; }
+.blog-consent button:hover { border-color: var(--accent); background: var(--accent); color: var(--bg); }
+
+@media (min-width: 1101px) {
+  .blog-article-body { grid-template-columns: minmax(0, 720px) 280px; justify-content: space-between; gap: 80px; }
+  .blog-toc { position: sticky; top: 120px; order: 2; align-self: start; }
+}
+
+@media (max-width: 800px) {
+  .blog-article { padding-block: 28px 64px; }
+  .blog-breadcrumb ol { margin-bottom: 26px; }
+  .blog-article-head { padding-bottom: 30px; }
+  .blog-article-head h1 { font-size: clamp(34px, 9vw, 52px); line-height: 1.08; }
+  .blog-meta { margin-top: 20px; }
+  .blog-article-body { gap: 32px; margin-top: 32px; }
+  .blog-content p, .blog-content li { font-size: 16px; line-height: 1.75; }
+  .blog-content h2 { margin-top: 52px; }
+  .blog-content .blog-cta { padding: 22px; }
+  .blog-content .blog-cta p { font-size: 16px; }
+  .blog-content .blog-cta .action { width: 100%; white-space: normal; }
+  .blog-card > a { padding: 24px; }
+  .blog-list { padding-block: 36px 72px; }
+  .blog-related { padding-bottom: 72px; }
+  .blog-consent { right: 12px; bottom: 12px; left: 12px; padding: 16px; }
+  .blog-consent div { width: 100%; }
+  .blog-consent button { flex: 1; }
+}
+
+/* Sur téléphone, chaque ligne de tableau devient une carte lisible sans
+   défilement horizontal. */
+@media (max-width: 640px) {
+  .blog-table { overflow: visible; border: 0; }
+  .blog-content table, .blog-content tbody, .blog-content tr, .blog-content td { display: block; width: 100%; min-width: 0; }
+  .blog-content thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .blog-content tr { padding: 14px 16px; border: 1px solid var(--line); background: var(--surface); }
+  .blog-content tr + tr { margin-top: 10px; }
+  .blog-content td { padding: 5px 0; border: 0; font-size: 15px; }
+  .blog-content td::before { content: attr(data-label); display: block; margin-bottom: 2px; color: var(--accent); font-size: 10px; letter-spacing: .095em; text-transform: uppercase; }
+  .blog-content td:first-child { padding-top: 0; font-family: var(--heading); font-size: 19px; letter-spacing: -.02em; }
+  .blog-content td:first-child::before { content: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blog-card > a { transition: none; }
+  .blog-card > a:hover { transform: none; }
+}
