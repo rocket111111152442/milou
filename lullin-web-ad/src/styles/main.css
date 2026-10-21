@@ -1,0 +1,55 @@
+/* Système graphique Lullin Web — couleurs et polices issues de lullin-web.com et du fichier officiel du logo. */
+@font-face { font-family: 'Space Grotesk'; src: url('/assets/fonts/space-grotesk-latin.woff2') format('woff2'); font-weight: 400 700; font-style: normal; }
+@font-face { font-family: 'DM Sans'; src: url('/assets/fonts/dm-sans-latin.woff2') format('woff2'); font-weight: 400 700; font-style: normal; }
+
+:root {
+  --bg: #111211;          /* fond officiel du site */
+  --bg-deep: #0b0b0a;     /* noir profond (référence du brief) pour les vignettages */
+  --surface: #1a1c19;     /* surface officielle */
+  --surface-2: #222520;
+  --line: rgba(240, 240, 232, 0.14);
+  --line-strong: rgba(240, 240, 232, 0.32);
+  --paper: #f0f0e8;       /* texte crème du site */
+  --cream: #eeece2;       /* crème du symbole */
+  --muted: #a4a79d;
+  --accent: #d2fd79;      /* accent typographique du site */
+  --lime: #c2f93a;        /* lime du symbole */
+  --heading: 'Space Grotesk', sans-serif;
+  --body: 'DM Sans', sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+body { font-family: var(--body); color: var(--paper); -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-kerning: normal; }
+
+#stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); contain: strict; }
+.scene { position: absolute; inset: 0; overflow: hidden; }
+.layer { position: absolute; inset: 0; pointer-events: none; }
+.abs { position: absolute; left: 0; top: 0; }
+
+.cam-viewport { position: absolute; inset: 0; transform-style: preserve-3d; }
+.cam-world { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-style: preserve-3d; transform-origin: 540px 960px; }
+.p3d { transform-style: preserve-3d; }
+.node { position: absolute; left: 0; top: 0; transform-style: preserve-3d; backface-visibility: hidden; }
+
+/* Typographie */
+.headline { position: absolute; font-family: var(--heading); color: var(--paper); text-transform: uppercase; white-space: nowrap; }
+.headline .line { display: block; position: relative; }
+.w-mask { display: inline-block; overflow: hidden; vertical-align: top; padding: 0.16em 0.04em 0.01em; margin: -0.16em -0.04em -0.01em; }
+.w-inner { display: inline-block; will-change: transform; transform-origin: 0% 100%; }
+.label { font-family: var(--body); font-weight: 500; font-size: 22px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.wordmark { font-family: var(--heading); font-weight: 600; letter-spacing: -0.059em; line-height: 1; display: inline-flex; align-items: baseline; color: var(--paper); white-space: nowrap; }
+.wordmark > span { color: var(--accent); font-weight: 400; }
+
+/* UI schématiques */
+.ui-card { position: absolute; background: var(--surface); border: 1.5px solid var(--line); border-radius: 22px; overflow: hidden; }
+.bar { position: absolute; border-radius: 999px; background: rgba(240, 240, 232, 0.16); }
+.bar.strong { background: rgba(240, 240, 232, 0.85); }
+.bar.lime { background: var(--accent); }
+.img-ph { position: absolute; border-radius: 16px; overflow: hidden; background: linear-gradient(150deg, #2a2e26 0%, #1d201b 55%, #252a1f 100%); }
+
+#fx { position: absolute; inset: 0; pointer-events: none; z-index: 100; } /* au-dessus de toutes les scènes */
+#flash { position: absolute; inset: 0; background: var(--cream); opacity: 0; }
+#vignette { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 48%, rgba(11, 11, 10, 0) 60%, rgba(11, 11, 10, 0.32) 100%); }
+#safe { position: absolute; inset: 0; display: none; }
+body.debug-safe #safe { display: block; }

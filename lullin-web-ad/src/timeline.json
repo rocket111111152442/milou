@@ -1,0 +1,21 @@
+{
+  "_comment": "Source unique de vérité pour l'image ET le son. Les temps sont exprimés en temps (beats). 1 temps = 28 images à 60 i/s = 0,4667 s (128,57 BPM).",
+  "width": 1080,
+  "height": 1920,
+  "fps": 60,
+  "beatFrames": 28,
+  "bpm": 128.57142857142858,
+  "totalBeats": 58,
+  "tailFrames": 6,
+  "scenes": [
+    { "id": "Scene01_Hook",            "start": 0,  "end": 4,  "label": "Accroche" },
+    { "id": "Scene02_GridAssembly",    "start": 4,  "end": 10, "label": "Du chaos à la structure" },
+    { "id": "Scene03_WebsiteReveal",   "start": 10, "end": 18, "label": "Révélation du site" },
+    { "id": "Scene04_Services",        "start": 18, "end": 27, "label": "Écosystème digital" },
+    { "id": "Scene05_LogoReveal",      "start": 27, "end": 36, "label": "Moment signature" },
+    { "id": "Scene06_ResponsiveDemo",  "start": 36, "end": 45, "label": "Desktop vers mobile" },
+    { "id": "Scene07_FinalMessage",    "start": 45, "end": 51, "label": "La décision" },
+    { "id": "Scene08_BrandOutro",      "start": 51, "end": 58, "label": "Signature finale" }
+  ],
+  "safeZone": { "left": 80, "right": 940, "top": 260, "bottom": 1480 }
+}

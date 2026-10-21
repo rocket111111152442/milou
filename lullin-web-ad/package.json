@@ -1,0 +1,19 @@
+{
+  "name": "lullin-web-ad-2026",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Film publicitaire vertical Lullin Web — composition programmatique (DOM + CSS 3D + Three.js) rendue image par image avec Chromium et FFmpeg.",
+  "scripts": {
+    "audio": "python3 audio/build_audio.py",
+    "preview": "node render/preview.mjs",
+    "render": "node render/render.mjs",
+    "deliver": "bash render/deliver.sh"
+  },
+  "dependencies": {
+    "three": "0.169.0"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}
