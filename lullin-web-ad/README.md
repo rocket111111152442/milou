@@ -102,6 +102,7 @@ Générés par `node render/gbp.mjs` (source : `gbp/gbp.js`), même système gra
 | `02_couverture_2048x1152` | Photo de couverture (16:9) |
 | `03` à `10` (1600 × 1200, 4:3) | Une image par service : section *Services* / *Produits*, et éventuellement *Photos* |
 | `11_demander-un-devis_1600x1200` | Image d'une *Actualité* (post) avec le bouton « Demander un devis » vers lullin-web.com |
+| `12_notre-methode_1600x1200` | Les 6 étapes d'un projet (textes de la page « Notre méthode ») : *Actualité* ou section *Services* |
 
 Limites : Google demande des images « fidèles à la réalité ». Ces visuels graphiques peuvent être refusés (« Non approuvé »)
 dans la section *Photos* ; ils sont surtout adaptés aux services, produits et posts. Ils ne remplacent pas de vraies photos

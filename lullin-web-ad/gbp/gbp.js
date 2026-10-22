@@ -22,6 +22,7 @@ export const IMAGES = {
   'photo-video': { w: 800, h: 600 },
   automatisations: { w: 800, h: 600 },
   devis: { w: 800, h: 600 },
+  methode: { w: 800, h: 600 },
 };
 
 const at = (el, x, y, style = {}) => { Object.assign(el.style, { position: 'absolute', left: `${x}px`, top: `${y}px`, ...style }); return el; };
@@ -273,6 +274,36 @@ const BUILD = {
     s.append(node('E-mail de confirmation', 'Envoyé automatiquement', ...pts[1], true));
     s.append(node('Relance programmée', 'Si pas de réponse', ...pts[2]));
     s.append(node('Tableau de suivi', 'Tout au même endroit', ...pts[3]));
+  },
+
+  // Les 6 étapes et leurs précisions sont reprises de la page « Notre méthode » de lullin-web.com.
+  methode(root) {
+    background(root, 800, 600, { seed: 13, glow: [0.72, 0.5] });
+    root.append(at(div('k', {}, 'Notre méthode'), 48, 46));
+    const t = at(div('t', { width: '336px' }), 46, 74); t.innerHTML = 'Votre site en <em>6&nbsp;étapes</em>'; root.append(t);
+    root.append(at(div('s', { width: '320px' }, 'Un prix connu avant de commencer, un seul interlocuteur.'), 48, 204));
+    root.append(at(lockup(30, 24), 48, 520));
+    root.append(at(div('', { font: '500 15px var(--body)', color: 'var(--muted)', letterSpacing: '0.02em' }, `lullin-web.com · ${LOCATION}`), 48, 558));
+    const steps = [
+      ['Vous nous présentez votre projet.', 'Premier échange gratuit et sans engagement.'],
+      ['Nous préparons votre offre.', 'Formule et prix connus avant le lancement.'],
+      ['Nous créons votre site.', 'Design, pages et fonctionnalités prévues.'],
+      ['Vous découvrez le résultat.', 'Aperçu et ajustements avant la mise en ligne.'],
+      ['Votre site est publié.', 'Nom de domaine configuré, site en ligne.'],
+      ['Nous pouvons continuer à le gérer.', 'Maintenance, uniquement si vous le souhaitez.'],
+    ];
+    const x0 = 392, y0 = 52, rowH = 72, gap = 10;
+    root.append(at(div('', { width: '2px', height: `${5 * (rowH + gap)}px`, background: 'linear-gradient(180deg, var(--lime), rgba(194,249,58,0.25))' }), x0 + 35, y0 + rowH / 2));
+    steps.forEach(([title, sub], i) => {
+      const y = y0 + i * (rowH + gap);
+      const last = i === steps.length - 1;
+      const r = at(div('card', { width: '330px', height: `${rowH}px`, borderRadius: '16px', background: '#1d201b', borderColor: i === 0 ? 'var(--lime)' : 'rgba(255,255,255,0.08)', borderWidth: i === 0 ? '2px' : '1.5px' }), x0 + 54, y);
+      r.append(at(div('', { font: '600 16px var(--heading)', letterSpacing: '-0.025em', color: 'var(--paper)', whiteSpace: 'nowrap' }, title), 18, 15));
+      r.append(at(div('', { font: '400 13px var(--body)', color: 'rgba(240,240,232,0.62)', whiteSpace: 'nowrap' }, sub), 18, 40));
+      root.append(r);
+      root.append(at(div('', { width: '40px', height: '40px', borderRadius: '50%', display: 'grid', placeItems: 'center', font: '600 14px var(--body)', letterSpacing: '0.02em',
+        background: i === 0 || last ? 'var(--lime)' : '#151714', color: i === 0 || last ? '#111211' : 'var(--accent)', border: i === 0 || last ? 'none' : '2px solid var(--lime)' }, `0${i + 1}`), x0 + 16, y + rowH / 2 - 20));
+    });
   },
 
   devis(root) {

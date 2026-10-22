@@ -19,7 +19,7 @@ await probe.waitForFunction(() => window.__images);
 const ids = only.length ? only : await probe.evaluate(() => window.__images);
 await probe.close();
 const NAMES = { logo: '01_logo', couverture: '02_couverture', 'sites-vitrines': '03_sites-vitrines', 'boutiques-en-ligne': '04_boutiques-en-ligne', refonte: '05_refonte',
-  maintenance: '06_maintenance', seo: '07_referencement-seo', 'reseaux-sociaux': '08_reseaux-sociaux', 'photo-video': '09_photo-video', automatisations: '10_automatisations-ia', devis: '11_demander-un-devis' };
+  maintenance: '06_maintenance', seo: '07_referencement-seo', 'reseaux-sociaux': '08_reseaux-sociaux', 'photo-video': '09_photo-video', automatisations: '10_automatisations-ia', devis: '11_demander-un-devis', methode: '12_notre-methode' };
 for (const id of ids) {
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, deviceScaleFactor: 2 });
   page.on('pageerror', (e) => console.error('[page error]', e.message));
