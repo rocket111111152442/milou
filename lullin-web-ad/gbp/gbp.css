@@ -1,0 +1,12 @@
+/* Visuels fixes pour la fiche Google Business Profile. Conçus en px CSS, exportés en ×2. */
+html, body { width: auto; height: auto; overflow: hidden; }
+#canvas { position: relative; overflow: hidden; background: var(--bg); }
+.k { font: 500 13px var(--body); letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.t { font: 600 52px/1.0 var(--heading); letter-spacing: -0.05em; color: var(--paper); }
+.t em { font-style: normal; color: var(--accent); }
+.s { font: 400 18px/1.4 var(--body); color: rgba(240, 240, 232, 0.78); }
+.card { position: absolute; background: var(--surface); border: 1.5px solid rgba(255, 255, 255, 0.1); border-radius: 18px; overflow: hidden; }
+.pill { display: inline-flex; align-items: center; gap: 10px; border-radius: 999px; white-space: nowrap; }
+.check { width: 26px; height: 26px; border-radius: 50%; background: var(--lime); display: grid; place-items: center; flex: none; }
+.row { display: flex; align-items: center; gap: 12px; }
+.shadow { box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55); }

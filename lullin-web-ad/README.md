@@ -90,3 +90,20 @@ audio/build_audio.py         synthèse musique + effets
 render/                      serveur local, aperçus, rendu parallèle, livraison
 output/                      livrables
 ```
+
+## Visuels Google Business Profile (`output/google-business/`)
+
+Générés par `node render/gbp.mjs` (source : `gbp/gbp.js`), même système graphique que le film. JPEG, sRGB, 175–400 Ko
+(Google : JPG/PNG, 10 Ko–5 Mo, 720 × 720 px recommandés).
+
+| Fichier | Où le déposer sur la fiche |
+|---|---|
+| `01_logo_1080x1080` | Logo (symbole centré dans un cercle de 70 % : reste entier si Google l'affiche en rond) |
+| `02_couverture_2048x1152` | Photo de couverture (16:9) |
+| `03` à `10` (1600 × 1200, 4:3) | Une image par service : section *Services* / *Produits*, et éventuellement *Photos* |
+| `11_demander-un-devis_1600x1200` | Image d'une *Actualité* (post) avec le bouton « Demander un devis » vers lullin-web.com |
+
+Limites : Google demande des images « fidèles à la réalité ». Ces visuels graphiques peuvent être refusés (« Non approuvé »)
+dans la section *Photos* ; ils sont surtout adaptés aux services, produits et posts. Ils ne remplacent pas de vraies photos
+(vous au travail, votre espace, des réalisations publiées avec l'accord des clients). La page affichée dans les visuels est la
+reconstruction de la page d'accueil de lullin-web.com ; l'« ancien site » du visuel Refonte est un schéma, pas un client réel.
