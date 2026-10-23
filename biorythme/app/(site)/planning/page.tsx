@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Planning from "@/components/booking/Planning";
 import { SplitTitle } from "@/components/Reveal";
 import { fetchPublicSessions } from "@/lib/queries";
-import { isSupabaseConfigured, publicClient } from "@/lib/supabase";
+import { isSupabaseConfigured, publicClient, supabaseHost } from "@/lib/supabase";
 import type { SessionFull } from "@/lib/types";
 import { myBookedSessionIds } from "@/app/actions";
 
@@ -25,7 +25,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
         myBookedSessionIds(),
       ]);
     } catch (err) {
-      console.error("[planning] lecture des séances impossible :", err);
+      console.error(`[planning] lecture des séances impossible (base ${supabaseHost}) :`, err);
       failed = true;
     }
   }

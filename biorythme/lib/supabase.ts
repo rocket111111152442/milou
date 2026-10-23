@@ -12,6 +12,15 @@ const anonKey =
 
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
+/** Adresse (non secrète) de la base utilisée, pour les journaux de diagnostic. */
+export const supabaseHost = (() => {
+  try {
+    return url ? new URL(url).host : "non configurée";
+  } catch {
+    return "invalide";
+  }
+})();
+
 let browserClient: SupabaseClient | null = null;
 
 /** Client public (clé anon) : lecture du planning, temps réel. */
