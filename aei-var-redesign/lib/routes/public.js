@@ -2,24 +2,24 @@
 import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 import { json, readBody, readBinary, clientIp, HttpError, sniffImage } from '../http.js';
 import { rateLimit } from '../ratelimit.js';
-import { readBiens, publicBiens, publicBien } from '../biens.js';
+import { readBiens, readBiensPublic, publicBiens, publicBien } from '../biens.js';
 import { sanitizeLead, createLead, TYPES, STATUSES, matchesTracking, findByCode, readLead, updateLead } from '../leads.js';
 import { readBuffer, writeBuffer, moveKey } from '../storage.js';
 import { sendEmail, emailEnabled, layout } from '../email.js';
 import agence from '../../config/agence.js';
 import { publicAvis } from '../avis.js';
 import { readCommunes, indicative } from '../communes.js';
-import { recordHit } from '../stats.js';
+import { recordHit, isBot } from '../stats.js';
 import { upsertFromLead } from '../crm.js';
 
 const PUBLIC_CACHE = { 'cache-control': 'public, max-age=0, s-maxage=30, stale-while-revalidate=300' };
 
 async function listPublic() {
-  return json(publicBiens(await readBiens()), 200, PUBLIC_CACHE);
+  return json(publicBiens(await readBiensPublic()), 200, PUBLIC_CACHE);
 }
 
 async function getPublic({ params }) {
-  const b = (await readBiens()).find(x => x.id === params.id && x.publie);
+  const b = (await readBiensPublic()).find(x => x.id === params.id && x.publie);
   if (!b) throw new HttpError(404, 'Bien introuvable');
   return json(publicBien(b), 200, PUBLIC_CACHE);
 }
@@ -61,7 +61,7 @@ async function submitLead({ request }) {
 
   const clean = sanitizeLead(body);
   if (clean.bienId) {
-    const bien = (await readBiens()).find(b => b.id === clean.bienId && b.publie);
+    const bien = (await readBiensPublic()).find(b => b.id === clean.bienId && b.publie);
     clean.bienTitre = bien ? `${bien.titre} (${bien.ville}${bien.ref ? ', réf. ' + bien.ref : ''})` : '';
     if (!bien) clean.bienId = '';
   }
@@ -150,10 +150,10 @@ async function media({ params }) {
 }
 
 // ---------- Avis, communes, estimation indicative, mesure d'audience ----------
-async function avis() { return json(await publicAvis(), 200, PUBLIC_CACHE); }
+async function avis() { return json(await publicAvis({ tolerant: true }), 200, PUBLIC_CACHE); }
 
 async function communesList() {
-  const { communes } = await readCommunes();
+  const { communes } = await readCommunes({ tolerant: true });
   return json(communes.map(c => ({ slug: c.slug, nom: c.nom })), 200, PUBLIC_CACHE);
 }
 
@@ -164,10 +164,18 @@ async function estimationIndicative({ request }) {
   return json({ indicative: r });
 }
 
+// Limite en mémoire (par instance) : la mesure d'audience ne doit jamais consommer d'opérations de stockage inutiles
+const hitSeen = new Map();
 async function statsHit({ request }) {
-  await rateLimit('hit', clientIp(request), 240, 3600);
+  const ua = request.headers.get('user-agent') || '';
+  if (isBot(ua)) return new Response(null, { status: 204 });
+  const ip = clientIp(request), now = Date.now();
+  const rec = hitSeen.get(ip);
+  if (rec && now - rec.t < 3_600_000 && rec.n >= 240) return new Response(null, { status: 204 });
+  hitSeen.set(ip, !rec || now - rec.t >= 3_600_000 ? { t: now, n: 1 } : { t: rec.t, n: rec.n + 1 });
+  if (hitSeen.size > 5000) hitSeen.clear();
   const { path, referrer, lang } = await readBody(request, 1000);
-  await recordHit({ path, referrer, lang, userAgent: request.headers.get('user-agent') });
+  await recordHit({ path, referrer, lang, userAgent: ua }).catch(e => console.error('Audience', e?.message));
   return new Response(null, { status: 204 });
 }
 

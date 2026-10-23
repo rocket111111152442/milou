@@ -136,6 +136,24 @@ export function sanitizeBien(b, previous = null) {
   };
 }
 
+// Lecture pour le site public : si le stockage est indisponible (quota dépassé, panne), on sert le dernier état connu
+// embarqué dans le code (lib/biens-snapshot.json) plutôt qu'une erreur. Un cache mémoire de 30 s évite de relire le stockage à chaque visite.
+import SNAPSHOT from './biens-snapshot.json' with { type: 'json' };
+let pubCache = { at: 0, data: null };
+export async function readBiensPublic() {
+  if (pubCache.data && Date.now() - pubCache.at < 30_000) return pubCache.data;
+  try {
+    const data = await readBiens();
+    pubCache = { at: Date.now(), data };
+    return data;
+  } catch (e) {
+    console.error('Stockage indisponible, repli sur le dernier état connu :', e?.message);
+    const data = SNAPSHOT.map(b => ({ ...b, statut: legacyStatut(b), publie: b.publie === undefined ? true : b.publie }));
+    pubCache = { at: Date.now() - 20_000, data }; // on réessaie le stockage dans ~10 s
+    return data;
+  }
+}
+
 export async function readBiens() {
   const list = await readJSON(KEY, []);
   return list.map(b => ({ ...b, statut: legacyStatut(b), publie: b.publie === undefined ? true : b.publie }));

@@ -37,12 +37,16 @@ export function sanitizeAvis(input) {
   return { agregat, avis };
 }
 
-export const readAvis = async () => ({ ...EMPTY, ...((await readJSON(KEY, null)) || INITIAL) });
+export const readAvis = async ({ tolerant = false } = {}) => {
+  let saved = null;
+  try { saved = await readJSON(KEY, null); } catch (e) { if (!tolerant) throw e; }
+  return { ...EMPTY, ...(saved || INITIAL) };
+};
 export const writeAvis = (data) => updateJSON(KEY, EMPTY, () => data);
 
 // Vue publique : avis publiés + note globale (saisie ou calculée à partir des avis publiés)
-export async function publicAvis() {
-  const { agregat, avis } = await readAvis();
+export async function publicAvis({ tolerant = false } = {}) {
+  const { agregat, avis } = await readAvis({ tolerant });
   const pub = avis.filter(a => a.publie);
   const calc = pub.length ? { note: Math.round((pub.reduce((s, a) => s + a.note, 0) / pub.length) * 10) / 10, nombre: pub.length, source: 'Avis publiés sur ce site', url: '', releveLe: '' } : null;
   return { global: agregat || calc, avis: pub.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 12) };

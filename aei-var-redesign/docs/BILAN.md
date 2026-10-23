@@ -24,6 +24,8 @@
 
 **Complément (suivi des dossiers)** : critères de recherche saisissables dans la fiche contact (pour le rapprochement interne, sans envoi d'e-mail), mandats rattachés aux biens (visibles dans la fiche du bien, création pré-remplie), agenda des visites avec compte rendu, avancement de la vente (mandat, offre, compromis, acte) en information interne jamais publiée.
 
+**Incident du 23/10/2026 : stockage suspendu.** Le stockage Vercel Blob du projet est passé en « limits-exceeded-suspended » (quota du forfait Hobby dépassé) : toutes les lectures et écritures renvoient 403, donc plus de connexion à l'admin ni de formulaires. Cause probable : le nombre d'opérations, que la version précédente consommait trop (compteur anti-abus + écriture de la mesure d'audience à chaque page vue, y compris pour les robots). Corrections : mesure d'audience mise en mémoire et écrite au plus une fois par minute, robots exclus avant toute opération, site public servi depuis le dernier état connu embarqué (`lib/biens-snapshot.json`) quand le stockage est indisponible, message d'erreur explicite (503). Le quota lui-même ne se rétablit que par la remise à zéro mensuelle ou un forfait supérieur : à décider par le propriétaire du compte Vercel.
+
 **Interkab : non réalisé, et pourquoi.** Interkab est le réseau inter-cabinets de La Boîte Immo, accessible depuis son logiciel Hektor (« Interkab Connect »). Je n'ai trouvé aucune documentation ni API publique permettant à un tiers de s'y connecter ; la participation passe par un abonnement Hektor. Rien n'a été simulé dans le site. Pour y accéder, il faut demander à La Boîte Immo si un accès partenaire existe (probablement non, l'éditeur étant concurrent).
 
 **Ce que cette mise à jour ne fait PAS (à dire clairement à un client)**

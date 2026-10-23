@@ -3,7 +3,7 @@
 import '../public/cards.js';
 import templates from './templates.generated.js';
 import { robots as robotsMeta } from './layout.generated.js';
-import { readBiens, publicBien, publicBiens, slug } from './biens.js';
+import { readBiensPublic as readBiens, publicBien, publicBiens, slug } from './biens.js';
 import { readCommunes } from './communes.js';
 import agence from '../config/agence.js';
 
@@ -74,7 +74,7 @@ export async function renderBien(id) {
 }
 
 export async function renderVille(slugIn) {
-  const { communes } = await readCommunes();
+  const { communes } = await readCommunes({ tolerant: true });
   const c = communes.find(x => x.slug === slugIn);
   if (!c) return new Response(head(templates.ville.replace('__BODY__', '<article class="container legal"><h1 class="h2">Page introuvable</h1><p><a href="/biens">Voir tous nos biens</a></p></article>'), { title: 'Page introuvable', description: '', canonical: `${SITE}/biens` }), { status: 404, headers: NOT_FOUND });
   const norm = (s) => slug(s);
@@ -99,7 +99,7 @@ export async function renderVille(slugIn) {
 
 export async function sitemap() {
   const biens = publicBiens(await readBiens());
-  const { communes } = await readCommunes();
+  const { communes } = await readCommunes({ tolerant: true });
   const urls = [
     ['/', 1], ['/biens', .9], ['/agences.html', .5], ['/honoraires.html', .4], ['/espace-client.html', .3],
     ...communes.map(c => [`/immobilier/${c.slug}`, .7]),

@@ -49,7 +49,11 @@ export function sanitizeCommunes(input) {
 }
 
 // Tant que l'agence n'a rien enregistré, le contenu de départ (config/contenu-initial.js) est utilisé
-export const readCommunes = async () => ({ ...EMPTY, ...((await readJSON(KEY, null)) || INITIAL) });
+export const readCommunes = async ({ tolerant = false } = {}) => {
+  let saved = null;
+  try { saved = await readJSON(KEY, null); } catch (e) { if (!tolerant) throw e; }
+  return { ...EMPTY, ...(saved || INITIAL) };
+};
 export const writeCommunes = (data) => updateJSON(KEY, EMPTY, () => data);
 
 const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -57,7 +61,7 @@ const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-
 // Estimation indicative = surface × prix au m² saisi par l'agence pour la commune et le type de bien, ± marge.
 // Renvoie null tant que l'agence n'a pas renseigné de prix : on n'affiche jamais de chiffre inventé.
 export async function indicative({ typeBien, ville, surface }) {
-  const { marge, communes } = await readCommunes();
+  const { marge, communes } = await readCommunes({ tolerant: true });
   const n = norm(ville);
   const c = communes.find(x => norm(x.nom) === n) || communes.find(x => n && (n.includes(norm(x.nom)) || norm(x.nom).includes(n)));
   if (!c) return null;

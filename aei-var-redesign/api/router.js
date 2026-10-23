@@ -44,6 +44,7 @@ async function entry(request) {
     if (e instanceof HttpError) return json({ error: e.message, ...e.extra }, e.status);
     if (e instanceof ConflictError) return json({ error: e.message }, 409);
     console.error(e);
+    if (e?.name === 'BlobError' || /Vercel Blob/i.test(e?.message || '')) return json({ error: 'Le service de stockage est momentanément indisponible. Réessayez plus tard ou appelez l’agence.' }, 503);
     return json({ error: 'Erreur interne. Réessayez dans un instant.' }, 500);
   }
 }

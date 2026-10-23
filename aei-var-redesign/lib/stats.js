@@ -3,6 +3,7 @@
 import { updateJSON, readJSON, listKeys, removeKeys } from './storage.js';
 
 const BOT = /bot|crawl|spider|slurp|headless|lighthouse|preview|monitor|curl|wget|python|node-fetch/i;
+export const isBot = (ua) => BOT.test(ua || '');
 const monthKey = (d) => `stats/${d.slice(0, 7)}.json`;
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -16,23 +17,41 @@ export function normalizePath(path) {
   return known.includes(p) ? { page: p } : null;
 }
 
+// Les pages vues sont cumulées en mémoire et écrites au plus une fois par minute et par instance : cela évite une écriture
+// de stockage à chaque visite (quota d'opérations du stockage). Conséquence assumée : la mesure est approximative
+// (quelques vues peuvent se perdre quand une instance s'arrête avant d'avoir écrit).
+let buffer = [];
+let lastFlush = Date.now();
+const FLUSH_MS = 60_000;
+
+async function flush() {
+  const items = buffer; buffer = []; lastFlush = Date.now();
+  if (!items.length) return;
+  const byMonth = new Map();
+  for (const it of items) (byMonth.get(monthKey(it.day)) || byMonth.set(monthKey(it.day), []).get(monthKey(it.day))).push(it);
+  for (const [key, list] of byMonth) {
+    await updateJSON(key, { days: {} }, (data) => {
+      for (const it of list) {
+        const d = (data.days[it.day] ||= { total: 0, pages: {}, biens: {}, refs: {}, langs: {} });
+        d.total++;
+        d.pages[it.page] = (d.pages[it.page] || 0) + 1;
+        if (it.bien) d.biens[it.bien] = (d.biens[it.bien] || 0) + 1;
+        if (it.ref) d.refs[it.ref] = (d.refs[it.ref] || 0) + 1;
+        d.langs[it.lang] = (d.langs[it.lang] || 0) + 1;
+      }
+      return data;
+    }, 3);
+  }
+}
+
 export async function recordHit({ path, referrer, lang, userAgent }) {
-  if (BOT.test(userAgent || '')) return false;
+  if (isBot(userAgent)) return false;
   const n = normalizePath(path);
   if (!n) return false;
   let ref = '';
   try { if (referrer) ref = new URL(referrer).hostname.replace(/^www\./, '').slice(0, 60); } catch {}
-  const day = today();
-  await updateJSON(monthKey(day), { days: {} }, (data) => {
-    const d = (data.days[day] ||= { total: 0, pages: {}, biens: {}, refs: {}, langs: {} });
-    d.total++;
-    d.pages[n.page] = (d.pages[n.page] || 0) + 1;
-    if (n.bien) d.biens[n.bien] = (d.biens[n.bien] || 0) + 1;
-    if (ref) d.refs[ref] = (d.refs[ref] || 0) + 1;
-    const l = ['fr', 'en', 'de'].includes(lang) ? lang : 'fr';
-    d.langs[l] = (d.langs[l] || 0) + 1;
-    return data;
-  }, 6);
+  buffer.push({ day: today(), page: n.page, bien: n.bien, ref, lang: ['fr', 'en', 'de'].includes(lang) ? lang : 'fr' });
+  if (Date.now() - lastFlush >= FLUSH_MS || buffer.length >= 50) await flush();
   return true;
 }
 
