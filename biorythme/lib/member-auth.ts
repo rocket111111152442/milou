@@ -2,7 +2,7 @@ import "server-only";
 import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { cookies } from "next/headers";
-import { adminClient } from "./supabase-admin";
+import { adminClient, serverSecretKey } from "./supabase-admin";
 
 const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
 
@@ -30,7 +30,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
 /* ---------- Session : cookie signé « id.expiration.signature » ---------- */
 
 function secret(): string {
-  const base = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.ADMIN_PASSWORD;
+  const base = serverSecretKey() || process.env.ADMIN_PASSWORD;
   if (!base) throw new Error("Aucun secret disponible pour signer les sessions.");
   return createHmac("sha256", "biorythme-member-session").update(base).digest("hex");
 }

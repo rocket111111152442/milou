@@ -2,7 +2,12 @@
 import { readFile } from "node:fs/promises";
 import pg from "pg";
 
-const url = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+// Base dédiée reliée avec le préfixe « stockage », ancienne base partagée en repli.
+const url =
+  process.env.stockage_POSTGRES_URL_NON_POOLING ||
+  process.env.stockage_POSTGRES_URL ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.POSTGRES_URL;
 if (!url) {
   console.log("[migrate] Pas de POSTGRES_URL : base non reliée, migration ignorée.");
   process.exit(0);
