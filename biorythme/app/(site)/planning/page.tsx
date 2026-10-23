@@ -24,7 +24,8 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
         fetchPublicSessions(client, from.toISOString(), to.toISOString()),
         myBookedSessionIds(),
       ]);
-    } catch {
+    } catch (err) {
+      console.error("[planning] lecture des séances impossible :", err);
       failed = true;
     }
   }

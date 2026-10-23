@@ -55,6 +55,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const firstError = rooms.error || coaches.error || courses.error || sessions.error || members.error;
   if (firstError) {
+    console.error("[admin] erreur base de données :", firstError);
     return <Notice title="Erreur base de données" text={firstError.message} />;
   }
 
