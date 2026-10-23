@@ -1,5 +1,6 @@
 import "server-only";
 import type { ShopId } from "./shops";
+import { dbEnabled } from "./db";
 import type { Settings } from "./settings";
 
 /** Adresse(s) qui reçoivent les commandes d'une boutique : ORDER_EMAIL_TO_SANARY, ORDER_EMAIL_TO_SIX_FOURS… sinon ORDER_EMAIL_TO. */
@@ -13,7 +14,7 @@ export function orderEmailTo(shop: ShopId) {
  * dans /admin/reglages (ou ORDERS_LIVE=1), e-mail ou webhook configuré.
  */
 export function ordersEnabled(shop: ShopId, settings?: Settings) {
-  const stored = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const stored = dbEnabled();
   return Boolean(
     (process.env.RESEND_API_KEY && orderEmailTo(shop)) ||
       process.env.ORDER_WEBHOOK_URL ||

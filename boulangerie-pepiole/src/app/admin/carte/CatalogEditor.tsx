@@ -5,13 +5,19 @@ import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState, useTransition } from "react";
 import { CATEGORIES, PRODUCTS, formatPrice } from "@/lib/catalog";
 import type { CustomProduct, ProductFields } from "@/lib/settings";
-import { updateSettings } from "../actions";
+import { updateSettings as updateSettingsAction } from "../actions";
 import { ProductForm, parseEuros, toEuros } from "./ProductForm";
 
 type Initial = { prices: Record<string, number>; unavailable: string[]; hidden: string[]; custom: CustomProduct[]; edits: Record<string, ProductFields> };
 type Row = ProductFields & { id: string; price: number; custom?: CustomProduct; edited?: boolean };
 
 const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((id) => b.has(id));
+
+/** Enregistre une partie des réglages ; lève l'erreur du serveur si l'enregistrement échoue. */
+async function updateSettings(patch: Parameters<typeof updateSettingsAction>[0]) {
+  const r = await updateSettingsAction(patch);
+  if (!r.ok) throw new Error(r.error);
+}
 
 export function CatalogEditor({ initial, updatedAt }: { initial: Initial; updatedAt: string | null }) {
   const [custom, setCustom] = useState(initial.custom);

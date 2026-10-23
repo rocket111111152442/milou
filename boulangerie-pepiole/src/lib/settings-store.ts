@@ -1,17 +1,18 @@
 import "server-only";
-import { get, put } from "@vercel/blob";
 import { revalidatePath, unstable_cache, updateTag } from "next/cache";
+import { dbEnabled, query } from "./db";
 import { DEFAULT_SETTINGS, normalizeSettings, type Settings } from "./settings";
 
-const PATH = "config/reglages.json";
+const KEY = "reglages";
 
 async function readSettings(): Promise<Settings> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return DEFAULT_SETTINGS;
+  if (!dbEnabled()) return DEFAULT_SETTINGS;
   try {
-    const res = await get(PATH, { access: "private", useCache: false });
-    if (!res || res.statusCode !== 200) return DEFAULT_SETTINGS;
-    return normalizeSettings(JSON.parse(await new Response(res.stream).text()));
-  } catch {
+    const { rows } = await query<{ data: unknown }>("select data from petrin_settings where key = $1", [KEY]);
+    return rows[0] ? normalizeSettings(rows[0].data) : DEFAULT_SETTINGS;
+  } catch (e) {
+    // Base indisponible : le site reste visible avec les réglages par défaut
+    console.warn("[settings] lecture impossible :", (e as Error).message);
     return DEFAULT_SETTINGS;
   }
 }
@@ -24,13 +25,11 @@ export const getSettingsFresh = readSettings;
 
 export async function saveSettings(next: Settings) {
   const clean = normalizeSettings({ ...next, updatedAt: new Date().toISOString() });
-  await put(PATH, JSON.stringify(clean), {
-    access: "private",
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    cacheControlMaxAge: 60,
-  });
+  await query(
+    `insert into petrin_settings (key, data, updated_at) values ($1, $2, now())
+     on conflict (key) do update set data = excluded.data, updated_at = now()`,
+    [KEY, JSON.stringify(clean)],
+  );
   // Appelé depuis une server action : effet immédiat sur tout le site
   updateTag("reglages");
   revalidatePath("/", "layout");

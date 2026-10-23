@@ -9,7 +9,7 @@ export const metadata = { title: "Commandes" };
 export default async function AdminOrdersPage() {
   let orders: StoredOrder[] = [];
   let error: string | null = null;
-  if (!storageEnabled()) error = "Le stockage des commandes n'est pas configuré (BLOB_READ_WRITE_TOKEN manquant).";
+  if (!storageEnabled()) error = "Le stockage des commandes n'est pas configuré (POSTGRES_URL manquant).";
   else {
     try {
       orders = await listOrders();

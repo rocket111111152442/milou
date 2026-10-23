@@ -19,7 +19,8 @@ export function ShopSettings({ initialLive, initialClosed, envLive }: { initialL
     setError(null);
     start(async () => {
       try {
-        await updateSettings(patch);
+        const r = await updateSettings(patch);
+        if (!r.ok) throw new Error(r.error);
       } catch (e) {
         rollback();
         setError(`Échec de l'enregistrement : ${(e as Error).message}`);

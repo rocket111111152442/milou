@@ -71,11 +71,17 @@ Installable comme une application (« Ajouter à l'écran d'accueil » → icôn
 | **Carte & prix** | ajouter un produit (photo, rayon, prix, format, description, délai de commande, choix du client pour les formules), le modifier ou le supprimer ; modifier aussi les produits d'origine (nom, photo, description, choix) avec « Rétablir » ; modifier les prix ; retirer un produit de la vente (« Momentanément indisponible ») ou de la carte |
 | **Réglages** | notifications push sur chaque appareil, interrupteur « Commande en ligne » par boutique (test / réel), fermetures exceptionnelles, remise à zéro complète (taper « EFFACER ») |
 
-Stockage : Blob store **privé** Vercel `petrin-de-pepiole-commandes` (région Paris) :
-`commandes/*.json`, `config/reglages.json`, `push/*.json`, `photos/*` (photos des produits ajoutés, servies par `/api/photo/…`).
+Stockage : base **Postgres (Supabase)**, tables préfixées `petrin_` (la base est partagée avec d'autres projets) :
+`petrin_orders` (commandes), `petrin_settings` (réglages), `petrin_push_devices` (appareils notifiés),
+`petrin_photos` (photos des produits ajoutés). Le schéma est dans `supabase/schema.sql` ; il est idempotent et
+appliqué à chaque build par `scripts/migrate.mjs`. L'accès se fait uniquement côté serveur (`src/lib/db.ts`, module
+`server-only`) avec `POSTGRES_URL` ; aucune clé de base n'est exposée au navigateur. RLS activée sans politique :
+l'API publique de Supabase n'a aucun accès à ces tables.
 
-Variables (déjà configurées sur Vercel) : `BLOB_READ_WRITE_TOKEN`, `ADMIN_PASSWORD`,
+Variables : `POSTGRES_URL` (exécution) et `POSTGRES_URL_NON_POOLING` (migration), fournies par l'intégration Supabase,
+`ADMIN_PASSWORD` (le compte admin vient de cette variable : il n'y a rien à recréer en base),
 `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`. Optionnel : `ORDERS_LIVE=1` force le mode réel partout.
+Sans `POSTGRES_URL`, le site s'affiche avec les réglages par défaut mais les commandes ne sont pas enregistrées.
 
 Notifications : Android / ordinateur (Chrome, Edge, Firefox) directement ; iPhone / iPad (iOS 16.4+) après
 « Sur l'écran d'accueil » depuis Safari.

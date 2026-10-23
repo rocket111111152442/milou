@@ -4,13 +4,13 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { ADMIN_COOKIE, checkPassword, isAdmin, sessionToken } from "@/lib/admin-auth";
-import { ORDER_STATUSES, deleteOrder as removeOrder, setOrderStatus, wipePrefix, type OrderStatus } from "@/lib/orders-store";
+import { ORDER_STATUSES, deleteOrder as removeOrder, setOrderStatus, wipeOrders, type OrderStatus } from "@/lib/orders-store";
+import { savePhoto, wipePhotos } from "@/lib/photos-store";
 import { getSettingsFresh, saveSettings } from "@/lib/settings-store";
 import { DEFAULT_SETTINGS, type Settings } from "@/lib/settings";
 import { SHOP_IDS, type ShopId } from "@/lib/shops";
-import { notifyTest, removeDevice, saveDevice } from "@/lib/push";
+import { notifyTest, removeDevice, saveDevice, wipeDevices } from "@/lib/push";
 import type { PushSubscription } from "web-push";
-import { put } from "@vercel/blob";
 import { randomBytes } from "node:crypto";
 
 // Anti force brute : 5 essais par IP toutes les 15 minutes (mémoire de l'instance)
@@ -59,7 +59,7 @@ export async function deleteOrder(orderNumber: string) {
 export async function resetAll(confirmation: string) {
   if (!(await isAdmin())) throw new Error("Non autorisé");
   if (confirmation !== "EFFACER") throw new Error("Confirmation incorrecte");
-  const [orders, photos, devices] = await Promise.all([wipePrefix("commandes/"), wipePrefix("photos/"), wipePrefix("push/")]);
+  const [orders, photos, devices] = await Promise.all([wipeOrders(), wipePhotos(), wipeDevices()]);
   await saveSettings(DEFAULT_SETTINGS);
   revalidatePath("/admin", "layout");
   return { orders, photos, devices };
@@ -73,10 +73,18 @@ async function guard() {
 }
 
 /** Modifie une partie des réglages (les autres champs sont conservés). */
-export async function updateSettings(patch: Partial<Settings>) {
+export async function updateSettings(patch: Partial<Settings>): Promise<{ ok: true } | { ok: false; error: string }> {
   await guard();
-  const current = await getSettingsFresh();
-  return saveSettings({ ...current, ...patch });
+  try {
+    const current = await getSettingsFresh();
+    await saveSettings({ ...current, ...patch });
+    return { ok: true };
+  } catch (e) {
+    // Renvoyé comme résultat (et non levé) : en production, une erreur levée par une action serveur
+    // arrive masquée dans le navigateur (« Minified React error #441 »).
+    console.error("[admin] enregistrement des réglages :", e);
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 export async function subscribeDevice(subscription: PushSubscription, shops: ShopId[], label: string) {
@@ -103,6 +111,6 @@ export async function uploadPhoto(form: FormData): Promise<string> {
   if (!ext) throw new Error("Format accepté : JPEG, PNG ou WebP");
   if (file.size > 4 * 1024 * 1024) throw new Error("Photo trop lourde (4 Mo maximum)");
   const name = `${randomBytes(8).toString("hex")}.${ext}`;
-  await put(`photos/${name}`, file, { access: "private", contentType: file.type, addRandomSuffix: false });
+  await savePhoto(name, Buffer.from(await file.arrayBuffer()), file.type);
   return `/api/photo/${name}`;
 }

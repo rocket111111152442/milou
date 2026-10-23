@@ -1,14 +1,12 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import webpush, { type PushSubscription } from "web-push";
-import { del, get, list, put } from "@vercel/blob";
+import { dbEnabled, query } from "./db";
 import { getShop, type ShopId } from "./shops";
 import { formatDateLong, formatTime } from "./hours";
 import type { StoredOrder } from "./orders-store";
 
-// Notifications push vers les téléphones / ordinateurs des boutiques (abonnements dans le Blob privé).
-
-const PREFIX = "push/";
+// Notifications push vers les téléphones / ordinateurs des boutiques (abonnements dans Postgres, table petrin_push_devices).
 
 export type PushDevice = {
   subscription: PushSubscription;
@@ -19,7 +17,7 @@ export type PushDevice = {
 };
 
 export function pushConfigured() {
-  return Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.BLOB_READ_WRITE_TOKEN);
+  return Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && dbEnabled());
 }
 
 function setup() {
@@ -30,41 +28,35 @@ function setup() {
   );
 }
 
-const keyOf = (endpoint: string) => `${PREFIX}${createHash("sha256").update(endpoint).digest("hex").slice(0, 32)}.json`;
+const keyOf = (endpoint: string) => createHash("sha256").update(endpoint).digest("hex").slice(0, 32);
 
 export async function saveDevice(device: PushDevice) {
-  await put(keyOf(device.subscription.endpoint), JSON.stringify(device), {
-    access: "private",
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+  await query(
+    `insert into petrin_push_devices (key, data) values ($1, $2)
+     on conflict (key) do update set data = excluded.data`,
+    [keyOf(device.subscription.endpoint), JSON.stringify(device)],
+  );
 }
 
 export async function removeDevice(endpoint: string) {
-  await del(keyOf(endpoint)).catch(() => {});
+  await query("delete from petrin_push_devices where key = $1", [keyOf(endpoint)]).catch(() => {});
 }
 
 async function listDevices() {
-  const { blobs } = await list({ prefix: PREFIX, limit: 1000 });
-  const devices = await Promise.all(
-    blobs.map(async (b) => {
-      const res = await get(b.pathname, { access: "private", useCache: false });
-      if (!res || res.statusCode !== 200) return null;
-      try {
-        return JSON.parse(await new Response(res.stream).text()) as PushDevice;
-      } catch {
-        return null;
-      }
-    }),
-  );
-  return devices.filter((d): d is PushDevice => d !== null);
+  const { rows } = await query<{ data: PushDevice }>("select data from petrin_push_devices");
+  return rows.map((r) => r.data);
 }
 
 export async function countDevices() {
   if (!pushConfigured()) return 0;
-  const { blobs } = await list({ prefix: PREFIX, limit: 1000 });
-  return blobs.length;
+  const { rows } = await query<{ n: string }>("select count(*) as n from petrin_push_devices");
+  return Number(rows[0]?.n ?? 0);
+}
+
+/** Supprime tous les appareils abonnés ; renvoie leur nombre. */
+export async function wipeDevices() {
+  const { rowCount } = await query("delete from petrin_push_devices");
+  return rowCount ?? 0;
 }
 
 async function send(payload: object, shop: ShopId | null) {
