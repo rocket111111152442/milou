@@ -25,9 +25,9 @@ export default async function OpengraphImage() {
   const gold = "linear-gradient(100deg, #B9AFA6 0%, #E9E2DA 25%, #FBF8F4 45%, #D3CAC1 65%, #F1EBE4 85%, #C2B8AE 100%)";
   return new ImageResponse(
     (
-      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#e6dce1", fontFamily: "Display" }}>
+      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#dccbd8", fontFamily: "Display" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "54px 64px", background: "#0C0A0D", boxShadow: "0 40px 80px -40px rgba(17,11,21,0.6)", position: "relative" }}>
-          <div style={{ position: "absolute", top: 10, left: 10, right: 10, bottom: 10, border: "1px solid rgba(230, 220, 225,0.25)", display: "flex" }} />
+          <div style={{ position: "absolute", top: 10, left: 10, right: 10, bottom: 10, border: "1px solid rgba(220, 203, 216,0.25)", display: "flex" }} />
           <div style={{ fontSize: 20, letterSpacing: 12, color: "#D9D0C6", textTransform: "uppercase" }}>Maison</div>
           <div style={{ marginTop: 16, fontSize: 48, letterSpacing: 6, whiteSpace: "nowrap", textTransform: "uppercase", backgroundImage: gold, backgroundClip: "text", color: "transparent" }}>Empreinte de Violettes</div>
           <div style={{ marginTop: 22, width: 90, height: 1, background: "#CFC6BC" }} />

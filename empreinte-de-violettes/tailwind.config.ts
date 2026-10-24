@@ -22,7 +22,7 @@ const config: Config = {
         },
         ivory: "#F6F1EA",
         // Herbier
-        paper: { DEFAULT: "#e6dce1", deep: "#dacdd5", light: "#f0e9ed" },
+        paper: { DEFAULT: "#dccbd8", deep: "#ccb6c8", light: "#ebdfe8" },
         ink: { DEFAULT: "#1B1320", soft: "#3B2E41", muted: "#6B5E70", faint: "#9A8F9C" },
         plum: { DEFAULT: "#2A1A33", deep: "#1A1020", night: "#110B15" },
         foil: { DEFAULT: "#D9D0C6", light: "#F1EBE4", deep: "#B9AFA6" },
