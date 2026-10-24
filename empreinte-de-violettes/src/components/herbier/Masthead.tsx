@@ -77,13 +77,13 @@ export function Masthead({ menu }: { menu: MenuData }) {
         style={{ pointerEvents: veiled ? "none" : undefined }}
       >
         {ann && !scrolled && !menuOpen && (
-          <Link href={ann.link || "/boutique"} className="group block border-b border-ink/10 bg-paper-deep/80 py-2 text-center font-text text-[0.82rem] italic text-ink-soft">
+          <Link href={ann.link || "/boutique"} className="group block bg-paper-deep border-b border-ink/10 py-2 text-center font-text text-[0.82rem] italic text-ink-soft">
             <span className="wrap block truncate">
               {ann.text} <span className="not-italic text-ink-muted transition group-hover:text-ink">→</span>
             </span>
           </Link>
         )}
-        <div className={cn("transition-[background-color,box-shadow,backdrop-filter] duration-500", scrolled || menuOpen ? "bg-paper/[0.97] shadow-[0_1px_0_rgba(27,19,32,0.1)]" : isHome ? "bg-gradient-to-b from-paper via-paper/80 to-transparent" : "bg-transparent")}>
+        <div className={cn("transition-[background-color,box-shadow,backdrop-filter] duration-500", scrolled || menuOpen ? "bg-paper/[0.97] shadow-[0_1px_0_rgba(27,19,32,0.1)]" : isHome ? "h-paper shadow-[0_1px_0_rgba(27,19,32,0.1)]" : "bg-transparent")}>
           <div className="wrap grid h-[64px] grid-cols-[1fr_auto_1fr] items-center gap-4">
             <div className="flex items-center">
               <button onClick={() => setMenuOpen(!menuOpen)} className="group flex items-center gap-3" aria-expanded={menuOpen} aria-controls="sommaire">
