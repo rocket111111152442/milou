@@ -8,6 +8,7 @@ import { useUI } from "@/store/ui";
 import { EASE } from "../Elements";
 import { Label } from "../Label";
 import { Plate } from "../Plate";
+import { IntroFilm } from "./IntroFilm";
 
 type Mode = "full" | "quick";
 
@@ -21,6 +22,7 @@ export function Cover({ introEnabled, oncePerSession, coords, founded, tagline, 
   const setIntroDone = useUI((s) => s.setIntroDone);
   const [mode, setMode] = useState<Mode | null>(null);
   const [skipped, setSkipped] = useState(false);
+  const [film, setFilm] = useState(true);
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export function Cover({ introEnabled, oncePerSession, coords, founded, tagline, 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const m: Mode = introEnabled && !seen && !reduce ? "full" : "quick";
     setMode(m);
-    const t = setTimeout(setIntroDone, m === "full" ? 4700 : 700);
+    const t = setTimeout(setIntroDone, m === "full" ? 4900 : 700);
     return () => clearTimeout(t);
   }, [introEnabled, oncePerSession, setIntroDone]);
 
@@ -41,6 +43,7 @@ export function Cover({ introEnabled, oncePerSession, coords, founded, tagline, 
 
   const skip = () => {
     setSkipped(true);
+    setFilm(false);
     setIntroDone();
   };
 
@@ -54,11 +57,14 @@ export function Cover({ introEnabled, oncePerSession, coords, founded, tagline, 
   const full = mode === "full" && !skipped;
   const k = skipped ? "skip" : mode || "wait";
   // horaires de l'intro complète (secondes)
-  const T = full ? { fern: 0.15, violet: 0.55, label: 0.45, after: 3.7 } : { fern: 0, violet: 0.15, label: 0, after: 0.35 };
-  const dur = full ? 2.6 : 1.5;
+  // avec le film d'ouverture, la couverture se dévoile au moment où le papier se lève
+  const base = full ? 3.9 : 0;
+  const T = { fern: base, violet: base + 0.15, after: base + 0.35 };
+  const dur = 1.5;
 
   return (
     <section ref={ref} className="relative h-[100svh] min-h-[600px] overflow-hidden" aria-label="Empreinte de Violettes">
+      {full && film && <IntroFilm onDone={() => setFilm(false)} onSkip={skip} />}
       {mode && (
         <>
           <motion.div className="pointer-events-none absolute bottom-[-5svh] left-[-22vw] h-[56svh] text-plum sm:left-[-12vw] sm:h-[88svh] lg:left-[-7vw]" style={{ y: fernY }}>
@@ -72,8 +78,8 @@ export function Cover({ introEnabled, oncePerSession, coords, founded, tagline, 
 
       <motion.div className="absolute inset-0 flex flex-col items-center justify-center px-5" style={{ y: labelY, scale: labelScale }}>
         {mode && (
-          <motion.div key={`l-${k}`} initial={full ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: EASE }}>
-            <Label as="h1" size="lg" instant={!full} delay={T.label} sheen={full} />
+          <motion.div key={`l-${k}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: EASE, delay: base }}>
+            <Label as="h1" size="lg" instant />
           </motion.div>
         )}
         {mode && (
@@ -122,17 +128,6 @@ export function Cover({ introEnabled, oncePerSession, coords, founded, tagline, 
       )}
 
       <AnimatePresence>
-        {playing && (
-          <motion.button
-            onClick={skip}
-            className="sc absolute bottom-7 left-1/2 z-10 -translate-x-1/2 text-ink-muted hover:text-ink sm:bottom-9"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1, transition: { delay: 0.9 } }}
-            exit={{ opacity: 0 }}
-          >
-            Passer l&apos;introduction
-          </motion.button>
-        )}
       </AnimatePresence>
     </section>
   );
