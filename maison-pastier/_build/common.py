@@ -4,7 +4,7 @@ import json, re, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.dirname(HERE)
-SITE = os.environ.get("SITE_URL", "").rstrip("/")
+SITE = os.environ.get("SITE_URL", "https://maison-pastier.vercel.app").rstrip("/")
 
 PHONE_TEL = "+33664974282"
 PHONE_TXT = "06 64 97 42 82"
