@@ -63,7 +63,8 @@ export function Masthead({ menu }: { menu: MenuData }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const veiled = isHome && !introDone;
+  // accueil, tout en haut : pas de bandeau du tout, il apparaît dès qu'on descend
+  const veiled = isHome && (!introDone || (!scrolled && !menuOpen));
   const count = mounted ? cartCount(lines) : 0;
   const ann = menu.announcement;
 
@@ -151,7 +152,7 @@ function Sommaire({ menu, open, onClose, pathname }: { menu: MenuData; open: boo
       {open && (
         <motion.div
           id="sommaire"
-          className="h-paper-deep fixed inset-0 z-40 overflow-y-auto pt-[64px]"
+          className="fixed inset-0 z-40 overflow-y-auto bg-paper-deep pt-[64px] [background-image:var(--paper-grain)]"
           data-lenis-prevent
           initial={{ clipPath: "inset(0% 0% 100% 0%)" }}
           animate={{ clipPath: "inset(0% 0% 0% 0%)" }}
