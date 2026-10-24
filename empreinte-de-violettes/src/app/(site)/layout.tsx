@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
 import { Bag } from "@/components/herbier/Bag";
+import { Botanica } from "@/components/herbier/Botanica";
 import { Colophon } from "@/components/herbier/Colophon";
 import { Label } from "@/components/herbier/Label";
 import { Masthead, type MenuData } from "@/components/herbier/Masthead";
@@ -91,7 +92,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       </a>
       <Masthead menu={menu} />
       <main id="contenu" className="relative">
-        {children}
+        <Botanica />
+        <div className="relative z-[1]">{children}</div>
       </main>
       <Colophon settings={settings} categories={cats} />
       <Bag freeFrom={mainZone?.freeFrom ?? null} freeZone={mainZone?.name ?? ""} />

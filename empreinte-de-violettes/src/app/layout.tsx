@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Bodoni_Moda, Jost, Newsreader } from "next/font/google";
+import { Fraunces, Jost, Newsreader } from "next/font/google";
 import { getSettings } from "@/lib/catalog";
 import { siteUrl } from "@/lib/orders";
 import "./globals.css";
 
-const display = Bodoni_Moda({ subsets: ["latin"], style: ["normal", "italic"], axes: ["opsz"], variable: "--font-display", display: "swap" });
+const display = Fraunces({ subsets: ["latin"], style: ["normal", "italic"], axes: ["opsz", "SOFT"], variable: "--font-display", display: "swap" });
 const text = Newsreader({ subsets: ["latin"], style: ["normal", "italic"], axes: ["opsz"], variable: "--font-text", display: "swap" });
 const sans = Jost({ subsets: ["latin"], weight: ["300", "400", "500", "600"], variable: "--font-sans", display: "swap" });
 

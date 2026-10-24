@@ -25,7 +25,7 @@ const config: Config = {
         paper: { DEFAULT: "#EDE6DF", deep: "#E3D9CF", light: "#F4EFEA" },
         ink: { DEFAULT: "#1B1320", soft: "#3B2E41", muted: "#6B5E70", faint: "#9A8F9C" },
         plum: { DEFAULT: "#2A1A33", deep: "#1A1020", night: "#110B15" },
-        foil: { DEFAULT: "#B8975A", light: "#DCC48F", deep: "#8A6B33" },
+        foil: { DEFAULT: "#D9D0C6", light: "#F1EBE4", deep: "#B9AFA6" },
         bone: "#E3D7C8",
         gold: {
           DEFAULT: "#C6A15B",

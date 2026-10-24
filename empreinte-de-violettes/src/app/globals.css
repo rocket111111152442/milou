@@ -376,14 +376,15 @@ html[data-intro="seen"] #ev-intro {
   --paper-deep: #e3d9cf;
   --ink: #1b1320;
   --plum: #2a1a33;
+  /* « dorure » devenue crème nacré : plus d'or sur le site */
   --foil-grad: linear-gradient(
     105deg,
-    #8a6b33 0%,
-    #c9a865 22%,
-    #f1dfae 38%,
-    #b08a46 52%,
-    #e2c98f 70%,
-    #94723a 100%
+    #b9afa6 0%,
+    #e9e2da 24%,
+    #fbf8f4 40%,
+    #d3cac1 56%,
+    #f1ebe4 74%,
+    #c2b8ae 100%
   );
   --paper-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.28 0 0 0 0 0.32 0 0 0 0.10 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
@@ -395,7 +396,8 @@ html[data-intro="seen"] #ev-intro {
     color: var(--ink);
   }
   .h-paper-deep {
-    background-color: var(--paper-deep);
+    /* teinte translucide : les gravures de fond restent visibles à travers */
+    background-color: rgba(205, 190, 176, 0.32);
     background-image: var(--paper-grain);
     color: var(--ink);
   }
@@ -431,7 +433,7 @@ html[data-intro="seen"] #ev-intro {
     content: "";
     position: absolute;
     inset: 7px;
-    border: 1px solid rgba(201, 168, 101, 0.28);
+    border: 1px solid rgba(237, 230, 223, 0.22);
     pointer-events: none;
   }
   .foil {
@@ -502,7 +504,7 @@ html[data-intro="seen"] #ev-intro {
     content: "";
     position: absolute;
     inset: 4px;
-    border: 1px solid rgba(201, 168, 101, 0.3);
+    border: 1px solid rgba(237, 230, 223, 0.25);
     transition: inset 0.5s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .btn-label:hover > span {
@@ -576,11 +578,11 @@ html[data-intro="seen"] #ev-intro {
     @apply mx-auto w-full max-w-[1440px] px-5 sm:px-8 lg:px-14;
   }
   .h-title {
-    @apply font-display font-normal leading-[0.98] tracking-[-0.012em];
+    @apply font-display font-[460] leading-[1] tracking-[-0.018em];
     font-size: clamp(2.7rem, 6.4vw, 6rem);
   }
   .h-section {
-    @apply font-display font-normal leading-[1.02] tracking-[-0.01em];
+    @apply font-display font-[440] leading-[1.04] tracking-[-0.015em];
     font-size: clamp(2.1rem, 4.4vw, 4rem);
   }
   .h-title em,
