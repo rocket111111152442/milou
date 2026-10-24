@@ -47,7 +47,7 @@
   }
   ::selection {
     background: #2a1a33;
-    color: #ede6df;
+    color: #e6dce1;
   }
   :focus-visible {
     outline: 1px solid #6b5e70;
@@ -332,12 +332,12 @@ html[data-intro="seen"] #ev-intro {
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: #ede6df;
+  background: #e6dce1;
 }
 ::-webkit-scrollbar-thumb {
   background: #b9adb7;
   border-radius: 10px;
-  border: 3px solid #ede6df;
+  border: 3px solid #e6dce1;
 }
 .admin-scope ::-webkit-scrollbar-track {
   background: #f4f1f6;
@@ -372,8 +372,8 @@ html[data-intro="seen"] #ev-intro {
    HERBIER — système graphique du site public
    ===================================================================== */
 :root {
-  --paper: #ede6df;
-  --paper-deep: #e3d9cf;
+  --paper: #e6dce1;
+  --paper-deep: #dacdd5;
   --ink: #1b1320;
   --plum: #2a1a33;
   /* « dorure » devenue crème nacré : plus d'or sur le site */
@@ -397,19 +397,19 @@ html[data-intro="seen"] #ev-intro {
   }
   .h-paper-deep {
     /* teinte translucide : les gravures de fond restent visibles à travers */
-    background-color: rgba(205, 190, 176, 0.32);
+    background-color: rgba(190, 168, 184, 0.32);
     background-image: var(--paper-grain);
     color: var(--ink);
   }
   .h-plum {
     background-color: var(--plum);
     background-image: var(--paper-grain);
-    color: #ede6df;
+    color: #e6dce1;
   }
   .h-night {
     background-color: #120b16;
     background-image: var(--paper-grain);
-    color: #ede6df;
+    color: #e6dce1;
   }
 
   /* Petites capitales espacées */
@@ -433,7 +433,7 @@ html[data-intro="seen"] #ev-intro {
     content: "";
     position: absolute;
     inset: 7px;
-    border: 1px solid rgba(237, 230, 223, 0.22);
+    border: 1px solid rgba(230, 220, 225, 0.22);
     pointer-events: none;
   }
   .foil {
@@ -504,7 +504,7 @@ html[data-intro="seen"] #ev-intro {
     content: "";
     position: absolute;
     inset: 4px;
-    border: 1px solid rgba(237, 230, 223, 0.25);
+    border: 1px solid rgba(230, 220, 225, 0.25);
     transition: inset 0.5s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .btn-label:hover > span {
@@ -542,7 +542,7 @@ html[data-intro="seen"] #ev-intro {
     position: absolute;
     width: 16px;
     height: 16px;
-    background: #ede6df;
+    background: #e6dce1;
     z-index: 2;
     box-shadow: 0 0 0 0.5px rgba(27, 19, 32, 0.25);
   }
@@ -594,7 +594,7 @@ html[data-intro="seen"] #ev-intro {
   }
   /* Feuille d'herbier (papier épais posé sur la page) */
   .sheet {
-    background-color: #f4efea;
+    background-color: #f0e9ed;
     box-shadow:
       0 1px 1px rgba(27, 19, 32, 0.06),
       0 2px 4px rgba(27, 19, 32, 0.05),
@@ -605,7 +605,7 @@ html[data-intro="seen"] #ev-intro {
     position: absolute;
     width: 54px;
     height: 16px;
-    background: rgba(237, 230, 223, 0.82);
+    background: rgba(230, 220, 225, 0.82);
     box-shadow: 0 0 0 0.5px rgba(27, 19, 32, 0.12), 0 2px 3px -2px rgba(27, 19, 32, 0.3);
     z-index: 3;
   }
