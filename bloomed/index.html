@@ -22,12 +22,8 @@
   <link rel="preload" as="image" href="assets/img/noe.webp">
   <link rel="stylesheet" href="assets/css/style.css">
   <script>
-    /* Active les animations JS et ne rejoue l'intro des nuages qu'une fois par visite */
+    /* Active les animations JS (l'intro des nuages se joue à chaque arrivée sur la page) */
     document.documentElement.classList.add('js');
-    try {
-      if (sessionStorage.getItem('bloomed-intro')) document.documentElement.classList.add('skip-intro');
-      sessionStorage.setItem('bloomed-intro', '1');
-    } catch (e) {}
   </script>
 
   <script type="application/ld+json">
@@ -732,7 +728,24 @@
       <svg viewBox="0 0 200 120" aria-hidden="true"><use href="#cloud-a"/></svg><span>↑</span>
     </a>
   </div>
+  <p class="credit">Site créé par <a href="https://lullin-web.com" target="_blank" rel="noopener">lullin-web.com</a></p>
 </footer>
+
+<!-- Rideau de nuages : se ferme puis se rouvre quand on change de section -->
+<div class="curtain" aria-hidden="true">
+  <div class="curtain__half curtain__half--left">
+    <svg viewBox="0 0 200 120"><use href="#cloud-a"/></svg>
+    <svg viewBox="0 0 200 120"><use href="#cloud-c"/></svg>
+  </div>
+  <div class="curtain__half curtain__half--right">
+    <svg viewBox="0 0 200 120"><use href="#cloud-b"/></svg>
+    <svg viewBox="0 0 200 120"><use href="#cloud-a"/></svg>
+  </div>
+  <div class="curtain__brand">
+    <svg class="sticker sticker--blue" viewBox="-125 -125 250 250"><use href="#fl-blue" class="petals"/><use href="#fl-eye" class="eye"/></svg>
+    <svg class="sticker sticker--pink" viewBox="-125 -125 250 250"><use href="#fl-pink" class="petals"/><use href="#fl-eye" class="eye"/></svg>
+  </div>
+</div>
 
 <!-- Barre de réservation mobile -->
 <div class="mobilebar" aria-label="Actions rapides">

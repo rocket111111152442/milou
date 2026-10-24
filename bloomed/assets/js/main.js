@@ -282,6 +282,34 @@
   updateStatus();
   setInterval(updateStatus, 60 * 1000);
 
+  /* ---------- Rideau de nuages entre les sections ---------- */
+  const curtain = $('.curtain');
+  let curtainBusy = false;
+  if (curtain && !reduceMotion) {
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('a[href^="#"]');
+      if (!link || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      const id = link.getAttribute('href');
+      const target = id.length > 1 && document.querySelector(id);
+      if (!target) return;
+      e.preventDefault();
+      if (curtainBusy) return;
+      curtainBusy = true;
+      curtain.classList.add('is-closed');
+      setTimeout(() => {
+        // saut instantané pendant que le rideau est fermé
+        document.documentElement.style.scrollBehavior = 'auto';
+        target.scrollIntoView({ block: 'start' });
+        document.documentElement.style.scrollBehavior = '';
+        history.pushState(null, '', id);
+        setTimeout(() => {
+          curtain.classList.remove('is-closed');
+          setTimeout(() => { curtainBusy = false; }, 600);
+        }, 350);
+      }, 600);
+    });
+  }
+
   /* ---------- Divers ---------- */
   $$('[data-year]').forEach((el) => { el.textContent = new Date().getFullYear(); });
   onScroll();
