@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useScroll, useTransform, type MotionValue } from "framer-motion";
+import { motion, useInView, useScroll, useTransform, type MotionValue } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { PLATE_NAMES, type PlateName } from "@/lib/plates";
@@ -18,7 +18,7 @@ const hash = (t: string) => [...t].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0
 function layout(height: number, width: number, seed: string, startAt: number): Item[] {
   const r = rng(hash(seed));
   const mobile = width < 768;
-  const step = mobile ? 380 : 290;
+  const step = mobile ? 420 : 340;
   const items: Item[] = [];
   let side: "l" | "r" = r() > 0.5 ? "l" : "r";
   for (let top = startAt; top < height - 200; top += step * (0.75 + r() * 0.5)) {
@@ -82,13 +82,16 @@ export function Botanica() {
 }
 
 function Sprig({ it, scrollY }: { it: Item; scrollY: MotionValue<number> }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // hors de l'écran, la gravure ne bouge plus (économise le processeur)
+  const visible = useInView(ref, { margin: "200px 0px" });
   const y = useTransform(scrollY, (v) => -((v - it.top) / 1000) * it.depth);
   return (
-    <motion.div className="absolute text-plum will-change-transform" style={{ top: it.top, [it.side === "r" ? "right" : "left"]: it.x, width: it.w, y }}>
+    <motion.div ref={ref} className="absolute text-plum will-change-transform" style={{ top: it.top, [it.side === "r" ? "right" : "left"]: it.x, width: it.w, y }}>
       <motion.div
         style={{ transformOrigin: "50% 100%" }}
         initial={{ rotate: it.rot }}
-        animate={{ rotate: [it.rot - 3, it.rot + 3, it.rot - 3], y: [0, -14, 0] }}
+        animate={visible ? { rotate: [it.rot - 3, it.rot + 3, it.rot - 3], y: [0, -14, 0] } : { rotate: it.rot, y: 0 }}
         transition={{ duration: it.dur, delay: it.delay, repeat: Infinity, ease: "easeInOut" }}
       >
         <Plate name={it.plate} flip={it.flip} opacity={it.op} duration={2.4} />

@@ -83,7 +83,7 @@ export function Masthead({ menu }: { menu: MenuData }) {
             </span>
           </Link>
         )}
-        <div className={cn("transition-[background-color,box-shadow,backdrop-filter] duration-500", scrolled || menuOpen ? "bg-paper/90 shadow-[0_1px_0_rgba(27,19,32,0.1)] backdrop-blur-md" : isHome ? "bg-gradient-to-b from-paper via-paper/80 to-transparent" : "bg-transparent")}>
+        <div className={cn("transition-[background-color,box-shadow,backdrop-filter] duration-500", scrolled || menuOpen ? "bg-paper/[0.97] shadow-[0_1px_0_rgba(27,19,32,0.1)]" : isHome ? "bg-gradient-to-b from-paper via-paper/80 to-transparent" : "bg-transparent")}>
           <div className="wrap grid h-[64px] grid-cols-[1fr_auto_1fr] items-center gap-4">
             <div className="flex items-center">
               <button onClick={() => setMenuOpen(!menuOpen)} className="group flex items-center gap-3" aria-expanded={menuOpen} aria-controls="sommaire">

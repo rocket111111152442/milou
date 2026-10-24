@@ -651,3 +651,16 @@ html[data-intro="seen"] #ev-intro {
     transform: rotate(45deg);
   }
 }
+
+/* respiration des grosses fleurs de l'accueil : animation CSS, gérée par le compositeur */
+.breathe {
+  animation: breathe 8s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes breathe {
+  from { transform: scale(1) rotate(-1.5deg); }
+  to { transform: scale(1.07) rotate(1.5deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .breathe { animation: none; }
+}

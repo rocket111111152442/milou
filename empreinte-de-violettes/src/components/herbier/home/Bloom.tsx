@@ -3,7 +3,6 @@
 import { motion, useMotionValue, useSpring, useTransform, type MotionValue } from "framer-motion";
 import { useEffect } from "react";
 import type { PlateName } from "@/lib/plates";
-import { Doily } from "../Lace";
 import { Plate } from "../Plate";
 
 // [planche, x (vw, centre), y (vh, centre), largeur (vw), rotation, profondeur 0–1, retournée]
@@ -87,12 +86,12 @@ function Flower({ f, i, sx, sy, progress, start }: { f: Flower; i: number; sx: M
           transition={{ duration: 2.2, delay: start + 0.08 * i, ease: [0.16, 1, 0.3, 1] }}
         >
           {/* respiration : la fleur avance et recule doucement vers nous */}
-          <motion.div
-            animate={{ scale: [1, 1.05 + depth * 0.05, 1], rotate: [0, (i % 2 ? 1 : -1) * 3, 0] }}
-            transition={{ duration: 7 + (i % 5), delay: start + 2.2, repeat: Infinity, ease: "easeInOut" }}
+          <div
+            className={depth >= 0.7 ? "breathe" : undefined}
+            style={{ animationDuration: `${7 + (i % 5)}s`, animationDelay: `${start + 2.2}s`, animationDirection: i % 2 ? "alternate-reverse" : "alternate" }}
           >
             <Plate name={name} flip={flip} reveal="none" opacity={0.6 + depth * 0.35} />
-          </motion.div>
+          </div>
         </motion.div>
       </motion.div>
     </motion.div>
@@ -113,14 +112,14 @@ function Lace({ progress, start }: { progress: MotionValue<number>; start: numbe
         <motion.div key={i} className={`absolute ${pos} ${size}`} style={{ scale: s }}>
           {i === 0 ? (
             <motion.div className="w-[min(112vw,1050px)] -translate-y-[3vh]" initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 0.85, scale: 1 }} transition={{ duration: 2, delay: start + d, ease: [0.16, 1, 0.3, 1] }}>
-              <motion.div animate={{ rotate: 360 }} transition={{ duration: speed, repeat: Infinity, ease: "linear" }}>
-                <Doily className="w-full drop-shadow-[0_6px_14px_rgba(60,40,20,0.18)]" scallops={48} />
+              <motion.div className="will-change-transform" animate={{ rotate: 360 }} transition={{ duration: speed, repeat: Infinity, ease: "linear" }}>
+                <img src="/planches/tinted/dentelle-grande.webp" alt="" draggable={false} className="block w-full select-none" />
               </motion.div>
             </motion.div>
           ) : (
           <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: i === 0 ? 0.9 : 0.75, scale: 1 }} transition={{ duration: 2, delay: start + d, ease: [0.16, 1, 0.3, 1] }}>
-            <motion.div animate={{ rotate: i % 2 ? -360 : 360 }} transition={{ duration: speed, repeat: Infinity, ease: "linear" }}>
-              <Doily className="w-full drop-shadow-[0_6px_14px_rgba(60,40,20,0.18)]" scallops={30} />
+            <motion.div className="will-change-transform" animate={{ rotate: i % 2 ? -360 : 360 }} transition={{ duration: speed, repeat: Infinity, ease: "linear" }}>
+              <img src="/planches/tinted/dentelle.webp" alt="" draggable={false} className="block w-full select-none" />
             </motion.div>
           </motion.div>
           )}

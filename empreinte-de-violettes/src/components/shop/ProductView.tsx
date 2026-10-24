@@ -236,7 +236,7 @@ export function ProductView({
       {/* barre d'achat mobile, visible tant que le bouton principal est hors de l'écran */}
       <AnimatePresence>
         {inSection && !buyVisible && (
-          <motion.div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/15 bg-paper/95 px-5 py-3 backdrop-blur lg:hidden" initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ duration: 0.45, ease: EASE }}>
+          <motion.div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/15 bg-paper/[0.97] px-5 py-3 lg:hidden" initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ duration: 0.45, ease: EASE }}>
             <button onClick={onAdd} disabled={soldOut} className="btn-label w-full !py-3.5">
               <span>{added ? "Ajouté au panier" : soldOut ? "Épuisé" : `Ajouter · ${euro(unit * qty)}`}</span>
             </button>
