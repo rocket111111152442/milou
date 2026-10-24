@@ -118,6 +118,12 @@ export function Colophon({ settings, categories }: { settings: Settings; categor
           </p>
           <p className="italic">Gravures anciennes : Wellcome Collection, domaine public.</p>
         </div>
+        <p className="mt-6 text-center font-text text-[0.82rem] text-paper/45">
+          Site créé par{" "}
+          <a href="https://lullin-web.com" target="_blank" rel="noopener" className="ulink text-paper/70 hover:text-paper">
+            lullin-web.com
+          </a>
+        </p>
       </div>
     </footer>
   );
