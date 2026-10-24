@@ -8,6 +8,7 @@ import { useUI } from "@/store/ui";
 import { EASE } from "../Elements";
 import { Label } from "../Label";
 import { Plate } from "../Plate";
+import { Bloom } from "./Bloom";
 import { IntroFilm } from "./IntroFilm";
 
 type Mode = "full" | "quick";
@@ -65,18 +66,10 @@ export function Cover({ introEnabled, oncePerSession, coords, founded, tagline, 
   return (
     <section ref={ref} className="relative h-[100svh] min-h-[600px] overflow-hidden" aria-label="Empreinte de Violettes">
       {full && film && <IntroFilm onDone={() => setFilm(false)} onSkip={skip} />}
-      {mode && (
-        <>
-          <motion.div className="pointer-events-none absolute bottom-[-5svh] left-[-22vw] h-[56svh] text-plum sm:left-[-12vw] sm:h-[88svh] lg:left-[-7vw]" style={{ y: fernY }}>
-            <Plate key={`f-${k}`} name="fougere" reveal={skipped ? "none" : "mount"} delay={T.fern} duration={dur} className="h-full" style={{ height: "100%" }} />
-          </motion.div>
-          <motion.div className="pointer-events-none absolute right-[-16vw] top-[8svh] h-[34svh] text-plum sm:right-[-6vw] sm:top-[11svh] sm:h-[62svh] lg:right-[-2vw]" style={{ y: violetY }}>
-            <Plate key={`v-${k}`} name="violette" reveal={skipped ? "none" : "mount"} delay={T.violet} duration={dur} flip className="h-full" style={{ height: "100%" }} />
-          </motion.div>
-        </>
-      )}
+      {mode && <Bloom progress={scrollYProgress} start={base} />}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[15] h-44 bg-gradient-to-t from-paper via-paper/75 to-transparent" aria-hidden />
 
-      <motion.div className="absolute inset-0 flex flex-col items-center justify-center px-5" style={{ y: labelY, scale: labelScale }}>
+      <motion.div className="absolute inset-0 z-20 flex flex-col items-center justify-center px-5" style={{ y: labelY, scale: labelScale }}>
         {mode && (
           <motion.div key={`l-${k}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: EASE, delay: base }}>
             <Label as="h1" size="lg" instant />
@@ -104,7 +97,7 @@ export function Cover({ introEnabled, oncePerSession, coords, founded, tagline, 
       </motion.div>
 
       {mode && (
-        <motion.div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ opacity: fade }}>
+        <motion.div className="pointer-events-none absolute inset-x-0 bottom-0 z-20" style={{ opacity: fade }}>
         <motion.div
           key={`i-${k}`}
           className="wrap grid grid-cols-[1fr_auto_1fr] items-end pb-6 sm:pb-8"
