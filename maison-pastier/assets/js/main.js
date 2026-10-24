@@ -335,6 +335,31 @@
   }
 
   /* ------------------------------------------------------------------------
+     Apparition à l'écran
+     Lance fn une seule fois quand l'élément arrive à l'écran, ou tout de suite
+     s'il est déjà visible ou dépassé (lien avec ancre, rechargement en bas de
+     page). On n'utilise pas l'option `once` de ScrollTrigger 3.12 : un
+     déclencheur `once` déjà dépassé se supprime pendant son initialisation et
+     fait planter la création des suivants.
+     ------------------------------------------------------------------------ */
+  let burst = 0;
+  let burstAt = 0;
+  function whenVisible(el, fn, ratio = 0.88) {
+    let done = false;
+    const run = () => {
+      if (done) return;
+      done = true;
+      // Petit décalage quand plusieurs éléments apparaissent en même temps
+      const now = performance.now();
+      burst = now - burstAt < 150 ? Math.min(burst + 1, 6) : 0;
+      burstAt = now;
+      fn(burst * 0.08);
+    };
+    ScrollTrigger.create({ trigger: el, start: `top ${Math.round(ratio * 100)}%`, onEnter: run, onEnterBack: run });
+    if (el.getBoundingClientRect().top < window.innerHeight * ratio) run();
+  }
+
+  /* ------------------------------------------------------------------------
      Animations au scroll
      ------------------------------------------------------------------------ */
   function scrollAnimations() {
@@ -344,27 +369,22 @@
     $$("[data-split]").forEach((el) => {
       const words = splitWords(el);
       gsap.set(words, { yPercent: 115 });
-      ScrollTrigger.create({
-        trigger: el,
-        start: "top 88%",
-        once: true,
-        onEnter: () => gsap.to(words, { yPercent: 0, duration: 1.1, ease: "expo.out", stagger: 0.035 }),
-      });
+      whenVisible(el, (delay) => gsap.to(words, { yPercent: 0, duration: 1.1, ease: "expo.out", stagger: 0.035, delay }));
     });
 
     // Apparitions simples
-    ScrollTrigger.batch("[data-reveal]", {
-      start: "top 90%",
-      once: true,
-      onEnter: (els) => gsap.fromTo(els, { opacity: 0, y: 46 }, { opacity: 1, y: 0, duration: 1.1, ease: "expo.out", stagger: 0.09, overwrite: true }),
+    $$("[data-reveal]").forEach((el) => {
+      whenVisible(el, (delay) => gsap.fromTo(el, { opacity: 0, y: 46 }, { opacity: 1, y: 0, duration: 1.1, ease: "expo.out", delay }), 0.9);
     });
 
     // Images révélées par un volet
     $$("[data-reveal-img]").forEach((el) => {
       const img = $("img", el);
-      const tl = gsap.timeline({ scrollTrigger: { trigger: el, start: "top 85%", once: true } });
-      tl.to(el, { clipPath: "inset(0% 0 0 0)", duration: 1.4, ease: "expo.inOut" });
-      if (img) tl.from(img, { scale: 1.3, duration: 1.8, ease: "expo.out" }, 0.1);
+      whenVisible(el, (delay) => {
+        const tl = gsap.timeline({ delay });
+        tl.to(el, { clipPath: "inset(0% 0 0 0)", duration: 1.4, ease: "expo.inOut" });
+        if (img) tl.from(img, { scale: 1.3, duration: 1.8, ease: "expo.out" }, 0.1);
+      }, 0.85);
     });
 
     // Parallaxe
@@ -403,15 +423,10 @@
       const dec = parseInt(el.dataset.decimals || "0", 10);
       const obj = { v: 0 };
       el.textContent = (0).toFixed(dec).replace(".", ",");
-      ScrollTrigger.create({
-        trigger: el,
-        start: "top 90%",
-        once: true,
-        onEnter: () => gsap.to(obj, {
-          v: end, duration: 2, ease: "power3.out",
-          onUpdate: () => { el.textContent = obj.v.toFixed(dec).replace(".", ","); },
-        }),
-      });
+      whenVisible(el, () => gsap.to(obj, {
+        v: end, duration: 2, ease: "power3.out",
+        onUpdate: () => { el.textContent = obj.v.toFixed(dec).replace(".", ","); },
+      }), 0.9);
     });
 
     // Tracés SVG dessinés au scroll
@@ -429,20 +444,14 @@
     $$(".reviews__stars").forEach((wrap) => {
       const fg = $$(".s-fg", wrap);
       gsap.set(fg, { scale: 0, transformOrigin: "50% 50%" });
-      ScrollTrigger.create({
-        trigger: wrap, start: "top 85%", once: true,
-        onEnter: () => gsap.to(fg, { scale: 1, duration: 0.7, ease: "back.out(2.5)", stagger: 0.12 }),
-      });
+      whenVisible(wrap, () => gsap.to(fg, { scale: 1, duration: 0.7, ease: "back.out(2.5)", stagger: 0.12 }), 0.85);
     });
 
     // Pots de sauce qui se remplissent
     $$("[data-jars]").forEach((wrap) => {
       const fills = $$(".jar-fill", wrap);
       gsap.set(fills, { scaleY: 0, transformOrigin: "50% 100%" });
-      ScrollTrigger.create({
-        trigger: wrap, start: "top 85%", once: true,
-        onEnter: () => gsap.to(fills, { scaleY: 1, duration: 1.3, ease: "power3.out", stagger: 0.12 }),
-      });
+      whenVisible(wrap, () => gsap.to(fills, { scaleY: 1, duration: 1.3, ease: "power3.out", stagger: 0.12 }), 0.85);
     });
 
     // Pictos dessinés (formes de pâtes)
@@ -453,10 +462,7 @@
         s.style.strokeDasharray = `${len}`;
         s.style.strokeDashoffset = `${len}`;
       });
-      ScrollTrigger.create({
-        trigger: wrap, start: "top 88%", once: true,
-        onEnter: () => gsap.to(shapes, { strokeDashoffset: 0, duration: 1.6, ease: "power2.inOut", stagger: 0.05 }),
-      });
+      whenVisible(wrap, () => gsap.to(shapes, { strokeDashoffset: 0, duration: 1.6, ease: "power2.inOut", stagger: 0.05 }));
     });
 
     // Héros : parallaxe de sortie
@@ -470,13 +476,9 @@
     $$(".footer__giant").forEach((el) => {
       const letters = el.textContent.split("");
       el.innerHTML = letters.map((l) => `<span>${l === " " ? "&nbsp;" : l}</span>`).join("");
-      gsap.from($$("span", el), {
-        yPercent: 100,
-        ease: "expo.out",
-        duration: 1.4,
-        stagger: 0.03,
-        scrollTrigger: { trigger: el, start: "top 95%", once: true },
-      });
+      const spans = $$("span", el);
+      gsap.set(spans, { yPercent: 100 });
+      whenVisible(el, () => gsap.to(spans, { yPercent: 0, ease: "expo.out", duration: 1.4, stagger: 0.03 }), 0.95);
     });
 
     // Lignes de la timeline (savoir-faire)
@@ -484,7 +486,8 @@
       const fill = $(".timeline__line i", tl);
       if (fill) gsap.to(fill, { scaleY: 1, ease: "none", scrollTrigger: { trigger: tl, start: "top 60%", end: "bottom 60%", scrub: true } });
       $$(".tl-step__dot", tl).forEach((dot) => {
-        gsap.from(dot, { scale: 0, rotate: -90, duration: 0.9, ease: "back.out(2)", scrollTrigger: { trigger: dot, start: "top 75%", once: true } });
+        gsap.set(dot, { scale: 0, rotate: -90 });
+        whenVisible(dot, () => gsap.to(dot, { scale: 1, rotate: 0, duration: 0.9, ease: "back.out(2)" }), 0.75);
       });
     });
   }
@@ -533,8 +536,9 @@
       steps.forEach((step) => {
         const img = $(".step__img img", step);
         if (img) {
-          gsap.fromTo(img, { scale: 1.25, xPercent: 6 }, {
-            scale: 1.05, xPercent: -6, ease: "none",
+          // Le zoom reste supérieur au décalage pour ne jamais découvrir le bord de l'image
+          gsap.fromTo(img, { scale: 1.2, xPercent: 6 }, {
+            scale: 1.15, xPercent: -6, ease: "none",
             scrollTrigger: { trigger: step, containerAnimation: tween, start: "left right", end: "right left", scrub: true },
           });
         }
@@ -544,8 +548,10 @@
 
     mm.add("(max-width: 899px)", () => {
       steps.forEach((step) => {
-        gsap.from(step, { opacity: 0, y: 60, duration: 1, ease: "expo.out", scrollTrigger: { trigger: step, start: "top 85%", once: true } });
+        gsap.set(step, { opacity: 0, y: 60 });
+        whenVisible(step, () => gsap.to(step, { opacity: 1, y: 0, duration: 1, ease: "expo.out" }), 0.85);
       });
+      return () => gsap.set(steps, { clearProps: "opacity,transform" });
     });
   }
 

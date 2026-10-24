@@ -2506,6 +2506,32 @@ a.c-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-md); }
   .map { min-height: 380px; }
 }
 
+/* Défilement horizontal : chaque étape tient dans la hauteur de l'écran */
+@media (min-width: 900px) {
+  .process__pin {
+    height: 100vh;
+    height: 100svh;
+    min-height: 560px;
+    justify-content: flex-start;
+    padding-block: clamp(84px, 12vh, 120px) clamp(22px, 4vh, 44px);
+    gap: clamp(16px, 3.5vh, 40px);
+  }
+  .process__head h2 { max-width: none; font-size: clamp(2.2rem, 1.1rem + 2.6vw, 4rem); }
+  .process__viewport { flex: 1 1 auto; min-height: 0; }
+  .process__track { height: 100%; align-items: stretch; }
+  .step {
+    height: 100%;
+    grid-template-rows: minmax(140px, 1fr) auto auto;
+    gap: clamp(10px, 2vh, 20px);
+    width: clamp(260px, min(28vw, 56vh), 460px);
+  }
+  .step:nth-child(even) { padding-top: clamp(14px, 5vh, 56px); }
+  .step__img { aspect-ratio: auto; height: 100%; min-height: 0; }
+  .step__num { font-size: clamp(3.4rem, 10vh, 7rem); }
+  .step p { font-size: 0.95rem; }
+  .step--end { height: auto; align-self: center; }
+}
+
 @media (max-width: 899px) {
   .process__pin { min-height: auto; }
   .process__head { flex-direction: column; align-items: flex-start; }
