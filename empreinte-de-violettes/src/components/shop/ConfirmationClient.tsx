@@ -2,33 +2,37 @@
 
 import { motion } from "framer-motion";
 import { useEffect } from "react";
-import { Petals } from "@/components/motion/Petals";
-import { VioletMark } from "@/components/site/Logo";
+import { EASE } from "@/components/herbier/Elements";
+import { Plate } from "@/components/herbier/Plate";
 import { useCart } from "@/store/cart";
 
-/** Éclosion de la violette + vidage du panier après paiement. */
+/** Remerciement : la violette s'encre, puis le mot. Le panier est vidé après paiement. */
 export function ConfirmationHero({ name, number, paid, pending }: { name: string; number: string; paid: string; pending: boolean }) {
   const clear = useCart((s) => s.clear);
   useEffect(() => {
     if (!pending) clear();
   }, [clear, pending]);
   return (
-    <div className="relative overflow-hidden pb-12 pt-44 text-center">
-      <Petals count={40} />
-      <motion.div initial={{ scale: 0, rotate: -120 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 90, damping: 12, delay: 0.2 }} className="relative mx-auto w-fit">
-        <span className="absolute inset-0 -m-6 rounded-full bg-gold/20 blur-2xl" />
-        <VioletMark className="relative h-24 w-24 text-gold" strokeWidth={1.1} />
-      </motion.div>
-      <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="eyebrow relative mt-10 text-gold">
-        Commande {number}
+    <div className="wrap flex flex-col items-center pb-14 pt-28 text-center sm:pt-36">
+      <Plate name="violette" reveal="mount" duration={2.4} className="w-[min(240px,55vw)] text-plum" />
+      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="sc mt-10 text-ink-muted">
+        Commande <span className="tab">{number}</span>
       </motion.p>
-      <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.75, duration: 1, ease: [0.22, 1, 0.36, 1] }} className="h-display relative mt-5 text-[clamp(3rem,7vw,6.5rem)]">
-        {pending ? "Paiement en cours…" : <>Merci, <em className="text-foil">{name}</em></>}
+      <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1, duration: 1.1, ease: EASE }} className="h-title mt-5">
+        {pending ? (
+          <>
+            Paiement <em className="text-plum">en cours…</em>
+          </>
+        ) : (
+          <>
+            Merci, <em className="text-plum">{name}.</em>
+          </>
+        )}
       </motion.h1>
-      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1 }} className="relative mx-auto mt-6 max-w-xl text-ivory/65">
+      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="body-text mx-auto mt-6 max-w-xl">
         {pending
-          ? "Nous attendons la confirmation de Stripe. Cette page se met à jour dès réception — vous recevrez aussi un e-mail."
-          : `Votre commande est confirmée${paid}. Un e-mail récapitulatif vient de vous être envoyé ; la fleuriste prépare déjà vos fleurs.`}
+          ? "Nous attendons la confirmation de Stripe. Cette page se met à jour d'elle-même ; vous recevrez aussi un e-mail."
+          : `Votre commande est confirmée${paid}. Un récapitulatif vient de partir par e-mail ; la fleuriste prépare déjà vos fleurs.`}
       </motion.p>
     </div>
   );

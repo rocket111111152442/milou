@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { PageHead } from "@/components/herbier/PageHead";
 import { Composer } from "@/components/shop/Composer";
-import { PageHero } from "@/components/site/PageHero";
 import { getAtelier } from "@/lib/catalog";
-import { IMG } from "@/lib/seed";
+import { euro } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -14,21 +15,22 @@ export default async function AtelierPage() {
   const atelier = await getAtelier();
   return (
     <>
-      <PageHero
-        eyebrow="L'atelier de composition"
+      <PageHead
+        kicker="L'atelier"
+        folio="sur mesure"
         title="Votre bouquet,"
         accent="tige par tige"
-        intro="Choisissez parmi les fleurs et feuillages du moment, regardez votre bouquet prendre forme, puis laissez la fleuriste le composer à la main. Prix calculé en direct."
-        image={IMG.handsFern}
-        crumbs={[{ href: "/atelier", label: "Atelier" }]}
-        compact
+        intro={`Choisissez parmi les fleurs et feuillages du moment ; la planche se compose à mesure. La fleuriste montera ensuite votre bouquet à la main, en spirale. Composition ${euro(atelier.basePrice, { compact: true })}, de ${atelier.minStems} à ${atelier.maxStems} tiges.`}
       />
       {atelier.enabled ? (
         <Composer atelier={atelier} />
       ) : (
-        <section className="bg-paper py-32 text-center text-noir">
-          <p className="font-display text-4xl italic">L&apos;atelier est momentanément fermé.</p>
-          <p className="mt-3 text-noir/60">Revenez très vite, ou contactez-nous pour une création sur mesure.</p>
+        <section className="wrap pb-32 text-center">
+          <p className="font-display text-[2.4rem] italic">L&apos;atelier est fermé pour quelques jours.</p>
+          <p className="body-text mt-3">Revenez très vite, ou écrivez-nous pour une création sur mesure.</p>
+          <Link href="/contact" className="btn-line mt-8">
+            Nous écrire <span className="arrow">→</span>
+          </Link>
         </section>
       )}
     </>

@@ -2,10 +2,10 @@
 
 Site e-commerce de **Empreinte de Violettes**, artisane fleuriste à Six-Fours-les-Plages (830 av. Maréchal de Lattre de Tassigny, 04 94 32 87 32).
 
-- Univers violet très sombre / noir / ivoire, **papier peint fougère** généré en SVG (inspiré de la carte de visite), feuille d'or animée.
-- **Intro en motion design (≈ 5 s)** : la violette se dessine, les fougères se déroulent, le nom s'écrit en lettres d'or, puis un double rideau dévoile le site (une fois par visite, désactivable dans l'admin, raccourcie si l'appareil demande moins d'animations).
-- Animations : défilement fluide (Lenis), curseur personnalisé, textes révélés lettre à lettre, parallaxe des arches, pétales interactifs, bandeau défilant sensible à la vitesse, défilement horizontal épinglé, constellation qui se trace au scroll, bouquet qui éclot au scroll, transitions de page en rideau, effet « vol vers le panier »…
-- **E-commerce complet** : catalogue, filtres, fiches produit (tailles, options), atelier « composez votre bouquet » avec dessin en direct, panier, livraison / retrait / Drive avec zones et créneaux, carte message, codes promo, **paiement Stripe**, e-mails, suivi de commande.
+- **Direction artistique « herbier »** : la boutique se lit comme un vieil herbier ou un cabinet de curiosités. Papier crème, encre prune, l'étiquette noire à dorure de la carte de visite comme seul élément doré ; typographies Bodoni Moda (titres) et Newsreader (texte) ; numéros de planches en chiffres romains, titres courants, points de conduite, photos maintenues par des bandelettes, étiquettes d'herbier ; 23 gravures botaniques anciennes du domaine public rendues comme de l'encre.
+- **Intro en motion design (≈ 5 s)** : l'encre des gravures (fougère, violette) monte sur le papier, l'étiquette noire se déplie depuis un filet, « Maison » s'espace, le nom s'imprime lettre à lettre à la feuille d'or puis prend la lumière ; l'en-tête apparaît ensuite. Version courte au cours d'une même visite, bouton « Passer », désactivable dans l'admin, réduite si l'appareil demande moins d'animations.
+- Animations volontairement sobres : encre qui monte au défilement, titres révélés mot à mot, parallaxe douce de la couverture, survol des planches où le bouquet redevient gravure, lettres d'avis qui se succèdent, panier en forme de bon de commande, transitions de page discrètes. Pas de curseur personnalisé, de particules ni de bandeau défilant.
+- **E-commerce complet** : catalogue, filtres, fiches produit (tailles, options), atelier « composez votre bouquet » où la planche se compose gravure après gravure, panier, livraison / retrait / Drive avec zones et créneaux, carte message, codes promo, **paiement Stripe**, e-mails, suivi de commande.
 - **Panneau d'administration** (`/admin`) : tableau de bord, commandes (statuts, e-mail client, remboursement Stripe, impression bon + carte), planning de livraison avec tournée Google Maps, clients, produits, catégories, occasions, options, atelier, zones & créneaux, promos, textes de toutes les pages, avis, FAQ, galerie, messages, newsletter, horaires, fermetures, annonce, maintenance, sauvegarde/restauration.
 
 Stack : Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS · Framer Motion · Lenis · Stripe · Upstash Redis · Resend · Vercel Blob.
@@ -56,6 +56,10 @@ Créer un compte sur resend.com, vérifier le domaine, puis renseigner `RESEND_A
 
 Les photos actuelles sont des images libres de droits (Unsplash) **en attendant les vraies photos des créations**. Depuis l'admin, chaque produit, catégorie, page et la galerie acceptent un téléversement (compression automatique). Pour héberger les photos proprement, ajouter Vercel Blob (*Storage → Blob*) → `BLOB_READ_WRITE_TOKEN`.
 
+### Gravures
+
+Les gravures de `public/planches/` proviennent de la [Wellcome Collection](https://wellcomecollection.org) (Public Domain Mark) : eaux-fortes de Nicolas Robert (vers 1660), planches d'après Aubriet, Ehret, Sowerby, impression nature d'Alois Auer… Titres et liens sources dans `public/planches/credits.json`. Elles ont été détourées en encre (fond transparent) pour être recolorées en CSS. Chaque produit, catégorie et fleur de l'atelier reçoit automatiquement une gravure d'après son nom ; l'admin peut la changer (champ « Gravure de l'herbier »).
+
 ## 6. À valider avec la fleuriste avant la mise en ligne
 
 Informations reprises de sources publiques (site officiel, Google, Sessile, Mariages.net) ou **posées par défaut** — tout est modifiable dans l'admin :
@@ -80,9 +84,12 @@ src/
   app/(site)/        pages publiques (accueil, boutique, produit, atelier, commande, mariage, deuil…)
   app/admin/         espace fleuriste (protégé par mot de passe)
   app/api/           commande, webhook Stripe, contact, créneaux, admin (CRUD, upload, sauvegarde)
-  components/        site, accueil, boutique, animations, admin
+  components/herbier/ charte « herbier » : en-tête, sommaire, panier, gravures, étiquette, planches, accueil
+  components/shop/   catalogue, fiche produit, atelier, commande, suivi
+  components/admin/  espace fleuriste
   lib/               données (Redis / fichiers / mémoire), prix, livraison, Stripe, e-mails, validation
-scripts/generate-patterns.mjs   génère le papier peint fougère (public/patterns)
+public/planches/    gravures botaniques (WebP en alpha) + crédits
+scripts/generate-patterns.mjs   génère le motif fougère utilisé par l'admin (public/patterns)
 ```
 
 Commandes utiles : `npm run build` (vérifie tout le projet), `npm run typecheck`, `npm run patterns`.

@@ -91,6 +91,7 @@ export const adminSchemas = {
     colors: z.array(str(20)).max(8).default([]),
     tags: z.array(str(40)).max(20).default([]),
     star: str(80).optional(),
+    plate: str(40).optional(),
     sortOrder: z.coerce.number().default(0),
   }),
   categories: z.object({
@@ -99,6 +100,7 @@ export const adminSchemas = {
     name: str(80).min(1),
     description: str(1000).default(""),
     image: img.default(""),
+    plate: str(40).optional(),
     active: z.boolean().default(true),
     showInMenu: z.boolean().default(true),
     sortOrder: z.coerce.number().default(0),
@@ -272,7 +274,7 @@ export const docSchemas = {
     basePrice: money,
     minStems: z.coerce.number().int().min(1).max(100),
     maxStems: z.coerce.number().int().min(1).max(200),
-    flowers: z.array(z.object({ id: str(80).min(1), name: str(80).min(1), color: str(20), price: money, active: z.boolean(), kind: z.enum(["fleur", "feuillage"]) })).max(60),
+    flowers: z.array(z.object({ id: str(80).min(1), name: str(80).min(1), color: str(20), price: money, active: z.boolean(), kind: z.enum(["fleur", "feuillage"]), plate: str(40).optional() })).max(60),
     wrappings: z.array(z.object({ id: str(80).min(1), name: str(80).min(1), price: money, color: str(20) })).min(1).max(12),
   }),
 } as const;

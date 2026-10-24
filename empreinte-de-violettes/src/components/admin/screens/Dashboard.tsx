@@ -105,15 +105,15 @@ export function Dashboard({ s, storage }: { s: DashboardStats; storage: string }
           <div className="mt-6 grid grid-cols-3 gap-4 border-t border-noir/[0.06] pt-5 text-center">
             <div>
               <p className="text-xs text-noir/45">Aujourd&apos;hui</p>
-              <p className="font-display text-2xl">{euro(s.revenueToday)}</p>
+              <p className="font-sans text-2xl font-light tabular-nums">{euro(s.revenueToday)}</p>
             </div>
             <div>
               <p className="text-xs text-noir/45">7 jours</p>
-              <p className="font-display text-2xl">{euro(s.revenue7)}</p>
+              <p className="font-sans text-2xl font-light tabular-nums">{euro(s.revenue7)}</p>
             </div>
             <div>
               <p className="text-xs text-noir/45">30 jours</p>
-              <p className="font-display text-2xl">{euro(s.revenue30)}</p>
+              <p className="font-sans text-2xl font-light tabular-nums">{euro(s.revenue30)}</p>
             </div>
           </div>
         </Card>

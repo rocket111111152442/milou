@@ -1,6 +1,5 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -15,24 +14,24 @@ export function TrackForm() {
     setLoading(true);
     setMsg("");
     const r = await fetch("/api/orders/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ number, email }) });
-    const d = await r.json();
+    const d = await r.json().catch(() => ({ message: "Une erreur est survenue." }));
     setLoading(false);
     if (d.ok) router.push(d.url);
     else setMsg(d.message);
   }
   return (
-    <form onSubmit={submit} className="mx-auto mt-10 grid max-w-xl gap-4 rounded-[2rem] border border-ivory/10 bg-ivory/[0.03] p-8">
+    <form onSubmit={submit} className="sheet mx-auto grid max-w-xl gap-7 p-8 sm:p-10">
       <label>
-        <span className="label text-ivory">Numéro de commande</span>
-        <input required value={number} onChange={(e) => setNumber(e.target.value.toUpperCase())} placeholder="EV-261023-XXX" className="field-box" />
+        <span className="f-label">Numéro de commande</span>
+        <input required value={number} onChange={(e) => setNumber(e.target.value.toUpperCase())} placeholder="EV-261023-XXX" className="f-line tab tracking-[0.06em]" />
       </label>
       <label>
-        <span className="label text-ivory">E-mail utilisé pour la commande</span>
-        <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="field-box" />
+        <span className="f-label">E-mail utilisé pour la commande</span>
+        <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="f-line" autoComplete="email" />
       </label>
-      {msg && <p className="text-sm text-rose-300">{msg}</p>}
-      <button className="btn btn-gold mt-2" disabled={loading}>
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>Suivre ma commande</span>}
+      {msg && <p className="font-text italic text-[#7d2d2d]">{msg}</p>}
+      <button className="btn-label mt-2" disabled={loading}>
+        <span>{loading ? "Recherche…" : "Suivre ma commande"}</span>
       </button>
     </form>
   );

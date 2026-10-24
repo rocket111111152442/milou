@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ProductCard } from "@/components/site/ProductCard";
-import { SectionTitle } from "@/components/site/SectionTitle";
+import { Fade, RunningHead, Words } from "@/components/herbier/Elements";
+import { Plate } from "@/components/herbier/Plate";
+import { Specimen } from "@/components/herbier/Specimen";
 import { ProductView } from "@/components/shop/ProductView";
 import { getAddons, getCategories, getDelivery, getProduct, getProducts } from "@/lib/catalog";
-import { euro } from "@/lib/format";
+import { euro, hhmm } from "@/lib/format";
 import { siteUrl } from "@/lib/orders";
+import { PLATES, plateFor } from "@/lib/plates";
+import { toSpecimens } from "@/lib/specimen";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +29,20 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const [product, products, categories, addons, delivery] = await Promise.all([getProduct(slug), getProducts(), getCategories(), getAddons(), getDelivery()]);
   if (!product) notFound();
   const category = categories.find((c) => c.id === product.categoryId);
-  const related = products.filter((p) => p.id !== product.id && p.categoryId === product.categoryId).slice(0, 4);
-  const z = delivery.zones.filter((x) => x.active);
-  const minFee = Math.min(...z.map((x) => x.fee));
-  const deliveryHint = product.pickupOnly
-    ? "Disponible en retrait boutique et Drive"
-    : `Livraison dès ${euro(minFee, { compact: true })} · jour même avant ${delivery.sameDayCutoff.replace(":", " h ").replace(" h 00", " h")}`;
+  const specimens = toSpecimens(products, categories);
+  const number = specimens.findIndex((s) => s.id === product.id) + 1;
+  const plate = plateFor(product);
+  const related = specimens.filter((p) => p.id !== product.id && p.categoryId === product.categoryId).slice(0, 3);
+
+  const zones = delivery.zones.filter((x) => x.active);
+  const minFee = zones.length ? Math.min(...zones.map((x) => x.fee)) : 0;
+  const notes: [string, string][] = [
+    product.pickupOnly ? ["Réception", "retrait en boutique ou Drive"] : ["Livraison", `dès ${euro(minFee, { compact: true })} · le jour même avant ${hhmm(delivery.sameDayCutoff)}`],
+    ["Retrait en boutique", product.deliveryOnly ? "non disponible" : "gratuit"],
+    ["Carte manuscrite", "offerte"],
+    ["Paiement", "sécurisé par Stripe"],
+  ];
+
   const fromPrice = product.variants.length ? Math.min(...product.variants.map((v) => v.price)) : product.price;
   const jsonLd = {
     "@context": "https://schema.org",
@@ -53,16 +64,37 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <ProductView product={product} category={category?.name || "Création"} addons={addons} deliveryHint={deliveryHint} />
+      <ProductView product={product} category={category?.name || "Création"} addons={addons} notes={notes} number={number} plate={plate} />
+
+      <section className="h-paper-deep py-24 sm:py-32">
+        <div className="wrap grid items-center gap-14 lg:grid-cols-12 lg:gap-10">
+          <div className="lg:col-span-5 lg:col-start-2">
+            <Plate name={plate} duration={2.6} className="mx-auto w-[min(420px,85%)] text-plum" />
+          </div>
+          <div className="lg:col-span-5 lg:col-start-8">
+            <p className="sc text-ink-muted">La planche</p>
+            <h2 className="h-section mt-5">
+              <Words text={product.name} /> <em><Words text="à l'encre" delay={0.1} /></em>
+            </h2>
+            <Fade delay={0.2}>
+              <p className="body-text mt-6">
+                Chaque création de la Maison a sa planche dans notre herbier : une gravure botanique ancienne, choisie pour la fleur qui la porte.
+              </p>
+              <p className="folio mt-6 text-ink-muted">{PLATES[plate].title}. Wellcome Collection, domaine public.</p>
+            </Fade>
+          </div>
+        </div>
+      </section>
+
       {related.length > 0 && (
-        <section className="border-t border-ivory/10 bg-noir py-24">
-          <div className="mx-auto max-w-[1600px] px-6 sm:px-10 lg:px-16">
-            <SectionTitle eyebrow="Dans le même esprit" title="Vous aimerez" accent="aussi" size="md" />
-            <div className="mt-14 grid grid-cols-1 gap-x-8 gap-y-16 sm:grid-cols-2 lg:grid-cols-4">
-              {related.map((p, i) => (
-                <ProductCard key={p.id} product={p} index={i} />
-              ))}
-            </div>
+        <section className="wrap py-24 sm:py-28">
+          <RunningHead left="Dans le même esprit" right={category?.name} />
+          <div className="mt-14 grid gap-x-8 gap-y-14 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-12">
+            {related.map((p, i) => (
+              <Fade key={p.id} delay={i * 0.1}>
+                <Specimen p={p} hover="plate" />
+              </Fade>
+            ))}
           </div>
         </section>
       )}

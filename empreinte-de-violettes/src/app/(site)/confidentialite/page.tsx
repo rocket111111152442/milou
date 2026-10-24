@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { LegalPage } from "@/components/site/LegalPage";
+import { LegalPage } from "@/components/herbier/LegalPage";
 import { getContent } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Confidentialité" };
+export const metadata: Metadata = { title: "Politique de confidentialité" };
 
 export default async function Page() {
   const content = await getContent();
-  return <LegalPage title="Confidentialité" text={content.legal.privacy} href="/confidentialite" />;
+  return <LegalPage title="Politique de confidentialité" text={content.legal.privacy} />;
 }

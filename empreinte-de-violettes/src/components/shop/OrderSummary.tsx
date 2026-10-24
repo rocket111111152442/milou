@@ -1,19 +1,20 @@
 import { euro, frDate, MODE_LABEL } from "@/lib/format";
 import type { Order } from "@/lib/types";
 
+/** Récapitulatif d'une commande, présenté comme un bon. */
 export function OrderSummary({ order }: { order: Order }) {
   return (
-    <div className="rounded-[2rem] border border-ivory/10 bg-ivory/[0.03] p-6 sm:p-8">
-      <div className="grid gap-6 sm:grid-cols-2">
+    <div className="sheet perf-top px-6 pb-8 pt-10 sm:px-10">
+      <div className="grid gap-8 sm:grid-cols-2">
         <div>
-          <p className="eyebrow text-gold">{MODE_LABEL[order.mode]}</p>
-          <p className="mt-2 font-display text-2xl">{frDate(order.date)}</p>
-          <p className="text-sm text-ivory/60">{order.slotLabel}</p>
+          <p className="sc text-ink-muted">{MODE_LABEL[order.mode]}</p>
+          <p className="mt-2 font-display text-[1.6rem] leading-tight">{frDate(order.date).charAt(0).toUpperCase() + frDate(order.date).slice(1)}</p>
+          <p className="font-text text-[1rem] italic text-ink-soft">{order.slotLabel}</p>
         </div>
         {order.recipient && (
           <div>
-            <p className="eyebrow text-gold">Destinataire</p>
-            <p className="mt-2 text-sm leading-relaxed text-ivory/75">
+            <p className="sc text-ink-muted">Destinataire</p>
+            <p className="mt-2 font-text text-[1rem] leading-relaxed text-ink-soft">
               {order.recipient.name}
               <br />
               {order.recipient.address}
@@ -29,44 +30,53 @@ export function OrderSummary({ order }: { order: Order }) {
           </div>
         )}
       </div>
-      <ul className="mt-8 divide-y divide-ivory/10 border-y border-ivory/10">
+      <ul className="mt-8 border-t border-ink/15 font-text">
         {order.items.map((i, k) => (
-          <li key={k} className="flex justify-between gap-4 py-4 text-sm">
-            <span>
-              {i.quantity} × <span className="font-display text-lg">{i.name}</span>
-              {i.variantName && <span className="text-ivory/50"> — {i.variantName}</span>}
-              {i.addons.length > 0 && <span className="block text-xs text-gold/80">+ {i.addons.map((a) => a.name).join(", ")}</span>}
-              {i.custom && <span className="block text-xs text-ivory/50">{i.custom.stems.map((s) => `${s.quantity} ${s.name.toLowerCase()}`).join(", ")}</span>}
-            </span>
-            <span className="tabular-nums">{euro(i.lineTotal)}</span>
+          <li key={k} className="border-b border-ink/10 py-4">
+            <div className="flex items-baseline">
+              <span>
+                <span className="tab text-ink-muted">{i.quantity} × </span>
+                <span className="font-display text-[1.2rem]">{i.name}</span>
+                {i.variantName && <span className="italic text-ink-muted"> — {i.variantName}</span>}
+              </span>
+              <span className="leader" />
+              <span className="tab">{euro(i.lineTotal)}</span>
+            </div>
+            {i.addons.length > 0 && <p className="text-[0.9rem] italic text-plum">+ {i.addons.map((a) => a.name).join(", ")}</p>}
+            {i.custom && <p className="text-[0.9rem] italic text-ink-muted">{i.custom.stems.map((s) => `${s.quantity} ${s.name.toLowerCase()}`).join(", ")}</p>}
           </li>
         ))}
       </ul>
-      <dl className="mt-5 space-y-1.5 text-sm">
-        <div className="flex justify-between text-ivory/65">
+      <dl className="mt-5 space-y-1.5 font-text text-[1rem]">
+        <div className="flex items-baseline text-ink-soft">
           <dt>Sous-total</dt>
-          <dd>{euro(order.subtotal)}</dd>
+          <span className="leader" />
+          <dd className="tab">{euro(order.subtotal)}</dd>
         </div>
         {order.mode === "delivery" && (
-          <div className="flex justify-between text-ivory/65">
+          <div className="flex items-baseline text-ink-soft">
             <dt>Livraison</dt>
-            <dd>{order.deliveryFee ? euro(order.deliveryFee) : "Offerte"}</dd>
+            <span className="leader" />
+            <dd className="tab">{order.deliveryFee ? euro(order.deliveryFee) : "offerte"}</dd>
           </div>
         )}
         {order.discount > 0 && (
-          <div className="flex justify-between text-gold-light">
+          <div className="flex items-baseline text-plum">
             <dt>Remise {order.promoCode}</dt>
-            <dd>− {euro(order.discount)}</dd>
+            <span className="leader" />
+            <dd className="tab">− {euro(order.discount)}</dd>
           </div>
         )}
-        <div className="flex items-baseline justify-between pt-3">
-          <dt className="eyebrow">Total</dt>
-          <dd className="font-display text-3xl">{euro(order.total)}</dd>
+        <div className="flex items-baseline pt-3">
+          <dt className="sc">Total</dt>
+          <span className="leader" />
+          <dd className="tab font-text text-[1.9rem] leading-none">{euro(order.total)}</dd>
         </div>
       </dl>
       {order.cardMessage && (
-        <blockquote className="mt-6 rounded-xl bg-[#F3EADF] p-5 text-center font-display text-lg italic text-noir">
-          « {order.cardMessage} »{order.cardSignature && !order.anonymous && <span className="mt-1 block not-italic text-aubergine-700">— {order.cardSignature}</span>}
+        <blockquote className="mx-auto mt-10 max-w-md -rotate-1 border border-ink/15 bg-paper p-6 text-center">
+          <p className="font-display text-[1.3rem] italic leading-snug">« {order.cardMessage} »</p>
+          {order.cardSignature && !order.anonymous && <p className="mt-2 font-text italic text-ink-soft">— {order.cardSignature}</p>}
         </blockquote>
       )}
     </div>

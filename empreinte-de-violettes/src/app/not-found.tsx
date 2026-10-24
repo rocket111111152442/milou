@@ -1,23 +1,21 @@
 import Link from "next/link";
-import { Petals } from "@/components/motion/Petals";
-import { VioletMark } from "@/components/site/Logo";
+import { Plate } from "@/components/herbier/Plate";
 
 export default function NotFound() {
   return (
-    <main className="fern-night relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-noir px-6 text-center text-ivory">
-      <Petals count={30} />
-      <VioletMark className="relative h-20 w-20 animate-floaty text-gold" strokeWidth={1} />
-      <p className="eyebrow relative mt-10 text-gold">Erreur 404</p>
-      <h1 className="h-display relative mt-5 text-[clamp(3rem,8vw,7rem)]">
-        Cette page s&apos;est <em className="text-foil">envolée</em>
+    <main className="h-paper flex min-h-screen flex-col items-center justify-center px-6 py-20 text-center">
+      <Plate name="brins" reveal="mount" duration={1.8} className="w-[min(420px,80vw)] text-plum" />
+      <p className="sc mt-12 text-ink-muted">Planche manquante · erreur 404</p>
+      <h1 className="h-title mt-5">
+        Cette page <em>manque à l&apos;herbier</em>
       </h1>
-      <p className="relative mt-6 max-w-md text-ivory/60">Comme un pétale emporté par le mistral… Revenons au jardin.</p>
-      <div className="relative mt-10 flex flex-wrap justify-center gap-4">
-        <Link href="/" className="btn btn-gold">
+      <p className="body-text mt-6 max-w-md">Elle a peut-être été déplacée, ou n&apos;a jamais été cueillie. Reprenons depuis le sommaire.</p>
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-8">
+        <Link href="/" className="btn-label">
           <span>Retour à l&apos;accueil</span>
         </Link>
-        <Link href="/boutique" className="btn btn-ghost text-ivory">
-          <span>La boutique</span>
+        <Link href="/boutique" className="btn-line">
+          La boutique <span className="arrow">→</span>
         </Link>
       </div>
     </main>

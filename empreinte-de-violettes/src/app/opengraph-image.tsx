@@ -4,39 +4,38 @@ export const alt = "Empreinte de Violettes — Artisane fleuriste à Six-Fours-l
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function OpengraphImage() {
-  const petal = (r: number) => `M0,0C${r * 0.25},${-r * 0.1} ${r * 0.4},${-r * 0.92} 0,${-r}C${-r * 0.4},${-r * 0.92} ${-r * 0.25},${-r * 0.1} 0,0Z`;
+/** Police Google au format TTF (le moteur d'image ne lit pas le WOFF2). Sans réseau : police par défaut. */
+async function font(family: string, style = "") {
+  try {
+    const css = await (await fetch(`https://fonts.googleapis.com/css2?family=${family}${style}`)).text();
+    const url = css.match(/src: url\((.+?)\) format\('(?:truetype|opentype)'\)/)?.[1];
+    return url ? await (await fetch(url)).arrayBuffer() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Image de partage : l'étiquette noire à dorure posée sur le papier, comme la carte de visite. */
+export default async function OpengraphImage() {
+  const [display, text] = await Promise.all([font("Bodoni+Moda"), font("Newsreader", ":ital@1")]);
+  const fonts = [
+    ...(display ? [{ name: "Display", data: display, style: "normal" as const, weight: 400 as const }] : []),
+    ...(text ? [{ name: "Text", data: text, style: "italic" as const, weight: 400 as const }] : []),
+  ];
+  const gold = "linear-gradient(100deg, #8A6B33 0%, #C9A865 25%, #F1DFAE 45%, #B08A46 65%, #E2C98F 85%, #94723A 100%)";
   return new ImageResponse(
     (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "radial-gradient(circle at 50% 40%, #3A2350 0%, #160C1C 55%, #09060C 100%)",
-          color: "#F6F1EA",
-          fontFamily: "serif",
-        }}
-      >
-        <svg width="140" height="140" viewBox="-50 -50 100 100">
-          <g transform="translate(0,6)" fill="#3A2350" stroke="#D9BC7E" strokeWidth="1.6">
-            <path d={petal(40)} transform="rotate(-24)" />
-            <path d={petal(40)} transform="rotate(24)" />
-            <path d={petal(34)} transform="rotate(-94)" />
-            <path d={petal(34)} transform="rotate(94)" />
-            <path d={petal(38)} transform="rotate(180)" />
-            <circle r="4" fill="#D9BC7E" />
-          </g>
-        </svg>
-        <div style={{ marginTop: 30, fontSize: 22, letterSpacing: 14, color: "#C6A15B", textTransform: "uppercase" }}>Maison</div>
-        <div style={{ marginTop: 10, fontSize: 70, letterSpacing: 8, color: "#EAD7A8", textTransform: "uppercase" }}>Empreinte de Violettes</div>
-        <div style={{ marginTop: 22, width: 220, height: 1, background: "#C6A15B" }} />
-        <div style={{ marginTop: 22, fontSize: 24, letterSpacing: 8, color: "#B9A2CF", textTransform: "uppercase" }}>Artisane fleuriste · Six-Fours-les-Plages</div>
+      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#EDE6DF", fontFamily: "Display" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "54px 64px", background: "#0C0A0D", boxShadow: "0 40px 80px -40px rgba(17,11,21,0.6)", position: "relative" }}>
+          <div style={{ position: "absolute", top: 10, left: 10, right: 10, bottom: 10, border: "1px solid rgba(201,168,101,0.32)", display: "flex" }} />
+          <div style={{ fontSize: 20, letterSpacing: 12, color: "#C9A865", textTransform: "uppercase" }}>Maison</div>
+          <div style={{ marginTop: 16, fontSize: 48, letterSpacing: 6, whiteSpace: "nowrap", textTransform: "uppercase", backgroundImage: gold, backgroundClip: "text", color: "transparent" }}>Empreinte de Violettes</div>
+          <div style={{ marginTop: 22, width: 90, height: 1, background: "#B8975A" }} />
+          <div style={{ marginTop: 20, fontSize: 17, letterSpacing: 11, color: "#B8975A", textTransform: "uppercase" }}>Artisane fleuriste</div>
+        </div>
+        <div style={{ marginTop: 44, fontSize: 28, fontStyle: "italic", fontFamily: "Text", color: "#3B2E41" }}>Bouquets, plantes et curiosités botaniques · Six-Fours-les-Plages</div>
       </div>
     ),
-    size,
+    { ...size, fonts },
   );
 }

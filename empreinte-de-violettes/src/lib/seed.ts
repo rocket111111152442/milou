@@ -331,13 +331,13 @@ export const seedDelivery: DeliverySettings = {
 
 export const seedContent: Content = {
   hero: {
-    eyebrow: "Maison fondée en 2022 · Six-Fours-les-Plages",
+    eyebrow: "Maison fondée en avril 2022",
     titleLine1: "L'art floral",
     titleLine2: "à l'anglaise",
     subtitle:
       "Bouquets sauvages, fleurs locales et plantes rares, composés à la main dans notre cabinet de curiosités botaniques. Livrés chez vous ou à retirer en boutique.",
-    ctaLabel: "Découvrir la boutique",
-    images: [IMG.darkBouquet, IMG.pinkRosesDark, IMG.dahliaDark],
+    ctaLabel: "Entrer dans la boutique",
+    images: [IMG.dahliaDark],
     videoUrl: "",
   },
   marquee: [
@@ -349,7 +349,7 @@ export const seedContent: Content = {
     "Partenaire Interflora",
   ],
   manifesto: {
-    eyebrow: "Notre manifeste",
+    eyebrow: "Le geste",
     text:
       "Ici, chaque bouquet laisse une empreinte. Des fleurs cueillies au plus près, du marché aux fleurs d'Hyères aux producteurs du Var, assemblées avec la liberté d'un jardin anglais et la rigueur apprise auprès d'un Meilleur Ouvrier de France. Pas de fleurs figées : des tiges qui bougent, des feuillages qui respirent, des couleurs qui racontent une saison.",
     signature: "— L'artisane fleuriste",

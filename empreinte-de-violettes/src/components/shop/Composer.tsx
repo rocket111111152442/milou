@@ -1,12 +1,12 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Minus, Plus, RotateCcw, Shuffle } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
-import { BouquetArt, kindFromName, type Stem } from "@/components/site/BouquetArt";
+import { useMemo, useState } from "react";
+import { EASE } from "@/components/herbier/Elements";
+import { Plate } from "@/components/herbier/Plate";
 import { cn } from "@/lib/cn";
-import { flyToCart } from "@/lib/fly";
 import { euro } from "@/lib/format";
+import { plateFor } from "@/lib/plates";
 import type { AtelierSettings } from "@/lib/types";
 import { useCart } from "@/store/cart";
 
@@ -17,33 +17,42 @@ const PRESETS: { name: string; picks: [string, number][] }[] = [
   { name: "Blanc pur", picks: [["anémone", 5], ["matricaire", 5], ["eucalyptus", 4], ["fougère", 3]] },
 ];
 
+/** L'atelier : on choisit ses tiges, la planche se compose sous nos yeux, gravure après gravure. */
 export function Composer({ atelier }: { atelier: AtelierSettings }) {
   const add = useCart((s) => s.add);
-  const flowers = atelier.flowers.filter((f) => f.active);
+  const flowers = useMemo(() => atelier.flowers.filter((f) => f.active).map((f) => ({ ...f, plate: plateFor(f) })), [atelier.flowers]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [wrapId, setWrapId] = useState(atelier.wrappings[0]?.id);
   const [note, setNote] = useState("");
   const [added, setAdded] = useState(false);
   const [filter, setFilter] = useState<"tout" | "fleur" | "feuillage">("tout");
-  const artRef = useRef<HTMLDivElement>(null);
 
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const wrap = atelier.wrappings.find((w) => w.id === wrapId) || atelier.wrappings[0];
-  const price = atelier.basePrice + flowers.reduce((s, f) => s + (counts[f.id] || 0) * f.price, 0) + (wrap?.price || 0);
+  const stemsPrice = flowers.reduce((s, f) => s + (counts[f.id] || 0) * f.price, 0);
+  const price = atelier.basePrice + stemsPrice + (wrap?.price || 0);
 
-  const stems: Stem[] = useMemo(
-    () =>
-      flowers.flatMap((f) =>
-        Array.from({ length: counts[f.id] || 0 }, (_, k) => ({ id: `${f.id}-${k}`, kind: kindFromName(f.name, f.kind), color: f.color })),
-      ),
-    [flowers, counts],
-  );
-  // ordre de placement stable mais mélangé (les tiges d'une même fleur ne s'agglutinent pas)
-  const ordered = useMemo(() => {
-    const out = [...stems];
-    out.sort((a, b) => hash(a.id) - hash(b.id));
-    return out;
-  }, [stems]);
+  // disposition en éventail : feuillages aux bords et derrière, fleurs au centre et devant
+  const chosen = flowers.filter((f) => counts[f.id]);
+  const layout = useMemo(() => {
+    const leaves = chosen.filter((f) => f.kind === "feuillage");
+    const blooms = chosen.filter((f) => f.kind !== "feuillage");
+    const order = [...leaves.slice(0, Math.ceil(leaves.length / 2)), ...blooms, ...leaves.slice(Math.ceil(leaves.length / 2))];
+    const n = order.length;
+    const spread = Math.min(46, 12 + n * 7);
+    return order.map((f, k) => {
+      const t = n === 1 ? 0 : k / (n - 1) - 0.5;
+      const leaf = f.kind === "feuillage";
+      return {
+        f,
+        rotate: t * spread * 2 + (leaf ? Math.sign(t || 1) * 4 : 0),
+        scale: (leaf ? 0.98 : 0.84) + Math.min(counts[f.id], 6) * 0.03,
+        z: leaf ? 1 : 10 - Math.round(Math.abs(t) * 6),
+        lift: leaf ? 0 : (1 - Math.abs(t) * 2) * 6,
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [counts, flowers]);
 
   const change = (id: string, d: number) =>
     setCounts((c) => {
@@ -82,14 +91,10 @@ export function Composer({ atelier }: { atelier: AtelierSettings }) {
     setCounts(out);
   };
 
-  const summary = flowers
-    .filter((f) => counts[f.id])
-    .map((f) => `${counts[f.id]} ${f.name.toLowerCase()}`)
-    .join(", ");
+  const summary = chosen.map((f) => `${counts[f.id]} ${f.name.toLowerCase()}`).join(", ");
 
   const onAdd = () => {
     if (total < atelier.minStems) return;
-    flyToCart(artRef.current);
     add({
       productId: null,
       name: "Création de l'atelier",
@@ -104,141 +109,185 @@ export function Composer({ atelier }: { atelier: AtelierSettings }) {
   };
 
   const shown = flowers.filter((f) => filter === "tout" || f.kind === filter);
-  const ratio = total / atelier.maxStems;
 
   return (
-    <section className="fern-paper relative bg-paper pb-28 pt-12 text-noir">
-      <div className="mx-auto grid max-w-[1600px] gap-12 px-6 sm:px-10 lg:grid-cols-[1.05fr_1fr] lg:gap-20 lg:px-16">
-        {/* aperçu */}
+    <section className="wrap pb-28">
+      <div className="grid gap-14 lg:grid-cols-[1fr_1.08fr] lg:gap-16">
+        {/* la planche */}
         <div className="lg:sticky lg:top-24 lg:self-start">
-          <div ref={artRef} className="relative mx-auto aspect-[400/470] w-full max-w-[560px]">
-            <div className="absolute inset-[8%] rounded-full bg-[radial-gradient(circle,rgba(185,162,207,0.45),transparent_65%)] blur-2xl" />
-            <BouquetArt stems={ordered} wrapColor={wrap?.color} isVase={wrap?.id === "wrap_vase" || /vase/i.test(wrap?.name || "")} className="relative h-full w-full overflow-visible drop-shadow-[0_30px_40px_rgba(38,21,47,0.22)]" />
-            <AnimatePresence>
-              {total === 0 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-x-0 top-[28%] text-center">
-                  <p className="font-display text-3xl italic text-aubergine-700">Votre bouquet commence ici</p>
-                  <p className="mt-2 text-sm text-noir/55">Ajoutez des tiges, ou laissez-vous inspirer.</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+          <div className="sheet relative p-4 sm:p-5">
+            <span className="tape -top-2 left-[18%] -rotate-[4deg]" aria-hidden />
+            <span className="tape -top-2 right-[18%] rotate-[3deg]" aria-hidden />
+            <div className="relative aspect-[4/5] overflow-hidden bg-paper-light" aria-label={summary ? `Votre bouquet : ${summary}` : "Votre bouquet est vide"} role="img">
+              <AnimatePresence>
+                {layout.map(({ f, rotate, scale, z, lift }) => (
+                  <motion.div
+                    key={f.id}
+                    className="absolute bottom-[13%] left-[27%] w-[46%] origin-bottom text-ink"
+                    style={{ zIndex: z }}
+                    initial={{ opacity: 0, rotate: rotate * 0.6, scale: scale * 0.9, y: 20 }}
+                    animate={{ opacity: f.kind === "feuillage" ? 0.78 : 1, rotate, scale, y: -lift * 4 }}
+                    exit={{ opacity: 0, scale: scale * 0.92, transition: { duration: 0.35 } }}
+                    transition={{ duration: 0.9, ease: EASE }}
+                  >
+                    <Plate name={f.plate} reveal="mount" duration={1.2} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {/* le lien de raphia, là où les tiges se croisent */}
+              <AnimatePresence>
+                {total > 0 && (
+                  <motion.svg key="tie" viewBox="0 0 80 40" className="absolute bottom-[10%] left-1/2 z-20 w-[16%] -translate-x-1/2 text-ink" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} aria-hidden>
+                    <motion.path d="M40 20 C30 6, 12 6, 14 16 C16 26, 32 24, 40 20 C48 24, 64 26, 66 16 C68 6, 50 6, 40 20 M40 20 C36 28, 30 34, 24 38 M40 20 C44 28, 50 34, 57 38" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.2, ease: EASE }} />
+                    <ellipse cx="40" cy="20" rx="3.4" ry="2.6" fill="currentColor" />
+                  </motion.svg>
+                )}
+              </AnimatePresence>
+              <AnimatePresence>
+                {total === 0 && (
+                  <motion.div className="absolute inset-0 flex flex-col items-center justify-center px-10 text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <div className="absolute inset-[7%] border border-dashed border-ink/20" />
+                    <p className="font-display text-[1.9rem] italic leading-tight">Votre planche commence ici.</p>
+                    <p className="body-text mt-3 !text-[1rem]">Ajoutez des tiges : chaque fleur vient s&apos;y graver.</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <div className="mt-4 grid grid-cols-[auto_1fr] items-end gap-4">
+              <p className="folio pb-1 text-ink-muted">Pl. atelier</p>
+              <div className="herb-label min-w-0 px-3 py-2.5">
+                <p className="font-display text-[1.2rem] leading-tight">Création de l&apos;atelier</p>
+                <p className="truncate font-text text-[0.86rem] italic text-ink-muted">{summary || "aucune tige pour l'instant"}</p>
+              </div>
+            </div>
           </div>
-          <div className="mx-auto mt-6 flex max-w-[560px] flex-wrap justify-center gap-2">
+          <div className="mt-6 flex flex-wrap items-baseline gap-x-5 gap-y-2 font-text text-[1rem]">
+            <span className="sc text-ink-muted">S&apos;inspirer —</span>
             {PRESETS.map((p) => (
-              <button key={p.name} onClick={() => preset(p.picks)} className="rounded-full border border-noir/15 bg-white/50 px-4 py-2 text-xs uppercase tracking-[0.16em] transition hover:border-aubergine-600 hover:bg-aubergine-700 hover:text-ivory">
+              <button key={p.name} onClick={() => preset(p.picks)} className="ulink italic">
                 {p.name}
               </button>
             ))}
+            <button onClick={inspire} className="ulink italic">
+              au hasard
+            </button>
           </div>
         </div>
 
-        {/* configuration */}
+        {/* la sélection */}
         <div>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex gap-1 rounded-full border border-noir/10 bg-white/50 p-1">
+          <div className="flex flex-wrap items-baseline justify-between gap-4 border-b border-ink/15 pb-4">
+            <div className="flex gap-6" role="tablist" aria-label="Type de tiges">
               {(["tout", "fleur", "feuillage"] as const).map((k) => (
-                <button key={k} onClick={() => setFilter(k)} className={cn("relative rounded-full px-4 py-1.5 text-xs uppercase tracking-[0.14em]", filter === k ? "text-ivory" : "text-noir/60")}>
-                  {filter === k && <motion.span layoutId="comp-filter" className="absolute inset-0 rounded-full bg-aubergine-700" />}
-                  <span className="relative">{k === "tout" ? "Tout" : k === "fleur" ? "Fleurs" : "Feuillages"}</span>
+                <button key={k} role="tab" aria-selected={filter === k} onClick={() => setFilter(k)} className={cn("font-display text-[1.3rem]", filter === k ? "italic" : "text-ink-muted hover:text-ink")}>
+                  <span className={filter === k ? "ulink-on" : "ulink"}>{k === "tout" ? "Tout" : k === "fleur" ? "Fleurs" : "Feuillages"}</span>
                 </button>
               ))}
             </div>
-            <div className="flex gap-2">
-              <button onClick={inspire} className="flex items-center gap-2 rounded-full border border-noir/15 px-4 py-2 text-xs uppercase tracking-[0.14em] transition hover:border-aubergine-600">
-                <Shuffle className="h-3.5 w-3.5" /> Inspirez-moi
-              </button>
-              <button onClick={() => setCounts({})} className="flex items-center gap-2 rounded-full border border-noir/15 px-4 py-2 text-xs uppercase tracking-[0.14em] transition hover:border-aubergine-600">
-                <RotateCcw className="h-3.5 w-3.5" /> Recommencer
-              </button>
-            </div>
+            <button onClick={() => setCounts({})} disabled={!total} className="font-text text-[0.95rem] italic text-ink-muted hover:text-ink disabled:opacity-40">
+              tout effacer
+            </button>
           </div>
 
-          <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+          <ul className="mt-6 grid grid-cols-2 gap-px bg-ink/10 sm:grid-cols-3">
             {shown.map((f) => {
               const n = counts[f.id] || 0;
               return (
-                <motion.li key={f.id} layout className={cn("flex items-center gap-4 rounded-2xl border p-3 pr-2 transition", n ? "border-aubergine-500 bg-white" : "border-noir/10 bg-white/50")}>
-                  <span className="relative h-11 w-11 shrink-0 rounded-full border border-noir/10" style={{ background: `radial-gradient(circle at 35% 30%, #fff8, ${f.color} 55%)` }}>
+                <li key={f.id} className={cn("relative flex flex-col bg-paper p-3 transition-colors duration-500 sm:p-4", n > 0 && "bg-paper-light")}>
+                  <button onClick={() => change(f.id, 1)} disabled={total >= atelier.maxStems} className="group relative block aspect-[3/4] w-full text-ink-soft disabled:cursor-not-allowed" aria-label={`Ajouter une tige de ${f.name}`}>
+                    <Plate name={f.plate} fit="contain" reveal="none" className="absolute inset-[4%] transition-transform duration-700 ease-silk group-hover:scale-[1.04]" />
                     <AnimatePresence>
                       {n > 0 && (
-                        <motion.span key={n} initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-aubergine-700 px-1 text-[0.6rem] text-ivory">
+                        <motion.span key={n} className="absolute right-0 top-0 font-display text-[1.6rem] italic leading-none text-plum" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                           {n}
                         </motion.span>
                       )}
                     </AnimatePresence>
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-display text-lg leading-tight">{f.name}</span>
-                    <span className="text-xs text-noir/50">{euro(f.price)} la tige</span>
-                  </span>
-                  <span className="flex items-center">
-                    <button onClick={() => change(f.id, -1)} disabled={!n} className="rounded-full p-2 text-noir/50 transition hover:bg-noir/5 hover:text-noir disabled:opacity-30" aria-label={`Retirer une tige de ${f.name}`}>
-                      <Minus className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => change(f.id, 1)} disabled={total >= atelier.maxStems} className="rounded-full p-2 text-noir/70 transition hover:bg-aubergine-700 hover:text-ivory disabled:opacity-30" aria-label={`Ajouter une tige de ${f.name}`}>
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </span>
-                </motion.li>
+                  </button>
+                  <p className="mt-3 font-display text-[1.12rem] leading-tight">{f.name}</p>
+                  <div className="mt-1 flex items-baseline justify-between font-text text-[0.88rem]">
+                    <span className="italic text-ink-muted">{euro(f.price)} la tige</span>
+                    <span className="flex items-center gap-2">
+                      <button onClick={() => change(f.id, -1)} disabled={!n} className="px-1 text-[1.05rem] text-ink-muted hover:text-ink disabled:opacity-25" aria-label={`Retirer une tige de ${f.name}`}>
+                        −
+                      </button>
+                      <button onClick={() => change(f.id, 1)} disabled={total >= atelier.maxStems} className="px-1 text-[1.05rem] text-ink-muted hover:text-ink disabled:opacity-25" aria-label={`Ajouter une tige de ${f.name}`}>
+                        +
+                      </button>
+                    </span>
+                  </div>
+                </li>
               );
             })}
           </ul>
 
-          <div className="mt-10">
-            <p className="label text-noir">Emballage</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {atelier.wrappings.map((w) => (
-                <button key={w.id} onClick={() => setWrapId(w.id)} className={cn("rounded-2xl border p-3 text-left transition", w.id === wrapId ? "border-aubergine-600 bg-white" : "border-noir/10 bg-white/50 hover:border-noir/30")} aria-pressed={w.id === wrapId}>
-                  <span className="block h-8 w-8 rounded-full border border-noir/10" style={{ background: w.color }} />
-                  <span className="mt-2 block text-sm leading-tight">{w.name}</span>
-                  <span className="text-xs text-noir/50">{w.price ? `+ ${euro(w.price)}` : "Offert"}</span>
-                </button>
-              ))}
+          <fieldset className="min-w-0 mt-12">
+            <legend className="sc mb-3 text-ink-muted">Emballage</legend>
+            <div className="border-t border-ink/15">
+              {atelier.wrappings.map((w) => {
+                const on = w.id === wrapId;
+                return (
+                  <label key={w.id} className={cn("flex cursor-pointer items-baseline gap-4 border-b border-ink/15 py-3 font-text text-[1.02rem]", on ? "text-ink" : "text-ink-soft hover:text-ink")}>
+                    <input type="radio" name="wrap" className="sr-only" checked={on} onChange={() => setWrapId(w.id)} />
+                    <span className="radio-dot translate-y-[1px]" data-on={on} aria-hidden />
+                    <span className={on ? "italic" : ""}>{w.name}</span>
+                    <span className="leader" />
+                    <span className="tab">{w.price ? `+ ${euro(w.price, { compact: true })}` : "offert"}</span>
+                  </label>
+                );
+              })}
             </div>
-          </div>
+          </fieldset>
 
-          <div className="mt-10">
-            <label htmlFor="comp-note" className="label text-noir">
-              Une indication pour la fleuriste ? (facultatif)
-            </label>
-            <textarea id="comp-note" value={note} onChange={(e) => setNote(e.target.value.slice(0, 300))} rows={2} placeholder="Tons plutôt pastel, sans lys, pour une naissance…" className="field-box-light resize-none" />
-          </div>
+          <label className="mt-10 block">
+            <span className="f-label">Un mot pour la fleuriste (facultatif)</span>
+            <textarea value={note} onChange={(e) => setNote(e.target.value.slice(0, 300))} rows={2} placeholder="Tons plutôt pastel, sans lys, pour une naissance…" className="f-line resize-none" />
+          </label>
 
-          <div className="sticky bottom-4 mt-10 rounded-3xl border border-noir/10 bg-noir p-6 text-ivory shadow-2xl">
-            <div className="flex items-end justify-between gap-6">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-ivory/50">
-                  {total} / {atelier.maxStems} tiges {total < atelier.minStems && <span className="text-gold-light">· minimum {atelier.minStems}</span>}
-                </p>
-                <div className="mt-3 h-1 w-48 overflow-hidden rounded-full bg-ivory/10">
-                  <motion.div className="bg-foil h-full" animate={{ width: `${ratio * 100}%` }} transition={{ duration: 0.5 }} />
-                </div>
-                <p className="mt-2 text-[0.7rem] text-ivory/45">Composition {euro(atelier.basePrice)} incluse</p>
-              </div>
-              <AnimatePresence mode="popLayout">
-                <motion.p key={price} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -16, opacity: 0 }} className="font-display text-4xl tabular-nums">
+          {/* bon de composition */}
+          <div className="sheet perf-top relative mt-12 px-6 pb-6 pt-8 sm:px-8">
+            <p className="sc text-ink-muted">Bon de composition</p>
+            <ul className="mt-4 space-y-1.5 font-text text-[1rem]">
+              {chosen.length === 0 && <li className="italic text-ink-muted">Aucune tige choisie — minimum {atelier.minStems}.</li>}
+              {chosen.map((f) => (
+                <li key={f.id} className="flex items-baseline">
+                  <span>
+                    <span className="tab">{counts[f.id]}</span> × {f.name}
+                  </span>
+                  <span className="leader" />
+                  <span className="tab">{euro(counts[f.id] * f.price)}</span>
+                </li>
+              ))}
+              <li className="flex items-baseline text-ink-soft">
+                <span>Composition à la main</span>
+                <span className="leader" />
+                <span className="tab">{euro(atelier.basePrice)}</span>
+              </li>
+              {wrap && (
+                <li className="flex items-baseline text-ink-soft">
+                  <span>{wrap.name}</span>
+                  <span className="leader" />
+                  <span className="tab">{wrap.price ? euro(wrap.price) : "offert"}</span>
+                </li>
+              )}
+            </ul>
+            <div className="mt-5 flex items-baseline border-t border-ink/15 pt-4">
+              <span className="sc">
+                Total · <span className="tab">{total}</span>/{atelier.maxStems} tiges
+              </span>
+              <span className="leader" />
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span key={price} className="tab font-text text-[1.9rem] leading-none" initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -10, opacity: 0 }} transition={{ duration: 0.4 }}>
                   {euro(price)}
-                </motion.p>
+                </motion.span>
               </AnimatePresence>
             </div>
-            <button onClick={onAdd} disabled={total < atelier.minStems} className="btn btn-gold mt-5 w-full">
-              {added ? (
-                <span className="flex items-center gap-2">
-                  <Check className="h-4 w-4" /> Ajouté au panier
-                </span>
-              ) : (
-                <span>Ajouter ma création au panier</span>
-              )}
+            <button onClick={onAdd} disabled={total < atelier.minStems} className="btn-label mt-6 w-full">
+              <span>{added ? "Ajoutée au panier" : total < atelier.minStems ? `Encore ${atelier.minStems - total} tige${atelier.minStems - total > 1 ? "s" : ""} au minimum` : "Ajouter ma création au panier"}</span>
             </button>
           </div>
         </div>
       </div>
     </section>
   );
-}
-
-function hash(s: string) {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
-  return h >>> 0;
 }

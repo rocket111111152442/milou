@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
-import { GalleryGrid } from "@/components/home/GalleryGrid";
-import { Testimonials } from "@/components/home/Testimonials";
-import { Marquee } from "@/components/motion/Marquee";
-import { ImageReveal, Reveal } from "@/components/motion/Reveal";
-import { ContactForm } from "@/components/site/ContactForm";
-import { PageHero } from "@/components/site/PageHero";
-import { SectionTitle } from "@/components/site/SectionTitle";
-import { SmartImage } from "@/components/site/SmartImage";
-import { Steps } from "@/components/site/Steps";
+import { ContactForm } from "@/components/herbier/ContactForm";
+import { Fade, Mounted, RunningHead, Words } from "@/components/herbier/Elements";
+import { Lettres } from "@/components/herbier/home/Lettres";
+import { PageHead } from "@/components/herbier/PageHead";
 import { getContent, getGallery, getReviews, getSettings } from "@/lib/catalog";
+import { roman } from "@/lib/roman";
 import { IMG } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +15,7 @@ export const metadata: Metadata = {
 
 const PRESTA = [
   ["Bouquet de la mariée", "Cascade, rond ou champêtre, composé avec vos fleurs préférées."],
-  ["Boutonnières & accessoires", "Boutonnières, couronnes et peignes de cheveux, bracelets de demoiselles d'honneur."],
+  ["Boutonnières & accessoires", "Boutonnières, couronnes et peignes de cheveux, bracelets des demoiselles d'honneur."],
   ["Cérémonie", "Arche, allée, bancs, autel : une mise en scène florale pour le « oui »."],
   ["Réception", "Centres de table, mange-debout, buffet, plan de table fleuri."],
   ["Voiture", "Décoration florale du véhicule des mariés."],
@@ -29,66 +25,83 @@ const PRESTA = [
 export default async function WeddingPage() {
   const [content, gallery, reviews, settings] = await Promise.all([getContent(), getGallery(), getReviews(), getSettings()]);
   const w = content.wedding;
+  const [t1, ...t2] = w.title.split(",");
+  const pics = gallery.filter((g) => g.category === "mariage");
+  const pic = (k: number, fallback: string) => pics[k]?.image || fallback;
   return (
     <>
-      <PageHero eyebrow="Mariages & événements" title={w.title.split(",")[0]} accent={w.title.includes(",") ? w.title.split(",").slice(1).join(",").trim() : undefined} intro={w.intro} image={w.image} crumbs={[{ href: "/mariage", label: "Mariage" }]} />
-      <div className="border-y border-ivory/10 bg-noir py-5">
-        <Marquee items={["Bouquet de mariée", "Boutonnières", "Arches & allées", "Centres de table", "Voiture des mariés", "Fleurs de saison"]} itemClassName="font-display text-4xl font-light italic text-ivory/85 sm:text-5xl" />
-      </div>
+      <PageHead kicker="Mariages" folio="sur rendez-vous" title={t2.length ? `${t1},` : t1} accent={t2.join(",").trim() || undefined} intro={w.intro} plate="lys" />
 
-      <section className="fern-paper bg-ivory py-28 text-noir sm:py-36">
-        <div className="mx-auto grid max-w-[1600px] gap-16 px-6 sm:px-10 lg:grid-cols-2 lg:px-16">
-          <div>
-            <SectionTitle eyebrow="Nos prestations" title="Du premier regard" accent="au dernier pétale" tone="light" size="md" />
-            <div className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-noir/10 bg-noir/10 sm:grid-cols-2">
-              {PRESTA.map(([t, d], i) => (
-                <Reveal key={t} delay={(i % 2) * 0.1} className="bg-ivory p-6">
-                  <p className="font-caps text-[0.6rem] tracking-[0.3em] text-aubergine-600">{String(i + 1).padStart(2, "0")}</p>
-                  <h3 className="mt-3 font-display text-2xl">{t}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-noir/60">{d}</p>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <ImageReveal className="col-span-2 aspect-[16/10] rounded-t-[200px]">
-              <SmartImage src={IMG.weddingAisle} alt="Allée de cérémonie fleurie" fill sizes="50vw" className="object-cover" />
-            </ImageReveal>
-            <ImageReveal className="aspect-[3/4] rounded-2xl" delay={0.15}>
-              <SmartImage src={IMG.weddingHands} alt="Bouquet de mariée" fill sizes="25vw" className="object-cover" />
-            </ImageReveal>
-            <ImageReveal className="aspect-[3/4] rounded-2xl" delay={0.3}>
-              <SmartImage src={IMG.weddingTable} alt="Table de réception fleurie" fill sizes="25vw" className="object-cover" />
-            </ImageReveal>
-          </div>
+      <section className="wrap grid gap-16 pb-24 lg:grid-cols-12 lg:gap-10">
+        <div className="lg:col-span-6">
+          <RunningHead left="Nos prestations" right={roman(PRESTA.length)} />
+          <ol className="mt-8">
+            {PRESTA.map(([t, d], i) => (
+              <Fade key={t} delay={i * 0.05}>
+                <li className="grid grid-cols-[2.5rem_1fr] gap-x-4 border-b border-ink/15 py-5">
+                  <span className="pt-1 font-text text-[0.9rem] italic text-ink-muted">{roman(i + 1)}.</span>
+                  <div>
+                    <h3 className="font-display text-[1.6rem] leading-tight">{t}</h3>
+                    <p className="body-text mt-1 !text-[1rem]">{d}</p>
+                  </div>
+                </li>
+              </Fade>
+            ))}
+          </ol>
+        </div>
+        <div className="grid grid-cols-2 gap-6 lg:col-span-5 lg:col-start-8">
+          <Fade className="col-span-2">
+            <Mounted src={pic(1, IMG.weddingAisle)} alt="Allée de cérémonie fleurie" ratio="16/11" sizes="(max-width: 1024px) 90vw, 38vw" caption="Fig. 1 — L'allée de cérémonie." />
+          </Fade>
+          <Fade delay={0.1}>
+            <Mounted src={pic(3, IMG.weddingHands)} alt="Bouquet de mariée" ratio="3/4" sizes="20vw" caption="Fig. 2 — Le jour J." />
+          </Fade>
+          <Fade delay={0.2} className="mt-12">
+            <Mounted src={pic(2, IMG.weddingTable)} alt="Table de réception fleurie" ratio="3/4" sizes="20vw" caption="Fig. 3 — À table." />
+          </Fade>
         </div>
       </section>
 
-      <section className="bg-noir py-28 sm:py-36">
-        <div className="mx-auto grid max-w-[1600px] gap-16 px-6 sm:px-10 lg:grid-cols-[0.9fr_1.1fr] lg:px-16">
-          <div>
-            <SectionTitle eyebrow="Notre accompagnement" title="Quatre temps," accent="un seul fil" size="md" />
-            <Reveal delay={0.2}>
-              <p className="mt-8 max-w-md text-ivory/65">{w.priceNote}</p>
-              <p className="mt-4 max-w-md text-sm text-ivory/45">Paiement par carte, virement ou espèces. Acompte de 50 % à la signature du devis, solde la semaine du mariage.</p>
-            </Reveal>
+      <section className="h-plum py-24 sm:py-32">
+        <div className="wrap grid gap-14 lg:grid-cols-12 lg:gap-10">
+          <div className="lg:col-span-4">
+            <p className="sc text-paper/50">Le déroulé</p>
+            <h2 className="h-section mt-6">
+              <Words text="Quatre temps," /> <em><Words text="un seul fil" delay={0.1} /></em>
+            </h2>
+            <p className="mt-8 font-text text-[1.05rem] italic leading-relaxed text-paper/70">{w.priceNote}</p>
+            <p className="mt-4 font-text text-[0.95rem] leading-relaxed text-paper/55">Acompte de 50 % à la signature du devis, solde la semaine du mariage. Carte, virement ou espèces.</p>
           </div>
-          <Steps steps={w.steps} tone="dark" />
+          <ol className="lg:col-span-7 lg:col-start-6">
+            {w.steps.map((s, i) => (
+              <Fade key={s.title} delay={i * 0.08}>
+                <li className="grid grid-cols-[2.5rem_1fr] gap-x-4 border-t border-paper/15 py-6">
+                  <span className="pt-1.5 font-text text-[0.9rem] italic text-paper/50">{roman(i + 1)}.</span>
+                  <div>
+                    <h3 className="font-display text-[1.8rem] leading-tight">{s.title}</h3>
+                    <p className="mt-2 font-text text-[1.02rem] leading-relaxed text-paper/70">{s.text}</p>
+                  </div>
+                </li>
+              </Fade>
+            ))}
+          </ol>
         </div>
       </section>
 
-      <GalleryGrid items={gallery.filter((g) => g.category === "mariage" || g.category === "evenement").concat(gallery.filter((g) => g.category === "atelier")).slice(0, 8)} instagram={settings.instagram} title="Nos mariages" />
-      <Testimonials reviews={reviews} rating={5} count={11} />
+      <Lettres reviews={reviews.filter((r) => /mariage/i.test(r.source)).map((r) => ({ id: r.id, author: r.author, text: r.text, source: r.source }))} rating={settings.googleRating} count={settings.googleReviews} numeral="IV" />
 
-      <section id="devis" className="fern-night bg-aubergine-950 py-28 sm:py-36">
-        <div className="mx-auto grid max-w-[1400px] gap-16 px-6 sm:px-10 lg:grid-cols-[0.8fr_1.2fr] lg:px-16">
-          <div>
-            <SectionTitle eyebrow="Demande de devis" title="Racontez-nous" accent="votre jour" size="md" />
-            <Reveal delay={0.2}>
-              <p className="mt-8 max-w-sm text-ivory/65">Quelques informations suffisent pour un premier échange. Nous revenons vers vous sous 48 h avec nos disponibilités.</p>
-              <p className="mt-6 font-display text-2xl">{settings.phone}</p>
-            </Reveal>
-          </div>
+      <section id="devis" className="wrap grid gap-14 py-24 sm:py-32 lg:grid-cols-12 lg:gap-10">
+        <div className="lg:col-span-4">
+          <RunningHead left="Demande de devis" />
+          <h2 className="h-section mt-8">
+            <Words text="Racontez-nous" /> <em><Words text="votre jour" delay={0.1} /></em>
+          </h2>
+          <p className="body-text mt-6">Quelques informations suffisent pour un premier échange. Nous revenons vers vous sous 48 heures avec nos disponibilités.</p>
+          <a href={`tel:${settings.phone.replace(/\s/g, "")}`} className="tab mt-6 inline-block font-display text-[1.8rem] hover:italic">
+            {settings.phone}
+          </a>
+        </div>
+        <div className="lg:col-span-7 lg:col-start-6">
           <ContactForm defaultType="mariage" />
         </div>
       </section>

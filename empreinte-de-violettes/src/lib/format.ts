@@ -62,3 +62,26 @@ export const MODE_LABEL: Record<string, string> = {
   pickup: "Retrait en boutique",
   drive: "Drive",
 };
+
+/** Regroupe les jours consécutifs aux horaires identiques : « Du mardi au samedi — 9 h – 12 h 30, 15 h – 19 h 30 ». */
+export function groupHours(hours: { day: number; closed: boolean; ranges: { from: string; to: string }[] }[]) {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const key = (d: number) => {
+    const h = hours.find((x) => x.day === d);
+    return !h || h.closed ? "closed" : h.ranges.map((r) => `${r.from}-${r.to}`).join("|");
+  };
+  const groups: { days: number[]; key: string }[] = [];
+  for (const d of order) {
+    const k = key(d);
+    const last = groups[groups.length - 1];
+    if (last && last.key === k) last.days.push(d);
+    else groups.push({ days: [d], key: k });
+  }
+  const name = (d: number) => DAYS[d].toLowerCase();
+  return groups.map((g) => {
+    const h = hours.find((x) => x.day === g.days[0]);
+    const label =
+      g.days.length === 1 ? DAYS[g.days[0]] : g.days.length === 2 ? `${DAYS[g.days[0]]} et ${name(g.days[1])}` : `Du ${name(g.days[0])} au ${name(g.days[g.days.length - 1])}`;
+    return { label, closed: g.key === "closed", lines: g.key === "closed" || !h ? [] : h.ranges.map((r) => `${hhmm(r.from)} – ${hhmm(r.to)}`) };
+  });
+}

@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
-import { ArrowUpRight, Phone } from "lucide-react";
-import { MapEmbed } from "@/components/home/Visit";
-import { Reveal } from "@/components/motion/Reveal";
-import { ContactForm } from "@/components/site/ContactForm";
-import { OpenBadge } from "@/components/site/OpenBadge";
-import { PageHero } from "@/components/site/PageHero";
-import { FacebookIcon, InstagramIcon } from "@/components/site/Social";
+import { ContactForm } from "@/components/herbier/ContactForm";
+import { Fade } from "@/components/herbier/Elements";
+import { Hours } from "@/components/herbier/Hours";
+import { OpenNow } from "@/components/herbier/OpenNow";
+import { PageHead } from "@/components/herbier/PageHead";
 import { getSettings } from "@/lib/catalog";
-import { DAYS } from "@/lib/format";
 import type { MessageType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -19,62 +16,61 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const settings = await getSettings();
   const type = TYPES.includes(sp.type as MessageType) ? (sp.type as MessageType) : "contact";
+  const q = encodeURIComponent(`${settings.shopName} ${settings.address} ${settings.postcode} ${settings.city}`);
   return (
     <>
-      <PageHero eyebrow="Contact" title="Écrivez-nous," accent="on vous répond" intro="Une question, une commande particulière, un événement à fleurir ? Par message, par téléphone ou en boutique : nous sommes à votre écoute." crumbs={[{ href: "/contact", label: "Contact" }]} compact>
-        <div className="mt-8">
-          <OpenBadge settings={settings} />
-        </div>
-      </PageHero>
-      <section className="fern-night bg-aubergine-950 py-24">
-        <div className="mx-auto grid max-w-[1500px] gap-16 px-6 sm:px-10 lg:grid-cols-[0.8fr_1.2fr] lg:px-16">
-          <Reveal className="space-y-10">
-            <div>
-              <p className="eyebrow mb-3 text-gold/80">Téléphone</p>
-              <a href={`tel:${settings.phone.replace(/\s/g, "")}`} className="inline-flex items-center gap-3 font-display text-4xl hover:text-gold-light">
-                <Phone className="h-5 w-5" strokeWidth={1.3} /> {settings.phone}
-              </a>
-            </div>
-            <div>
-              <p className="eyebrow mb-3 text-gold/80">Boutique</p>
-              <a href={settings.mapsUrl} target="_blank" rel="noreferrer" className="group inline-flex items-start gap-2 font-display text-2xl leading-snug hover:text-gold-light">
-                <span>
-                  {settings.address}
-                  <br />
-                  {settings.postcode} {settings.city}
-                </span>
-                <ArrowUpRight className="mt-1 h-4 w-4" />
-              </a>
-            </div>
-            <div>
-              <p className="eyebrow mb-3 text-gold/80">Horaires</p>
-              <dl className="max-w-xs space-y-1.5 text-sm text-ivory/70">
-                {[2, 3, 4, 5, 6, 0, 1].map((d) => {
-                  const h = settings.hours.find((x) => x.day === d);
-                  return (
-                    <div key={d} className="flex justify-between gap-4">
-                      <dt>{DAYS[d]}</dt>
-                      <dd className="tabular-nums">{!h || h.closed ? "Fermé" : h.ranges.map((r) => `${r.from}–${r.to}`).join(" · ")}</dd>
-                    </div>
-                  );
-                })}
-              </dl>
-            </div>
-            <div className="flex gap-3">
-              <a href={settings.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" className="rounded-full border border-ivory/15 p-3 transition hover:border-gold hover:text-gold">
-                <InstagramIcon className="h-5 w-5" />
-              </a>
-              <a href={settings.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="rounded-full border border-ivory/15 p-3 transition hover:border-gold hover:text-gold">
-                <FacebookIcon className="h-5 w-5" />
-              </a>
-            </div>
-          </Reveal>
-          <Reveal delay={0.15}>
-            <ContactForm defaultType={type} />
-          </Reveal>
-        </div>
-        <div className="mx-auto mt-20 max-w-[1500px] px-6 sm:px-10 lg:px-16">
-          <MapEmbed settings={settings} className="h-[460px]" />
+      <PageHead kicker="Nous écrire" folio="contact" title="Écrivez-nous," accent="on vous répond" intro="Une question, une commande particulière, un événement à fleurir ? Par lettre, par téléphone ou en boutique : nous sommes là." />
+      <section className="wrap grid gap-16 pb-24 lg:grid-cols-12 lg:gap-10">
+        <Fade className="space-y-12 lg:col-span-4">
+          <div>
+            <p className="sc mb-3 text-ink-muted">Par téléphone</p>
+            <a href={`tel:${settings.phone.replace(/\s/g, "")}`} className="tab font-display text-[2.2rem] leading-none hover:italic">
+              {settings.phone}
+            </a>
+            <OpenNow hours={settings.hours} className="mt-3 block font-text text-[1rem] italic text-ink-soft" />
+          </div>
+          <div>
+            <p className="sc mb-3 text-ink-muted">En boutique</p>
+            <address className="font-display text-[1.45rem] not-italic leading-snug">
+              {settings.address}
+              <br />
+              {settings.postcode} {settings.city}
+            </address>
+            <a href={settings.mapsUrl} target="_blank" rel="noreferrer" className="btn-line mt-4">
+              Itinéraire <span className="arrow">→</span>
+            </a>
+          </div>
+          <div>
+            <p className="sc mb-4 text-ink-muted">Heures d&apos;ouverture</p>
+            <Hours hours={settings.hours} />
+          </div>
+          <div className="flex gap-6 font-text text-[1.02rem] italic">
+            <a href={`mailto:${settings.email}`} className="ulink">
+              {settings.email}
+            </a>
+          </div>
+          <div className="flex gap-6 font-text text-[1.02rem] italic">
+            <a href={settings.instagram} target="_blank" rel="noreferrer" className="ulink">
+              Instagram
+            </a>
+            <a href={settings.facebook} target="_blank" rel="noreferrer" className="ulink">
+              Facebook
+            </a>
+          </div>
+        </Fade>
+        <Fade delay={0.1} className="lg:col-span-7 lg:col-start-6">
+          <ContactForm defaultType={type} />
+        </Fade>
+      </section>
+      <section className="wrap pb-28">
+        <div className="sheet p-3 sm:p-4">
+          <iframe
+            title="Plan d'accès à la boutique"
+            src={`https://www.google.com/maps?q=${q}&output=embed`}
+            className="block h-[420px] w-full border-0 grayscale-[0.6] sepia-[0.15]"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
         </div>
       </section>
     </>

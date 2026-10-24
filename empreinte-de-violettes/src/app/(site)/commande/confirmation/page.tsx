@@ -37,17 +37,17 @@ export default async function ConfirmationPage({ searchParams }: { searchParams:
   const paid = order.paymentStatus === "in_store" ? " — règlement au retrait" : order.paymentStatus === "demo" ? " (mode démonstration, aucun paiement)" : "";
 
   return (
-    <div className="fern-night bg-noir pb-32">
+    <div className="pb-28">
       {pending && <meta httpEquiv="refresh" content="4" />}
       <ConfirmationHero name={order.customer.firstName} number={order.number} paid={paid} pending={pending} />
-      <div className="mx-auto max-w-3xl px-6">
+      <div className="wrap max-w-3xl">
         <OrderSummary order={order} />
-        <div className="mt-10 flex flex-wrap justify-center gap-4">
-          <Link href={`/suivi?n=${encodeURIComponent(order.number)}&t=${order.accessToken}`} className="btn btn-gold">
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-8">
+          <Link href={`/suivi?n=${encodeURIComponent(order.number)}&t=${order.accessToken}`} className="btn-label">
             <span>Suivre ma commande</span>
           </Link>
-          <Link href="/boutique" className="btn btn-ghost text-ivory">
-            <span>Retour à la boutique</span>
+          <Link href="/boutique" className="btn-line">
+            Retour à la boutique <span className="arrow">→</span>
           </Link>
         </div>
       </div>

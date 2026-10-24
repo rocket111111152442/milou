@@ -5,7 +5,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#09060C",
         noir: "#0E0912",
         aubergine: {
           50: "#F6F2F9",
@@ -22,7 +21,11 @@ const config: Config = {
           950: "#100915",
         },
         ivory: "#F6F1EA",
-        paper: "#EFE6DC",
+        // Herbier
+        paper: { DEFAULT: "#EDE6DF", deep: "#E3D9CF", light: "#F4EFEA" },
+        ink: { DEFAULT: "#1B1320", soft: "#3B2E41", muted: "#6B5E70", faint: "#9A8F9C" },
+        plum: { DEFAULT: "#2A1A33", deep: "#1A1020", night: "#110B15" },
+        foil: { DEFAULT: "#B8975A", light: "#DCC48F", deep: "#8A6B33" },
         bone: "#E3D7C8",
         gold: {
           DEFAULT: "#C6A15B",
@@ -32,7 +35,8 @@ const config: Config = {
       },
       fontFamily: {
         display: ["var(--font-display)", "Georgia", "serif"],
-        caps: ["var(--font-caps)", "Georgia", "serif"],
+        caps: ["var(--font-display)", "Georgia", "serif"],
+        text: ["var(--font-text)", "Georgia", "serif"],
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
       },
       fontSize: {

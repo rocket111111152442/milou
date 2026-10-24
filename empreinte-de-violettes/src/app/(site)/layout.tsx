@@ -1,14 +1,12 @@
 import { cookies } from "next/headers";
-import { Cursor } from "@/components/motion/Cursor";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
-import { AnnouncementBar } from "@/components/site/AnnouncementBar";
-import { CartDrawer } from "@/components/site/CartDrawer";
-import { Footer } from "@/components/site/Footer";
-import { Header } from "@/components/site/Header";
-import { Intro } from "@/components/site/Intro";
-import { VioletMark } from "@/components/site/Logo";
+import { Bag } from "@/components/herbier/Bag";
+import { Colophon } from "@/components/herbier/Colophon";
+import { Label } from "@/components/herbier/Label";
+import { Masthead, type MenuData } from "@/components/herbier/Masthead";
 import { ADMIN_COOKIE, verifySession } from "@/lib/auth";
 import { getCategories, getContent, getDelivery, getSettings } from "@/lib/catalog";
+import { hhmm } from "@/lib/format";
 import { siteUrl } from "@/lib/orders";
 import { IMG } from "@/lib/seed";
 
@@ -20,11 +18,10 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
 
   if (settings.maintenance.enabled && !isAdmin) {
     return (
-      <main className="fern-night flex min-h-screen flex-col items-center justify-center bg-noir px-6 text-center">
-        <VioletMark className="h-16 w-16 text-gold" />
-        <p className="eyebrow mt-8 text-gold">Empreinte de Violettes</p>
-        <h1 className="mt-4 max-w-2xl font-display text-5xl font-light">{settings.maintenance.message}</h1>
-        <p className="mt-6 text-ivory/60">
+      <main className="h-paper flex min-h-screen flex-col items-center justify-center px-6 text-center">
+        <Label size="md" />
+        <h1 className="mt-12 max-w-2xl font-display text-[clamp(2rem,4vw,3.4rem)] italic leading-tight">{settings.maintenance.message}</h1>
+        <p className="body-text mt-6">
           {settings.address}, {settings.postcode} {settings.city} · {settings.phone}
         </p>
       </main>
@@ -33,23 +30,24 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
 
   const cats = categories.filter((c) => c.showInMenu).map((c) => ({ href: `/boutique?categorie=${c.slug}`, label: c.name }));
   const tuesday = settings.hours.find((h) => h.day === 2);
-  const menu = {
+  const menu: MenuData = {
     links: [
-      { href: "/boutique", label: "La boutique", image: IMG.darkBouquet },
-      { href: "/atelier", label: "L'atelier", image: IMG.handsFern },
-      { href: "/mariage", label: "Mariages", image: IMG.brideDark },
-      { href: "/deuil", label: "Deuil & hommage", image: IMG.whiteRoseDark },
-      { href: "/boutique?categorie=plantes", label: "Plantes rares", image: IMG.monsteraDark },
-      { href: "/la-maison", label: "La Maison", image: IMG.shopFront },
-      { href: "/livraison", label: "Livraison", image: IMG.kraftBouquet },
-      { href: "/contact", label: "Contact", image: IMG.roseGarden },
+      { href: "/boutique", label: "La boutique", note: "bouquets, plantes, séchées", plate: "bouquet-ancien" },
+      { href: "/atelier", label: "L'atelier", note: "composer tige par tige", plate: "renoncule" },
+      { href: "/mariage", label: "Mariages", note: "sur rendez-vous", plate: "lys" },
+      { href: "/deuil", label: "Deuil & hommage", note: "livré aux funérariums", plate: "anemone-lys" },
+      { href: "/la-maison", label: "La Maison", note: "depuis 2022", plate: "violette" },
+      { href: "/livraison", label: "Livraison & retrait", note: "Six-Fours et alentours", plate: "eucalyptus" },
+      { href: "/contact", label: "Nous écrire", note: settings.phone, plate: "pensee" },
+      { href: "/faq", label: "Questions fréquentes", note: "bon à savoir", plate: "fougere" },
     ],
     categories: cats,
     phone: settings.phone,
     address: `${settings.address}, ${settings.postcode} ${settings.city}`,
     instagram: settings.instagram,
     facebook: settings.facebook,
-    hoursLine: tuesday && !tuesday.closed ? `Mar.–sam. ${tuesday.ranges.map((r) => `${r.from}–${r.to}`).join(" / ")} · dim. matin` : "",
+    hoursLine: tuesday && !tuesday.closed ? `Du mardi au samedi, ${tuesday.ranges.map((r) => `${hhmm(r.from)}–${hhmm(r.to)}`).join(" et ")} · dimanche matin` : "",
+    announcement: settings.announcement.active ? { text: settings.announcement.text, link: settings.announcement.link } : null,
   };
   const mainZone = delivery.zones.find((z) => z.active && z.freeFrom != null);
 
@@ -88,13 +86,15 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   return (
     <SmoothScroll>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <Cursor />
-      <Intro enabled={settings.intro.enabled} oncePerSession={settings.intro.oncePerSession} />
-      {settings.announcement.active && <AnnouncementBar text={settings.announcement.text} link={settings.announcement.link} />}
-      <Header menu={menu} hasAnnouncement={settings.announcement.active} />
-      <main className="grain relative">{children}</main>
-      <Footer settings={settings} categories={cats} />
-      <CartDrawer freeFrom={mainZone?.freeFrom ?? null} freeZone={mainZone?.name ?? ""} />
+      <a href="#contenu" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:bg-paper focus:px-4 focus:py-2">
+        Aller au contenu
+      </a>
+      <Masthead menu={menu} />
+      <main id="contenu" className="relative">
+        {children}
+      </main>
+      <Colophon settings={settings} categories={cats} />
+      <Bag freeFrom={mainZone?.freeFrom ?? null} freeZone={mainZone?.name ?? ""} />
     </SmoothScroll>
   );
 }

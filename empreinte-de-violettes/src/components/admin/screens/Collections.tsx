@@ -1,6 +1,7 @@
 "use client";
 
 import { Mail, Plus, Star, Trash2 } from "lucide-react";
+import { plateOptions } from "@/lib/plates";
 import { euro, frDate, frDateTime } from "@/lib/format";
 import type { Addon, Category, Faq, GalleryItem, Message, Occasion, Product, ProductVariant, PromoCode, Review, Subscriber } from "@/lib/types";
 import { CollectionManager } from "../CollectionManager";
@@ -92,6 +93,7 @@ export function ProductsScreen({ items, categories, occasions }: { items: Produc
         { key: "subtitle", label: "Sous-titre", type: "text" },
         { key: "categoryId", label: "Catégorie", type: "select", options: categories.map((c) => ({ value: c.id, label: c.name })) },
         { key: "star", label: "Étoile / constellation", type: "text", help: "facultatif" },
+        { key: "plate", label: "Gravure de l'herbier", type: "select", options: [{ value: "", label: "Automatique (d'après le nom)" }, ...plateOptions], help: "illustration ancienne associée à la création" },
         { key: "description", label: "Description", type: "textarea", rows: 4 },
         { key: "details", label: "Entretien & détails", type: "textarea", rows: 3 },
         { key: "images", label: "Photos", type: "images", max: 8 },
@@ -138,6 +140,7 @@ export function CategoriesScreen({ items }: { items: Category[] }) {
         { key: "sortOrder", label: "Ordre", type: "number" },
         { key: "description", label: "Description", type: "textarea", rows: 3 },
         { key: "image", label: "Image", type: "image" },
+        { key: "plate", label: "Gravure de l'herbier", type: "select", options: [{ value: "", label: "Automatique" }, ...plateOptions] },
         { key: "active", label: "Visible", type: "toggle" },
         { key: "showInMenu", label: "Dans le menu", type: "toggle" },
         { key: "slug", label: "Adresse (slug)", type: "text", span: 2 },

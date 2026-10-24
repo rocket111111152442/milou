@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
+import { PageHead } from "@/components/herbier/PageHead";
 import { Checkout } from "@/components/shop/Checkout";
-import { PageHero } from "@/components/site/PageHero";
 import { getDelivery, getSettings } from "@/lib/catalog";
 import { getStripe } from "@/lib/orders";
 
@@ -11,8 +11,8 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const [delivery, settings] = await Promise.all([getDelivery(), getSettings()]);
   return (
-    <div className="fern-night bg-noir">
-      <PageHero eyebrow="Commande sécurisée" title="Plus que quelques" accent="pétales…" crumbs={[{ href: "/commande", label: "Commande" }]} compact />
+    <>
+      <PageHead kicker="Commande" folio="paiement sécurisé" title="Le bon" accent="de commande" />
       <Checkout
         cancelled={sp.annule === "1"}
         config={{
@@ -26,6 +26,6 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
           shopAddress: `${settings.address}, ${settings.city}`,
         }}
       />
-    </div>
+    </>
   );
 }

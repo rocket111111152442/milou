@@ -2,6 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { PLATE_NAMES } from "@/lib/plates";
 import { cn } from "@/lib/cn";
 import { DAYS } from "@/lib/format";
 import type { AtelierSettings, Content, DeliverySettings, FulfillmentMode } from "@/lib/types";
@@ -62,14 +63,24 @@ export function AtelierEditor({ initial }: { initial: AtelierSettings }) {
             {doc.flowers.map((f, i) => {
               const up = (k: string, v: unknown) => setDoc((d) => ({ ...d, flowers: d.flowers.map((x, j) => (j === i ? { ...x, [k]: v } : x)) }));
               return (
-                <div key={f.id} className={cn("grid grid-cols-[auto_1fr_120px_110px_auto_auto] items-end gap-2 rounded-xl p-2", !f.active && "opacity-50")}>
+                <div key={f.id} className={cn("grid grid-cols-[auto_1fr_120px_110px_auto_auto] items-end gap-2 rounded-xl p-2 max-md:grid-cols-[auto_1fr_auto_auto]", !f.active && "opacity-50")}>
                   <input type="color" value={f.color} onChange={(e) => up("color", e.target.value)} className="h-9 w-9 cursor-pointer rounded-lg border border-noir/10" aria-label="Couleur" />
                   <input value={f.name} onChange={(e) => up("name", e.target.value)} className="adm-input" aria-label="Nom" />
                   <MoneyField label="" value={f.price} onChange={(v) => up("price", v ?? 0)} />
-                  <select value={f.kind} onChange={(e) => up("kind", e.target.value)} className="adm-input" aria-label="Type">
-                    <option value="fleur">Fleur</option>
-                    <option value="feuillage">Feuillage</option>
-                  </select>
+                  <span className="grid gap-1">
+                    <select value={f.kind} onChange={(e) => up("kind", e.target.value)} className="adm-input" aria-label="Type">
+                      <option value="fleur">Fleur</option>
+                      <option value="feuillage">Feuillage</option>
+                    </select>
+                    <select value={f.plate || ""} onChange={(e) => up("plate", e.target.value || undefined)} className="adm-input !text-xs" aria-label="Gravure">
+                      <option value="">Gravure auto</option>
+                      {PLATE_NAMES.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
                   <button onClick={() => up("active", !f.active)} className={cn("rounded-lg px-2 py-2 text-xs", f.active ? "text-emerald-700" : "text-noir/40")}>
                     {f.active ? "Actif" : "Masqué"}
                   </button>
@@ -80,7 +91,7 @@ export function AtelierEditor({ initial }: { initial: AtelierSettings }) {
               );
             })}
           </div>
-          <p className="mt-3 text-xs text-noir/45">Astuce : le dessin s&apos;adapte au nom (rose, pivoine, renoncule, anémone, dahlia, tulipe, lavande, muflier, eucalyptus, fougère, olivier, graminées).</p>
+          <p className="mt-3 text-xs text-noir/45">Astuce : la gravure est choisie d&apos;après le nom (rose, pivoine, renoncule, anémone, dahlia, tulipe, muflier, eucalyptus, fougère, olivier, graminées…) ; vous pouvez la forcer avec « Gravure ».</p>
         </Card>
         <Card
           title="Emballages"
@@ -266,7 +277,7 @@ export function DeliveryEditor({ initial }: { initial: DeliverySettings }) {
 
 const TABS = [
   ["hero", "Accueil"],
-  ["seasonal", "Bandeau saisonnier"],
+  ["seasonal", "Rendez-vous de saison"],
   ["about", "La Maison"],
   ["wedding", "Mariage"],
   ["funeral", "Deuil"],
@@ -297,32 +308,25 @@ export function ContentEditor({ initial }: { initial: Content }) {
 
       {tab === "hero" && (
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card title="Grand titre d'accueil">
+          <Card title="Couverture de l'accueil">
             <div className="space-y-4">
-              <TextField label="Sur-titre" value={doc.hero.eyebrow} onChange={(v) => hero("eyebrow", v)} />
-              <div className="grid grid-cols-2 gap-3">
-                <TextField label="Titre ligne 1" value={doc.hero.titleLine1} onChange={(v) => hero("titleLine1", v)} />
-                <TextField label="Titre ligne 2 (italique doré)" value={doc.hero.titleLine2} onChange={(v) => hero("titleLine2", v)} />
-              </div>
-              <TextArea label="Texte" rows={3} value={doc.hero.subtitle} onChange={(v) => hero("subtitle", v)} />
-              <TextField label="Bouton" value={doc.hero.ctaLabel} onChange={(v) => hero("ctaLabel", v)} />
-              <ImagesField label="Images (arches)" max={3} value={doc.hero.images} onChange={(v) => hero("images", v)} help="1 grande arche + 2 petites" />
-              <TextField label="Vidéo de fond (URL .mp4, facultatif)" value={doc.hero.videoUrl} onChange={(v) => hero("videoUrl", v)} />
+              <p className="text-sm text-noir/55">La couverture reprend l&apos;étiquette noire de la carte de visite ; seuls les textes ci-dessous changent.</p>
+              <TextArea label="Phrase sous l'étiquette" rows={3} value={doc.hero.subtitle} onChange={(v) => hero("subtitle", v)} />
+              <TextField label="Lien vers la boutique" value={doc.hero.ctaLabel} onChange={(v) => hero("ctaLabel", v)} />
+              <TextField label="Mention en bas à droite" value={doc.hero.eyebrow} onChange={(v) => hero("eyebrow", v)} help="ex. Maison fondée en avril 2022" />
+              <ImagesField label="Photo de l'avant-propos" max={1} value={doc.hero.images} onChange={(v) => hero("images", v)} help="« Fig. 1 » de l'accueil" />
             </div>
           </Card>
           <div className="space-y-6">
-            <Card title="Bandeau défilant">
-              <TagsField label="Phrases" value={doc.marquee} onChange={(v) => setDoc((d) => ({ ...d, marquee: v }))} />
-            </Card>
-            <Card title="Manifeste">
+            <Card title="Le geste (manifeste)">
               <div className="space-y-4">
-                <TextField label="Sur-titre" value={doc.manifesto.eyebrow} onChange={(v) => man("eyebrow", v)} />
+                <TextField label="Titre courant" value={doc.manifesto.eyebrow} onChange={(v) => man("eyebrow", v)} help="la 1re phrase du texte s'affiche en grand" />
                 <TextArea label="Texte" rows={6} value={doc.manifesto.text} onChange={(v) => man("text", v)} />
                 <TextField label="Signature" value={doc.manifesto.signature} onChange={(v) => man("signature", v)} />
                 <ImageField label="Image" value={doc.manifesto.image} onChange={(v) => man("image", v)} />
               </div>
             </Card>
-            <Card title="Chiffres clés">
+            <Card title="En quelques notes (avant-propos)">
               <div className="space-y-2">
                 {doc.stats.map((s, i) => (
                   <div key={i} className="grid grid-cols-[120px_1fr_auto] gap-2">
@@ -348,17 +352,14 @@ export function ContentEditor({ initial }: { initial: Content }) {
         <Card title="Bandeau saisonnier (Toussaint, Noël, Saint-Valentin, Fête des mères…)">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <Toggle label="Afficher le bandeau sur l'accueil" checked={doc.seasonal.active} onChange={(v) => sea("active", v)} />
+              <Toggle label="Afficher dans l'almanach de l'accueil" checked={doc.seasonal.active} onChange={(v) => sea("active", v)} />
             </div>
             <TextField label="Sur-titre" value={doc.seasonal.eyebrow} onChange={(v) => sea("eyebrow", v)} />
             <TextField label="Titre" value={doc.seasonal.title} onChange={(v) => sea("title", v)} />
             <TextArea className="md:col-span-2" label="Texte" rows={3} value={doc.seasonal.text} onChange={(v) => sea("text", v)} />
-            <TextField label="Compte à rebours jusqu'au" type="datetime-local" value={doc.seasonal.targetDate.slice(0, 16)} onChange={(v) => sea("targetDate", v)} />
+            <TextField label="Date de l'événement (masqué une fois passée)" type="datetime-local" value={doc.seasonal.targetDate.slice(0, 16)} onChange={(v) => sea("targetDate", v)} />
             <TextField label="Bouton" value={doc.seasonal.ctaLabel} onChange={(v) => sea("ctaLabel", v)} />
             <TextField className="md:col-span-2" label="Lien du bouton" value={doc.seasonal.ctaLink} onChange={(v) => sea("ctaLink", v)} help="ex. /boutique?categorie=fetes-et-saisons" />
-            <div className="md:col-span-2">
-              <ImageField label="Image" value={doc.seasonal.image} onChange={(v) => sea("image", v)} />
-            </div>
           </div>
         </Card>
       )}

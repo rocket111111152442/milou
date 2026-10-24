@@ -32,6 +32,7 @@ export interface Product {
   colors: string[]; // teintes dominantes (hex) pour l'affichage
   tags: string[];
   star?: string; // constellation / étoile associée
+  plate?: string; // gravure de l'herbier (sinon déduite du nom)
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -43,6 +44,7 @@ export interface Category {
   name: string;
   description: string;
   image: string;
+  plate?: string;
   active: boolean;
   showInMenu: boolean;
   sortOrder: number;
@@ -314,6 +316,7 @@ export interface AtelierFlower {
   price: number;
   active: boolean;
   kind: "fleur" | "feuillage";
+  plate?: string;
 }
 
 export interface AtelierSettings {

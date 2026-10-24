@@ -1,10 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check } from "lucide-react";
+import { EASE, roman } from "@/components/herbier/Elements";
+import { cn } from "@/lib/cn";
 import { frDateTime } from "@/lib/format";
 import type { Order } from "@/lib/types";
 
+/** Les étapes de la commande, comme les entrées d'un registre. */
 export function Timeline({ order }: { order: Pick<Order, "status" | "mode" | "history"> }) {
   const steps =
     order.mode === "delivery"
@@ -24,32 +26,32 @@ export function Timeline({ order }: { order: Pick<Order, "status" | "mode" | "hi
   const idx = steps.findIndex(([s]) => s === order.status);
   const current = order.status === "pending_payment" ? -1 : idx;
   if (order.status === "cancelled" || order.status === "refunded") {
-    return <p className="rounded-2xl bg-rose-950/40 p-5 text-center text-rose-100">Cette commande a été {order.status === "cancelled" ? "annulée" : "remboursée"}.</p>;
+    return <p className="font-display text-[1.6rem] italic">Cette commande a été {order.status === "cancelled" ? "annulée" : "remboursée"}.</p>;
   }
   return (
-    <div>
-      <div className="relative flex justify-between">
-        <div className="absolute left-5 right-5 top-5 h-px bg-ivory/15" />
-        <motion.div className="bg-foil absolute left-5 top-5 h-px" initial={{ width: 0 }} animate={{ width: current <= 0 ? 0 : `calc(${(current / (steps.length - 1)) * 100}% - ${(current / (steps.length - 1)) * 40}px)` }} transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1], delay: 0.3 }} />
-        {steps.map(([s, label], i) => {
-          const done = i <= current;
-          const hist = order.history.filter((h) => h.status === s).pop();
-          return (
-            <div key={s} className="relative z-10 flex w-20 flex-col items-center text-center sm:w-28">
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2 + i * 0.15, type: "spring", stiffness: 200, damping: 14 }}
-                className={`flex h-10 w-10 items-center justify-center rounded-full border ${done ? "border-gold bg-gold text-noir" : "border-ivory/20 bg-noir text-ivory/40"} ${i === current ? "ring-4 ring-gold/20" : ""}`}
-              >
-                {done ? <Check className="h-4 w-4" /> : <span className="text-xs">{i + 1}</span>}
-              </motion.span>
-              <span className={`mt-3 text-xs ${done ? "text-ivory" : "text-ivory/40"}`}>{label}</span>
-              {hist && <span className="mt-1 text-[0.6rem] text-ivory/40">{frDateTime(hist.at)}</span>}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <ol className="relative">
+      <span className="absolute bottom-3 left-[0.4rem] top-3 w-px bg-ink/15" aria-hidden />
+      <motion.span
+        className="absolute left-[0.4rem] top-3 w-px origin-top bg-ink"
+        style={{ height: `calc(${(Math.max(0, current) / (steps.length - 1)) * 100}% - 1.5rem)` }}
+        initial={{ scaleY: 0 }}
+        animate={{ scaleY: 1 }}
+        transition={{ duration: 1.6, ease: EASE, delay: 0.3 }}
+        aria-hidden
+      />
+      {steps.map(([s, label], i) => {
+        const done = i <= current;
+        const hist = order.history.filter((h) => h.status === s).pop();
+        return (
+          <motion.li key={s} className="relative flex items-baseline gap-5 py-3 pl-8" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, ease: EASE, delay: 0.2 + i * 0.12 }}>
+            <span className={cn("absolute left-0 top-[1.15rem] h-[13px] w-[13px] rounded-full border", done ? "border-ink bg-ink" : "border-ink/30 bg-paper", i === current && "ring-4 ring-ink/10")} aria-hidden />
+            <span className="w-8 shrink-0 font-text text-[0.85rem] italic text-ink-muted">{roman(i + 1)}.</span>
+            <span className={cn("font-display text-[1.4rem]", done ? "text-ink" : "text-ink-faint", i === current && "italic")}>{label}</span>
+            <span className="leader" />
+            <span className="shrink-0 font-text text-[0.88rem] italic text-ink-muted">{hist ? frDateTime(hist.at) : done ? "" : "à venir"}</span>
+          </motion.li>
+        );
+      })}
+    </ol>
   );
 }

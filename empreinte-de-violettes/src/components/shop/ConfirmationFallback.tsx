@@ -17,26 +17,26 @@ export function ConfirmationFallback({ number, token }: { number: string; token:
       setOrder(null);
     }
   }, [number, token]);
-  if (order === undefined) return <div className="min-h-screen bg-noir" />;
+  if (order === undefined) return <div className="min-h-screen" />;
   if (!order)
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-noir px-6 text-center">
-        <p className="font-display text-4xl italic">Commande introuvable</p>
-        <p className="mt-3 max-w-md text-ivory/60">Le lien semble incomplet. Vérifiez l&apos;e-mail de confirmation ou contactez-nous.</p>
-        <Link href="/suivi" className="btn btn-ivory mt-8">
-          <span>Suivre une commande</span>
+      <div className="wrap flex min-h-[80vh] flex-col items-center justify-center text-center">
+        <p className="font-display text-[2.4rem] italic">Commande introuvable.</p>
+        <p className="body-text mt-3 max-w-md">Le lien semble incomplet. Vérifiez l&apos;e-mail de confirmation ou contactez-nous.</p>
+        <Link href="/suivi" className="btn-line mt-8">
+          Suivre une commande <span className="arrow">→</span>
         </Link>
       </div>
     );
   const paid = order.paymentStatus === "in_store" ? " — règlement au retrait" : order.paymentStatus === "demo" ? " (mode démonstration, aucun paiement)" : "";
   return (
-    <div className="fern-night bg-noir pb-32">
+    <div className="pb-28">
       <ConfirmationHero name={order.customer.firstName} number={order.number} paid={paid} pending={false} />
-      <div className="mx-auto max-w-3xl px-6">
+      <div className="wrap max-w-3xl">
         <OrderSummary order={order} />
         <div className="mt-10 flex justify-center">
-          <Link href="/boutique" className="btn btn-ghost text-ivory">
-            <span>Retour à la boutique</span>
+          <Link href="/boutique" className="btn-line">
+            Retour à la boutique <span className="arrow">→</span>
           </Link>
         </div>
       </div>

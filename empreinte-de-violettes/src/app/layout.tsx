@@ -1,17 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Cinzel, Cormorant_Garamond, Jost } from "next/font/google";
+import { Bodoni_Moda, Jost, Newsreader } from "next/font/google";
 import { getSettings } from "@/lib/catalog";
 import { siteUrl } from "@/lib/orders";
 import "./globals.css";
 
-const display = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-display",
-  display: "swap",
-});
-const caps = Cinzel({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-caps", display: "swap" });
+const display = Bodoni_Moda({ subsets: ["latin"], style: ["normal", "italic"], axes: ["opsz"], variable: "--font-display", display: "swap" });
+const text = Newsreader({ subsets: ["latin"], style: ["normal", "italic"], axes: ["opsz"], variable: "--font-text", display: "swap" });
 const sans = Jost({ subsets: ["latin"], weight: ["300", "400", "500", "600"], variable: "--font-sans", display: "swap" });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -28,14 +22,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#0E0912",
+  themeColor: "#EDE6DF",
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${display.variable} ${caps.variable} ${sans.variable}`} suppressHydrationWarning>
+    <html lang="fr" className={`${display.variable} ${text.variable} ${sans.variable}`} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -43,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body>{children}</body>
+      <body className="h-paper font-text">{children}</body>
     </html>
   );
 }

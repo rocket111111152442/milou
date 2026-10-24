@@ -1,84 +1,90 @@
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { AtelierTeaser } from "@/components/home/AtelierTeaser";
-import { Constellation } from "@/components/home/Constellation";
-import { Featured } from "@/components/home/Featured";
-import { GalleryGrid } from "@/components/home/GalleryGrid";
-import { Hero } from "@/components/home/Hero";
-import { Manifesto } from "@/components/home/Manifesto";
-import { Seasonal } from "@/components/home/Seasonal";
-import { Services } from "@/components/home/Services";
-import { Testimonials } from "@/components/home/Testimonials";
-import { Univers } from "@/components/home/Univers";
-import { Visit } from "@/components/home/Visit";
-import { WeddingTeaser } from "@/components/home/WeddingTeaser";
-import { Marquee } from "@/components/motion/Marquee";
-import { FaqList } from "@/components/site/FaqList";
-import { SectionTitle } from "@/components/site/SectionTitle";
-import { getAtelier, getCategories, getContent, getFaqs, getGallery, getProducts, getReviews, getSettings } from "@/lib/catalog";
-import { euro } from "@/lib/format";
+import { AvantPropos } from "@/components/herbier/home/AvantPropos";
+import { Almanach } from "@/components/herbier/home/Almanach";
+import { Cover } from "@/components/herbier/home/Cover";
+import { Diptyque } from "@/components/herbier/home/Diptyque";
+import { Geste } from "@/components/herbier/home/Geste";
+import { Lettres } from "@/components/herbier/home/Lettres";
+import { Planches } from "@/components/herbier/home/Planches";
+import { Rayons, type Rayon } from "@/components/herbier/home/Rayons";
+import { Recevoir } from "@/components/herbier/home/Recevoir";
+import { Visite } from "@/components/herbier/home/Visite";
+import { getCategories, getContent, getDelivery, getGallery, getProducts, getReviews, getSettings } from "@/lib/catalog";
+import { parisNow } from "@/lib/delivery";
+import { plateFor } from "@/lib/plates";
+import { IMG } from "@/lib/seed";
+import { toSpecimens } from "@/lib/specimen";
 
 export const dynamic = "force-dynamic";
 
+/** 43.0988 → « 43° 05′ 56″ N » */
+const dms = (v: number, pos: string, neg: string) => {
+  const a = Math.abs(v);
+  const d = Math.floor(a);
+  const m = Math.floor((a - d) * 60);
+  const s = Math.round(((a - d) * 60 - m) * 60);
+  return `${d}° ${String(m).padStart(2, "0")}′ ${String(s).padStart(2, "0")}″ ${v >= 0 ? pos : neg}`;
+};
+
+/** Première idée d'une description, en 50 signes au plus, coupée à une virgule ou entre deux mots. */
+function shortNote(text: string, max = 50) {
+  let t = text.split(/[.:]/)[0].trim();
+  while (t.length > max && t.includes(",")) t = t.slice(0, t.lastIndexOf(",")).trim();
+  if (t.length > max) t = t.slice(0, t.lastIndexOf(" ", max)).trim();
+  return t;
+}
+
 export default async function HomePage() {
-  const [settings, content, products, categories, reviews, faqs, gallery, atelier] = await Promise.all([
+  const [settings, content, products, categories, reviews, gallery, delivery] = await Promise.all([
     getSettings(),
     getContent(),
     getProducts(),
     getCategories(),
     getReviews(),
-    getFaqs(),
     getGallery(),
-    getAtelier(),
+    getDelivery(),
   ]);
-  const cardProducts = products.map((p) => ({
-    id: p.id,
-    slug: p.slug,
-    name: p.name,
-    subtitle: p.subtitle,
-    price: p.price,
-    images: p.images,
-    variants: p.variants,
-    isNew: p.isNew,
-    seasonal: p.seasonal,
-    stock: p.stock,
-    star: p.star,
-    compareAtPrice: p.compareAtPrice,
-    categoryId: p.categoryId,
-    featured: p.featured,
+  const specimens = toSpecimens(products, categories);
+  const featured = [...specimens.filter((p) => p.featured), ...specimens.filter((p) => !p.featured)].slice(0, 6);
+
+  const count = (n: number) => `${n} création${n > 1 ? "s" : ""}`;
+  const rayons: Rayon[] = categories.map((c) => ({
+    href: `/boutique?categorie=${c.slug}`,
+    name: c.name,
+    note: shortNote(c.description),
+    count: count(products.filter((p) => p.categoryId === c.id).length),
+    image: c.image,
+    plate: plateFor({ plate: c.plate, name: c.name, id: c.id }),
   }));
-  const univers = categories.map((c) => ({ href: `/boutique?categorie=${c.slug}`, title: c.name, text: c.description, image: c.image }));
-  univers.splice(2, 0, { href: "/mariage", title: "Mariages", text: content.wedding.intro.slice(0, 110) + "…", image: content.wedding.image });
+  rayons.push(
+    { href: "/atelier", name: "L'atelier", note: "composer son bouquet tige par tige", count: "sur mesure", image: content.manifesto.image, plate: "renoncule" },
+    { href: "/mariage", name: "Mariages", note: "bouquet, cérémonie, réception", count: "sur devis", image: content.wedding.image, plate: "lys" },
+  );
+
+  const now = parisNow();
+  const month = Number(now.date.slice(5, 7)) - 1;
+  const target = content.seasonal.targetDate ? content.seasonal.targetDate.slice(0, 10) : null;
+  const daysTo = target ? Math.round((Date.parse(target) - Date.parse(now.date)) / 86_400_000) : null;
+  const pick = (cat: string, fallback: string) => gallery.find((g) => g.category === cat)?.image || fallback;
 
   return (
     <>
-      <Hero content={content} settings={settings} />
-      <div className="border-y border-ivory/10 bg-noir py-6">
-        <Marquee items={content.marquee} itemClassName="font-display text-[clamp(1.8rem,4vw,3.6rem)] font-light italic text-ivory/90" />
-      </div>
-      <Manifesto content={content} />
-      <Featured products={cardProducts} categories={categories.map((c) => ({ id: c.id, name: c.name }))} />
-      <Seasonal seasonal={content.seasonal} />
-      <Constellation products={cardProducts.filter((p) => p.categoryId !== "cat_deuil")} />
-      <Univers items={univers} />
-      {atelier.enabled && <AtelierTeaser basePrice={euro(atelier.basePrice, { compact: true })} />}
-      <Services />
-      <WeddingTeaser wedding={content.wedding} images={gallery.filter((g) => g.category === "mariage").map((g) => g.image)} />
-      <Testimonials reviews={reviews} rating={settings.googleRating} count={settings.googleReviews} />
-      <GalleryGrid items={gallery} instagram={settings.instagram} />
-      <Visit settings={settings} />
-      <section className="fern-paper bg-ivory py-28 text-noir sm:py-36">
-        <div className="mx-auto grid max-w-[1600px] gap-14 px-6 sm:px-10 lg:grid-cols-[0.8fr_1.4fr] lg:px-16">
-          <div>
-            <SectionTitle eyebrow="Questions fréquentes" title="Bon à" accent="savoir" tone="light" size="md" />
-            <Link href="/faq" className="btn btn-ghost-dark mt-10">
-              <span>Toutes les questions</span>
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <FaqList faqs={faqs.slice(0, 5)} />
-        </div>
-      </section>
+      <Cover
+        introEnabled={settings.intro.enabled}
+        oncePerSession={settings.intro.oncePerSession}
+        coords={`${dms(settings.lat, "N", "S")} — ${dms(settings.lng, "E", "O")}`}
+        founded={content.hero.eyebrow}
+        tagline={content.hero.subtitle}
+        cta={content.hero.ctaLabel}
+      />
+      <AvantPropos content={content} image={content.hero.images[0] || IMG.dahliaDark} caption="Dans l'atelier." />
+      <Rayons rayons={rayons} />
+      <Planches products={featured} total={products.length} />
+      <Almanach seasonal={{ ...content.seasonal, active: content.seasonal.active && (daysTo == null || daysTo >= 0) }} month={month} daysTo={daysTo} />
+      <Geste label={content.manifesto.eyebrow} text={content.manifesto.text} signature={content.manifesto.signature} image={content.manifesto.image} />
+      <Recevoir delivery={delivery} />
+      <Lettres reviews={reviews.map((r) => ({ id: r.id, author: r.author, text: r.text, source: r.source }))} rating={settings.googleRating} count={settings.googleReviews} />
+      <Diptyque content={content} weddingImage={content.wedding.image || pick("mariage", IMG.brideDark)} funeralImage={content.funeral.image || pick("deuil", IMG.whiteRoseDark)} />
+      <Visite settings={settings} image={content.about.image || IMG.shopFront} />
     </>
   );
 }
