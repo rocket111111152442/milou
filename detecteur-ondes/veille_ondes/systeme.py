@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -33,6 +35,27 @@ def nom_os() -> str:
 
 def description_systeme() -> str:
     return f"{platform.system()} {platform.release()} ({platform.machine()})"
+
+
+DOSSIER_OUTILS = Path(__file__).resolve().parent.parent / "outils"
+
+
+def chercher_outil(nom: str) -> str | None:
+    """Programme installé sur le système, ou déposé n'importe où dans le dossier « outils ».
+
+    Windows décompresse souvent un zip dans un sous-dossier supplémentaire
+    (outils/platform-tools-latest-windows/platform-tools/adb.exe) : on cherche donc
+    dans tous les sous-dossiers.
+    """
+    chemin = shutil.which(nom)
+    if chemin:
+        return chemin
+    executable = nom + (".exe" if nom_os() == "windows" else "")
+    try:
+        trouves = sorted(DOSSIER_OUTILS.rglob(executable), key=lambda p: len(p.parts))
+    except OSError:
+        return None
+    return str(trouves[0]) if trouves else None
 
 
 def decoder(octets: bytes) -> str:

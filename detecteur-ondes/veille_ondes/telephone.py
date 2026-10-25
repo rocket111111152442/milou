@@ -18,13 +18,11 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 from datetime import date
 from pathlib import Path
 
-from .systeme import executer, nom_os
+from .systeme import chercher_outil, executer
 
-DOSSIER_PROJET = Path(__file__).resolve().parent.parent
 FICHIER_INDICATEURS = Path(__file__).resolve().parent / "indicateurs" / "logiciels_espions.json"
 URL_INDICATEURS = "https://raw.githubusercontent.com/AssoEchap/stalkerware-indicators/master/"
 
@@ -58,14 +56,7 @@ PERMISSIONS_SENSIBLES = {
 # --- outil adb ----------------------------------------------------------------------
 
 def trouver_adb() -> str | None:
-    chemin = shutil.which("adb")
-    if chemin:
-        return chemin
-    nom = "adb.exe" if nom_os() == "windows" else "adb"
-    for candidat in (DOSSIER_PROJET / "outils" / "platform-tools" / nom, DOSSIER_PROJET / "outils" / nom):
-        if candidat.exists():
-            return str(candidat)
-    return None
+    return chercher_outil("adb")
 
 
 def analyser_adb_devices(texte: str) -> list[tuple[str, str]]:

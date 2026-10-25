@@ -13,13 +13,12 @@ micro-ondes (2 450 MHz), du Wi-Fi et du Bluetooth.
 from __future__ import annotations
 
 import math
-import shutil
 import statistics
 import tempfile
 from pathlib import Path
 
 from .exposition import champ_v_m
-from .systeme import executer, nom_os
+from .systeme import chercher_outil, executer
 
 # (début MHz, fin MHz, nom, explication). Les bandes étroites passent avant les larges.
 BANDES = [
@@ -61,7 +60,6 @@ BANDES = [
 ]
 
 BANDE_MICRO_ONDES = (2400.0, 2500.0)
-OUTILS = Path(__file__).resolve().parent.parent / "outils"
 IDS_USB_TINYSA = {(0x0483, 0x5740)}
 
 PAS_ARTEFACT_MHZ = 28.8  # fréquence de l'oscillateur de la clé RTL-SDR
@@ -75,14 +73,7 @@ def identifier_bande(f_mhz: float) -> tuple[str, str] | None:
 
 
 def _trouver_programme(nom: str) -> str | None:
-    chemin = shutil.which(nom)
-    if chemin:
-        return chemin
-    executable = nom + (".exe" if nom_os() == "windows" else "")
-    for candidat in (OUTILS / executable, OUTILS / nom / executable):
-        if candidat.exists():
-            return str(candidat)
-    return None
+    return chercher_outil(nom)
 
 
 def trouver_rtl_power() -> str | None:

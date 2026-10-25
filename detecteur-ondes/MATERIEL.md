@@ -48,7 +48,8 @@ spectre.
 Préparation d'un téléphone Android (une seule fois) :
 
 1. Téléchargez « SDK Platform-Tools pour Windows » sur developer.android.com (page *platform-tools*),
-   décompressez-le dans le dossier `outils` du logiciel : vous devez obtenir `outils\platform-tools\adb.exe`.
+   décompressez-le dans un dossier `outils` à créer à côté de `lancer_windows.bat` (le logiciel trouve
+   `adb.exe` même s'il est dans un sous-dossier).
 2. Sur le téléphone : Paramètres > À propos du téléphone > (Informations sur le logiciel) > touchez **7 fois**
    « Numéro de version ». Les « Options pour les développeurs » apparaissent.
 3. Paramètres > Options pour les développeurs > activez **Débogage USB**.

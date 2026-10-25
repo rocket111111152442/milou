@@ -66,3 +66,15 @@ def test_tasklist_et_ps():
     tasklist = '"System Idle Process","0","Services","0","8 Ko"\n"AnyDesk.exe","4242","Console","1","20 000 Ko"\n'
     assert ordinateur.analyser_tasklist(tasklist)[1] == {"pid": 4242, "nom": "AnyDesk.exe"}
     assert ordinateur.analyser_ps("  1 /sbin/launchd\n 512 /usr/sbin/sshd\n")[1] == {"pid": 512, "nom": "sshd"}
+
+
+def test_outil_trouve_dans_un_sous_dossier(tmp_path, monkeypatch):
+    from veille_ondes import systeme
+    monkeypatch.setattr(systeme, "DOSSIER_OUTILS", tmp_path)
+    monkeypatch.setattr(systeme.shutil, "which", lambda nom: None)
+    nom = "adb.exe" if systeme.nom_os() == "windows" else "adb"
+    cible = tmp_path / "platform-tools-latest-windows" / "platform-tools" / nom
+    cible.parent.mkdir(parents=True)
+    cible.write_text("")
+    assert systeme.chercher_outil("adb") == str(cible)
+    assert systeme.chercher_outil("hackrf_sweep") is None
