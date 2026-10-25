@@ -1,7 +1,8 @@
 # Veille Ondes
 
 Logiciel qui tourne **uniquement sur votre ordinateur** et qui fait l'inventaire des ondes radio que
-l'ordinateur peut capter, vérifie votre réseau, et cherche des signes de piratage de l'ordinateur.
+l'ordinateur (ou un récepteur branché) peut capter, cherche des caméras, vérifie votre réseau, et cherche des
+signes de piratage de l'ordinateur et d'un téléphone Android.
 Il produit un rapport en français qui dit, pour chaque point, si c'est normal ou non, et quoi faire.
 
 Aucune donnée n'est envoyée sur Internet. Les résultats restent dans le dossier `donnees/`.
@@ -14,7 +15,10 @@ Aucune donnée n'est envoyée sur Internet. Les résultats restent dans le dossi
 | Bluetooth | Tous les appareils Bluetooth basse consommation à portée, avec repérage des traceurs (AirTag, SmartTag, Tile, traceurs Google) | Bluetooth (déjà présent sur un portable) |
 | Réseau local | Les appareils connectés à votre box, avec alerte si un appareil inconnu apparaît | Rien |
 | Ordinateur | Logiciels de prise de contrôle à distance (TeamViewer, AnyDesk, VNC…), accès à distance ouverts, programmes au démarrage, antivirus Windows | Rien |
-| Radio large bande | Toutes les émissions entre 24 et 1 700 MHz (radio, TNT, antennes 4G, télécommandes 433 MHz, alarmes 868 MHz…) | **Optionnel** : clé RTL-SDR, voir [MATERIEL.md](MATERIEL.md) |
+| Caméras | Caméras et enregistreurs vidéo branchés sur votre box (protocoles RTSP / ONVIF, pages de connexion), mini-caméras Wi-Fi qui créent leur propre réseau | Rien (détecteur de lentilles conseillé pour l'inspection physique) |
+| Téléphone Android | Applications installées comparées à la liste publique de 644 logiciels espions connus, droits typiques des logiciels espions (accessibilité, administrateur, notifications, pas d'icône), root, mises à jour ; désactivation ou désinstallation d'une application | Câble USB + outil gratuit adb de Google |
+| iPhone | Guide de contrôle pas à pas (un ordinateur ne peut pas inspecter un iPhone) | Rien |
+| Radio et micro-ondes | Émissions jusqu'à 5,3 GHz avec un tinySA Ultra (dont la bande des fours à micro-ondes, 2,45 GHz, avec estimation en V/m et comparaison avec votre propre four), jusqu'à 6 GHz avec un HackRF, ou 24-1 700 MHz avec une clé RTL-SDR | **Optionnel**, voir [MATERIEL.md](MATERIEL.md) |
 
 Les analyses sont conservées : le rapport compare les pièces entre elles et les heures (jour / nuit).
 
@@ -23,12 +27,15 @@ Les analyses sont conservées : le rapport compare les pièces entre elles et le
 Il faut le savoir avant d'interpréter les résultats :
 
 - **Un ordinateur ne capte pas « toutes les ondes ».** Sa carte Wi-Fi ne voit que le Wi-Fi, sa puce
-  Bluetooth que le Bluetooth. Sans clé SDR, la 4G/5G, la TNT, la radio et le reste sont invisibles.
-  Même avec une clé SDR, les fréquences au-delà de 1,7 GHz (dont la 5G à 3,5 GHz) ne sont pas couvertes.
+  Bluetooth que le Bluetooth. Sans récepteur radio, la bande des micro-ondes en tant que telle, la 4G/5G,
+  la TNT et le reste sont invisibles. Même avec un tinySA, rien n'est mesuré au-delà d'environ 5,3 GHz.
 - **Les valeurs en V/m sont des ordres de grandeur** (incertitude d'un facteur 3 environ), pas une mesure
   qui fait foi. La mesure officielle et gratuite de l'ANFR est expliquée dans le rapport.
-- **Le téléphone ne peut pas être analysé depuis l'ordinateur.** Le rapport donne la liste des contrôles
-  à faire sur le téléphone lui-même.
+- **Téléphone :** un Android branché en USB est analysé (logiciels espions grand public). Les logiciels
+  espions d'État (type Pegasus) ne sont pas détectables ainsi. Un iPhone ne peut pas être inspecté par un
+  ordinateur : seulement un guide de contrôle.
+- **Caméras :** une caméra qui enregistre sur carte mémoire, en 4G, ou éteinte n'est visible que par une
+  inspection physique (guide fourni, détecteur de lentilles conseillé).
 - **« Rien d'anormal » ne veut dire que « rien d'anormal dans ce qui a été vérifié ».**
 
 ## Interpréter les résultats honnêtement
@@ -91,17 +98,24 @@ sudo apt install python3-venv python3-tk network-manager bluez   # Debian / Ubun
 python -m veille_ondes analyser --lieu chambre --mon-wifi "Livebox-1234"
 python -m veille_ondes surveiller --intervalle 15 --duree 8 --lieu chambre
 python -m veille_ondes reference          # mémoriser les appareils actuels de la box
-python -m veille_ondes analyser --sdr     # avec une clé RTL-SDR branchée
-python -m veille_ondes analyser --sdr-csv balayage.csv   # analyser un fichier rtl_power existant
+python -m veille_ondes analyser --sdr     # avec un tinySA, un HackRF ou une clé RTL-SDR branché
+python -m veille_ondes analyser --sdr --lieu "test micro-ondes"   # référence : votre four en marche, à 1 m
+python -m veille_ondes analyser --seulement telephone             # téléphone Android branché en USB
+python -m veille_ondes telephone desactiver com.exemple.appli     # aussi : reactiver, desinstaller
+python -m veille_ondes analyser --sdr-csv balayage.csv   # analyser un fichier rtl_power / hackrf_sweep
 python -m veille_ondes --help
 ```
 
 ## Confidentialité
 
-- Le logiciel ne contacte aucun serveur. Il n'envoie de petits paquets qu'aux adresses de **votre propre
-  réseau local** (pour que les appareils connectés à la box se signalent). L'option `--sans-balayage`
-  désactive même cela.
-- Il ne modifie rien sur l'ordinateur : il lit des informations, il ne supprime et ne bloque rien.
+- Le logiciel ne contacte aucun serveur. Seule exception, uniquement si vous la lancez vous-même :
+  `python -m veille_ondes mettre-a-jour-indicateurs` télécharge la dernière liste des logiciels espions connus.
+- Vos données ne quittent jamais l'ordinateur. Les seules sondes envoyées vont aux adresses de **votre
+  propre réseau local**, pour que les appareils et les caméras connectés à la box se signalent. L'option
+  `--sans-balayage` désactive le balayage des adresses, et `--sans-cameras` la recherche de caméras.
+- Il ne modifie rien sur l'ordinateur : il lit des informations, il ne supprime et ne bloque rien. Sur le
+  téléphone, il ne désactive ou ne désinstalle une application que si vous le demandez, application par
+  application, et jamais une application du système.
 - Le dossier `donnees/` contient vos analyses. Vous pouvez le supprimer à tout moment.
 
 ## Tests
@@ -110,3 +124,8 @@ python -m veille_ondes --help
 pip install pytest
 python -m pytest
 ```
+
+## Crédits
+
+Liste des logiciels espions connus : [Echap, stalkerware-indicators](https://github.com/AssoEchap/stalkerware-indicators),
+licence CC BY 4.0 (extraite le 25/10/2026, fichier `veille_ondes/indicateurs/logiciels_espions.json`).

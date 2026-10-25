@@ -205,11 +205,69 @@ def _section_sdr(s: dict) -> str:
         lignes.append([formater_mhz(e["pic_mhz"]), f"{formater_mhz(e['debut_mhz'])} – {formater_mhz(e['fin_mhz'])}",
                        f"+{formater_nombre(e['exces_db'])} dB",
                        bande, _e(e.get("explication") or "")])
-    return ("<h2>Radio large bande (SDR)</h2>"
-            f"<p class='doux'>Plage balayée : {s['plage_mhz'][0]:.0f} à {s['plage_mhz'][1]:.0f} MHz. Les niveaux "
-            "sont relatifs au bruit de fond (clé non calibrée) : ils permettent de comparer, pas de mesurer une "
-            "exposition en V/m.</p>"
+    unite = ("Les niveaux du tinySA sont en dBm (étalonnés par le fabricant), ce qui permet une estimation du "
+             "champ." if s.get("absolu") else
+             "Les niveaux sont relatifs au bruit de fond (récepteur non calibré) : ils permettent de comparer "
+             "des pièces ou des heures, pas de mesurer une exposition en V/m.")
+    mo = s.get("micro_ondes")
+    bloc_mo = ""
+    if mo:
+        bloc_mo = (f"<p><strong>Bande des micro-ondes (2 400-2 500 MHz) :</strong> maximum "
+                   f"{_e(mo['max_db'])} {'dBm' if mo['absolu'] else 'dB relatifs'} à {formater_mhz(mo['pic_mhz'])}"
+                   + (f", champ estimé {formater_v_m(mo['champ_v_m'])} (limite 61 V/m)" if mo.get("champ_v_m") else "")
+                   + ".</p>")
+    return (f"<h2>Radio large bande ({_e(s.get('source'))})</h2>"
+            f"<p class='doux'>Plage balayée : {s['plage_mhz'][0]:.0f} à {s['plage_mhz'][1]:.0f} MHz. {unite}</p>"
+            + bloc_mo
             + _tableau(["Pic", "Étendue", "Au-dessus du bruit", "Bande", "Usage habituel"], lignes, {2}))
+
+
+def _section_cameras(cam: dict) -> str:
+    if not cam or not cam.get("ok"):
+        return ""
+    morceaux = ["<h2>Caméras</h2>"]
+    lignes = [[_e(c["ip"]), f'<span class="mono">{_e(c["mac"])}</span>', _e("; ".join(c["indices"]))]
+              for c in cam.get("cameras_reseau", [])]
+    morceaux.append("<h3>Sur votre réseau</h3>" + (
+        _tableau(["Adresse IP", "Adresse MAC", "Indices"], lignes) if cam.get("reseau_verifie")
+        else "<p class='doux'>Réseau local non examiné.</p>"))
+    lignes = [[_e(w["ssid"]), f'<span class="mono">{_e(w.get("bssid") or "—")}</span>',
+               f"{w['signal_dbm']:.0f} dBm" if w.get("signal_dbm") is not None else "?"]
+              for w in cam.get("wifi_cameras", [])]
+    morceaux.append("<h3>Réseaux Wi-Fi dont le nom ressemble à une caméra</h3>"
+                    + _tableau(["Nom", "Adresse", "Signal"], lignes, {2}))
+    autres = cam.get("autres_appareils_reseau", [])
+    if autres:
+        morceaux.append("<h3>Autres appareils à connaître</h3>" + _tableau(
+            ["Adresse IP", "Remarque"], [[_e(a["ip"]), _e(a["remarque"])] for a in autres]))
+    return "".join(morceaux)
+
+
+def _section_telephone(tel: dict) -> str:
+    if not tel or not tel.get("ok"):
+        return ""
+    a = tel["appareil"]
+    entete = (f"<p>{_e(a.get('fabricant'))} {_e(a.get('modele'))} · Android {_e(a.get('android'))} · correctifs de "
+              f"sécurité du {_e(a.get('correctif_securite'))} · {'rooté' if a.get('root') else 'non rooté'} · "
+              f"{tel.get('nb_applications')} applications au total, dont {len(tel['applications'])} installées "
+              f"par l'utilisateur.</p>")
+    a_examiner = [x for x in tel["applications"] if x["niveau"] != "normal" or x["acces_puissant"]]
+    lignes = []
+    for x in a_examiner:
+        etat = " (désactivée)" if x.get("desactive") else ""
+        lignes.append([_badge(x["niveau"]), f'<span class="mono">{_e(x["paquet"])}</span>{etat}',
+                       _e(x["magasin"] or "hors magasin"), _e(" ; ".join(x["raisons"])), _e(x.get("installe_le") or "")])
+    tous = [[f'<span class="mono">{_e(x["paquet"])}</span>', _e(x["magasin"] or "hors magasin"),
+             _e(x.get("installe_le") or "")] for x in sorted(tel["applications"], key=lambda x: x["paquet"])]
+    return ("<h2>Téléphone</h2>" + entete
+            + "<h3>Applications à examiner</h3>"
+              "<p class='doux'>Pour désactiver ou désinstaller une application : bouton « Applis du téléphone » dans "
+              "Veille Ondes. Seules les applications installées par l'utilisateur peuvent être touchées.</p>"
+            + _tableau(["Niveau", "Application", "Origine", "Raisons", "Installée le"], lignes)
+            + "<details><summary>Toutes les applications installées par l'utilisateur</summary>"
+            + _tableau(["Application", "Origine", "Installée le"], tous) + "</details>"
+            + "<p class='doux'><small>Liste des logiciels espions connus : association Echap, "
+              "github.com/AssoEchap/stalkerware-indicators, licence CC BY 4.0.</small></p>")
 
 
 # --- historique et comparaison des pièces ------------------------------------------------
@@ -229,6 +287,7 @@ def _chiffres(a: dict, config: dict) -> dict:
         "nb_bt": len(appareils) if bt.get("ok") else None,
         "separes": sum(1 for x in appareils if x.get("traceur_separe")) if bt.get("ok") else None,
         "nb_reseau": len(reseau.get("appareils", [])) if reseau.get("ok") else None,
+        "micro_ondes": ((a.get("sdr") or {}).get("micro_ondes") or {}).get("max_db"),
     }
 
 
@@ -276,10 +335,12 @@ def _section_historique(analyses: list[dict], config: dict) -> str:
         champs = [c["champ"] for c in chiffres if c["champ"]]
         voisins = [c["voisin_max"] for c in chiffres if c["voisin_max"] is not None]
         bts = [c["nb_bt"] for c in chiffres if c["nb_bt"] is not None]
+        mos = [c["micro_ondes"] for c in chiffres if c["micro_ondes"] is not None]
         lignes_lieux.append([_e(lieu), str(len(chiffres)),
                              f"{mean(voisins):.0f} dBm" if voisins else "—",
                              formater_v_m(mean(champs)) if champs else "—",
-                             f"{mean(bts):.0f}" if bts else "—"])
+                             f"{mean(bts):.0f}" if bts else "—",
+                             f"{max(mos):.0f} dB" if mos else "—"])
     return ("<h2>Historique</h2>" + graphique
             + _tableau(["Date", "Lieu", "Wi-Fi", "Voisin le plus fort", "Champ Wi-Fi estimé", "Bluetooth",
                         "Traceurs séparés", "Appareils réseau"], lignes, {2, 3, 4, 5, 6, 7})
@@ -287,23 +348,79 @@ def _section_historique(analyses: list[dict], config: dict) -> str:
               "<p class='doux'>Si un émetteur visait une pièce précise, ses valeurs y seraient nettement et "
               "durablement plus élevées que dans les autres pièces. Des écarts de 5 à 10 dB d'une pièce à l'autre "
               "sont normaux (murs, distance à la box). Valable pour les bandes que l'ordinateur capte.</p>"
-            + _tableau(["Lieu", "Analyses", "Voisin le plus fort (moy.)", "Champ Wi-Fi (moy.)", "Bluetooth (moy.)"],
-                       lignes_lieux, {1, 2, 3, 4}))
+            + _tableau(["Lieu", "Analyses", "Voisin le plus fort (moy.)", "Champ Wi-Fi (moy.)", "Bluetooth (moy.)",
+                        "2,4 GHz max (récepteur)"], lignes_lieux, {1, 2, 3, 4, 5}))
 
 
 # --- textes fixes ------------------------------------------------------------------------------
 
 LIMITES = """
-<h2>Ce que cet ordinateur peut mesurer… et ce qu'il ne peut pas</h2>
+<h2>Ce que ce logiciel peut mesurer… et ce qu'il ne peut pas</h2>
 <div class="carte">
 <p><strong>Mesuré :</strong> les réseaux Wi-Fi (2,4 / 5 / 6 GHz selon la carte), les appareils Bluetooth basse
-consommation, les appareils connectés à votre box, les logiciels de prise de contrôle à distance et les accès
-ouverts sur l'ordinateur. Avec une clé SDR (optionnelle) : les émissions entre 24 et 1 766 MHz.</p>
-<p><strong>Pas mesuré :</strong> la 4G/5G au-delà de 1 766 MHz, les fréquences plus hautes (radars, 26 GHz…),
-les champs basse fréquence (lignes électriques, appareils ménagers), les ultrasons. Aucun ordinateur ne
-fournit une mesure d'exposition qui fait foi : les valeurs en V/m sont des ordres de grandeur.</p>
-<p><strong>À savoir :</strong> le téléphone ne peut pas être analysé depuis l'ordinateur (voir la liste de
-contrôle ci-dessous). Un résultat « rien d'anormal » porte uniquement sur ce qui a été vérifié.</p>
+consommation, les appareils et caméras connectés à votre box, les logiciels de prise de contrôle à distance de
+l'ordinateur, les applications d'un téléphone Android branché en USB. Avec un récepteur radio optionnel : les
+émissions jusqu'à 1,7 GHz (clé RTL-SDR) ou jusqu'à 5-6 GHz, dont la bande des fours à micro-ondes (tinySA Ultra,
+HackRF).</p>
+<p><strong>Pas mesuré :</strong> les fréquences au-delà de la plage du récepteur, les champs basse fréquence
+(lignes électriques, appareils ménagers), les ultrasons ; un iPhone (seulement par le guide ci-dessous) ; une
+caméra qui enregistre sur carte mémoire, en 4G, ou éteinte (seulement par inspection physique). Les valeurs en V/m
+sont des ordres de grandeur : seule une mesure ANFR fait foi.</p>
+<p><strong>À savoir :</strong> un résultat « rien d'anormal » porte uniquement sur ce qui a été vérifié.</p>
+</div>
+"""
+
+GUIDES = """
+<h2>Guides à faire soi-même</h2>
+<div class="carte">
+<h3 id="micro-ondes">Mesure de référence « four à micro-ondes »</h3>
+<p>Avec un tinySA Ultra ou un HackRF : mettez une tasse d'eau dans votre four, lancez-le 2 minutes, posez le
+récepteur à 1 m et faites une analyse avec le lieu « test micro-ondes ». Vous verrez à quoi ressemble un vrai
+four sur votre récepteur ; toutes les mesures suivantes y seront comparées. Un four est conçu pour garder ses
+ondes à l'intérieur : la fuite autorisée est de 50 W/m² à 5 cm de la porte, et elle diminue très vite avec la
+distance. Un appareil capable d'envoyer une puissance de ce type à travers un mur serait massif, chaufferait le
+mur et couperait le Wi-Fi 2,4 GHz et le Bluetooth de tout le voisinage : il serait très visible sur le récepteur.</p>
+
+<h3 id="cameras">Chercher une caméra cachée (inspection physique)</h3>
+<ul>
+<li>Éteignez la lumière, fermez les volets. Tenez une lampe (celle du téléphone) à hauteur des yeux, le long de
+votre regard, et balayez lentement la pièce : l'objectif d'une caméra renvoie un petit point brillant, bleu ou
+violet, qui reste fixe quand vous bougez un peu. Un détecteur de lentilles (lumière rouge clignotante et viseur)
+rend cette recherche bien plus facile.</li>
+<li>Dans le noir, regardez la pièce avec la caméra <strong>avant</strong> (selfie) de votre téléphone : elle voit
+souvent les LED infrarouges de vision nocturne, invisibles à l'œil, sous forme de points violets ou blancs.</li>
+<li>Endroits typiques : détecteur de fumée, chargeur USB ou multiprise, réveil, cadre, horloge, ampoule, prise
+murale factice, peluche, box TV, objets face au lit, au canapé ou à la douche. Méfiez-vous des objets que vous
+n'avez pas achetés vous-même.</li>
+<li>Faites une analyse Veille Ondes dans chaque pièce : un réseau Wi-Fi « IPC… », « HDWiFiCam »… dont le
+signal est très fort indique une mini-caméra Wi-Fi tout près.</li>
+<li>Si vous trouvez une caméra chez vous qui n'est pas à vous : ne la débranchez pas tout de suite, prenez des
+photos et contactez la police ou la gendarmerie (c'est une infraction : atteinte à la vie privée).</li>
+</ul>
+
+<h3 id="iphone">Contrôler un iPhone (aucun ordinateur ne peut l'inspecter en profondeur)</h3>
+<ul>
+<li>Réglages &gt; Général &gt; Mise à jour logicielle : installez la dernière version.</li>
+<li>Réglages &gt; Confidentialité et sécurité &gt; <strong>Contrôle de sécurité</strong> : passe en revue les
+personnes et applications qui ont accès à vos données et à votre position, et permet de tout couper.</li>
+<li>Réglages &gt; Général &gt; <strong>VPN et gestion de l'appareil</strong> : il ne doit y avoir aucun profil
+que vous n'avez pas installé (un profil inconnu peut surveiller le téléphone).</li>
+<li>Réglages &gt; [votre nom] : liste des appareils connectés à votre compte Apple ; supprimez ceux que vous ne
+reconnaissez pas, changez le mot de passe et activez la double authentification.</li>
+<li>Réglages &gt; Confidentialité et sécurité &gt; Localisation &gt; Services système et « Partager ma
+position » : vérifiez qui voit votre position (app Localiser &gt; Personnes).</li>
+<li>Si vous craignez un logiciel espion très avancé : Réglages &gt; Confidentialité et sécurité &gt;
+<strong>Mode Isolement</strong>.</li>
+</ul>
+
+<h3 id="android">Contrôler un Android à la main (en plus de l'analyse par câble)</h3>
+<ul>
+<li>Paramètres &gt; Sécurité &gt; Google Play Protect &gt; Analyser.</li>
+<li>Paramètres &gt; Accessibilité : aucune application inconnue ne doit y apparaître comme activée.</li>
+<li>Paramètres &gt; Sécurité &gt; Applis d'administration de l'appareil : seules « Localiser mon appareil » ou
+des applis de votre employeur doivent y figurer.</li>
+<li>Compte Google &gt; Sécurité &gt; Vos appareils, et « Bilan de sécurité ».</li>
+</ul>
 </div>
 """
 
@@ -318,39 +435,37 @@ d'administration de la box, désactivez le WPS, vérifiez la liste des appareils
 depuis un appareil de confiance, et activez la double authentification.</li>
 <li><strong>Ordinateur :</strong> mises à jour, analyse antivirus complète, désinstallation de tout logiciel de
 prise de contrôle à distance que vous n'utilisez pas.</li>
-</ul>
-<h3>2. Contrôler le téléphone (les intitulés varient selon le modèle)</h3>
-<ul>
-<li><strong>iPhone :</strong> Réglages &gt; Général &gt; Mise à jour logicielle ; Réglages &gt; Confidentialité et
-sécurité &gt; Contrôle de sécurité (passe en revue les partages et les accès) ; Réglages &gt; Général &gt; VPN et
-gestion de l'appareil (aucun profil que vous n'avez pas installé) ; Réglages &gt; votre nom : liste des appareils
-connectés à votre compte, supprimez ceux que vous ne connaissez pas.</li>
-<li><strong>Android :</strong> Paramètres &gt; Sécurité &gt; Google Play Protect &gt; Analyser ; Paramètres &gt;
-Accessibilité : aucune application inconnue ne doit y avoir accès (c'est ce qu'utilisent les logiciels espions) ;
-applications d'administration de l'appareil ; compte Google &gt; Sécurité &gt; Vos appareils.</li>
-<li>En dernier recours : sauvegarde des photos, réinitialisation d'usine, puis changement des mots de passe.</li>
+<li><strong>Téléphone :</strong> mises à jour, contrôles du guide ci-dessus ; en dernier recours, sauvegarde des
+photos, réinitialisation d'usine, puis changement des mots de passe.</li>
 <li>Aide gratuite et officielle en cas de piratage : <strong>cybermalveillance.gouv.fr</strong>.</li>
 </ul>
-<h3>3. Faire mesurer officiellement les ondes chez vous (gratuit)</h3>
+<h3>2. Faire mesurer officiellement les ondes chez vous (gratuit)</h3>
 <p>En France, toute personne peut obtenir une mesure d'exposition aux ondes dans son logement, réalisée par un
 laboratoire accrédité et financée par l'État : formulaire <strong>Cerfa n° 15003</strong> (sur service-public.fr),
 à faire signer par votre mairie (ou une association agréée), qui le transmet à l'<strong>ANFR</strong>. Les résultats
 sont publiés sur cartoradio.fr. C'est la mesure qui fait foi, toutes fréquences confondues, bien plus fiable que ce
 logiciel ou qu'un détecteur acheté en ligne. En Belgique : IBPT ; en Suisse : OFCOM.</p>
-<h3>4. Si vous ressentez des effets physiques</h3>
+<h3>3. Si vous ressentez des effets physiques</h3>
 <p>Maux de tête, troubles du sommeil, picotements, acouphènes ou sensation de chaleur sont des symptômes réels,
 qui méritent d'être pris au sérieux par un médecin : ils ont de nombreuses causes possibles, que lui seul peut
 rechercher. Les études en double aveugle n'ont pas montré que les personnes qui se disent sensibles aux ondes
 perçoivent leur présence aux niveaux rencontrés dans les logements ; en parler à un médecin reste la façon la plus
 sûre d'être soulagé.</p>
-<h3>5. Si vous pensez être visé par quelqu'un</h3>
+<h3>4. Si vous pensez être visé par quelqu'un</h3>
 <p>Le brouillage et l'utilisation d'émetteurs non autorisés sont des infractions : un signal anormal, persistant et
-localisé peut être signalé à l'ANFR. Le harcèlement peut faire l'objet d'une plainte (police, gendarmerie) ; ce
-rapport et l'historique des mesures peuvent être joints. N'utilisez pas de brouilleur : c'est interdit
-(article L33-3-1 du code des postes et des communications électroniques) et cela couperait aussi votre propre
-téléphone et votre Wi-Fi.</p>
+localisé peut être signalé à l'ANFR. Le harcèlement, l'espionnage d'un téléphone et la pose d'une caméra chez
+autrui peuvent faire l'objet d'une plainte (police, gendarmerie) ; ce rapport et l'historique des mesures peuvent
+être joints. N'utilisez pas de brouilleur : c'est interdit (article L33-3-1 du code des postes et des
+communications électroniques) et cela couperait aussi votre propre téléphone et votre Wi-Fi.</p>
 </div>
 """
+
+
+def page_guides() -> str:
+    """Page autonome avec les guides (bouton « Guides » de la fenêtre)."""
+    return (f'<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" '
+            f'content="width=device-width, initial-scale=1"><title>Guides Veille Ondes</title><style>{CSS}</style>'
+            f'</head><body><main><h1>Guides Veille Ondes</h1>{GUIDES}{SUITE}</main></body></html>')
 
 
 def generer(analyse: dict, constats: list[Constat], synthese: str, historique: list[dict], config: dict) -> str:
@@ -373,9 +488,12 @@ def generer(analyse: dict, constats: list[Constat], synthese: str, historique: l
 {_section_wifi(analyse.get('wifi'), config)}
 {_section_bluetooth(analyse.get('bluetooth'))}
 {_section_reseau(analyse.get('reseau_local'), config)}
+{_section_cameras(analyse.get('cameras'))}
 {_section_ordinateur(analyse.get('ordinateur'))}
+{_section_telephone(analyse.get('telephone'))}
 {_section_sdr(analyse.get('sdr'))}
 {_section_historique(historique, config)}
+{GUIDES}
 {SUITE}
 <p class="doux"><small>Veille Ondes {_e(analyse.get('version'))} — logiciel libre, exécuté localement.</small></p>
 </main></body></html>

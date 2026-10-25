@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Callable
 
-from . import __version__, bluetooth, ordinateur, reseau_local, sdr, wifi
+from . import __version__, bluetooth, cameras, ordinateur, reseau_local, sdr, telephone, wifi
 from .systeme import description_systeme
 
-MODULES = ("wifi", "bluetooth", "reseau_local", "ordinateur", "sdr")
+# ordre d'exécution : la recherche de caméras réutilise les résultats Wi-Fi, Bluetooth et réseau local
+MODULES = ("wifi", "bluetooth", "reseau_local", "cameras", "ordinateur", "telephone", "sdr")
+PAR_DEFAUT = ("wifi", "bluetooth", "reseau_local", "cameras", "ordinateur")
 
 
 def _resume(cle: str, r: dict) -> str:
@@ -27,12 +30,21 @@ def _resume(cle: str, r: dict) -> str:
         return (f"{r['nb_processus']} programmes examinés, "
                 f"{len(r['outils_acces_distant'])} outil(s) de prise de contrôle à distance actif(s)")
     if cle == "sdr":
-        return f"{len(r['emissions'])} émissions repérées"
+        return f"{r.get('source')} : {len(r['emissions'])} émissions repérées"
+    if cle == "cameras":
+        reseau = (f"{len(r['cameras_reseau'])} caméra(s) sur le réseau" if r.get("reseau_verifie")
+                  else "réseau local non examiné")
+        return f"{reseau}, {len(r['wifi_cameras'])} réseau(x) Wi-Fi au nom de caméra"
+    if cle == "telephone":
+        suspectes = sum(1 for a in r["applications"] if a["niveau"] in ("important", "a_verifier"))
+        return (f"{r['appareil']['fabricant']} {r['appareil']['modele']} : {len(r['applications'])} applis "
+                f"installées par l'utilisateur, {suspectes} à examiner")
     return "terminé"
 
 
-def lancer_analyse(lieu: str = "", modules: tuple[str, ...] = ("wifi", "bluetooth", "reseau_local", "ordinateur"),
+def lancer_analyse(lieu: str = "", modules: tuple[str, ...] = PAR_DEFAUT,
                    duree_bluetooth: float = 15.0, sdr_csv: str | None = None, balayage_reseau: bool = True,
+                   materiel_radio: str = "auto", dossier_donnees: Path | None = None,
                    journal: Callable[[str], None] = print) -> dict:
     analyse = {
         "horodatage": datetime.now().isoformat(timespec="seconds"),
@@ -46,8 +58,14 @@ def lancer_analyse(lieu: str = "", modules: tuple[str, ...] = ("wifi", "bluetoot
                       lambda: bluetooth.scanner(duree_bluetooth)),
         "reseau_local": ("Réseau local : appareils connectés à votre box",
                          lambda: reseau_local.scanner(balayage_reseau)),
+        "cameras": ("Caméras : réseau local, réseaux Wi-Fi et Bluetooth", lambda: cameras.scanner(
+            analyse.get("reseau_local") or reseau_local.scanner(balayage_reseau),
+            analyse.get("wifi"), analyse.get("bluetooth"))),
         "ordinateur": ("Ordinateur : prise de contrôle à distance, ports, démarrage", ordinateur.scanner),
-        "sdr": ("Radio large bande (SDR) : balayage 24-1700 MHz", lambda: sdr.scanner(sdr_csv)),
+        "telephone": ("Téléphone Android (USB) : applications et réglages de sécurité",
+                      lambda: telephone.scanner(dossier_donnees)),
+        "sdr": ("Radio large bande : balayage avec le récepteur branché",
+                lambda: sdr.scanner(sdr_csv, materiel_radio)),
     }
     for cle in MODULES:
         if cle not in modules:

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import analyse as interpretation
 from . import rapport
-from .collecte import MODULES, lancer_analyse
+from .collecte import MODULES, PAR_DEFAUT, lancer_analyse
 from .historique import Historique
 
 
@@ -22,13 +22,20 @@ def _journal(message: str) -> None:
 def analyser_et_rapporter(args, historique: Historique) -> Path:
     if args.mon_wifi:
         historique.definir_mes_wifi(args.mon_wifi)
-    modules = [m for m in MODULES if not getattr(args, f"sans_{m}", False)]
-    if not (args.sdr or args.sdr_csv):
-        modules.remove("sdr")
+    if args.seulement:
+        modules = [m.strip() for m in args.seulement.split(",") if m.strip() in MODULES]
+    else:
+        modules = [m for m in PAR_DEFAUT if not getattr(args, f"sans_{m}", False)]
+        if args.telephone:
+            modules.append("telephone")
+        if args.sdr or args.sdr_csv:
+            modules.append("sdr")
     precedentes = historique.charger(limite=500)
     _journal(f"Analyse du {datetime.now():%d/%m/%Y %H:%M} — lieu : {args.lieu or 'non précisé'}")
     analyse = lancer_analyse(lieu=args.lieu, modules=tuple(modules), duree_bluetooth=args.duree_bluetooth,
-                             sdr_csv=args.sdr_csv, balayage_reseau=not args.sans_balayage, journal=_journal)
+                             sdr_csv=args.sdr_csv, balayage_reseau=not args.sans_balayage,
+                             materiel_radio=args.materiel_radio, dossier_donnees=historique.dossier,
+                             journal=_journal)
     config = historique.config()
     constats = interpretation.evaluer(analyse, precedentes, config)
     synthese = interpretation.synthese(constats)
@@ -95,6 +102,26 @@ def commande_reference(args) -> int:
     return 0
 
 
+def commande_telephone(args) -> int:
+    from .telephone import agir
+    reussi, message = agir(args.action, args.paquet, args.serie)
+    _journal(("OK : " if reussi else "ÉCHEC : ") + message)
+    return 0 if reussi else 1
+
+
+def commande_indicateurs(args) -> int:
+    from .telephone import mettre_a_jour_indicateurs
+    historique = Historique(args.donnees)
+    _journal("Téléchargement de la liste des logiciels espions connus (association Echap, licence CC BY 4.0)…")
+    try:
+        n = mettre_a_jour_indicateurs(historique.dossier)
+    except Exception as e:
+        _journal(f"Échec : {e}. La liste fournie avec le logiciel reste utilisée.")
+        return 1
+    _journal(f"Liste à jour : {n} noms d'applications connues.")
+    return 0
+
+
 def commande_rapport(args) -> int:
     historique = Historique(args.donnees)
     analyses = historique.charger(limite=500)
@@ -124,12 +151,16 @@ def construire_parseur() -> argparse.ArgumentParser:
     mesure.add_argument("--lieu", default="", help="pièce ou lieu de la mesure (ex. : chambre)")
     mesure.add_argument("--mon-wifi", action="append", default=[], help="nom de votre Wi-Fi (répétable ; remplace la liste enregistrée)")
     mesure.add_argument("--duree-bluetooth", type=float, default=15.0, help="durée d'écoute Bluetooth en secondes")
-    mesure.add_argument("--sdr", action="store_true", help="balayage radio avec une clé RTL-SDR (rtl_power)")
-    mesure.add_argument("--sdr-csv", help="analyser un fichier CSV déjà produit par rtl_power")
-    for m in MODULES:
-        if m != "sdr":
-            mesure.add_argument(f"--sans-{m.replace('_', '-')}", dest=f"sans_{m}", action="store_true",
-                                help=f"ne pas faire la mesure « {m} »")
+    mesure.add_argument("--sdr", action="store_true",
+                        help="balayage radio avec le récepteur branché (tinySA, HackRF ou clé RTL-SDR)")
+    mesure.add_argument("--materiel-radio", default="auto", choices=["auto", "tinysa", "hackrf", "rtlsdr"],
+                        help="récepteur radio à utiliser")
+    mesure.add_argument("--sdr-csv", help="analyser un fichier CSV déjà produit par rtl_power ou hackrf_sweep")
+    mesure.add_argument("--telephone", action="store_true", help="analyser le téléphone Android branché en USB")
+    mesure.add_argument("--seulement", help="liste de mesures à faire, ex. : telephone ou cameras,wifi")
+    for m in PAR_DEFAUT:
+        mesure.add_argument(f"--sans-{m.replace('_', '-')}", dest=f"sans_{m}", action="store_true",
+                            help=f"ne pas faire la mesure « {m} »")
 
     p = argparse.ArgumentParser(prog="veille_ondes",
                                 description="Inventaire local des ondes radio et contrôle de l'ordinateur.")
@@ -144,6 +175,14 @@ def construire_parseur() -> argparse.ArgumentParser:
     r.set_defaults(fonction=commande_reference)
     g = sous.add_parser("rapport", parents=[commun], help="regénérer le rapport de la dernière analyse")
     g.set_defaults(fonction=commande_rapport)
+    t = sous.add_parser("telephone", help="désactiver, réactiver ou désinstaller une appli du téléphone Android")
+    t.add_argument("action", choices=["desactiver", "reactiver", "desinstaller"])
+    t.add_argument("paquet", help="nom technique de l'application (ex. : com.exemple.appli)")
+    t.add_argument("--serie", help="numéro de série du téléphone si plusieurs sont branchés")
+    t.set_defaults(fonction=commande_telephone)
+    i = sous.add_parser("mettre-a-jour-indicateurs", parents=[commun],
+                        help="télécharger la dernière liste des logiciels espions connus (connexion Internet)")
+    i.set_defaults(fonction=commande_indicateurs)
     sous.add_parser("interface", help="ouvrir la fenêtre (par défaut)")
     return p
 

@@ -1,22 +1,25 @@
-"""Balayage radio large bande avec un récepteur RTL-SDR (clé USB, achat optionnel).
+"""Balayage radio large bande avec un récepteur optionnel (voir MATERIEL.md).
 
-C'est le seul moyen, avec ce logiciel, de voir les émissions hors Wi-Fi /
-Bluetooth : radio FM, TNT, antennes 4G/5G, télécommandes 433 MHz, compteurs
-communicants, alarmes 868 MHz, etc. Plage couverte : 24 MHz à 1 766 MHz.
-Le Wi-Fi (2,4 / 5 GHz) et le Bluetooth sont HORS de cette plage.
+Trois récepteurs sont pris en charge :
+- clé RTL-SDR : 24 à 1 766 MHz, niveaux relatifs (non calibrés) ;
+- HackRF One : 1 MHz à 6 GHz, niveaux relatifs (non calibrés) ;
+- analyseur de spectre tinySA Ultra : jusqu'à environ 5,3 GHz, niveaux en dBm
+  (étalonnés par le fabricant), ce qui permet une estimation du champ en V/m.
 
-Les niveaux affichés par une clé RTL-SDR sont RELATIFS (non calibrés) : ils
-servent à repérer et comparer des émissions, pas à mesurer une exposition en V/m.
+Seuls HackRF et tinySA Ultra couvrent la bande 2,4 GHz, celle des fours à
+micro-ondes (2 450 MHz), du Wi-Fi et du Bluetooth.
 """
 
 from __future__ import annotations
 
+import math
 import shutil
 import statistics
 import tempfile
 from pathlib import Path
 
-from .systeme import executer
+from .exposition import champ_v_m
+from .systeme import executer, nom_os
 
 # (début MHz, fin MHz, nom, explication). Les bandes étroites passent avant les larges.
 BANDES = [
@@ -45,7 +48,21 @@ BANDES = [
     (1518.0, 1559.0, "Satellites (bande L)", "communications par satellite"),
     (1559.0, 1610.0, "GPS / Galileo", "satellites de navigation (normalement sous le bruit)"),
     (1710.0, 1785.0, "Téléphonie mobile 1800 MHz", "téléphones 4G (sens montant)"),
+    (1805.0, 1880.0, "Téléphonie mobile 1800 MHz", "antennes relais 4G"),
+    (1880.0, 1900.0, "DECT", "téléphones fixes sans fil et leurs bases"),
+    (1920.0, 1980.0, "Téléphonie mobile 2100 MHz", "téléphones 3G/4G/5G (sens montant)"),
+    (2110.0, 2170.0, "Téléphonie mobile 2100 MHz", "antennes relais 3G/4G/5G"),
+    (2400.0, 2500.0, "Bande 2,4 GHz", "Wi-Fi, Bluetooth, fours à micro-ondes, babyphones, caméras sans fil"),
+    (2500.0, 2690.0, "Téléphonie mobile 2600 MHz", "antennes relais et téléphones 4G"),
+    (3400.0, 3800.0, "5G 3,5 GHz", "antennes relais et téléphones 5G"),
+    (5150.0, 5350.0, "Wi-Fi 5 GHz", "box, répéteurs, ordinateurs"),
+    (5470.0, 5725.0, "Wi-Fi 5 GHz", "box, répéteurs, ordinateurs"),
+    (5725.0, 5875.0, "Bande 5,8 GHz", "Wi-Fi, caméras sans fil, drones"),
 ]
+
+BANDE_MICRO_ONDES = (2400.0, 2500.0)
+OUTILS = Path(__file__).resolve().parent.parent / "outils"
+IDS_USB_TINYSA = {(0x0483, 0x5740)}
 
 PAS_ARTEFACT_MHZ = 28.8  # fréquence de l'oscillateur de la clé RTL-SDR
 
@@ -57,23 +74,55 @@ def identifier_bande(f_mhz: float) -> tuple[str, str] | None:
     return None
 
 
-def trouver_rtl_power() -> str | None:
-    for nom in ("rtl_power", "rtl_power.exe"):
-        chemin = shutil.which(nom)
-        if chemin:
-            return chemin
-    locale = Path(__file__).resolve().parent.parent / "outils"
-    for candidat in (locale / "rtl_power.exe", locale / "rtl_power"):
+def _trouver_programme(nom: str) -> str | None:
+    chemin = shutil.which(nom)
+    if chemin:
+        return chemin
+    executable = nom + (".exe" if nom_os() == "windows" else "")
+    for candidat in (OUTILS / executable, OUTILS / nom / executable):
         if candidat.exists():
             return str(candidat)
     return None
 
 
-def lire_csv_rtl_power(texte: str) -> list[tuple[float, float]]:
-    """Lit un fichier CSV produit par rtl_power et renvoie [(fréquence MHz, niveau dB)] triés.
+def trouver_rtl_power() -> str | None:
+    return _trouver_programme("rtl_power")
+
+
+def trouver_hackrf() -> str | None:
+    return _trouver_programme("hackrf_sweep")
+
+
+def trouver_tinysa() -> str | None:
+    """Port série d'un tinySA branché en USB (nécessite le module pyserial)."""
+    try:
+        from serial.tools import list_ports
+    except ImportError:
+        return None
+    for port in list_ports.comports():
+        if (port.vid, port.pid) in IDS_USB_TINYSA:
+            return port.device
+    return None
+
+
+def materiels_disponibles() -> list[str]:
+    """Récepteurs détectés, du plus utile au moins utile."""
+    trouves = []
+    if trouver_tinysa():
+        trouves.append("tinysa")
+    if trouver_hackrf():
+        trouves.append("hackrf")
+    if trouver_rtl_power():
+        trouves.append("rtlsdr")
+    return trouves
+
+
+def lire_csv_rtl_power(texte: str, combiner: str = "moyenne") -> list[tuple[float, float]]:
+    """Lit un CSV de rtl_power ou hackrf_sweep (même format) : [(fréquence MHz, niveau dB)] triés.
 
     Format d'une ligne : date, heure, Hz bas, Hz haut, pas Hz, nb échantillons, dB, dB, ...
-    Si plusieurs balayages sont présents, les niveaux sont moyennés.
+    Si plusieurs balayages sont présents, les niveaux sont moyennés, ou on garde le
+    maximum (combiner="max"), utile pour ne pas rater un émetteur intermittent.
     """
     cumul: dict[float, list[float]] = {}
     for ligne in texte.splitlines():
@@ -88,11 +137,45 @@ def lire_csv_rtl_power(texte: str) -> list[tuple[float, float]]:
         for i, db in enumerate(niveaux):
             f = round((bas + (i + 0.5) * pas) / 1e6, 4)
             cumul.setdefault(f, []).append(db)
+    if combiner == "max":
+        return sorted((f, max(v)) for f, v in cumul.items())
     return sorted((f, sum(v) / len(v)) for f, v in cumul.items())
 
 
+def analyser_sortie_tinysa(texte: str) -> list[tuple[float, float]]:
+    """Réponse à « scan début fin points 3 » : une ligne « fréquence(Hz) niveau(dBm) » par point."""
+    points = []
+    for ligne in texte.splitlines():
+        morceaux = ligne.split()
+        if len(morceaux) != 2:
+            continue
+        try:
+            f_hz, dbm = float(morceaux[0]), float(morceaux[1])
+        except ValueError:
+            continue
+        if f_hz > 1000 and -200 < dbm < 50:
+            points.append((round(f_hz / 1e6, 4), dbm))
+    return points
+
+
+def resume_bande_micro_ondes(points: list[tuple[float, float]], absolu: bool) -> dict | None:
+    """Niveau dans la bande 2,4-2,5 GHz (fours à micro-ondes, Wi-Fi, Bluetooth)."""
+    debut, fin = BANDE_MICRO_ONDES
+    dans = [(f, db) for f, db in points if debut <= f <= fin]
+    if len(dans) < 3:
+        return None
+    f_max, db_max = max(dans, key=lambda x: x[1])
+    resume = {"pic_mhz": round(f_max, 2), "max_db": round(db_max, 1), "absolu": absolu}
+    if absolu:
+        # somme des puissances de tous les points : borne haute de la puissance totale dans la bande
+        total = 10 * math.log10(sum(10 ** (db / 10) for _, db in dans))
+        resume["total_dbm"] = round(total, 1)
+        resume["champ_v_m"] = champ_v_m(total, 2450)
+    return resume
+
+
 def detecter_emissions(points: list[tuple[float, float]], seuil_db: float = 10.0,
-                       fenetre_mhz: float = 10.0, maximum: int = 40) -> list[dict]:
+                       fenetre_mhz: float = 10.0, maximum: int = 40, artefacts_rtl: bool = True) -> list[dict]:
     """Repère les zones nettement au-dessus du bruit de fond local.
 
     Le bruit de fond d'une clé SDR varie avec la fréquence : on le calcule comme
@@ -103,6 +186,7 @@ def detecter_emissions(points: list[tuple[float, float]], seuil_db: float = 10.0
     frequences = [f for f, _ in points]
     niveaux = [db for _, db in points]
     pas = statistics.median(b - a for a, b in zip(frequences, frequences[1:])) or 1.0
+    ecart_max = max(pas * 1.5, 5.0)  # au-delà, ce sont deux zones de balayage différentes
 
     au_dessus = []
     debut = 0
@@ -120,7 +204,7 @@ def detecter_emissions(points: list[tuple[float, float]], seuil_db: float = 10.0
     for i, (f, db) in enumerate(points):
         exces, bruit = au_dessus[i]
         if exces >= seuil_db:
-            if courant and f - courant["fin_mhz"] <= pas * 1.5:
+            if courant and f - courant["fin_mhz"] <= ecart_max:
                 courant["fin_mhz"] = f
                 if exces > courant["exces_db"]:
                     courant.update(pic_mhz=f, niveau_db=db, exces_db=exces)
@@ -134,7 +218,7 @@ def detecter_emissions(points: list[tuple[float, float]], seuil_db: float = 10.0
         bande = identifier_bande(s["pic_mhz"])
         s["bande"], s["explication"] = bande if bande else (None, None)
         reste = s["pic_mhz"] % PAS_ARTEFACT_MHZ
-        s["artefact_possible"] = (min(reste, PAS_ARTEFACT_MHZ - reste) < 0.3
+        s["artefact_possible"] = (artefacts_rtl and min(reste, PAS_ARTEFACT_MHZ - reste) < 0.3
                                   and s["fin_mhz"] - s["debut_mhz"] <= pas * 2)
         for cle in ("debut_mhz", "fin_mhz", "pic_mhz", "niveau_db", "exces_db"):
             s[cle] = round(s[cle], 2)
@@ -142,37 +226,108 @@ def detecter_emissions(points: list[tuple[float, float]], seuil_db: float = 10.0
     return segments[:maximum]
 
 
-def scanner(fichier_csv: str | None = None, debut_mhz: int = 24, fin_mhz: int = 1700,
-            pas_khz: int = 500, integration_s: int = 20) -> dict:
-    """Lance un balayage (ou lit un CSV rtl_power existant) et repère les émissions."""
+def _balayage_rtl(programme: str) -> tuple[list[tuple[float, float]], str | None]:
+    with tempfile.TemporaryDirectory() as dossier:
+        sortie = Path(dossier) / "balayage.csv"
+        r = executer([programme, "-f", "24M:1700M:500k", "-g", "30", "-i", "20", "-c", "20%", "-1", str(sortie)],
+                     delai=320)
+        if not sortie.exists():
+            return [], "rtl_power n'a rien produit (clé branchée ? pilote installé ?) : " + (r.erreurs or r.sortie)[-300:]
+        return lire_csv_rtl_power(sortie.read_text(encoding="utf-8", errors="replace")), None
+
+
+def _balayage_hackrf(programme: str) -> tuple[list[tuple[float, float]], str | None]:
+    with tempfile.TemporaryDirectory() as dossier:
+        sortie = Path(dossier) / "balayage.csv"
+        base = [programme, "-f", "0:6000", "-w", "1000000", "-l", "32", "-g", "20"]
+        r = executer(base + ["-N", "8", "-r", str(sortie)], delai=180)
+        if not sortie.exists() or not sortie.stat().st_size:
+            r = executer(base + ["-1", "-r", str(sortie)], delai=180)  # anciennes versions sans -N
+        if not sortie.exists():
+            return [], ("hackrf_sweep n'a rien produit (HackRF branché ? pilote installé ?) : "
+                        + (r.erreurs or r.sortie)[-300:])
+        return lire_csv_rtl_power(sortie.read_text(encoding="utf-8", errors="replace"), combiner="max"), None
+
+
+# (début Hz, fin Hz, nombre de passages) : la bande des micro-ondes est balayée plusieurs fois
+# pour attraper un émetteur intermittent (un four fonctionne par impulsions).
+ZONES_TINYSA = [
+    (24_000_000, 800_000_000, 2),
+    (800_000_000, 1_000_000_000, 2),
+    (1_700_000_000, 2_200_000_000, 2),
+    (2_400_000_000, 2_500_000_000, 6),
+    (2_500_000_000, 2_700_000_000, 2),
+    (3_300_000_000, 3_900_000_000, 2),
+    (5_100_000_000, 5_300_000_000, 2),
+]
+
+
+def _balayage_tinysa(port: str) -> tuple[list[tuple[float, float]], str | None]:
+    try:
+        import serial
+    except ImportError:
+        return [], "module pyserial absent (relancez l'installation : pip install pyserial)"
+    maximums: dict[float, float] = {}
+    try:
+        with serial.Serial(port, 115200, timeout=5) as s:
+            def commande(texte: str, delai: float = 60.0) -> str:
+                s.timeout = delai
+                s.reset_input_buffer()
+                s.write((texte + "\r").encode("ascii"))
+                return s.read_until(b"ch> ").decode("ascii", errors="replace")
+
+            commande("", 3)
+            version = commande("version", 5)
+            if "tinysa" not in version.lower():
+                return [], f"l'appareil branché sur {port} ne répond pas comme un tinySA"
+            ultra = "tinysa4" in version.lower()
+            for debut, fin, passages in ZONES_TINYSA:
+                if not ultra and fin > 960_000_000:
+                    continue  # le tinySA de base s'arrête à 960 MHz
+                for _ in range(passages):
+                    for f, dbm in analyser_sortie_tinysa(commande(f"scan {debut} {fin} 290 3")):
+                        maximums[f] = max(dbm, maximums.get(f, -999.0))
+    except (OSError, serial.SerialException) as e:
+        return [], f"communication impossible avec le tinySA ({port}) : {e}"
+    if not maximums:
+        return [], "le tinySA n'a renvoyé aucune mesure (mode « ultra » activé pour aller au-delà de 800 MHz ?)"
+    return sorted(maximums.items()), None
+
+
+NOMS_MATERIELS = {"rtlsdr": "clé RTL-SDR", "hackrf": "HackRF One", "tinysa": "tinySA", "fichier": "fichier CSV"}
+
+
+def scanner(fichier_csv: str | None = None, materiel: str = "auto") -> dict:
+    """Lance un balayage avec le récepteur disponible (ou lit un CSV rtl_power / hackrf_sweep existant)."""
     if fichier_csv:
         try:
             texte = Path(fichier_csv).read_text(encoding="utf-8", errors="replace")
         except OSError as e:
             return {"ok": False, "erreur": f"Impossible de lire {fichier_csv} : {e}", "emissions": []}
-        source = fichier_csv
+        points, erreur, materiel, absolu = lire_csv_rtl_power(texte, combiner="max"), None, "fichier", False
     else:
-        programme = trouver_rtl_power()
-        if not programme:
+        disponibles = materiels_disponibles()
+        if materiel == "auto":
+            materiel = disponibles[0] if disponibles else ""
+        if not materiel or materiel not in disponibles:
             return {"ok": False, "disponible": False, "emissions": [],
-                    "erreur": "Aucun récepteur SDR configuré (programme rtl_power introuvable). "
+                    "erreur": "Aucun récepteur radio branché (tinySA, HackRF ou clé RTL-SDR). "
                               "Voir MATERIEL.md : c'est un achat optionnel."}
-        with tempfile.TemporaryDirectory() as dossier:
-            sortie = Path(dossier) / "balayage.csv"
-            r = executer([programme, "-f", f"{debut_mhz}M:{fin_mhz}M:{pas_khz}k", "-g", "30",
-                          "-i", str(integration_s), "-c", "20%", "-1", str(sortie)],
-                         delai=integration_s * 4 + 240)
-            if not sortie.exists():
-                message = (r.erreurs or r.sortie).strip()[-300:]
-                return {"ok": False, "disponible": True, "emissions": [],
-                        "erreur": f"rtl_power n'a rien produit (clé branchée ? pilote installé ?) : {message}"}
-            texte = sortie.read_text(encoding="utf-8", errors="replace")
-        source = "rtl_power"
-    points = lire_csv_rtl_power(texte)
+        if materiel == "tinysa":
+            points, erreur = _balayage_tinysa(trouver_tinysa())
+        elif materiel == "hackrf":
+            points, erreur = _balayage_hackrf(trouver_hackrf())
+        else:
+            points, erreur = _balayage_rtl(trouver_rtl_power())
+        absolu = materiel == "tinysa"
+    if erreur:
+        return {"ok": False, "disponible": True, "emissions": [], "erreur": erreur}
     if not points:
-        return {"ok": False, "emissions": [], "erreur": "Le fichier de balayage est vide ou illisible."}
+        return {"ok": False, "emissions": [], "erreur": "Le balayage est vide ou illisible."}
     return {
-        "ok": True, "source": source,
+        "ok": True, "source": NOMS_MATERIELS.get(materiel, materiel), "materiel": materiel, "absolu": absolu,
+        "unite": "dBm" if absolu else "dB (relatif)",
         "plage_mhz": [points[0][0], points[-1][0]], "nb_points": len(points),
-        "emissions": detecter_emissions(points),
+        "emissions": detecter_emissions(points, artefacts_rtl=materiel in ("rtlsdr", "fichier")),
+        "micro_ondes": resume_bande_micro_ondes(points, absolu),
     }

@@ -15,8 +15,10 @@ import tkinter as tk
 import webbrowser
 from tkinter import messagebox, ttk
 
+from .analyse import LIBELLES_NIVEAUX
 from .historique import Historique
-from .sdr import trouver_rtl_power
+from .rapport import page_guides
+from .sdr import NOMS_MATERIELS, materiels_disponibles
 
 DOSSIER_PROJET = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -57,16 +59,21 @@ class Fenetre:
         self.choix = {}
         for i, (cle, texte) in enumerate([("wifi", "Wi-Fi"), ("bluetooth", "Bluetooth"),
                                           ("reseau_local", "Appareils sur ma box"),
+                                          ("cameras", "Caméras cachées"),
                                           ("ordinateur", "Contrôle de l'ordinateur")]):
             v = tk.BooleanVar(value=True)
-            ttk.Checkbutton(options, text=texte, variable=v).grid(row=0, column=i, sticky="w", padx=6)
+            ttk.Checkbutton(options, text=texte, variable=v).grid(row=i // 3, column=i % 3, sticky="w", padx=6)
             self.choix[cle] = v
+        self.telephone = tk.BooleanVar(value=False)
+        ttk.Checkbutton(options, text="Téléphone Android (câble USB)", variable=self.telephone).grid(
+            row=1, column=2, sticky="w", padx=6)
         self.sdr = tk.BooleanVar(value=False)
-        sdr_ok = trouver_rtl_power() is not None
-        ttk.Checkbutton(options, text="Radio large bande (clé SDR)" if sdr_ok else
-                        "Radio large bande (clé SDR non détectée)", variable=self.sdr,
-                        state="normal" if sdr_ok else "disabled").grid(row=1, column=0, columnspan=2,
-                                                                       sticky="w", padx=6, pady=(6, 0))
+        materiels = materiels_disponibles()
+        texte_radio = ("Radio / micro-ondes : " + ", ".join(NOMS_MATERIELS[m] for m in materiels) if materiels
+                       else "Radio / micro-ondes (aucun récepteur branché)")
+        ttk.Checkbutton(options, text=texte_radio, variable=self.sdr,
+                        state="normal" if materiels else "disabled").grid(row=2, column=0, columnspan=3,
+                                                                          sticky="w", padx=6, pady=(6, 0))
 
         boutons = ttk.Frame(cadre)
         boutons.pack(fill="x")
@@ -89,6 +96,14 @@ class Fenetre:
         ttk.Button(boutons2, text="Ouvrir le dernier rapport", command=self.ouvrir_rapport).pack(side="left")
         ttk.Button(boutons2, text="Enregistrer mes appareils comme référence",
                    command=self.reference).pack(side="left", padx=6)
+        ttk.Button(boutons2, text="Guides (iPhone, caméras, micro-ondes)", command=self.ouvrir_guides).pack(side="left")
+
+        boutons3 = ttk.Frame(cadre)
+        boutons3.pack(fill="x", pady=(8, 0))
+        ttk.Label(boutons3, text="Téléphone Android :").pack(side="left")
+        self.bouton_telephone = ttk.Button(boutons3, text="Analyser le téléphone", command=self.analyser_telephone)
+        self.bouton_telephone.pack(side="left", padx=6)
+        ttk.Button(boutons3, text="Applis du téléphone…", command=self.gerer_telephone).pack(side="left")
 
         self.texte = tk.Text(cadre, height=16, wrap="word", state="disabled", font=("TkFixedFont", 10))
         self.texte.pack(fill="both", expand=True, pady=(10, 0))
@@ -129,6 +144,8 @@ class Fenetre:
         for cle, v in self.choix.items():
             if not v.get():
                 args.append(f"--sans-{cle.replace('_', '-')}")
+        if self.telephone.get():
+            args.append("--telephone")
         if self.sdr.get():
             args.append("--sdr")
         return args
@@ -144,7 +161,7 @@ class Fenetre:
         except OSError as e:
             messagebox.showerror("Veille Ondes", f"Impossible de lancer l'analyse : {e}")
             return
-        for b in (self.bouton_analyse, self.bouton_surveiller):
+        for b in (self.bouton_analyse, self.bouton_surveiller, self.bouton_telephone):
             b.configure(state="disabled")
         self.bouton_arreter.configure(state="normal")
         threading.Thread(target=self._relayer, args=(self.processus,), daemon=True).start()
@@ -157,7 +174,7 @@ class Fenetre:
 
     def termine(self) -> None:
         self.processus = None
-        for b in (self.bouton_analyse, self.bouton_surveiller):
+        for b in (self.bouton_analyse, self.bouton_surveiller, self.bouton_telephone):
             b.configure(state="normal")
         self.bouton_arreter.configure(state="disabled")
         self.ecrire("\n")
@@ -175,6 +192,79 @@ class Fenetre:
         self.ecrire("\n")
         self._lancer(["surveiller", "--intervalle", str(intervalle), "--duree", str(duree),
                       *self._arguments_mesure()])
+
+    def analyser_telephone(self) -> None:
+        self.ecrire("\nBranchez le téléphone Android avec un câble de données, activez le « Débogage USB » "
+                    "(guide dans MATERIEL.md) et acceptez la demande qui s'affiche sur le téléphone.\n")
+        self._lancer(["analyser", "--seulement", "telephone", "--lieu", self.lieu.get().strip() or "téléphone"])
+
+    def gerer_telephone(self) -> None:
+        tel = next((a["telephone"] for a in reversed(self.historique.charger(limite=100))
+                    if (a.get("telephone") or {}).get("ok")), None)
+        if not tel:
+            messagebox.showinfo("Veille Ondes", "Analysez d'abord le téléphone (bouton « Analyser le téléphone »).")
+            return
+        fenetre = tk.Toplevel(self.racine)
+        fenetre.title(f"Applications du téléphone — {tel['appareil'].get('modele', '')}")
+        fenetre.minsize(760, 420)
+        ttk.Label(fenetre, padding=8, wraplength=740, text=(
+            "Seules les applications installées par l'utilisateur sont listées. « Désactiver » est réversible ; "
+            "« Désinstaller » ne l'est pas. Si vous comptez porter plainte, faites d'abord constater le téléphone "
+            "(le rapport est conservé).")).pack(fill="x")
+        arbre = ttk.Treeview(fenetre, columns=("niveau", "origine", "raisons"), show="tree headings", height=14)
+        for colonne, titre, largeur in (("#0", "Application", 240), ("niveau", "Niveau", 90),
+                                        ("origine", "Origine", 110), ("raisons", "Raisons", 420)):
+            arbre.heading(colonne, text=titre)
+            arbre.column(colonne, width=largeur, stretch=colonne == "raisons")
+        for app in tel["applications"]:
+            arbre.insert("", "end", iid=app["paquet"], text=app["paquet"] + (" (désactivée)" if app.get("desactive") else ""),
+                         values=(LIBELLES_NIVEAUX[app["niveau"]], app["magasin"] or "hors magasin",
+                                 " ; ".join(app["raisons"])))
+        arbre.pack(fill="both", expand=True, padx=8)
+        detail = ttk.Label(fenetre, padding=8, wraplength=740, justify="left",
+                           text="Sélectionnez une application pour voir le détail.")
+        detail.pack(fill="x")
+        par_paquet = {app["paquet"]: app for app in tel["applications"]}
+
+        def afficher_detail(_evenement=None):
+            if arbre.selection():
+                app = par_paquet[arbre.selection()[0]]
+                detail.configure(text=f"{app['paquet']} — {LIBELLES_NIVEAUX[app['niveau']]} — "
+                                      + (" ; ".join(app["raisons"]) or "rien de particulier")
+                                      + (f" — installée le {app['installe_le']}" if app.get("installe_le") else ""))
+        arbre.bind("<<TreeviewSelect>>", afficher_detail)
+        boutons = ttk.Frame(fenetre, padding=8)
+        boutons.pack(fill="x")
+        for action, texte in (("desactiver", "Désactiver"), ("reactiver", "Réactiver"),
+                              ("desinstaller", "Désinstaller")):
+            ttk.Button(boutons, text=texte, command=lambda a=action: self._agir_telephone(
+                a, arbre.selection(), tel["appareil"]["serie"], fenetre)).pack(side="left", padx=(0, 6))
+
+    def _agir_telephone(self, action: str, selection: tuple, serie: str, parent: tk.Toplevel) -> None:
+        if not selection:
+            messagebox.showinfo("Veille Ondes", "Sélectionnez d'abord une application.", parent=parent)
+            return
+        paquet = selection[0]
+        verbes = {"desactiver": "désactiver", "reactiver": "réactiver", "desinstaller": "DÉSINSTALLER (définitif)"}
+        if not messagebox.askyesno("Veille Ondes", f"Voulez-vous {verbes[action]} l'application\n{paquet} ?\n\n"
+                                   "Le téléphone doit être branché et déverrouillé.", parent=parent):
+            return
+        env = dict(os.environ, PYTHONIOENCODING="utf-8")
+        options = {"creationflags": 0x08000000} if os.name == "nt" else {}
+        try:
+            r = subprocess.run([sys.executable, "-m", "veille_ondes", "telephone", action, paquet, "--serie", serie],
+                               cwd=DOSSIER_PROJET, capture_output=True, timeout=120, env=env, **options)
+            message = r.stdout.decode("utf-8", errors="replace").strip() or r.stderr.decode("utf-8", "replace")
+        except (OSError, subprocess.TimeoutExpired) as e:
+            message = f"ÉCHEC : {e}"
+        self.ecrire(f"\n{paquet} : {message}\n")
+        messagebox.showinfo("Veille Ondes", message, parent=parent)
+
+    def ouvrir_guides(self) -> None:
+        self.historique.dossier.mkdir(parents=True, exist_ok=True)
+        fichier = self.historique.dossier / "guides.html"
+        fichier.write_text(page_guides(), encoding="utf-8")
+        webbrowser.open(fichier.resolve().as_uri())
 
     def reference(self) -> None:
         if not messagebox.askyesno(
