@@ -1,0 +1,7 @@
+# données personnelles des analyses : elles restent sur votre ordinateur
+donnees/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+outils/
