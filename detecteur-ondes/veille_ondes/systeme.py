@@ -40,22 +40,41 @@ def description_systeme() -> str:
 DOSSIER_OUTILS = Path(__file__).resolve().parent.parent / "outils"
 
 
-def chercher_outil(nom: str) -> str | None:
+def _chercher_dans(dossier: Path, executable: str, profondeur: int) -> str | None:
+    if not dossier.is_dir():
+        return None
+    base = len(dossier.parts)
+    for racine, sous_dossiers, fichiers in os.walk(dossier):
+        for f in fichiers:
+            if f.lower() == executable.lower():
+                return str(Path(racine) / f)
+        if len(Path(racine).parts) - base >= profondeur:
+            sous_dossiers[:] = []
+        else:
+            sous_dossiers[:] = sorted(d for d in sous_dossiers if not d.startswith((".", "$")))
+    return None
+
+
+def chercher_outil(nom: str, emplacements_en_plus: tuple[tuple[Path, int], ...] = ()) -> str | None:
     """Programme installé sur le système, ou déposé n'importe où dans le dossier « outils ».
 
     Windows décompresse souvent un zip dans un sous-dossier supplémentaire
     (outils/platform-tools-latest-windows/platform-tools/adb.exe) : on cherche donc
-    dans tous les sous-dossiers.
+    dans les sous-dossiers, puis dans les emplacements supplémentaires indiqués
+    (dossier, profondeur maximale).
     """
     chemin = shutil.which(nom)
     if chemin:
         return chemin
     executable = nom + (".exe" if nom_os() == "windows" else "")
-    try:
-        trouves = sorted(DOSSIER_OUTILS.rglob(executable), key=lambda p: len(p.parts))
-    except OSError:
-        return None
-    return str(trouves[0]) if trouves else None
+    for dossier, profondeur in ((DOSSIER_OUTILS, 6), *emplacements_en_plus):
+        try:
+            trouve = _chercher_dans(dossier, executable, profondeur)
+        except OSError:
+            continue
+        if trouve:
+            return trouve
+    return None
 
 
 def decoder(octets: bytes) -> str:

@@ -21,7 +21,8 @@ import re
 from datetime import date
 from pathlib import Path
 
-from .systeme import chercher_outil, executer
+from .historique import DOSSIER_PAR_DEFAUT
+from .systeme import DOSSIER_OUTILS, chercher_outil, executer
 
 FICHIER_INDICATEURS = Path(__file__).resolve().parent / "indicateurs" / "logiciels_espions.json"
 URL_INDICATEURS = "https://raw.githubusercontent.com/AssoEchap/stalkerware-indicators/master/"
@@ -55,8 +56,27 @@ PERMISSIONS_SENSIBLES = {
 
 # --- outil adb ----------------------------------------------------------------------
 
-def trouver_adb() -> str | None:
-    return chercher_outil("adb")
+def emplacements_adb() -> tuple[tuple[Path, int], ...]:
+    """Endroits où l'outil de Google se retrouve souvent après téléchargement."""
+    accueil = Path.home()
+    lieux = [
+        (DOSSIER_OUTILS.parent.parent, 4),             # dossier qui contient celui du logiciel
+        (accueil / "Downloads", 4), (accueil / "Téléchargements", 4),
+        (accueil / "Desktop", 4), (accueil / "Bureau", 4), (accueil / "OneDrive" / "Bureau", 4),
+        (accueil / "AppData" / "Local" / "Android" / "Sdk" / "platform-tools", 1),
+    ]
+    return tuple(lieux)
+
+
+def trouver_adb(dossier_donnees: Path | None = None) -> str | None:
+    config = (dossier_donnees or DOSSIER_PAR_DEFAUT) / "config.json"
+    try:
+        choisi = json.loads(config.read_text(encoding="utf-8")).get("chemin_adb")
+        if choisi and Path(choisi).is_file():
+            return choisi
+    except (OSError, json.JSONDecodeError, AttributeError):
+        pass
+    return chercher_outil("adb", emplacements_adb())
 
 
 def analyser_adb_devices(texte: str) -> list[tuple[str, str]]:
@@ -268,11 +288,12 @@ def evaluer_application(paquet: str, installateur: str | None, accessibilite: bo
 # --- point d'entrée -------------------------------------------------------------------------------
 
 def scanner(dossier_donnees: Path | None = None, serie: str | None = None) -> dict:
-    adb = trouver_adb()
+    adb = trouver_adb(dossier_donnees)
     if not adb:
         return {"ok": False, "disponible": False,
-                "erreur": "L'outil adb est introuvable. Téléchargez les « SDK Platform-Tools » de Google "
-                          "(gratuit) et décompressez-les dans le dossier « outils » du logiciel (voir MATERIEL.md)."}
+                "erreur": "L'outil adb.exe est introuvable. Cliquez « Choisir adb.exe… » dans la fenêtre et "
+                          "sélectionnez le fichier adb.exe (dans le dossier platform-tools téléchargé chez Google), "
+                          f"ou décompressez les « SDK Platform-Tools » dans ce dossier : {DOSSIER_OUTILS}"}
     appareils = analyser_adb_devices(executer([adb, "devices"], delai=30).sortie)
     if serie:
         appareils = [a for a in appareils if a[0] == serie]
@@ -331,14 +352,14 @@ def scanner(dossier_donnees: Path | None = None, serie: str | None = None) -> di
 
 # --- actions sur une application -------------------------------------------------------------------
 
-def agir(action: str, paquet: str, serie: str | None = None) -> tuple[bool, str]:
+def agir(action: str, paquet: str, serie: str | None = None, dossier_donnees: Path | None = None) -> tuple[bool, str]:
     """Désactive, réactive ou désinstalle une application installée par l'utilisateur.
 
     Par sécurité, seules les applications non système peuvent être touchées.
     """
-    adb = trouver_adb()
+    adb = trouver_adb(dossier_donnees)
     if not adb:
-        return False, "outil adb introuvable"
+        return False, "outil adb introuvable (bouton « Choisir adb.exe… »)"
     appareils = [a for a in analyser_adb_devices(executer([adb, "devices"]).sortie) if a[1] == "device"]
     if serie:
         appareils = [a for a in appareils if a[0] == serie]

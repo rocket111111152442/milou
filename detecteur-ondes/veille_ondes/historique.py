@@ -12,6 +12,7 @@ CONFIG_PAR_DEFAUT = {
     "mes_wifi": [],                  # noms de vos propres réseaux Wi-Fi
     "appareils_reseau_connus": {},   # adresse MAC -> description
     "date_reference": None,
+    "chemin_adb": None,              # emplacement d'adb.exe choisi à la main
 }
 
 

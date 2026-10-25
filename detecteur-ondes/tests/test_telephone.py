@@ -154,3 +154,23 @@ def test_constats_telephone():
     assert ("important", "Application à examiner ") in niveaux
     assert any("rooté" in c.titre for c in constats)
     assert any("Correctifs de sécurité" in c.titre for c in constats)
+
+
+def test_adb_choisi_a_la_main(tmp_path):
+    adb = tmp_path / "ailleurs" / "adb.exe"
+    adb.parent.mkdir()
+    adb.write_text("")
+    (tmp_path / "config.json").write_text('{"chemin_adb": "%s"}' % str(adb).replace("\\", "\\\\"))
+    assert telephone.trouver_adb(tmp_path) == str(adb)
+
+
+def test_adb_dans_les_telechargements(tmp_path, monkeypatch):
+    from veille_ondes import systeme
+    monkeypatch.setattr(systeme.shutil, "which", lambda nom: None)
+    monkeypatch.setattr(systeme, "DOSSIER_OUTILS", tmp_path / "logiciel" / "outils")
+    nom = "adb.exe" if systeme.nom_os() == "windows" else "adb"
+    cible = tmp_path / "Downloads" / "platform-tools-latest-windows" / "platform-tools" / nom
+    cible.parent.mkdir(parents=True)
+    cible.write_text("")
+    monkeypatch.setattr(telephone, "emplacements_adb", lambda: ((tmp_path / "Downloads", 4),))
+    assert telephone.trouver_adb(tmp_path / "donnees_vides") == str(cible)

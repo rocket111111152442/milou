@@ -56,7 +56,7 @@ def _installer_programme(dossier, nom, code_python):
 
 def test_telephone_simule(tmp_path, monkeypatch):
     adb = _installer_programme(tmp_path, "adb", FAUX_ADB)
-    monkeypatch.setattr(telephone, "trouver_adb", lambda: adb)
+    monkeypatch.setattr(telephone, "trouver_adb", lambda *args, **kwargs: adb)
     r = telephone.scanner()
     assert r["ok"] and r["appareil"]["modele"] == "SM-A546B"
     par_nom = {a["paquet"]: a for a in r["applications"]}

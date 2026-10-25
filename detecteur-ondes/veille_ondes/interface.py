@@ -13,7 +13,7 @@ import sys
 import threading
 import tkinter as tk
 import webbrowser
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from .analyse import LIBELLES_NIVEAUX
 from .historique import Historique
@@ -104,6 +104,7 @@ class Fenetre:
         self.bouton_telephone = ttk.Button(boutons3, text="Analyser le téléphone", command=self.analyser_telephone)
         self.bouton_telephone.pack(side="left", padx=6)
         ttk.Button(boutons3, text="Applis du téléphone…", command=self.gerer_telephone).pack(side="left")
+        ttk.Button(boutons3, text="Choisir adb.exe…", command=self.choisir_adb).pack(side="left", padx=6)
 
         self.texte = tk.Text(cadre, height=16, wrap="word", state="disabled", font=("TkFixedFont", 10))
         self.texte.pack(fill="both", expand=True, pady=(10, 0))
@@ -259,6 +260,20 @@ class Fenetre:
             message = f"ÉCHEC : {e}"
         self.ecrire(f"\n{paquet} : {message}\n")
         messagebox.showinfo("Veille Ondes", message, parent=parent)
+
+    def choisir_adb(self) -> None:
+        chemin = filedialog.askopenfilename(
+            title="Où se trouve adb.exe ? (dossier platform-tools)",
+            filetypes=[("adb", "adb.exe adb"), ("Tous les fichiers", "*.*")])
+        if not chemin:
+            return
+        if os.path.basename(chemin).lower() not in ("adb.exe", "adb"):
+            messagebox.showerror("Veille Ondes", "Ce n'est pas le fichier adb.exe.")
+            return
+        config = self.historique.config()
+        config["chemin_adb"] = chemin
+        self.historique.enregistrer_config(config)
+        self.ecrire(f"\nOutil adb enregistré : {chemin}\n")
 
     def ouvrir_guides(self) -> None:
         self.historique.dossier.mkdir(parents=True, exist_ok=True)
