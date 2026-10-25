@@ -49,6 +49,12 @@ Il faut le savoir avant d'interpréter les résultats :
 1. Installez Python 3.10 ou plus récent depuis <https://www.python.org/downloads/>.
    **Cochez la case « Add python.exe to PATH »** pendant l'installation.
 2. Double-cliquez sur `lancer_windows.bat`. La première fois, il installe ce qu'il faut (une minute).
+   Si « Contrôle intelligent des applications » bloque le fichier (fichier venu d'Internet) :
+   supprimez le dossier décompressé, faites un clic droit sur le **.zip** > Propriétés > cochez
+   **Débloquer** > OK, puis décompressez à nouveau. Ou bien, sans le `.bat` : clic droit dans le dossier >
+   « Ouvrir dans le Terminal », puis tapez `py -m venv .venv`,
+   `.venv\Scripts\python -m pip install -r requirements.txt` et `.venv\Scripts\python -m veille_ondes`.
+   Ne désactivez pas le Contrôle intelligent des applications : on ne peut pas le réactiver sans réinstaller Windows.
 3. Windows 11 : pour lister les réseaux Wi-Fi, Windows exige que la localisation soit activée :
    Paramètres > Confidentialité et sécurité > Localisation > activer « Services de localisation » et
    « Autoriser les applications de bureau à accéder à votre position ». Le logiciel vous le signale si besoin.
