@@ -96,6 +96,8 @@ def test_hackrf_simule(tmp_path, monkeypatch):
 class FauxTinySA:
     """Répond comme le shell USB d'un tinySA Ultra."""
 
+    version = "tinySA4_v1.4-143"
+
     def __init__(self, *args, **kwargs):
         self.timeout = 5
         self.reponse = b""
@@ -112,7 +114,7 @@ class FauxTinySA:
     def write(self, donnees):
         commande = donnees.decode().strip()
         if commande == "version":
-            texte = "version\r\ntinySA4_v1.4-143\r\nHW Version:V0.4.5.1\r\n"
+            texte = f"version\r\n{self.version}\r\nHW Version:V0.4.6\r\n"
         elif commande.startswith("scan"):
             _, debut, fin, points, _ = commande.split()
             debut, fin, points = int(debut), int(fin), int(points)
@@ -141,3 +143,16 @@ def test_tinysa_simule(monkeypatch):
     mo = r["micro_ondes"]
     assert 2449 <= mo["pic_mhz"] <= 2451 and mo["max_db"] == -40
     assert mo["champ_v_m"] < 1
+
+
+@pytest.mark.parametrize("version, va_jusqu_a", [("tinySA_v1.4-87", 960), ("tinySA4_v1.4-200", 5300),
+                                                 ("version inconnue ZS-407 tinySA", 5300)])
+def test_tinysa_selon_le_modele(monkeypatch, version, va_jusqu_a):
+    serial = pytest.importorskip("serial")
+    monkeypatch.setattr(FauxTinySA, "version", version)
+    monkeypatch.setattr(serial, "Serial", FauxTinySA)
+    monkeypatch.setattr(sdr, "materiels_disponibles", lambda: ["tinysa"])
+    monkeypatch.setattr(sdr, "trouver_tinysa", lambda: "COM7")
+    r = sdr.scanner()
+    assert r["ok"] and r["plage_mhz"][1] <= va_jusqu_a and r["plage_mhz"][1] > va_jusqu_a - 100
+    assert (r["micro_ondes"] is None) == (va_jusqu_a == 960)

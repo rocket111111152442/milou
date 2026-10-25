@@ -280,10 +280,14 @@ def _balayage_tinysa(port: str) -> tuple[list[tuple[float, float]], str | None]:
             version = commande("version", 5)
             if "tinysa" not in version.lower():
                 return [], f"l'appareil branché sur {port} ne répond pas comme un tinySA"
-            ultra = "tinysa4" in version.lower()
+            # le tinySA de base (micrologiciel « tinySA_… ») s'arrête à 960 MHz ; les Ultra, Ultra+ (ZS-405,
+            # ZS-406, ZS-407…) annoncent « tinySA4_… ». Dans le doute, on tente toute la plage.
+            de_base = "tinysa_" in version.lower() and "tinysa4" not in version.lower()
             for debut, fin, passages in ZONES_TINYSA:
-                if not ultra and fin > 960_000_000:
-                    continue  # le tinySA de base s'arrête à 960 MHz
+                if de_base:
+                    if debut >= 960_000_000:
+                        continue
+                    fin = min(fin, 960_000_000)
                 for _ in range(passages):
                     for f, dbm in analyser_sortie_tinysa(commande(f"scan {debut} {fin} 290 3")):
                         maximums[f] = max(dbm, maximums.get(f, -999.0))
