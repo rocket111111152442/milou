@@ -181,6 +181,57 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .bank--bottom { bottom: -7vw; }
 .bank--top { top: -8vw; }
 
+/* ---------- Effets dans les nuages ---------- */
+.cloudfx { display: block; animation-name: float, breathe; animation-duration: calc(var(--dur, 120s) / 3), 11s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; animation-direction: alternate; animation-delay: 0s, var(--fxd, 0s); transition: transform 1.2s var(--ease); }
+.bank.cloudfx { animation: breathe 14s ease-in-out infinite alternate; animation-delay: var(--fxd, 0s); }
+.hero__front-cloud.cloudfx, .concept__cloud.cloudfx, .bar__cloud.cloudfx, .tile__cloud.cloudfx { animation-duration: 30s, 10s; }
+.cloudfx__img { display: block; width: 100%; height: auto; max-width: none; transition: filter 1s var(--ease); }
+@keyframes breathe { from { scale: 1; } to { scale: 1.05; } }
+
+/* reflet de lumière irisé qui traverse le nuage (masqué à sa forme exacte) */
+.cloudfx::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  -webkit-mask: var(--mask) center / 100% 100% no-repeat;
+  mask: var(--mask) center / 100% 100% no-repeat;
+  background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, .95) 45%, rgba(255, 205, 226, .9) 50%, rgba(255, 240, 200, .75) 54%, rgba(195, 240, 222, .9) 58%, transparent 70%);
+  background-size: 320% 100%;
+  mix-blend-mode: screen;
+  animation: sheen 9s ease-in-out infinite;
+  animation-delay: var(--fxd, 0s);
+}
+@keyframes sheen {
+  0% { background-position: 110% 0; opacity: 0; }
+  10% { opacity: 1; }
+  55% { background-position: -10% 0; opacity: 1; }
+  65%, 100% { background-position: -10% 0; opacity: 0; }
+}
+
+/* halo doux qui pulse dans le hero et le final */
+.cloudfx--glow .cloudfx__img { animation: halo 7s ease-in-out infinite alternate; animation-delay: var(--fxd, 0s); }
+@keyframes halo {
+  from { filter: brightness(1) drop-shadow(0 0 0 rgba(255, 190, 215, 0)); }
+  to { filter: brightness(1.08) drop-shadow(0 0 26px rgba(255, 190, 215, .55)); }
+}
+/* nuage illuminé quand le curseur s'en approche */
+.cloudfx.is-lit .cloudfx__img { filter: brightness(1.12) drop-shadow(0 0 34px rgba(255, 255, 255, .9)) drop-shadow(0 0 60px rgba(255, 190, 215, .5)) !important; }
+
+.fx-off, .fx-off::after, .fx-off .cloudfx__img { animation-play-state: paused !important; }
+
+/* paillettes de lumière */
+.glint {
+  position: absolute; left: var(--x); top: var(--y); z-index: 1;
+  width: var(--s); height: var(--s); border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px 2px rgba(255, 255, 255, .9), 0 0 18px 4px rgba(255, 190, 215, .5);
+  opacity: 0;
+  animation: glint var(--t, 6s) ease-in-out infinite var(--d, 0s);
+}
+@keyframes glint {
+  0%, 100% { opacity: 0; transform: translateY(0) scale(.4); }
+  45% { opacity: 1; transform: translateY(-14px) scale(1); }
+  70% { opacity: .2; transform: translateY(-22px) scale(.6); }
+}
+
 /* ---------- Intro : la brume se lève ---------- */
 .intro {
   position: fixed; inset: 0; z-index: 300; overflow: hidden; pointer-events: none;

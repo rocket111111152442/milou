@@ -9,11 +9,52 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
+  /* ---------- Effets dans les nuages ----------
+     Chaque nuage est enveloppé pour recevoir : respiration, reflet de lumière
+     irisé qui le traverse, halo, et réaction au curseur. */
+  const FX_SELECTOR = '.cloud, .bank, .hero__front-cloud, .concept__cloud, .bar__cloud, .tile__cloud, .events__cloud';
+  $$(FX_SELECTOR).forEach((img, i) => {
+    if (img.tagName !== 'IMG') return;
+    const wrap = document.createElement('span');
+    wrap.className = img.className + ' cloudfx';
+    if (img.getAttribute('style')) wrap.setAttribute('style', img.getAttribute('style'));
+    if (img.dataset.depth) wrap.dataset.depth = img.dataset.depth;
+    wrap.setAttribute('aria-hidden', 'true');
+    wrap.style.setProperty("--mask", `url("${img.src}")`); // URL absolue : sinon résolue depuis le CSS
+    wrap.style.setProperty('--fxd', (-(i * 1.7) % 9).toFixed(1) + 's');
+    if (img.closest('.hero, .final')) wrap.classList.add('cloudfx--glow');
+    img.className = 'cloudfx__img';
+    img.removeAttribute('style');
+    delete img.dataset.depth;
+    img.replaceWith(wrap);
+    wrap.appendChild(img);
+  });
+
+  // paillettes de lumière qui scintillent dans le ciel
+  if (!reduceMotion) {
+    $$('.hero .sky, .final .sky').forEach((sky) => {
+      for (let i = 0; i < 16; i++) {
+        const g = document.createElement('span');
+        g.className = 'glint';
+        g.style.cssText = `--x:${(Math.random() * 100).toFixed(1)}%;--y:${(Math.random() * 90).toFixed(1)}%;--s:${(2 + Math.random() * 4).toFixed(1)}px;--d:${(-Math.random() * 6).toFixed(1)}s;--t:${(4 + Math.random() * 4).toFixed(1)}s`;
+        sky.appendChild(g);
+      }
+    });
+  }
+
+  // les effets s'arrêtent quand le nuage n'est pas à l'écran (économie de batterie)
+  if ('IntersectionObserver' in window) {
+    const fxObserver = new IntersectionObserver((entries) => {
+      entries.forEach((e) => e.target.classList.toggle('fx-off', !e.isIntersecting));
+    }, { rootMargin: '100px' });
+    $$('.cloudfx').forEach((el) => fxObserver.observe(el));
+  }
+
   /* ---------- Header, barre mobile, parallaxe ---------- */
   const header = $('#header');
   const mobilebar = $('.mobilebar');
   const parallaxEls = $$('[data-depth]').filter((el) => parseFloat(el.dataset.depth) > 0);
-  const pointer = { x: 0, y: 0 };
+  const pointer = { x: 0, y: 0, px: -9999, py: -9999 };
   let ticking = false;
 
   function update() {
@@ -26,8 +67,23 @@
         const r = el.getBoundingClientRect();
         if (r.bottom < -200 || r.top > window.innerHeight + 200) return;
         const center = r.top + r.height / 2 - window.innerHeight / 2;
-        const ty = -center * d * 0.35 + pointer.y * d * 30;
-        const tx = pointer.x * d * 50;
+        let ty = -center * d * 0.35 + pointer.y * d * 30;
+        let tx = pointer.x * d * 50;
+        // dans le hero, les nuages s'écartent quand on descend
+        if (el.closest('.hero')) {
+          const side = r.left + r.width / 2 < window.innerWidth / 2 ? -1 : 1;
+          tx += side * Math.min(y, window.innerHeight) * d * 1.4;
+        }
+        // le curseur repousse doucement les nuages et les illumine
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const dx = cx - pointer.px;
+        const dy = cy - pointer.py;
+        const dist = Math.hypot(dx, dy);
+        const radius = Math.max(r.width, r.height) * 0.6 + 120;
+        const near = dist < radius ? 1 - dist / radius : 0;
+        if (near) { tx += (dx / dist) * near * 45; ty += (dy / dist) * near * 30; }
+        el.classList.toggle('is-lit', near > 0.25);
         el.style.transform = `translate3d(${tx.toFixed(1)}px, ${ty.toFixed(1)}px, 0)`;
       });
     }
@@ -39,6 +95,8 @@
     window.addEventListener('pointermove', (e) => {
       pointer.x = e.clientX / window.innerWidth - 0.5;
       pointer.y = e.clientY / window.innerHeight - 0.5;
+      pointer.px = e.clientX;
+      pointer.py = e.clientY;
       requestUpdate();
     }, { passive: true });
   }
