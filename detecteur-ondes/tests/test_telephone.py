@@ -174,3 +174,31 @@ def test_adb_dans_les_telechargements(tmp_path, monkeypatch):
     cible.write_text("")
     monkeypatch.setattr(telephone, "emplacements_adb", lambda: ((tmp_path / "Downloads", 4),))
     assert telephone.trouver_adb(tmp_path / "donnees_vides") == str(cible)
+
+
+def test_attend_que_le_telephone_soit_autorise(monkeypatch):
+    reponses = iter(["SERIE\tunauthorized\n", "SERIE\tunauthorized\n", "SERIE\tdevice\n"])
+    vus = []
+
+    def faux_executer(commande, delai=60):
+        from veille_ondes.systeme import Resultat
+        if commande[-1] == "devices":
+            texte = next(reponses, "SERIE\tdevice\n")
+            vus.append(texte)
+            return Resultat(0, "List of devices attached\n" + texte)
+        return Resultat(1, "", "arrêt du test")
+
+    monkeypatch.setattr(telephone, "trouver_adb", lambda *a, **k: "adb")
+    monkeypatch.setattr(telephone, "executer", faux_executer)
+    monkeypatch.setattr(telephone.time, "sleep", lambda s: None)
+    r = telephone.scanner(attente_autorisation=30)
+    assert len(vus) == 3 and r["ok"]  # a attendu l'autorisation puis continué l'analyse
+
+
+def test_refus_persistant(monkeypatch):
+    from veille_ondes.systeme import Resultat
+    monkeypatch.setattr(telephone, "trouver_adb", lambda *a, **k: "adb")
+    monkeypatch.setattr(telephone, "executer", lambda c, delai=60: Resultat(0, "SERIE\tunauthorized\n"))
+    monkeypatch.setattr(telephone.time, "sleep", lambda s: None)
+    r = telephone.scanner(attente_autorisation=0)
+    assert not r["ok"] and "Révoquer" in r["erreur"]

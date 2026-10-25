@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from datetime import date
 from pathlib import Path
 
@@ -287,7 +288,8 @@ def evaluer_application(paquet: str, installateur: str | None, accessibilite: bo
 
 # --- point d'entrée -------------------------------------------------------------------------------
 
-def scanner(dossier_donnees: Path | None = None, serie: str | None = None) -> dict:
+def scanner(dossier_donnees: Path | None = None, serie: str | None = None,
+            attente_autorisation: float = 60.0) -> dict:
     adb = trouver_adb(dossier_donnees)
     if not adb:
         return {"ok": False, "disponible": False,
@@ -301,9 +303,19 @@ def scanner(dossier_donnees: Path | None = None, serie: str | None = None) -> di
         return {"ok": False, "erreur": "Aucun téléphone détecté. Branchez-le avec un câble de données, activez le "
                                        "« Débogage USB » (options pour les développeurs) et déverrouillez l'écran."}
     serie, etat = appareils[0]
+    # la demande « Autoriser le débogage USB ? » s'affiche sur le téléphone au moment où adb se connecte :
+    # on laisse 60 secondes pour l'accepter
+    fin_attente = time.time() + attente_autorisation
+    while etat in ("unauthorized", "offline") and time.time() < fin_attente:
+        time.sleep(2)
+        etats = dict(analyser_adb_devices(executer([adb, "devices"], delai=30).sortie))
+        etat = etats.get(serie, etat)
     if etat != "device":
-        return {"ok": False, "erreur": f"Téléphone en état « {etat} » : sur l'écran du téléphone, acceptez "
-                                       f"« Autoriser le débogage USB » puis relancez l'analyse."}
+        return {"ok": False, "erreur": (
+            f"Le téléphone refuse l'accès (état « {etat} »). Déverrouillez-le et acceptez « Autoriser le débogage "
+            "USB ? » en cochant « Toujours autoriser sur cet ordinateur ». Si la demande n'apparaît pas : "
+            "Options de développement > « Révoquer les autorisations de débogage USB », débranchez, rebranchez, "
+            "choisissez « Transfert de fichiers » si le téléphone le demande, puis relancez l'analyse.")}
 
     def prop(nom: str) -> str:
         return _shell(adb, serie, f"getprop {nom}").sortie.strip()
