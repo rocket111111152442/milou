@@ -6,6 +6,7 @@ une mesure qui se bloque (pilote Bluetooth…) peut être arrêtée avec le bout
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import queue
 import subprocess
@@ -302,9 +303,14 @@ class Fenetre:
         ttk.Button(boutons, text="Valider", command=valider).pack(side="left")
         ttk.Button(boutons, text="Annuler", command=fenetre.destroy).pack(side="left", padx=6)
         if not ports:
-            ttk.Label(fenetre, padding=(10, 0, 10, 10), foreground="#a00",
-                     text="Aucun port série détecté. Branchez l'appareil, allumez-le, puis rouvrez cette fenêtre."
-                     ).pack(fill="x")
+            if importlib.util.find_spec("serial") is None:
+                message = ("Le module « pyserial » n'est pas installé : fermez cette fenêtre, fermez "
+                           "Veille Ondes, puis relancez-le (le lanceur installe les dépendances "
+                           "manquantes à chaque démarrage).")
+            else:
+                message = "Aucun port série détecté. Branchez l'appareil, allumez-le, puis rouvrez cette fenêtre."
+            ttk.Label(fenetre, padding=(10, 0, 10, 10), foreground="#a00", wraplength=420,
+                     justify="left", text=message).pack(fill="x")
 
     def choisir_adb(self) -> None:
         chemin = filedialog.askopenfilename(

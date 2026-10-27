@@ -9,10 +9,15 @@ if [ ! -x ".venv/bin/python" ]; then
         read -r -p "Appuyez sur Entrée pour fermer."
         exit 1
     fi
-    python3 -m venv .venv && .venv/bin/python -m pip install --upgrade pip >/dev/null \
-        && .venv/bin/python -m pip install -r requirements.txt || {
+    python3 -m venv .venv && .venv/bin/python -m pip install --upgrade pip >/dev/null || {
         read -r -p "L'installation a échoué. Appuyez sur Entrée pour fermer."
         exit 1
     }
 fi
+# Toujours vérifier les dépendances (rapide si déjà à jour) : une mise à jour du
+# logiciel peut en ajouter de nouvelles, même quand .venv existait déjà.
+.venv/bin/python -m pip install -q -r requirements.txt || {
+    read -r -p "L'installation a échoué. Appuyez sur Entrée pour fermer."
+    exit 1
+}
 .venv/bin/python -m veille_ondes
