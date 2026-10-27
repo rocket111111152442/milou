@@ -125,7 +125,10 @@ class FauxTinySA:
             lignes = []
             for i in range(points):
                 f = debut + (fin - debut) * i // (points - 1)
-                lignes.append(f"{f} {-40.0 if 2_449_000_000 <= f <= 2_451_000_000 else -95.0}")
+                dbm = -40.0 if 2_449_000_000 <= f <= 2_451_000_000 else -95.0
+                # format réel observé sur micrologiciel v1.4-217 : notation scientifique
+                # et une 3e colonne (trace mémorisée) que le logiciel doit ignorer
+                lignes.append(f"{f} {dbm:e} 0.000000000 ")
             texte = commande + "\r\n" + "\r\n".join(lignes) + "\r\n"
         else:
             texte = commande + "\r\n"

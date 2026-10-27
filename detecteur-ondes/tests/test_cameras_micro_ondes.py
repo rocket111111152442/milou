@@ -60,6 +60,16 @@ def test_sortie_tinysa():
     assert sdr.analyser_sortie_tinysa(texte) == [(2400.0, -87.5), (2400.3448, -60.25)]
 
 
+def test_sortie_tinysa_format_firmware_recent():
+    """Micrologiciel v1.4-217 (et d'autres) : notation scientifique et une 3e colonne (trace
+    mémorisée) à ignorer. C'était rejeté par erreur (0 point mesuré) avant correction."""
+    texte = ("scan 2400000000 2500000000 20 3\r\n"
+             "2400000000 -8.881250e+01 0.000000000 \r\n"
+             "2442105263 -4.925000e+01 0.000000000 \r\n"
+             "ch> ")
+    assert sdr.analyser_sortie_tinysa(texte) == [(2400.0, -88.8125), (2442.1053, -49.25)]
+
+
 def test_csv_hackrf_garde_le_maximum():
     lignes = ["2026-10-25, 22:00:00, 2400000000, 2405000000, 1000000.00, 20, -70, -60, -70, -70, -70",
               "2026-10-25, 22:00:01, 2400000000, 2405000000, 1000000.00, 20, -70, -30, -70, -70, -70"]

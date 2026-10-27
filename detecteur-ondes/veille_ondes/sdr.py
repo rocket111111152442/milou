@@ -196,11 +196,12 @@ def lire_csv_rtl_power(texte: str, combiner: str = "moyenne") -> list[tuple[floa
 
 
 def analyser_sortie_tinysa(texte: str) -> list[tuple[float, float]]:
-    """Réponse à « scan début fin points 3 » : une ligne « fréquence(Hz) niveau(dBm) » par point."""
+    """Réponse à « scan début fin points 3 » : « fréquence(Hz) niveau(dBm) » par ligne, suivis selon la
+    version du micrologiciel d'une troisième colonne (trace mémorisée, 0 si aucune) qu'on ignore."""
     points = []
     for ligne in texte.splitlines():
         morceaux = ligne.split()
-        if len(morceaux) != 2:
+        if len(morceaux) < 2:
             continue
         try:
             f_hz, dbm = float(morceaux[0]), float(morceaux[1])
