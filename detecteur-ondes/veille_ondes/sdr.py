@@ -15,6 +15,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import re
 import statistics
 import tempfile
 from pathlib import Path
@@ -348,6 +349,54 @@ def _balayage_tinysa(port: str) -> tuple[list[tuple[float, float]], str | None]:
     if not maximums:
         return [], "le tinySA n'a renvoyé aucune mesure (mode « ultra » activé pour aller au-delà de 800 MHz ?)"
     return sorted(maximums.items()), None
+
+
+def diagnostiquer_tinysa(port: str) -> dict:
+    """Dialogue pas à pas avec le tinySA et renvoie tout ce qu'il répond, sans l'interpréter.
+
+    Sert à comprendre à distance pourquoi un balayage ne renvoie rien : contrairement à
+    _balayage_tinysa, chaque commande est courte (un seul petit balayage de test) et sa
+    réponse brute est conservée telle quelle.
+    """
+    resultat = {"ok": False, "port": port, "etapes": []}
+    try:
+        import serial
+    except ImportError:
+        resultat["erreur"] = "module pyserial absent"
+        return resultat
+
+    def noter(nom: str, brut: str) -> None:
+        resultat["etapes"].append({"commande": nom, "reponse": brut, "longueur": len(brut)})
+
+    try:
+        with serial.Serial(port, 115200, timeout=5) as s:
+            def commande(texte: str, delai: float = 8.0) -> str:
+                s.timeout = delai
+                s.reset_input_buffer()
+                s.write((texte + "\r").encode("ascii"))
+                return s.read_until(b"ch> ").decode("ascii", errors="replace")
+
+            noter("(connexion)", commande("", 3))
+            version = commande("version", 5)
+            noter("version", version)
+            resultat["repond_comme_tinysa"] = "tinysa" in version.lower()
+            resultat["modele_ultra"] = "tinysa4" in version.lower()
+
+            sweep = commande("sweep", 5)
+            noter("sweep", sweep)
+            m = re.search(r"(\d+)\s+(\d+)", sweep.replace(",", " "))
+            if m:
+                resultat["plage_actuelle_mhz"] = [int(m.group(1)) / 1e6, int(m.group(2)) / 1e6]
+                resultat["mode_ultra_actif_probable"] = int(m.group(2)) > 1_000_000_000
+
+            test = commande("scan 2400000000 2500000000 20 3", 15)
+            noter("scan 2400000000 2500000000 20 3", test)
+            points = analyser_sortie_tinysa(test)
+            resultat["points_mesure_test"] = len(points)
+            resultat["ok"] = True
+    except (OSError, serial.SerialException) as e:
+        resultat["erreur"] = f"communication impossible avec {port} : {e}"
+    return resultat
 
 
 NOMS_MATERIELS = {"rtlsdr": "clé RTL-SDR", "hackrf": "HackRF One", "tinysa": "tinySA", "fichier": "fichier CSV"}

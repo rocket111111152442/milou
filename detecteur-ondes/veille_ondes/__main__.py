@@ -109,6 +109,31 @@ def commande_telephone(args) -> int:
     return 0 if reussi else 1
 
 
+def commande_diagnostic_radio(args) -> int:
+    from .sdr import diagnostiquer_tinysa, trouver_tinysa
+    historique = Historique(args.donnees)
+    port = args.port or trouver_tinysa(historique.dossier)
+    if not port:
+        _journal("Aucun port trouvé. Précisez-le : veille_ondes diagnostic-radio --port COM5")
+        return 1
+    _journal(f"Dialogue avec le tinySA sur {port} (sans interprétation, pour diagnostic)…")
+    r = diagnostiquer_tinysa(port)
+    if not r["ok"]:
+        _journal("ÉCHEC : " + r.get("erreur", "raison inconnue"))
+        return 1
+    for etape in r["etapes"]:
+        _journal(f"\n--- {etape['commande']} ({etape['longueur']} caractères reçus) ---")
+        _journal(etape["reponse"] if etape["reponse"].strip() else "(rien reçu)")
+    _journal("\n--- Résumé ---")
+    _journal(f"Répond comme un tinySA : {r.get('repond_comme_tinysa')}")
+    _journal(f"Modèle Ultra/Ultra+ (tinySA4) : {r.get('modele_ultra')}")
+    if "plage_actuelle_mhz" in r:
+        _journal(f"Plage de balayage actuelle : {r['plage_actuelle_mhz'][0]:.0f} à "
+                 f"{r['plage_actuelle_mhz'][1]:.0f} MHz (mode Ultra actif : {r.get('mode_ultra_actif_probable')})")
+    _journal(f"Points mesurés sur le test 2400-2500 MHz : {r.get('points_mesure_test')}")
+    return 0
+
+
 def commande_indicateurs(args) -> int:
     from .telephone import mettre_a_jour_indicateurs
     historique = Historique(args.donnees)
@@ -183,6 +208,10 @@ def construire_parseur() -> argparse.ArgumentParser:
     i = sous.add_parser("mettre-a-jour-indicateurs", parents=[commun],
                         help="télécharger la dernière liste des logiciels espions connus (connexion Internet)")
     i.set_defaults(fonction=commande_indicateurs)
+    d = sous.add_parser("diagnostic-radio", parents=[commun],
+                        help="dialogue brut avec le tinySA, pour comprendre un balayage qui échoue")
+    d.add_argument("--port", help="port du tinySA (ex. : COM5) ; sinon, celui enregistré ou détecté")
+    d.set_defaults(fonction=commande_diagnostic_radio)
     sous.add_parser("interface", help="ouvrir la fenêtre (par défaut)")
     return p
 

@@ -97,6 +97,8 @@ class FauxTinySA:
     """Répond comme le shell USB d'un tinySA Ultra."""
 
     version = "tinySA4_v1.4-143"
+    sweep_debut_hz = 0
+    sweep_fin_hz = 800_000_000
 
     def __init__(self, *args, **kwargs):
         self.timeout = 5
@@ -115,6 +117,8 @@ class FauxTinySA:
         commande = donnees.decode().strip()
         if commande == "version":
             texte = f"version\r\n{self.version}\r\nHW Version:V0.4.6\r\n"
+        elif commande == "sweep":
+            texte = f"sweep\r\n{self.sweep_debut_hz} {self.sweep_fin_hz} 101\r\n"
         elif commande.startswith("scan"):
             _, debut, fin, points, _ = commande.split()
             debut, fin, points = int(debut), int(fin), int(points)
@@ -217,3 +221,60 @@ def test_message_si_aucun_recepteur_reconnu(monkeypatch):
     monkeypatch.setattr(serial, "comports", lambda: [_FauxPort("COM4", 1, 1, "Carte inconnue")])
     r = sdr.scanner()
     assert not r["ok"] and "COM4" in r["erreur"] and "Choisir le port du tinySA" in r["erreur"]
+
+
+class FauxTinySAMuet(FauxTinySA):
+    """Répond à « version » et « sweep » mais ne renvoie jamais de point pour « scan »
+    (reproduit le cas signalé : balayage terminé sans aucune mesure)."""
+
+    def write(self, donnees):
+        commande = donnees.decode().strip()
+        if commande.startswith("scan"):
+            self.reponse = (commande + "\r\nch> ").encode()
+        else:
+            super().write(donnees)
+
+
+def test_diagnostic_tinysa_ultra_actif(monkeypatch):
+    serial = pytest.importorskip("serial")
+    FauxTinySA.sweep_fin_hz = 5_300_000_000
+    monkeypatch.setattr(serial, "Serial", FauxTinySA)
+    r = sdr.diagnostiquer_tinysa("COM7")
+    assert r["ok"] and r["repond_comme_tinysa"] and r["modele_ultra"]
+    assert r["mode_ultra_actif_probable"] is True
+    assert r["points_mesure_test"] == 20
+    assert [e["commande"] for e in r["etapes"]] == ["(connexion)", "version", "sweep",
+                                                     "scan 2400000000 2500000000 20 3"]
+
+
+def test_diagnostic_tinysa_ultra_inactif(monkeypatch):
+    serial = pytest.importorskip("serial")
+    FauxTinySA.sweep_fin_hz = 800_000_000
+    monkeypatch.setattr(serial, "Serial", FauxTinySA)
+    r = sdr.diagnostiquer_tinysa("COM7")
+    assert r["ok"] and r["mode_ultra_actif_probable"] is False
+    assert r["plage_actuelle_mhz"][1] == 800.0
+
+
+def test_diagnostic_tinysa_scan_muet():
+    """Reproduit le cas signalé : l'appareil répond normalement mais « scan » ne renvoie
+    aucune mesure exploitable, même si l'appareil se déclare bien Ultra."""
+    serial = pytest.importorskip("serial")
+    import unittest.mock
+    with unittest.mock.patch.object(serial, "Serial", FauxTinySAMuet):
+        r = sdr.diagnostiquer_tinysa("COM7")
+    assert r["ok"] and r["repond_comme_tinysa"] and r["points_mesure_test"] == 0
+    assert "scan 2400000000 2500000000 20 3" in [e["commande"] for e in r["etapes"]]
+
+
+def test_diagnostic_tinysa_pas_branche():
+    serial = pytest.importorskip("serial")
+    import unittest.mock
+
+    class Refuse:
+        def __init__(self, *a, **k):
+            raise serial.SerialException("port introuvable")
+
+    with unittest.mock.patch.object(serial, "Serial", Refuse):
+        r = sdr.diagnostiquer_tinysa("COM9")
+    assert not r["ok"] and "COM9" in r["erreur"]

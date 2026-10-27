@@ -74,6 +74,8 @@ class Fenetre:
         self.bouton_port_radio = ttk.Button(options, text="Choisir le port du récepteur…",
                                             command=self.choisir_port_radio)
         self.bouton_port_radio.grid(row=2, column=2, sticky="w", padx=6, pady=(6, 0))
+        ttk.Button(options, text="Diagnostiquer le récepteur radio…", command=self.diagnostiquer_radio).grid(
+            row=3, column=0, columnspan=3, sticky="w", padx=6, pady=(4, 0))
         self.rafraichir_recepteur_radio()
 
         boutons = ttk.Frame(cadre)
@@ -199,6 +201,10 @@ class Fenetre:
         self.ecrire("\nBranchez le téléphone Android avec un câble de données, activez le « Débogage USB » "
                     "(guide dans MATERIEL.md) et acceptez la demande qui s'affiche sur le téléphone.\n")
         self._lancer(["analyser", "--seulement", "telephone", "--lieu", self.lieu.get().strip() or "téléphone"])
+
+    def diagnostiquer_radio(self) -> None:
+        self.ecrire("\nDialogue de diagnostic avec le récepteur radio (quelques secondes)…\n")
+        self._lancer(["diagnostic-radio"])
 
     def gerer_telephone(self) -> None:
         tel = next((a["telephone"] for a in reversed(self.historique.charger(limite=100))
