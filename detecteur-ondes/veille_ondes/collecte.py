@@ -66,7 +66,7 @@ def lancer_analyse(lieu: str = "", modules: tuple[str, ...] = PAR_DEFAUT,
                       "(si une demande s'affiche sur le téléphone, acceptez-la)",
                       lambda: telephone.scanner(dossier_donnees)),
         "sdr": ("Radio large bande : balayage avec le récepteur branché",
-                lambda: sdr.scanner(sdr_csv, materiel_radio)),
+                lambda: sdr.scanner(sdr_csv, materiel_radio, dossier_donnees)),
     }
     for cle in MODULES:
         if cle not in modules:

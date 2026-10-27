@@ -18,7 +18,7 @@ from tkinter import filedialog, messagebox, ttk
 from .analyse import LIBELLES_NIVEAUX
 from .historique import Historique
 from .rapport import page_guides
-from .sdr import NOMS_MATERIELS, materiels_disponibles
+from .sdr import NOMS_MATERIELS, materiels_disponibles, ports_serie_disponibles
 
 DOSSIER_PROJET = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -68,12 +68,12 @@ class Fenetre:
         ttk.Checkbutton(options, text="Téléphone Android (câble USB)", variable=self.telephone).grid(
             row=1, column=2, sticky="w", padx=6)
         self.sdr = tk.BooleanVar(value=False)
-        materiels = materiels_disponibles()
-        texte_radio = ("Radio / micro-ondes : " + ", ".join(NOMS_MATERIELS[m] for m in materiels) if materiels
-                       else "Radio / micro-ondes (aucun récepteur branché)")
-        ttk.Checkbutton(options, text=texte_radio, variable=self.sdr,
-                        state="normal" if materiels else "disabled").grid(row=2, column=0, columnspan=3,
-                                                                          sticky="w", padx=6, pady=(6, 0))
+        self.case_radio = ttk.Checkbutton(options, text="", variable=self.sdr, command=lambda: None)
+        self.case_radio.grid(row=2, column=0, columnspan=2, sticky="w", padx=6, pady=(6, 0))
+        self.bouton_port_radio = ttk.Button(options, text="Choisir le port du récepteur…",
+                                            command=self.choisir_port_radio)
+        self.bouton_port_radio.grid(row=2, column=2, sticky="w", padx=6, pady=(6, 0))
+        self.rafraichir_recepteur_radio()
 
         boutons = ttk.Frame(cadre)
         boutons.pack(fill="x")
@@ -260,6 +260,51 @@ class Fenetre:
             message = f"ÉCHEC : {e}"
         self.ecrire(f"\n{paquet} : {message}\n")
         messagebox.showinfo("Veille Ondes", message, parent=parent)
+
+    def rafraichir_recepteur_radio(self) -> None:
+        materiels = materiels_disponibles(self.historique.dossier)
+        if materiels:
+            self.case_radio.configure(text="Radio / micro-ondes : " + ", ".join(NOMS_MATERIELS[m] for m in materiels),
+                                      state="normal")
+        else:
+            self.case_radio.configure(text="Radio / micro-ondes (aucun récepteur reconnu)", state="disabled")
+            self.sdr.set(False)
+
+    def choisir_port_radio(self) -> None:
+        ports = ports_serie_disponibles()
+        fenetre = tk.Toplevel(self.racine)
+        fenetre.title("Port du récepteur radio (tinySA)")
+        ttk.Label(fenetre, padding=10, wraplength=420, justify="left", text=(
+            "Choisissez le port du tinySA dans la liste, ou tapez-le (ex. : COM5). Pour le connaître : "
+            "Gestionnaire de périphériques Windows > Ports (COM et LPT), notez le numéro affiché entre "
+            "parenthèses à côté de l'appareil.")).pack(fill="x")
+        variable = tk.StringVar()
+        liste = ttk.Combobox(fenetre, textvariable=variable, width=50,
+                             values=[f"{p} — {d}" if d else p for p, d in ports])
+        liste.pack(fill="x", padx=10, pady=(0, 10))
+        if ports:
+            liste.current(0)
+
+        def valider() -> None:
+            port = variable.get().split(" — ")[0].strip()
+            if not port:
+                messagebox.showerror("Veille Ondes", "Indiquez un port (ex. : COM5).", parent=fenetre)
+                return
+            config = self.historique.config()
+            config["port_tinysa"] = port
+            self.historique.enregistrer_config(config)
+            self.ecrire(f"\nPort du récepteur radio enregistré : {port}\n")
+            self.rafraichir_recepteur_radio()
+            fenetre.destroy()
+
+        boutons = ttk.Frame(fenetre, padding=10)
+        boutons.pack(fill="x")
+        ttk.Button(boutons, text="Valider", command=valider).pack(side="left")
+        ttk.Button(boutons, text="Annuler", command=fenetre.destroy).pack(side="left", padx=6)
+        if not ports:
+            ttk.Label(fenetre, padding=(10, 0, 10, 10), foreground="#a00",
+                     text="Aucun port série détecté. Branchez l'appareil, allumez-le, puis rouvrez cette fenêtre."
+                     ).pack(fill="x")
 
     def choisir_adb(self) -> None:
         chemin = filedialog.askopenfilename(

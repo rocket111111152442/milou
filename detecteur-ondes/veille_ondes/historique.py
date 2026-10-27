@@ -13,6 +13,7 @@ CONFIG_PAR_DEFAUT = {
     "appareils_reseau_connus": {},   # adresse MAC -> description
     "date_reference": None,
     "chemin_adb": None,              # emplacement d'adb.exe choisi à la main
+    "port_tinysa": None,              # port série du tinySA choisi à la main (ex. : COM5)
 }
 
 

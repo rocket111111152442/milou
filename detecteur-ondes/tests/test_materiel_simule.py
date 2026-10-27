@@ -85,7 +85,7 @@ open(fichier, "w").write("\n".join(lignes))
 
 def test_hackrf_simule(tmp_path, monkeypatch):
     programme = _installer_programme(tmp_path, "hackrf_sweep", FAUX_HACKRF)
-    monkeypatch.setattr(sdr, "materiels_disponibles", lambda: ["hackrf"])
+    monkeypatch.setattr(sdr, "materiels_disponibles", lambda *a, **k: ["hackrf"])
     monkeypatch.setattr(sdr, "trouver_hackrf", lambda: programme)
     r = sdr.scanner()
     assert r["ok"] and r["materiel"] == "hackrf" and not r["absolu"]
@@ -135,8 +135,8 @@ class FauxTinySA:
 def test_tinysa_simule(monkeypatch):
     serial = pytest.importorskip("serial")
     monkeypatch.setattr(serial, "Serial", FauxTinySA)
-    monkeypatch.setattr(sdr, "materiels_disponibles", lambda: ["tinysa"])
-    monkeypatch.setattr(sdr, "trouver_tinysa", lambda: "COM7")
+    monkeypatch.setattr(sdr, "materiels_disponibles", lambda *a, **k: ["tinysa"])
+    monkeypatch.setattr(sdr, "trouver_tinysa", lambda *a, **k: "COM7")
     r = sdr.scanner()
     assert r["ok"] and r["absolu"] and r["unite"] == "dBm"
     assert r["plage_mhz"][0] == 24 and r["plage_mhz"][1] == 5300
@@ -151,8 +151,69 @@ def test_tinysa_selon_le_modele(monkeypatch, version, va_jusqu_a):
     serial = pytest.importorskip("serial")
     monkeypatch.setattr(FauxTinySA, "version", version)
     monkeypatch.setattr(serial, "Serial", FauxTinySA)
-    monkeypatch.setattr(sdr, "materiels_disponibles", lambda: ["tinysa"])
-    monkeypatch.setattr(sdr, "trouver_tinysa", lambda: "COM7")
+    monkeypatch.setattr(sdr, "materiels_disponibles", lambda *a, **k: ["tinysa"])
+    monkeypatch.setattr(sdr, "trouver_tinysa", lambda *a, **k: "COM7")
     r = sdr.scanner()
     assert r["ok"] and r["plage_mhz"][1] <= va_jusqu_a and r["plage_mhz"][1] > va_jusqu_a - 100
     assert (r["micro_ondes"] is None) == (va_jusqu_a == 960)
+
+
+class _FauxPort:
+    def __init__(self, device, vid=None, pid=None, description=""):
+        self.device, self.vid, self.pid, self.description = device, vid, pid, description
+
+
+def test_tinysa_trouve_par_identifiant_usb_connu(monkeypatch):
+    serial = pytest.importorskip("serial.tools.list_ports")
+    monkeypatch.setattr(serial, "comports", lambda: [_FauxPort("COM3", 0x0483, 0x5740, "STM32 VCP")])
+    assert sdr.trouver_tinysa() == "COM3"
+
+
+def test_tinysa_repli_sur_unique_port_qui_repond(monkeypatch):
+    """Identifiant USB inconnu, mais un seul port série branché et qui répond comme un tinySA
+    à la sonde rapide : on l'accepte."""
+    serial = pytest.importorskip("serial.tools.list_ports")
+    monkeypatch.setattr(serial, "comports", lambda: [_FauxPort("COM9", 0x1234, 0x5678, "Appareil inconnu")])
+    monkeypatch.setattr(sdr, "_repond_comme_tinysa", lambda port, delai=1.5: port == "COM9")
+    assert sdr.trouver_tinysa() == "COM9"
+
+
+def test_tinysa_pas_de_repli_si_le_port_ne_repond_pas(monkeypatch):
+    """Un unique port série (ex. : COM1 hérité de la carte mère, présent sur beaucoup de PC
+    même sans rien de branché) qui ne répond pas comme un tinySA n'est pas pris pour tel."""
+    serial = pytest.importorskip("serial.tools.list_ports")
+    monkeypatch.setattr(serial, "comports", lambda: [_FauxPort("COM1", None, None, "Port série hérité")])
+    monkeypatch.setattr(sdr, "_repond_comme_tinysa", lambda port, delai=1.5: False)
+    assert sdr.trouver_tinysa() is None
+
+
+def test_tinysa_pas_de_repli_si_plusieurs_ports_inconnus(monkeypatch):
+    serial = pytest.importorskip("serial.tools.list_ports")
+    monkeypatch.setattr(serial, "comports", lambda: [_FauxPort("COM1", 1, 2), _FauxPort("COM2", 3, 4)])
+    assert sdr.trouver_tinysa() is None
+
+
+def test_tinysa_port_choisi_a_la_main(tmp_path, monkeypatch):
+    serial = pytest.importorskip("serial.tools.list_ports")
+    monkeypatch.setattr(serial, "comports", lambda: [_FauxPort("COM5", 9, 9), _FauxPort("COM6", 8, 8)])
+    (tmp_path / "config.json").write_text('{"port_tinysa": "COM6"}')
+    assert sdr.trouver_tinysa(tmp_path) == "COM6"
+
+
+def test_tinysa_port_choisi_mais_debranche(tmp_path, monkeypatch):
+    serial = pytest.importorskip("serial.tools.list_ports")
+    monkeypatch.setattr(serial, "comports", lambda: [_FauxPort("COM5", 9, 9)])
+    monkeypatch.setattr(sdr, "_repond_comme_tinysa", lambda port, delai=1.5: port == "COM5")
+    (tmp_path / "config.json").write_text('{"port_tinysa": "COM6"}')
+    # le port enregistré n'est plus branché : on retombe sur la détection automatique (ici, repli sur l'unique port)
+    assert sdr.trouver_tinysa(tmp_path) == "COM5"
+
+
+def test_message_si_aucun_recepteur_reconnu(monkeypatch):
+    serial = pytest.importorskip("serial.tools.list_ports")
+    monkeypatch.setattr(sdr, "materiels_disponibles", lambda *a, **k: [])
+    monkeypatch.setattr(sdr, "trouver_rtl_power", lambda: None)
+    monkeypatch.setattr(sdr, "trouver_hackrf", lambda: None)
+    monkeypatch.setattr(serial, "comports", lambda: [_FauxPort("COM4", 1, 1, "Carte inconnue")])
+    r = sdr.scanner()
+    assert not r["ok"] and "COM4" in r["erreur"] and "Choisir le port du tinySA" in r["erreur"]

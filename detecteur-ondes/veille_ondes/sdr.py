@@ -12,12 +12,15 @@ micro-ondes (2 450 MHz), du Wi-Fi et du Bluetooth.
 
 from __future__ import annotations
 
+import importlib.util
+import json
 import math
 import statistics
 import tempfile
 from pathlib import Path
 
 from .exposition import champ_v_m
+from .historique import DOSSIER_PAR_DEFAUT
 from .systeme import chercher_outil, executer
 
 # (début MHz, fin MHz, nom, explication). Les bandes étroites passent avant les larges.
@@ -60,7 +63,11 @@ BANDES = [
 ]
 
 BANDE_MICRO_ONDES = (2400.0, 2500.0)
-IDS_USB_TINYSA = {(0x0483, 0x5740)}
+# Identifiants USB connus du tinySA (STM32, VID STMicroelectronics 0x0483). Le constructeur n'a jamais
+# publié de liste officielle garantie stable d'une série à l'autre : en repli, on tente aussi l'unique
+# port série présent si aucun de ces identifiants n'a été trouvé (la commande « version » plus bas
+# vérifie ensuite que l'appareil répond bien comme un tinySA avant toute mesure).
+IDS_USB_TINYSA = {(0x0483, 0x5740), (0x0483, 0x5741), (0x0483, 0xA4B7)}
 
 PAS_ARTEFACT_MHZ = 28.8  # fréquence de l'oscillateur de la clé RTL-SDR
 
@@ -84,22 +91,76 @@ def trouver_hackrf() -> str | None:
     return _trouver_programme("hackrf_sweep")
 
 
-def trouver_tinysa() -> str | None:
-    """Port série d'un tinySA branché en USB (nécessite le module pyserial)."""
+def ports_serie_disponibles() -> list[tuple[str, str]]:
+    """[(nom du port, description)] de tout ce qui est branché, pour le choix manuel."""
     try:
         from serial.tools import list_ports
     except ImportError:
+        return []
+    return [(p.device, p.description or "") for p in list_ports.comports()]
+
+
+def _port_choisi_a_la_main(dossier_donnees: Path | None) -> str | None:
+    config = (dossier_donnees or DOSSIER_PAR_DEFAUT) / "config.json"
+    try:
+        port = json.loads(config.read_text(encoding="utf-8")).get("port_tinysa")
+    except (OSError, ValueError, AttributeError):
         return None
-    for port in list_ports.comports():
-        if (port.vid, port.pid) in IDS_USB_TINYSA:
-            return port.device
+    if port and any(p == port for p, _ in ports_serie_disponibles()):
+        return port
     return None
 
 
-def materiels_disponibles() -> list[str]:
+def _repond_comme_tinysa(port: str, delai: float = 1.5) -> bool:
+    """Sonde rapide avant de confier un port ambigu à un balayage de plusieurs minutes.
+
+    Beaucoup de PC (et quasiment toutes les machines virtuelles) ont un port série
+    « COM1 » hérité de la carte mère même sans rien de branché dessus : un simple
+    « il n'y a qu'un seul port » ne suffit pas à conclure que c'est le tinySA.
+    """
+    try:
+        import serial
+    except ImportError:
+        return False
+    try:
+        with serial.Serial(port, 115200, timeout=delai) as s:
+            s.reset_input_buffer()
+            s.write(b"version\r")
+            reponse = s.read_until(b"ch> ", size=200)
+    except (OSError, serial.SerialException):
+        return False
+    return b"tinysa" in reponse.lower()
+
+
+def trouver_tinysa(dossier_donnees: Path | None = None) -> str | None:
+    """Port série d'un tinySA branché en USB (nécessite le module pyserial).
+
+    Ordre : port choisi à la main dans la fenêtre, puis identifiant USB connu,
+    puis, s'il n'y a qu'un seul port série branché au total et qu'il répond
+    effectivement comme un tinySA à une sonde rapide.
+    """
+    choisi = _port_choisi_a_la_main(dossier_donnees)
+    if choisi:
+        return choisi
+    ports = ports_serie_disponibles()
+    if not ports:
+        return None
+    try:
+        from serial.tools import list_ports
+        for port in list_ports.comports():
+            if (port.vid, port.pid) in IDS_USB_TINYSA:
+                return port.device
+    except ImportError:
+        return None
+    if len(ports) == 1 and _repond_comme_tinysa(ports[0][0]):
+        return ports[0][0]
+    return None
+
+
+def materiels_disponibles(dossier_donnees: Path | None = None) -> list[str]:
     """Récepteurs détectés, du plus utile au moins utile."""
     trouves = []
-    if trouver_tinysa():
+    if trouver_tinysa(dossier_donnees):
         trouves.append("tinysa")
     if trouver_hackrf():
         trouves.append("hackrf")
@@ -292,7 +353,8 @@ def _balayage_tinysa(port: str) -> tuple[list[tuple[float, float]], str | None]:
 NOMS_MATERIELS = {"rtlsdr": "clé RTL-SDR", "hackrf": "HackRF One", "tinysa": "tinySA", "fichier": "fichier CSV"}
 
 
-def scanner(fichier_csv: str | None = None, materiel: str = "auto") -> dict:
+def scanner(fichier_csv: str | None = None, materiel: str = "auto",
+            dossier_donnees: Path | None = None) -> dict:
     """Lance un balayage avec le récepteur disponible (ou lit un CSV rtl_power / hackrf_sweep existant)."""
     if fichier_csv:
         try:
@@ -301,15 +363,24 @@ def scanner(fichier_csv: str | None = None, materiel: str = "auto") -> dict:
             return {"ok": False, "erreur": f"Impossible de lire {fichier_csv} : {e}", "emissions": []}
         points, erreur, materiel, absolu = lire_csv_rtl_power(texte, combiner="max"), None, "fichier", False
     else:
-        disponibles = materiels_disponibles()
+        disponibles = materiels_disponibles(dossier_donnees)
         if materiel == "auto":
             materiel = disponibles[0] if disponibles else ""
         if not materiel or materiel not in disponibles:
+            if importlib.util.find_spec("serial") is None:
+                detail = (" Le module « pyserial » n'est pas installé : relancez l'installation "
+                          "(pip install -r requirements.txt) ou pip install pyserial.")
+            else:
+                ports = ports_serie_disponibles()
+                detail = (f" {len(ports)} port(s) série détecté(s) mais aucun reconnu comme tinySA : "
+                          f"{', '.join(f'{p} ({d})' if d else p for p, d in ports)}. Utilisez « Choisir le "
+                          f"port du tinySA… » dans la fenêtre." if ports else
+                          " Aucun port série détecté : vérifiez que l'appareil est allumé, essayez un "
+                          "autre câble USB (certains ne transmettent pas de données) et un autre port.")
             return {"ok": False, "disponible": False, "emissions": [],
-                    "erreur": "Aucun récepteur radio branché (tinySA, HackRF ou clé RTL-SDR). "
-                              "Voir MATERIEL.md : c'est un achat optionnel."}
+                    "erreur": "Aucun récepteur radio reconnu (tinySA, HackRF ou clé RTL-SDR)." + detail}
         if materiel == "tinysa":
-            points, erreur = _balayage_tinysa(trouver_tinysa())
+            points, erreur = _balayage_tinysa(trouver_tinysa(dossier_donnees))
         elif materiel == "hackrf":
             points, erreur = _balayage_hackrf(trouver_hackrf())
         else:
