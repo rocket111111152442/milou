@@ -8,7 +8,7 @@ import { formatPrice } from "@watchly/types";
 import { normalizeForMatch } from "../extract/text";
 import { changeRatio, diffSentences } from "./similarity";
 
-export type AlertKind = "price" | "stock" | "page_change" | "keyword";
+export type AlertKind = "price" | "stock" | "page_change" | "keyword" | "web_topic";
 
 export interface Evaluation {
   outcome: "ok" | "changed" | "triggered" | "error";

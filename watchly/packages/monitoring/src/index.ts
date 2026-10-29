@@ -8,3 +8,6 @@ export * from "./results";
 export * from "./service";
 export * from "./runner";
 export * from "./search/planner";
+export * from "./search/brave";
+export * from "./search/classify";
+export * from "./search/engine";
