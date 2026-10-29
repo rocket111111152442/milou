@@ -11,6 +11,7 @@ import {
   profiles,
   subscriptions,
   trialUsage,
+  sql,
 } from "@watchly/database";
 import { createTestDatabase, createTestUser, type TestDatabase } from "@watchly/database/testing";
 import { createSubscriptionCheckout, checkTrialEligibility, previewCheckout } from "../src/checkout";
@@ -197,6 +198,9 @@ describe("stripe webhooks", () => {
     expect(usage!.status).toBe("converted");
     const [p] = await t.db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, u.id));
     expect(p!.role).toBe("business");
+    // Le montant encaissé est conservé pour le suivi du chiffre d'affaires (administration).
+    const [evt] = await t.db.execute<{ summary: { amount_paid: number; livemode: boolean } }>(sql`select summary from billing_events where type = 'invoice.paid' and summary->>'id' = 'in_convert'`);
+    expect(evt!.summary).toMatchObject({ amount_paid: 3999, livemode: false });
   });
 
   it("pauses monitors above quota when the subscription ends, then resumes them on upgrade", async () => {

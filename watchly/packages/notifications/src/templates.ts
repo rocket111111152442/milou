@@ -100,6 +100,20 @@ export function renderEmail(template: string, subject: string, payload: Record<s
       });
       return { subject, ...r };
     }
+    case "support_reply": {
+      const r = layout({
+        appUrl,
+        preheader: "Réponse à votre demande d'assistance",
+        heading: "Réponse de l'équipe Watchly",
+        paragraphs: String(p.body ?? "")
+          .split(/\n{2,}/)
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .slice(0, 20),
+        meta: [["Référence", String(p.ticketRef ?? "")], ["Sujet", String(p.subject ?? "")]],
+      });
+      return { subject, ...r };
+    }
     default: {
       const r = layout({
         appUrl,

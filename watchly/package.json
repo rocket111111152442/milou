@@ -19,7 +19,8 @@
     "db:migrate": "tsx packages/database/scripts/migrate.ts",
     "db:seed": "tsx packages/database/scripts/seed.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "admin:grant": "tsx packages/database/scripts/grant-admin.ts"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

@@ -107,6 +107,10 @@ function summarize(event: Stripe.Event): Record<string, unknown> {
     status: obj.status ?? null,
     customer: typeof obj.customer === "string" ? obj.customer : null,
     livemode: event.livemode,
+    // Montants réellement facturés / encaissés (centimes), pour le suivi du chiffre d'affaires.
+    ...(obj.object === "invoice"
+      ? { amount_paid: obj.amount_paid ?? null, amount_due: obj.amount_due ?? null, currency: obj.currency ?? null, billing_reason: obj.billing_reason ?? null }
+      : {}),
   };
 }
 
