@@ -15,6 +15,16 @@ test.describe("sécurité", () => {
     expect((await request.post("/api/billing/checkout", { data: { planId: "plus" }, headers: ORIGIN })).status()).toBe(401);
   });
 
+  test("cookies de session inaccessibles au JavaScript (httpOnly, SameSite=Lax)", async ({ page, context }) => {
+    const u = await createConfirmedUser(uniqueEmail("cookie"));
+    await login(page, u.email);
+    await page.waitForURL(/\/app/);
+    const session = (await context.cookies()).filter((c) => c.name.startsWith("sb-") && c.name.includes("auth-token"));
+    expect(session.length).toBeGreaterThan(0);
+    for (const c of session) expect(c).toMatchObject({ httpOnly: true, sameSite: "Lax" });
+    expect(await page.evaluate(() => document.cookie)).not.toContain("auth-token");
+  });
+
   test("protection CSRF : écriture refusée depuis une autre origine", async ({ page }) => {
     const u = await createConfirmedUser(uniqueEmail("csrf"));
     await login(page, u.email);

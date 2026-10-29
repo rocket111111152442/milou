@@ -16,3 +16,4 @@ apps/desktop/src-tauri/gen/
 *.tsbuildinfo
 .DS_Store
 /infra/scripts/.secrets/
+infra/docker/worker.env

@@ -2,7 +2,6 @@ import "server-only";
 import { createDb, type Database } from "@watchly/database";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __watchlyDb: { db: Database; close: () => Promise<void> } | undefined;
 }
 

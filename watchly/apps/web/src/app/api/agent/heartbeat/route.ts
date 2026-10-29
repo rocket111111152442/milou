@@ -1,4 +1,4 @@
-import { agentDevices, agentHeartbeats, count, eq, and, notifications, sql } from "@watchly/database";
+import { agentDevices, and, count, eq, notifications, sql } from "@watchly/database";
 import { getEntitlements } from "@watchly/billing";
 import { heartbeatSchema } from "@watchly/types";
 import { readJson } from "@/lib/api";

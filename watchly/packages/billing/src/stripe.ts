@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { assertStripeTestMode } from "@watchly/config/env";
+import type { SubscriptionStatus } from "@watchly/database/schema";
 
 export type StripeClient = Stripe;
 export type { Stripe };
@@ -27,9 +28,9 @@ export function idOf(v: string | { id: string } | null | undefined): string | nu
 }
 
 /** Statut Stripe -> statut stocké (les statuts inconnus sont traités comme inactifs). */
-export function normalizeStatus(s: string): import("@watchly/database/schema").SubscriptionStatus {
+export function normalizeStatus(s: string): SubscriptionStatus {
   const known = ["trialing", "active", "past_due", "canceled", "incomplete", "incomplete_expired", "unpaid", "paused"];
-  return (known.includes(s) ? s : "incomplete") as import("@watchly/database/schema").SubscriptionStatus;
+  return (known.includes(s) ? s : "incomplete") as SubscriptionStatus;
 }
 
 export const toDate = (sec: number | null | undefined): Date | null => (sec ? new Date(sec * 1000) : null);

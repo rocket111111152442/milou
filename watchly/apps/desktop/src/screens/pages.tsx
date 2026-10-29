@@ -28,7 +28,7 @@ import {
 } from "@watchly/ui/app";
 import { extractPage } from "@watchly/monitoring/extract";
 import { formatDateTime, formatInterval, formatRelative, type MonitorSummary, type NotificationView, type OverviewData, type ResultView } from "@watchly/types";
-import { api, ApiError } from "../lib/api";
+import { api, type ApiError } from "../lib/api";
 import type { ActivityEntry, AgentSnapshot, LocalAgent } from "../lib/agent";
 import { native } from "../lib/native";
 import { useRenderLink, useRouter } from "../lib/router";
@@ -48,7 +48,6 @@ function useResource<T>(path: string | null, deps: unknown[] = []) {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, version, ...deps]);
   return { data, error, reload: () => setVersion((v) => v + 1) };
 }

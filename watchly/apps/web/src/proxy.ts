@@ -19,6 +19,8 @@ export async function proxy(request: NextRequest) {
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(url, key, {
+    // Mêmes options que lib/supabase/server.ts (le proxy ne peut pas importer un module « server-only »).
+    cookieOptions: { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" },
     cookies: {
       getAll() {
         return request.cookies.getAll();

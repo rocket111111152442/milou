@@ -25,7 +25,6 @@ export const serverEnvSchema = z.object({
   BRAVE_SEARCH_API_KEY: optional,
   BRAVE_SEARCH_API_BASE: optionalUrl,
   WATCHLY_HASH_PEPPER: z.string().min(32).optional(),
-  WATCHLY_CRON_SECRET: z.string().min(32).optional(),
   WATCHLY_ALLOW_PRIVATE_TARGETS: z.enum(["0", "1"]).default("0"),
 });
 

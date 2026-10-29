@@ -70,7 +70,7 @@ describe("charge — file des surveillances de pages", () => {
             name: `P${m}`,
             url: `http://boutique-${(u * PER_USER + m) % SHOPS}.load.test:${port}/produit-${u}-${m}`,
             renderMode: "http",
-            condition: { type: "price_below", threshold: 50 },
+            condition: { type: "price_below", threshold: 50, currency: "EUR" },
             executionMode: "cloud_only",
             notify: { inapp: true, email: false, desktop: false },
           },

@@ -84,7 +84,7 @@ export default async function IncidentPage({ params }: { params: Promise<{ id: s
             <CardTitle>Capture d'écran au moment de l'échec</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* eslint-disable-next-line @next/next/no-img-element -- image privée servie par l'API, sans optimisation */}
+            {/* Image privée servie par l'API (contrôle d'accès), volontairement sans optimisation next/image. */}
             <img src={`/api/business/artifacts/${raw.screenshotId}`} alt={`Page affichée lors de l'échec du scénario sur ${d.domain}`} className="w-full rounded-xl border border-line" />
             <p className="mt-2 text-xs text-muted-fg">Conservée 30 jours.</p>
           </CardContent>

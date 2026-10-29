@@ -9,7 +9,7 @@
 import { lookup as dnsLookup, type LookupAddress } from "node:dns";
 import type { LookupFunction } from "node:net";
 import { createBrotliDecompress, createGunzip, createInflate } from "node:zlib";
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 import { Agent, request } from "undici";
 import { USER_AGENT } from "@watchly/config/constants";
 import { BlockedAddressError, isPublicAddress } from "./ip-policy";

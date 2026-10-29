@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { sql, type Database } from "@watchly/database";
 import { pageObservationSchema, type PageObservation } from "@watchly/types";
 import { extractPage, looksJsRendered } from "./extract/html";
-import { HostPoliteness } from "./net/politeness";
+import type { HostPoliteness } from "./net/politeness";
 import { RobotsCache } from "./net/robots";
 import { decodeBody, FetchError, safeFetch, type SafeFetchOptions } from "./net/safe-fetch";
 
