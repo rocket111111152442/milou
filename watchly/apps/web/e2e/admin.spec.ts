@@ -40,6 +40,27 @@ test.describe("administration LULLIN WEB", () => {
     await expect(page.getByText(/MODE TEST, aucun encaissement réel/)).toBeVisible();
     await expect(page.getByRole("heading", { name: "Points d'attention" })).toBeVisible();
 
+    // Erreurs des boucles du worker : seules celles de la dernière heure sont signalées.
+    const workerId = `e2e-worker-${Date.now()}`;
+    const now = new Date();
+    const old = new Date(now.getTime() - 2 * 3_600_000);
+    const stats = {
+      loops: {
+        "business:uptime": { runs: 10, errors: 3, lastError: "connexion refusée (e2e)", lastErrorAt: now.toISOString() },
+        "business:tls": { runs: 4, errors: 1, lastError: "erreur ancienne (e2e)", lastErrorAt: old.toISOString() },
+      },
+    };
+    await sql`insert into worker_heartbeats (worker_id, hostname, role, started_at, last_seen_at, stats)
+      values (${workerId}, 'e2e-host', 'all', now(), now(), ${sql.json(stats)})`;
+    try {
+      await page.reload();
+      await expect(page.getByText("business:uptime : 3 erreur(s) (connexion refusée (e2e))")).toBeVisible();
+      await expect(page.getByText("Erreurs dans les traitements du worker")).toBeVisible();
+      await expect(page.getByText(/erreur ancienne \(e2e\)/)).toHaveCount(0);
+    } finally {
+      await sql`delete from worker_heartbeats where worker_id = ${workerId}`;
+    }
+
     // Recherche puis suspension avec motif obligatoire.
     await page.getByRole("link", { name: "Utilisateurs" }).click();
     await page.getByRole("searchbox", { name: "Rechercher un utilisateur" }).fill(target.email);

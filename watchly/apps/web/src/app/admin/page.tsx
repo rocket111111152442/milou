@@ -142,6 +142,11 @@ export default async function AdminHome() {
                       <Badge tone={w.online ? "success" : "danger"}>{w.online ? "En ligne" : "Hors ligne"}</Badge>
                       vu {formatRelative(w.lastSeenAt)} · {w.succeeded} réussis / {w.failed} échecs
                     </span>
+                    {w.loopErrors.length ? (
+                      <span className="w-full text-xs text-danger">
+                        {w.loopErrors.map((l) => `${l.loop} : ${l.errors} erreur(s)${l.lastError ? ` (${l.lastError})` : ""}`).join(" · ")}
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>

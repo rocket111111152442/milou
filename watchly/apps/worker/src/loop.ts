@@ -3,7 +3,7 @@ import { logger } from "./logger";
 export interface LoopHandle {
   name: string;
   stop(): Promise<void>;
-  stats(): { runs: number; errors: number; lastRunAt: string | null; lastError: string | null };
+  stats(): { runs: number; errors: number; lastRunAt: string | null; lastError: string | null; lastErrorAt: string | null };
 }
 
 /**
@@ -14,7 +14,7 @@ export function startLoop(name: string, intervalMs: number, fn: () => Promise<un
   let stopped = false;
   let running: Promise<void> | null = null;
   let timer: NodeJS.Timeout | null = null;
-  const s = { runs: 0, errors: 0, lastRunAt: null as string | null, lastError: null as string | null };
+  const s = { runs: 0, errors: 0, lastRunAt: null as string | null, lastError: null as string | null, lastErrorAt: null as string | null };
   const tick = () => {
     if (stopped) return;
     running = (async () => {
@@ -24,6 +24,7 @@ export function startLoop(name: string, intervalMs: number, fn: () => Promise<un
       } catch (err) {
         s.errors++;
         s.lastError = (err as Error).message?.slice(0, 200) ?? "error";
+        s.lastErrorAt = new Date().toISOString();
         logger.error({ loop: name, err: { message: s.lastError, name: (err as Error).name } }, "loop iteration failed");
       } finally {
         s.lastRunAt = new Date().toISOString();

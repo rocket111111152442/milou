@@ -8,7 +8,7 @@ test.describe("sécurité", () => {
   test.beforeEach(resetRateLimits);
 
   test("API privées : 401 sans session", async ({ request }) => {
-    for (const path of ["/api/monitors", "/api/notifications", "/api/devices", "/api/account/export", "/api/overview", "/api/business/sites"]) {
+    for (const path of ["/api/monitors", "/api/notifications", "/api/devices", "/api/account/export", "/api/overview", "/api/history", "/api/business/sites"]) {
       expect((await request.get(path)).status(), path).toBe(401);
     }
     expect((await request.post("/api/monitors", { data: monitor, headers: ORIGIN })).status()).toBe(401);
@@ -48,6 +48,11 @@ test.describe("sécurité", () => {
     await pa.waitForURL(/\/app/);
     const created = await pa.request.post("/api/monitors", { data: monitor, headers: ORIGIN });
     const { id } = await created.json();
+    await sql`insert into monitoring_results (task_id, user_id, executed_by, outcome, error_code, error_message)
+      values (${id}, ${a.id}, 'cloud', 'error', 'timeout', 'Délai dépassé')`;
+    const own = await (await pa.request.get("/api/history?limit=10")).json();
+    expect(own.results).toHaveLength(1);
+    expect(own.results[0]).toMatchObject({ monitorId: id, monitorName: "Privé", outcome: "error" });
     await ca.close();
 
     const cb = await browser.newContext();
@@ -60,6 +65,8 @@ test.describe("sécurité", () => {
     expect((await pb.request.delete(`/api/monitors/${id}`, { headers: ORIGIN })).status()).toBe(404);
     const list = await (await pb.request.get("/api/monitors")).json();
     expect(list.monitors).toHaveLength(0);
+    const history = await (await pb.request.get("/api/history")).json();
+    expect(history.results).toHaveLength(0);
     const exported = await (await pb.request.get("/api/account/export")).text();
     expect(exported).not.toContain(id);
     await pb.goto(`/app/surveillances/${id}`);

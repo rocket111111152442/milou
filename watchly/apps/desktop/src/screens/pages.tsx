@@ -344,6 +344,18 @@ export function MonitorDetailPage({ id }: { id: string }) {
   );
 }
 
+export function HistoryPage() {
+  const { data, error, reload } = useResource<{ results: Array<ResultView & { monitorName: string }> }>("/api/history?limit=200");
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Historique" description="Les derniers contrôles de toutes vos surveillances, sur cet ordinateur ou sur les serveurs Watchly." />
+      {error ? <LoadError message={error} onRetry={reload} /> : null}
+      {!data && !error ? <LoadingBlock lines={6} /> : null}
+      {data ? <ResultTimeline results={data.results.map((r) => ({ ...r, summary: `${r.monitorName} — ${r.summary}` }))} /> : null}
+    </div>
+  );
+}
+
 export function AlertsPage() {
   const { data, error, reload } = useResource<{ notifications: NotificationView[] }>("/api/notifications?limit=100");
   const { push } = useToast();

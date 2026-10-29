@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Activity, Bell, LayoutDashboard, ListChecks, Pause, Play, Plus, Settings } from "lucide-react";
+import { Activity, Bell, History, LayoutDashboard, ListChecks, Pause, Play, Plus, Settings } from "lucide-react";
 import { Button, Callout, LoadingBlock, Logo, useToast } from "@watchly/ui";
 import { AppShell, type NavItem } from "@watchly/ui/app";
 import { api, ApiError } from "./lib/api";
@@ -9,7 +9,7 @@ import { showDesktopNotification } from "./lib/notify";
 import { RouterContext, useRenderLink } from "./lib/router";
 import { ConsentScreen, type Me } from "./screens/consent";
 import { LinkScreen } from "./screens/link";
-import { ActivityPage, AgentDot, AlertsPage, MonitorDetailPage, MonitorsPage, NewMonitorPage, OverviewPage, PHASE_LABEL } from "./screens/pages";
+import { ActivityPage, AgentDot, AlertsPage, HistoryPage, MonitorDetailPage, MonitorsPage, NewMonitorPage, OverviewPage, PHASE_LABEL } from "./screens/pages";
 import { SettingsPage } from "./screens/settings";
 
 type Stage = { name: "loading" } | { name: "unlinked" } | { name: "consent" } | { name: "ready" } | { name: "offline"; message: string };
@@ -182,6 +182,7 @@ function Main({
     { href: "/surveillances", label: "Mes surveillances", icon: <ListChecks />, active: is("/surveillances") && path !== "/surveillances/nouvelle" },
     { href: "/surveillances/nouvelle", label: "Nouvelle surveillance", icon: <Plus />, active: path === "/surveillances/nouvelle" },
     { href: "/alertes", label: "Alertes", icon: <Bell />, active: is("/alertes") },
+    { href: "/historique", label: "Historique", icon: <History />, active: is("/historique") },
     { href: "/activite", label: "Activité de cet ordinateur", icon: <Activity />, active: is("/activite") },
   ];
   const secondary: NavItem[] = [{ href: "/parametres", label: "Paramètres", icon: <Settings />, active: is("/parametres") }];
@@ -193,6 +194,7 @@ function Main({
   else if (path === "/surveillances/nouvelle") page = <NewMonitorPage webBase={info.apiBase} agent={agent} />;
   else if (detail) page = <MonitorDetailPage key={detail} id={detail} />;
   else if (path === "/alertes") page = <AlertsPage />;
+  else if (path === "/historique") page = <HistoryPage />;
   else if (path === "/activite") page = <ActivityPage snapshot={snapshot} />;
   else if (path === "/parametres")
     page = <SettingsPage info={info} me={me} paused={paused} onPausedChange={onPausedChange} onConsentChange={onConsent} onUnlinked={onUnlinked} />;

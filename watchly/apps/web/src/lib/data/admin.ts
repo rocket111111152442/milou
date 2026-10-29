@@ -18,7 +18,17 @@ export interface AdminKpis {
   devices: { total: number; online: number; consented: number };
   business: { sites: number; verified: number; openIncidents: number; endpoints: number };
   jobs24h: { succeeded: number; failed: number; pending: number; oldestPendingMinutes: number | null };
-  workers: Array<{ workerId: string; hostname: string; role: string; lastSeenAt: string; online: boolean; succeeded: number; failed: number }>;
+  workers: Array<{
+    workerId: string;
+    hostname: string;
+    role: string;
+    lastSeenAt: string;
+    online: boolean;
+    succeeded: number;
+    failed: number;
+    /** Boucles de traitement ayant échoué dans la dernière heure (nombre cumulé depuis le démarrage, dernier message). */
+    loopErrors: Array<{ loop: string; errors: number; lastError: string | null; lastErrorAt: string }>;
+  }>;
   costs: { monthMicros: number; budgetEur: number; byProvider: Array<{ provider: string; units: number; micros: number; cacheHits: number }> };
   emails24h: { sent: number; failed: number; pending: number };
   billingEventsFailed: number;
@@ -119,6 +129,7 @@ export async function getAdminKpis(db: Executor = getDb()): Promise<AdminKpis> {
       online: Date.now() - new Date(w.last_seen_at as string).getTime() < 120_000,
       succeeded: n(w.jobs_succeeded),
       failed: n(w.jobs_failed),
+      loopErrors: recentLoopErrors(w.stats),
     })),
     costs: {
       monthMicros: byProvider.reduce((a, r) => a + n(r.micros), 0),
@@ -138,6 +149,16 @@ export interface Anomaly {
 }
 
 /** Signaux à surveiller, déduits des données (aucune alerte inventée). */
+type LoopStats = { errors?: number; lastError?: string | null; lastErrorAt?: string | null };
+
+/** Erreurs de boucle survenues dans la dernière heure (les compteurs du worker sont cumulés depuis son démarrage). */
+export function recentLoopErrors(stats: unknown, now = Date.now()): AdminKpis["workers"][number]["loopErrors"] {
+  const loops = (stats as { loops?: Record<string, LoopStats> } | null)?.loops ?? {};
+  return Object.entries(loops)
+    .filter(([, l]) => (l.errors ?? 0) > 0 && l.lastErrorAt && now - new Date(l.lastErrorAt).getTime() < 3_600_000)
+    .map(([loop, l]) => ({ loop, errors: n(l.errors), lastError: l.lastError ?? null, lastErrorAt: l.lastErrorAt! }));
+}
+
 export function detectAnomalies(k: AdminKpis): Anomaly[] {
   const out: Anomaly[] = [];
   if (!k.workers.some((w) => w.online)) out.push({ severity: "high", title: "Aucun worker en ligne", detail: "Les contrôles serveur, e-mails et contrôles Business ne s'exécutent pas." });
@@ -148,6 +169,9 @@ export function detectAnomalies(k: AdminKpis): Anomaly[] {
     out.push({ severity: "medium", title: "Taux d'échec des contrôles élevé", detail: `${k.jobs24h.failed} échecs sur ${total} contrôles en 24 h.` });
   if (k.costs.budgetEur > 0 && k.costs.monthMicros / 1e6 > k.costs.budgetEur * 0.8)
     out.push({ severity: "medium", title: "Budget des API payantes bientôt atteint", detail: `${(k.costs.monthMicros / 1e6).toFixed(2)} € sur ${k.costs.budgetEur} € ce mois-ci.` });
+  const loopErrors = k.workers.filter((w) => w.online).flatMap((w) => w.loopErrors);
+  if (loopErrors.length)
+    out.push({ severity: "medium", title: "Erreurs dans les traitements du worker", detail: loopErrors.map((l) => `${l.loop} : ${l.errors} erreur(s)${l.lastError ? ` — ${l.lastError}` : ""}`).join(" · ").slice(0, 400) });
   if (k.billingEventsFailed > 0) out.push({ severity: "high", title: "Événements Stripe en échec", detail: `${k.billingEventsFailed} événement(s) de facturation non traités.` });
   if (k.emails24h.failed > 0) out.push({ severity: "medium", title: "E-mails en échec", detail: `${k.emails24h.failed} e-mail(s) non envoyés en 24 h.` });
   if (k.trials.blockedDuplicates30d > 5) out.push({ severity: "low", title: "Tentatives d'essais multiples", detail: `${k.trials.blockedDuplicates30d} essais refusés (même e-mail ou même carte) en 30 jours.` });

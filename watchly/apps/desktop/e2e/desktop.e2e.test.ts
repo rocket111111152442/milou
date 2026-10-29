@@ -225,6 +225,13 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
     await (await app.$("h2*=Historique des contrôles")).waitForDisplayed({ timeout: 10_000 });
     await new Promise((r) => setTimeout(r, 800));
     await shot("5-detail");
+    // Historique global : même résultat, avec le nom de la surveillance, servi par /api/history.
+    await (await app.$("a*=Historique")).click();
+    await (await app.$("h1*=Historique")).waitForDisplayed({ timeout: 10_000 });
+    await (await app.$("p*=Casque local —")).waitForDisplayed({ timeout: 10_000 });
+    expect(await (await app.$("a*=Historique")).getAttribute("aria-current")).toBe("page");
+    expect(await (await app.$("a*=Mes surveillances")).getAttribute("aria-current")).toBeNull();
+    await shot("6-historique");
   }, 120_000);
 
   it("pause depuis l'interface : l'état est transmis au serveur", async () => {
