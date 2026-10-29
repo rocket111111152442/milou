@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, type Page } from "@playwright/test";
@@ -97,4 +98,28 @@ export async function createConfirmedUser(email = uniqueEmail(), opts: { plan?: 
     await sql`delete from entitlements where user_id = ${id}`;
   }
   return { id, email };
+}
+
+/** Code TOTP (RFC 6238 : HMAC-SHA1, 30 s, 6 chiffres), comme une application d'authentification. */
+export function totp(secret: string, at = Date.now()): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const bits = [...secret.replace(/=+$/, "").toUpperCase()].map((c) => alphabet.indexOf(c).toString(2).padStart(5, "0")).join("");
+  const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
+  const h = createHmac("sha1", key).update(counter).digest();
+  const o = h[h.length - 1]! & 0xf;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+}
+
+/** Active la double authentification depuis la page Paramètres ; renvoie la clé TOTP. */
+export async function enableMfa(page: Page): Promise<string> {
+  if (!page.url().includes("/app/parametres")) await page.goto("/app/parametres");
+  await page.getByRole("button", { name: "Activer la double authentification" }).click();
+  await expect(page.getByRole("img", { name: /QR code de configuration/ })).toBeVisible();
+  const secret = (await page.getByTestId("mfa-secret").innerText()).trim();
+  await page.getByLabel(/^Code à 6 chiffres/).fill(totp(secret));
+  await page.getByRole("button", { name: "Confirmer l'activation" }).click();
+  await expect(page.getByText("Double authentification activée", { exact: true })).toBeVisible();
+  return secret;
 }

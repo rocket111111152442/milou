@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
-import { Card, CardContent, CardHeader, CardTitle, PageHeader } from "@watchly/ui";
+import { Callout, Card, CardContent, CardHeader, CardTitle, PageHeader } from "@watchly/ui";
 import { eq, profiles, withUser } from "@watchly/database";
 import { requireUser } from "@/lib/auth";
 import { listDevices } from "@/lib/data/account";
 import { getDb } from "@/lib/db";
-import { DangerZone, DevicesList, NotificationPrefs, PasswordForm, ProfileForm } from "./settings-forms";
+import { DangerZone, DevicesList, MfaSettings, NotificationPrefs, PasswordForm, ProfileForm } from "./settings-forms";
 
 export const metadata: Metadata = { title: "Paramètres" };
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ "double-authentification"?: string }> }) {
   const user = await requireUser("/app/parametres");
+  const mfaRequired = (await searchParams)["double-authentification"] === "requise" && !user.mfa.enrolled;
   const [prefs] = await withUser(getDb(), user.id, (tx) =>
     tx
       .select({ notifyEmail: profiles.notifyEmail, notifyInapp: profiles.notifyInapp, notifyDesktop: profiles.notifyDesktop, marketingOptIn: profiles.marketingOptIn })
@@ -43,6 +44,15 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <PasswordForm />
+        </CardContent>
+      </Card>
+      <Card id="double-authentification">
+        <CardHeader>
+          <CardTitle as="h2">Double authentification</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {mfaRequired ? <Callout tone="warning">La double authentification est obligatoire pour accéder à l'administration. Activez-la ci-dessous.</Callout> : null}
+          <MfaSettings factorId={user.mfa.factorId} since={user.mfa.since} />
         </CardContent>
       </Card>
       <Card>

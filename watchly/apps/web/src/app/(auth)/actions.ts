@@ -1,6 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { mfaChallengePath } from "@/lib/auth";
 import { appUrl, clientIp, ipKey, safeNext } from "@/lib/request";
 import { rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient, isAuthConfigured } from "@/lib/supabase/server";
@@ -85,14 +86,34 @@ export async function signInAction(_: FormState, form: FormData): Promise<FormSt
   if (!byIp.ok || !byAccount.ok) return { error: "Trop de tentatives de connexion. Réessayez dans 15 minutes.", values };
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
     if (error.code === "email_not_confirmed") {
       return { error: "Votre adresse e-mail n'est pas encore vérifiée. Consultez l'e-mail de confirmation.", values };
     }
     return { error: "Adresse e-mail ou mot de passe incorrect.", values };
   }
-  redirect(safeNext(String(form.get("suivant") ?? ""), "/app"));
+  const next = safeNext(String(form.get("suivant") ?? ""), "/app");
+  if (data.user?.factors?.some((f) => f.status === "verified")) redirect(mfaChallengePath(next));
+  redirect(next);
+}
+
+/** Deuxième étape de connexion : code à 6 chiffres de l'application d'authentification (TOTP). */
+export async function mfaChallengeAction(_: FormState, form: FormData): Promise<FormState> {
+  if (!isAuthConfigured()) return NOT_CONFIGURED;
+  const next = safeNext(String(form.get("suivant") ?? ""), "/app");
+  const code = String(form.get("code") ?? "").replace(/\s/g, "");
+  if (!/^\d{6}$/.test(code)) return { fieldErrors: { code: "Saisissez les 6 chiffres affichés par votre application" } };
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) redirect("/connexion?erreur=session");
+  const factor = data.user.factors?.find((f) => f.status === "verified" && f.factor_type === "totp");
+  if (!factor) redirect(next);
+  const rl = await rateLimit(`mfa:${data.user.id}`, 10, 900);
+  if (!rl.ok) return { error: "Trop de codes saisis. Réessayez dans 15 minutes." };
+  const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code });
+  if (error) return { fieldErrors: { code: "Code incorrect ou expiré. Saisissez le code affiché actuellement." } };
+  redirect(next);
 }
 
 export async function forgotPasswordAction(_: FormState, form: FormData): Promise<FormState> {

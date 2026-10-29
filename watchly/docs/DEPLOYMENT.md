@@ -12,6 +12,7 @@ Chaque étape marquée **[humain]** nécessite un compte, un paiement ou une dé
    ```
 3. Authentification → URL Configuration : *Site URL* = URL publique ; *Redirect URLs* = `https://DOMAINE/**`
    (et l'URL de Preview Vercel si utilisée). E-mails : confirmation obligatoire, mot de passe ≥ 10 caractères.
+   Authentification multifacteur : laisser « TOTP (App Authenticator) » activé (inscription et vérification).
 4. Modèles d'e-mails (Confirm signup, Reset password) : reprendre `supabase/templates/*.html`
    (liens `{{ .RedirectTo }}&token_hash=…`, indispensables au flux `/auth/confirm`).
 5. SMTP personnalisé (Resend) pour ne pas dépendre du service d'envoi limité de Supabase.

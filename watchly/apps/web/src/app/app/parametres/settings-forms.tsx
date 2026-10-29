@@ -1,9 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Download, Laptop, Trash2 } from "lucide-react";
+import { Download, Laptop, ShieldCheck, Trash2 } from "lucide-react";
 import { Button, Callout, Dialog, DialogClose, DialogContent, DialogTrigger, Field, Input, Label, Select, Switch } from "@watchly/ui";
-import { formatRelative, type DeviceView } from "@watchly/types";
+import { formatDateTime, formatRelative, type DeviceView } from "@watchly/types";
 import { apiCall, useApiAction } from "@/components/app/use-api";
 
 const ZONES = ["Europe/Paris", "Europe/Brussels", "Europe/Zurich", "Europe/Luxembourg", "America/Montreal", "Indian/Reunion", "America/Martinique", "America/Guadeloupe", "Pacific/Noumea", "Pacific/Tahiti", "UTC"];
@@ -96,6 +96,100 @@ export function PasswordForm() {
       <Button type="submit" variant="secondary" loading={pending} className="self-start" disabled={!current || next.length < 10}>
         Changer le mot de passe
       </Button>
+    </form>
+  );
+}
+
+export function MfaSettings({ factorId, since }: { factorId: string | null; since: string | null }) {
+  const [setup, setSetup] = useState<{ factorId: string; qrCode: string; secret: string } | null>(null);
+  const [code, setCode] = useState("");
+  const { run, pending } = useApiAction();
+  const cleanCode = code.replace(/\s/g, "");
+  const codeField = (id: string) => (
+    <Field id={id} label="Code à 6 chiffres" required hint="Affiché par votre application d'authentification.">
+      {(p) => <Input {...p} inputMode="numeric" autoComplete="one-time-code" maxLength={7} value={code} onChange={(e) => setCode(e.target.value)} className="max-w-40" />}
+    </Field>
+  );
+
+  if (factorId) {
+    return (
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (await run(`/api/account/mfa/${factorId}`, { code: cleanCode }, { method: "DELETE", success: "Double authentification désactivée" })) setCode("");
+        }}
+      >
+        <p className="flex items-center gap-2 text-sm">
+          <ShieldCheck className="size-4 text-success" aria-hidden="true" />
+          <span>
+            <strong>Double authentification activée</strong>
+            {since ? ` depuis le ${formatDateTime(since)}` : ""}. Un code est demandé à chaque connexion.
+          </span>
+        </p>
+        {codeField("mfa-disable-code")}
+        <Button type="submit" variant="secondary" loading={pending} className="self-start" disabled={!/^\d{6}$/.test(cleanCode)}>
+          Désactiver la double authentification
+        </Button>
+      </form>
+    );
+  }
+
+  if (!setup) {
+    return (
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-muted-fg">
+          En plus du mot de passe, un code temporaire généré par une application d'authentification (Google Authenticator, Microsoft
+          Authenticator, 1Password, Aegis…) sera demandé à chaque connexion.
+        </p>
+        <Button
+          className="self-start"
+          loading={pending}
+          onClick={async () => {
+            const r = await run<{ factorId: string; qrCode: string; secret: string }>("/api/account/mfa", {}, { refresh: false });
+            if (r) setSetup(r);
+          }}
+        >
+          Activer la double authentification
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (await run("/api/account/mfa/verify", { factorId: setup.factorId, code: cleanCode }, { success: "Double authentification activée" })) {
+          setSetup(null);
+          setCode("");
+        }
+      }}
+    >
+      <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm">
+        <li>Scannez ce QR code avec votre application d'authentification, ou saisissez la clé ci-dessous.</li>
+        <li>Saisissez le code à 6 chiffres affiché par l'application pour confirmer.</li>
+      </ol>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        {/* QR code SVG fourni par le serveur d'authentification (data URI, aucune ressource externe). */}
+        <img src={setup.qrCode} alt="QR code de configuration de la double authentification" width={176} height={176} className="rounded-lg border border-line bg-white p-2" />
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-xs text-muted-fg">Clé de configuration</span>
+          <code data-testid="mfa-secret" className="break-all rounded-md bg-surface px-2 py-1 font-mono text-sm">
+            {setup.secret}
+          </code>
+        </div>
+      </div>
+      {codeField("mfa-enroll-code")}
+      <div className="flex gap-2">
+        <Button type="submit" loading={pending} disabled={!/^\d{6}$/.test(cleanCode)}>
+          Confirmer l'activation
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setSetup(null)}>
+          Annuler
+        </Button>
+      </div>
     </form>
   );
 }

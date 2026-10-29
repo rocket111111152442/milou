@@ -5,6 +5,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { Button, Callout, Checkbox, Field, Input, Label } from "@watchly/ui";
 import {
   forgotPasswordAction,
+  mfaChallengeAction,
   resendConfirmationAction,
   resetPasswordAction,
   signInAction,
@@ -122,6 +123,22 @@ export function SignInForm({ suivant, googleEnabled }: { suivant?: string; googl
         Se connecter
       </Button>
       {googleEnabled ? <GoogleButton /> : null}
+    </form>
+  );
+}
+
+export function MfaChallengeForm({ suivant }: { suivant: string }) {
+  const [state, action, pending] = useActionState(mfaChallengeAction, {});
+  return (
+    <form action={action} className="flex flex-col gap-5">
+      <input type="hidden" name="suivant" value={suivant} />
+      <Field id="code" label="Code à 6 chiffres" required error={state.fieldErrors?.code} hint="Affiché par votre application d'authentification (Google Authenticator, 1Password, Aegis…).">
+        {(p) => <Input {...p} name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} required autoFocus />}
+      </Field>
+      <FormMessages state={state} />
+      <Button type="submit" size="lg" loading={pending}>
+        Vérifier
+      </Button>
     </form>
   );
 }

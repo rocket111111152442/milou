@@ -18,7 +18,7 @@ Aucune valeur secrète n'est versionnée. Modèle : `.env.example` (racine) et `
 | `STRIPE_SECRET_KEY` | pour payer | **oui** | `sk_test_…` uniquement tant que le cadre légal n'est pas validé. |
 | `STRIPE_WEBHOOK_SECRET` | pour payer | **oui** | Secret de signature de l'endpoint `/api/stripe/webhook`. |
 | `WATCHLY_ALLOW_LIVE_PAYMENTS` | non | non | Seule valeur acceptée : `I_HAVE_LEGAL_APPROVAL`. À ne définir qu'après validation juridique. |
-| `ADMIN_REQUIRE_MFA` | recommandé | non | `1` : l'administration exige la double authentification. |
+| `ADMIN_REQUIRE_MFA` | recommandé | non | `1` : l'administration exige une session validée par double authentification (TOTP) ; un administrateur sans double authentification est redirigé vers Paramètres pour l'activer. |
 | `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED` | non | non | `1` seulement si le fournisseur Google est configuré dans Supabase. |
 
 Sans Supabase ou base configurée, le site public fonctionne et l'espace client affiche clairement que le

@@ -1,7 +1,6 @@
 import "server-only";
 import { apiError, handleApiError, sameOrigin } from "./api";
 import { getCurrentUser } from "./auth";
-import { createSupabaseServerClient } from "./supabase/server";
 
 type AdminHandler = (req: Request, admin: { userId: string; email: string }, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>;
 
@@ -15,11 +14,8 @@ export function withAdmin(handler: AdminHandler) {
       if (req.headers.get("authorization")) return apiError(404, "not_found");
       const user = await getCurrentUser();
       if (!user || user.suspended || user.role !== "admin") return apiError(404, "not_found");
-      if (process.env.ADMIN_REQUIRE_MFA === "1") {
-        const supabase = await createSupabaseServerClient();
-        const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (data?.currentLevel !== "aal2") return apiError(404, "not_found");
-      }
+      if (user.mfa.enrolled && !user.mfa.verified) return apiError(404, "not_found");
+      if (process.env.ADMIN_REQUIRE_MFA === "1" && !user.mfa.verified) return apiError(404, "not_found");
       if (req.method !== "GET" && !sameOrigin(req)) return apiError(403, "bad_origin");
       return await handler(req, { userId: user.id, email: user.email }, ctx);
     } catch (err) {

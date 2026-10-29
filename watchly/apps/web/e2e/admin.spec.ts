@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { createConfirmedUser, DB_URL, login, resetRateLimits, sql, uniqueEmail } from "./helpers";
+import { createConfirmedUser, DB_URL, enableMfa, login, resetRateLimits, sql, uniqueEmail } from "./helpers";
 
 const ROOT = join(import.meta.dirname, "../../..");
 
@@ -33,7 +33,14 @@ test.describe("administration LULLIN WEB", () => {
       insert into support_tickets (user_id, email, subject, category) values (${target.id}, ${target.email}, 'Question sur une alerte', 'monitoring') returning id`;
     await sql`insert into support_messages (ticket_id, user_id, author, body) values (${ticket!.id}, ${target.id}, 'user', 'Bonjour, je ne reçois pas mes alertes.')`;
 
+    // ADMIN_REQUIRE_MFA=1 (configuration de production) : double authentification obligatoire avant l'administration.
     await login(page, admin.email, undefined, "/admin");
+    await page.waitForURL(/\/app\/parametres\?double-authentification=requise/);
+    const early = await page.request.post(`/api/admin/users/${target.id}/suspension`, { data: { suspended: true, reason: "abc" }, headers: { origin: "http://localhost:3000" } });
+    expect(early.status()).toBe(404);
+    await expect(page.getByText(/obligatoire pour accéder à l'administration/)).toBeVisible();
+    await enableMfa(page);
+    await page.goto("/admin");
     await page.waitForURL(/\/admin$/);
     await expect(page.getByRole("heading", { name: "Vue d'ensemble" })).toBeVisible();
     await expect(page.getByText("Revenu mensuel récurrent")).toBeVisible();

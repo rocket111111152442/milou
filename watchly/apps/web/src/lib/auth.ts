@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { authenticateDevice, bearerFrom, type Role } from "@watchly/auth";
 import { eq, profiles } from "@watchly/database";
@@ -15,6 +15,13 @@ export interface CurrentUser {
   displayName: string | null;
   onboardingCompletedAt: Date | null;
   timezone: string;
+  /** Double authentification (TOTP) : activée sur le compte, et validée pour la session en cours (aal2). */
+  mfa: { enrolled: boolean; verified: boolean; factorId: string | null; since: string | null };
+}
+
+/** Page de saisie du code de double authentification, avec retour vers `next` après validation. */
+export function mfaChallengePath(next: string): string {
+  return `/connexion/double-authentification?suivant=${encodeURIComponent(next)}`;
 }
 
 /**
@@ -41,6 +48,13 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     .where(eq(profiles.id, data.user.id))
     .limit(1);
   if (!p) return null;
+  // Facteurs lus sur l'utilisateur renvoyé par le serveur d'authentification (pas sur le cookie).
+  const factor = data.user.factors?.find((f) => f.status === "verified" && f.factor_type === "totp") ?? null;
+  let verified = false;
+  if (factor) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    verified = aal?.currentLevel === "aal2";
+  }
   return {
     id: data.user.id,
     email: p.email || data.user.email || "",
@@ -49,6 +63,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     displayName: p.displayName,
     onboardingCompletedAt: p.onboardingCompletedAt,
     timezone: p.timezone,
+    mfa: { enrolled: Boolean(factor), verified, factorId: factor?.id ?? null, since: factor?.created_at ?? null },
   };
 });
 
@@ -56,6 +71,8 @@ export async function requireUser(nextPath = "/app"): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect(`/connexion?suivant=${encodeURIComponent(nextPath)}`);
   if (user.suspended) redirect("/compte-suspendu");
+  // Mot de passe seul : la session n'ouvre rien tant que le code de double authentification n'est pas saisi.
+  if (user.mfa.enrolled && !user.mfa.verified) redirect(mfaChallengePath((await headers()).get("x-watchly-path") ?? nextPath));
   return user;
 }
 
@@ -63,11 +80,9 @@ export async function requireUser(nextPath = "/app"): Promise<CurrentUser> {
 export async function requireAdmin(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user || user.suspended || user.role !== "admin") notFound();
-  if (process.env.ADMIN_REQUIRE_MFA === "1") {
-    const supabase = await createSupabaseServerClient();
-    const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (data?.currentLevel !== "aal2") notFound();
-  }
+  if (user.mfa.enrolled && !user.mfa.verified) redirect(mfaChallengePath("/admin"));
+  // ADMIN_REQUIRE_MFA=1 : un administrateur sans double authentification est invité à l'activer.
+  if (process.env.ADMIN_REQUIRE_MFA === "1" && !user.mfa.verified) redirect("/app/parametres?double-authentification=requise#double-authentification");
   return user;
 }
 
@@ -91,5 +106,6 @@ export async function authenticateRequest(req: Request): Promise<RequestActor | 
   }
   const user = await getCurrentUser();
   if (!user || user.suspended) return null;
+  if (user.mfa.enrolled && !user.mfa.verified) return null;
   return { kind: "user", userId: user.id, role: user.role };
 }

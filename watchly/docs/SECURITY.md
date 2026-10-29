@@ -24,6 +24,7 @@ l'adresse de contact de LULLIN WEB. Ne joignez jamais de mot de passe ni de donn
 | Force brute / spam | Limitation de débit en base : connexion (IP et compte), inscription, réinitialisation, liaison d'appareil, API | E2E |
 | Énumération de comptes | Messages identiques pour adresse connue / inconnue | E2E |
 | Webhooks falsifiés | Signature Stripe obligatoire, idempotence (verrou consultatif), relecture de l'abonnement chez Stripe | Tests d'intégration + E2E |
+| Vol de mot de passe | Double authentification TOTP facultative (Paramètres), obligatoire pour l'administration avec `ADMIN_REQUIRE_MFA=1` ; tant que le code n'est pas saisi, la session n'ouvre ni l'espace client ni l'API (401) ; code exigé pour la désactiver | E2E `mfa.spec.ts`, `admin.spec.ts` (avec `ADMIN_REQUIRE_MFA=1`) |
 | Vol de jeton d'appareil | Jeton stocké haché côté serveur, gardé par Rust (trousseau du système) côté client, révocable depuis le site ; un jeton n'ouvre ni l'administration ni la facturation | E2E desktop, E2E sécurité |
 | Contrôles locaux abusifs | Agent limité aux tâches de SON utilisateur, accord explicite versionné et horodaté, robots.txt, 5 s entre deux requêtes vers un même site, aucune adresse locale | Tests unitaires de l'agent, E2E desktop |
 | Scénarios Business dangereux | Domaine vérifié uniquement, POST hors domaine bloqués, clics « payer/commander/supprimer… » et champs carte/mot de passe bloqués | Tests d'intégration avec Chromium réel |
@@ -53,7 +54,9 @@ risque est réduit par l'absence de contenu HTML fourni par les utilisateurs et 
 
 ## Points restant à traiter avant un lancement commercial
 
-- Activer `ADMIN_REQUIRE_MFA=1` et la double authentification des comptes administrateurs.
+- Activer `ADMIN_REQUIRE_MFA=1` en production (les administrateurs sont alors invités à activer la double
+  authentification avant d'accéder à l'administration). Pas de codes de secours : un administrateur qui perd son
+  application d'authentification doit faire supprimer le facteur depuis le tableau de bord Supabase.
 - Configurer les alertes de sécurité Supabase/Vercel et la rotation des clés.
 - Audit externe recommandé (test d'intrusion) avant ouverture au public.
 - Validation juridique (RGPD, CGV) — voir `docs/ROADMAP.md`.

@@ -26,7 +26,8 @@ E2E_BASE_URL=http://localhost:3000 pnpm test:e2e
 ```
 
 Les e-mails d'authentification sont lus dans Mailpit (http://127.0.0.1:54324) par les tests.
-Les tests E2E remettent à zéro les limites de débit de la base locale avant chaque test.
+Les tests E2E remettent à zéro les limites de débit de la base locale avant chaque test. Ils s'exécutent avec
+`ADMIN_REQUIRE_MFA=1` (configuration de production) et calculent les codes TOTP comme une application d'authentification.
 
 ## Ce qui est simulé (et ce qui ne l'est pas)
 

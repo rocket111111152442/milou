@@ -17,5 +17,6 @@ DATABASE_URL="$DB" STRIPE_PRICE_PLUS=price_1PlusLocal STRIPE_PRICE_PRO=price_1Pr
   echo "STRIPE_SECRET_KEY=sk_test_123"
   echo "STRIPE_API_BASE=http://localhost:12111"
   echo "STRIPE_WEBHOOK_SECRET=whsec_ci_$(openssl rand -hex 16)"
+  echo "ADMIN_REQUIRE_MFA=1"
 } > apps/web/.env.local
 echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"

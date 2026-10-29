@@ -17,6 +17,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Chemin demandé, transmis aux pages pour revenir au bon endroit après la double authentification.
+  request.headers.set("x-watchly-path", request.nextUrl.pathname + request.nextUrl.search);
   let response = NextResponse.next({ request });
   const supabase = createServerClient(url, key, {
     // Mêmes options que lib/supabase/server.ts (le proxy ne peut pas importer un module « server-only »).
@@ -45,5 +47,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Webhooks Stripe, API desktop (jeton Bearer) et fichiers statiques exclus.
-  matcher: ["/app/:path*", "/admin/:path*", "/auth/:path*", "/connexion", "/inscription", "/reinitialiser-mot-de-passe", "/api/((?!stripe|agent|health|cron).*)"],
+  matcher: ["/app/:path*", "/admin/:path*", "/auth/:path*", "/connexion/:path*", "/inscription", "/reinitialiser-mot-de-passe", "/api/((?!stripe|agent|health|cron).*)"],
 };

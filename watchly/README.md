@@ -63,6 +63,7 @@ DATABASE_URL=… pnpm admin:grant prenom@lullin-web.com
 | --- | --- |
 | Site public, SEO, accessibilité (axe), responsive | Fonctionnel et vérifié (E2E) |
 | Inscription, e-mail de confirmation, connexion, réinitialisation, déconnexion | Fonctionnel et vérifié (E2E, Supabase local) |
+| Double authentification (TOTP), obligatoire pour l'administration avec `ADMIN_REQUIRE_MFA=1` | Fonctionnel et vérifié (E2E, Supabase local) — pas de codes de secours |
 | Surveillance de pages (moteur A), file hybride ordinateur / serveurs | Fonctionnel et vérifié (intégration, E2E, desktop réel) |
 | Recherche sur Internet (moteur B, Brave Search) | Fonctionnel en environnement de test (API simulée) — clé Brave requise |
 | Business : vérification de propriété, disponibilité, HTTPS, scénarios, rapports | Fonctionnel et vérifié (intégration avec serveurs locaux et Chromium, E2E) |
