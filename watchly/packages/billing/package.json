@@ -16,6 +16,11 @@
     "@watchly/config": "workspace:*",
     "@watchly/types": "workspace:*",
     "stripe": "^23.0.1",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "@watchly/auth": "workspace:*",
+    "@watchly/notifications": "workspace:*"
+  },
+  "devDependencies": {
+    "@watchly/database": "workspace:*"
   }
 }
