@@ -1,7 +1,8 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import type { z } from "zod";
+import { ZodError, type z } from "zod";
 import { QuotaError, BillingError } from "@watchly/billing";
+import { BusinessError } from "@watchly/monitoring/business";
 import { authenticateRequest, type RequestActor } from "./auth";
 import { DatabaseUnavailableError } from "./db";
 import { rateLimit } from "./rate-limit";
@@ -81,6 +82,11 @@ export function withActor(
 
 export function handleApiError(err: unknown): Response {
   if (err instanceof QuotaError) return apiError(403, err.code, err.message);
+  if (err instanceof BusinessError) {
+    const status = err.code === "not_found" ? 404 : err.code === "duplicate" || err.code === "too_soon" ? 409 : 422;
+    return apiError(status, err.code, err.message);
+  }
+  if (err instanceof ZodError) return apiError(400, "invalid_input", "Données invalides.", { issues: err.issues.map((i) => ({ path: i.path.join("."), message: i.message })) });
   if (err instanceof BillingError) return apiError(err.code === "not_configured" ? 503 : 409, err.code, err.message);
   if (err instanceof DatabaseUnavailableError) return apiError(503, "not_configured", "Service non configuré.");
   console.error("api_error", (err as Error)?.name, (err as Error)?.message?.slice(0, 200));

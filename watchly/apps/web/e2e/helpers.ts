@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, type Page } from "@playwright/test";
 import postgres from "postgres";
 
@@ -67,4 +69,32 @@ export async function resetRateLimits() {
 /** Marque l'onboarding comme fait pour aller directement au tableau de bord. */
 export async function skipOnboarding(email: string) {
   await sql`update profiles set onboarding_completed_at = now() where email = ${email}`;
+}
+
+const SUPABASE_URL = process.env.E2E_SUPABASE_URL ?? "http://127.0.0.1:54321";
+
+function serviceRoleKey(): string {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) return process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const env = readFileSync(join(import.meta.dirname, "../.env.local"), "utf8");
+  return /^SUPABASE_SERVICE_ROLE_KEY=(.+)$/m.exec(env)?.[1]?.trim() ?? "";
+}
+
+/** Compte confirmé créé via l'API d'administration de Supabase locale (plus rapide que l'inscription). */
+export async function createConfirmedUser(email = uniqueEmail(), opts: { plan?: "plus" | "pro" | "business" } = {}): Promise<{ id: string; email: string }> {
+  const key = serviceRoleKey();
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" },
+    body: JSON.stringify({ email, password: PASSWORD, email_confirm: true, user_metadata: { display_name: "Test" } }),
+  });
+  if (!res.ok) throw new Error(`création du compte impossible : ${res.status} ${await res.text()}`);
+  const { id } = (await res.json()) as { id: string };
+  await sql`update profiles set onboarding_completed_at = now() where id = ${id}`;
+  if (opts.plan) {
+    // Équivaut au résultat d'un webhook Stripe « abonnement actif » (mode test).
+    await sql`insert into subscriptions (user_id, plan_id, stripe_subscription_id, stripe_customer_id, status, current_period_end)
+              values (${id}, ${opts.plan}, ${"sub_e2e_" + id}, ${"cus_e2e_" + id}, 'active', now() + interval '20 days')`;
+    await sql`delete from entitlements where user_id = ${id}`;
+  }
+  return { id, email };
 }
