@@ -36,6 +36,7 @@
     }
   },
   "devDependencies": {
-    "@watchly/database": "workspace:*"
+    "@watchly/database": "workspace:*",
+    "playwright": "1.63.0"
   }
 }

@@ -22,7 +22,7 @@ import {
   type CreateMonitorInput,
   type UpdateMonitorInput,
 } from "@watchly/types";
-import { canonicalUrl, InvalidTargetError, parseTargetUrl } from "./net/safe-url";
+import { canonicalUrl, InvalidTargetError, parseTargetUrl, type UrlPolicyOptions } from "./net/safe-url";
 import { buildQueries, planWebTopic } from "./search/planner";
 import { stableJitterSeconds } from "./schedule/next-run";
 import { decideExecutor } from "./queue";
@@ -49,7 +49,14 @@ export interface CreatedMonitor {
   initialJobId: string | null;
 }
 
-export async function createMonitor(db: Database, userId: string, input: CreateMonitorInput, now: Date = new Date()): Promise<CreatedMonitor> {
+export async function createMonitor(
+  db: Database,
+  userId: string,
+  input: CreateMonitorInput,
+  now: Date = new Date(),
+  /** Tests uniquement (cibles locales) : jamais transmis par l'API. */
+  urlPolicy: UrlPolicyOptions = {},
+): Promise<CreatedMonitor> {
   const ent = await getEntitlements(db, userId, now);
 
   let target: typeof monitoringTargets.$inferInsert;
@@ -57,7 +64,7 @@ export async function createMonitor(db: Database, userId: string, input: CreateM
   if (input.kind === "page") {
     let url: URL;
     try {
-      url = parseTargetUrl(input.url);
+      url = parseTargetUrl(input.url, urlPolicy);
     } catch (err) {
       if (err instanceof InvalidTargetError) throw new MonitorError("invalid_target", err.message);
       throw err;
