@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { authenticateDevice, bearerFrom, type Role } from "@watchly/auth";
 import { eq, profiles } from "@watchly/database";
@@ -21,6 +22,8 @@ export interface CurrentUser {
  * par le profil en base (rôle, suspension). Mis en cache pour la durée de la requête.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  // Lecture des cookies en premier : marque la route comme dynamique même sans configuration.
+  await cookies();
   if (!isAuthConfigured() || !isDatabaseConfigured()) return null;
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();

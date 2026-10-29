@@ -3,6 +3,9 @@ import { getCurrentUser, requireUser } from "@/lib/auth";
 import { unreadCount } from "@/lib/data/account";
 import { DashboardShell } from "./shell";
 
+// Espace privé : toujours rendu à la requête (session, données personnelles), jamais mis en cache statique.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = { title: { default: "Tableau de bord", template: "%s · Watchly" }, robots: { index: false } };
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
