@@ -1,0 +1,189 @@
+/*
+ * Watchly — jetons de design partagés (site, tableau de bord, application desktop).
+ * Usage côté application :
+ *   @import "tailwindcss";
+ *   @import "@watchly/ui/styles.css";
+ *   @source "<chemin>/packages/ui/src";
+ *
+ * Accessibilité des couleurs (WCAG 2.2, calculé) :
+ *   - #111118 sur #FFFFFF : 18,9:1
+ *   - #6B6B79 sur #FFFFFF : 5,3:1  -> texte secondaire courant (--color-muted-fg)
+ *   - #777785 sur #FFFFFF : 4,4:1  -> réservé aux icônes, grands textes et éléments décoratifs
+ *   - blanc sur #00E5FF (début du dégradé) : 1,5:1 -> le dégradé n'est jamais utilisé sous du texte
+ */
+@theme {
+  --color-white: #ffffff;
+  --color-ink: #111118;
+  --color-ink-soft: #2a2a33;
+  --color-surface: #f8f9fc;
+  --color-surface-strong: #f0f1f6;
+  --color-line: #e7e8ef;
+  --color-line-strong: #d6d8e2;
+  --color-muted: #777785;
+  --color-muted-fg: #6b6b79;
+  --color-cyan: #00e5ff;
+  --color-blue: #245bff;
+  --color-violet: #8028ff;
+  --color-pink: #ed4df5;
+
+  --color-success: #0f8a5f;
+  --color-success-soft: #e7f6ef;
+  --color-warning: #a15c00;
+  --color-warning-soft: #fff4e0;
+  --color-danger: #c4213b;
+  --color-danger-soft: #fdecef;
+  --color-info: #245bff;
+  --color-info-soft: #edf2ff;
+
+  --font-sans: var(--font-inter, "Inter Variable"), "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-display: var(--font-manrope, "Manrope Variable"), "Manrope", var(--font-sans);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+
+  --shadow-soft: 0 1px 2px rgb(17 17 24 / 0.04), 0 4px 16px rgb(17 17 24 / 0.04);
+  --shadow-lift: 0 2px 4px rgb(17 17 24 / 0.04), 0 12px 32px rgb(17 17 24 / 0.08);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-pulse-dot: pulse-dot 2s var(--ease-out-soft) infinite;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-scan: scan 3.2s var(--ease-out-soft) infinite;
+
+  @keyframes pulse-dot {
+    0% { box-shadow: 0 0 0 0 currentColor; }
+    70% { box-shadow: 0 0 0 6px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+  @keyframes shimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes float-y {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  @keyframes overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes dialog-in {
+    from { opacity: 0; transform: translate(-50%, -48%) scale(0.98); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+  @keyframes scan {
+    0% { transform: translateX(-100%); opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { transform: translateX(100%); opacity: 0; }
+  }
+}
+
+@layer base {
+  :root {
+    --watchly-gradient: linear-gradient(90deg, #00e5ff, #245bff, #8028ff, #ed4df5);
+    color-scheme: light;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--color-white);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: rgb(36 91 255 / 0.16);
+  }
+}
+
+@layer components {
+  .bg-watchly-gradient {
+    background-image: var(--watchly-gradient);
+  }
+  /* Bordure dégradée fine (fond conservé) */
+  .border-gradient {
+    border: 1.5px solid transparent;
+    background:
+      linear-gradient(var(--border-gradient-fill, #fff), var(--border-gradient-fill, #fff)) padding-box,
+      var(--watchly-gradient) border-box;
+  }
+  .gradient-underline {
+    background-image: var(--watchly-gradient);
+    background-repeat: no-repeat;
+    background-size: 100% 0.18em;
+    background-position: 0 92%;
+    padding-bottom: 0.04em;
+  }
+  .skeleton {
+    background: linear-gradient(90deg, #f0f1f6 25%, #f8f9fc 37%, #f0f1f6 63%);
+    background-size: 400% 100%;
+    animation: var(--animate-shimmer);
+  }
+  .animate-fade-up {
+    animation: fade-up 0.7s var(--ease-out-soft) both;
+  }
+  .animate-float {
+    animation: fade-up 0.6s var(--ease-out-soft) both, float-y 5s ease-in-out 1.2s infinite;
+  }
+  /* Révélation au défilement : visible par défaut (sans JS), masquée seulement quand le JS est prêt. */
+  html.js [data-reveal] {
+    transition: opacity 0.6s var(--ease-out-soft), transform 0.6s var(--ease-out-soft);
+    transition-delay: var(--reveal-delay, 0s);
+  }
+  html.js [data-reveal]:not([data-revealed]) {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  .hairline-grid {
+    background-image:
+      linear-gradient(to right, rgb(17 17 24 / 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(17 17 24 / 0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.js [data-reveal]:not([data-revealed]) {
+    transform: none;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@theme {
+  @keyframes dialog-in-toast {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+}
