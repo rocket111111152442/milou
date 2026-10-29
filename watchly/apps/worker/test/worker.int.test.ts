@@ -3,10 +3,11 @@
  */
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { emailOutbox, eq, monitoringResults, notifications, subscriptions, workerHeartbeats } from "@watchly/database";
+import { businessChecks, businessSites, emailOutbox, eq, incidents, monitoringResults, notifications, subscriptions, workerHeartbeats } from "@watchly/database";
 import { createTestDatabase, createTestUser, type TestDatabase } from "@watchly/database/testing";
 import { recomputeEntitlements } from "@watchly/billing";
 import { createMonitor } from "@watchly/monitoring";
+import { createEndpoint, createSite } from "@watchly/monitoring/business";
 import { startWorker } from "../src/index";
 
 let t: TestDatabase;
@@ -15,11 +16,17 @@ let resend: Server;
 let shopPort = 0;
 let resendPort = 0;
 let price = "899,00";
+let siteUp = true;
 const sentEmails: Array<{ to: string[]; subject: string; idempotency?: string }> = [];
 
 beforeAll(async () => {
   t = await createTestDatabase();
   shop = createServer((req, res) => {
+    if (req.url === "/sante") {
+      res.writeHead(siteUp ? 200 : 500, { "content-type": "text/plain" });
+      res.end(siteUp ? "OK" : "erreur");
+      return;
+    }
     if (req.url === "/robots.txt") {
       res.writeHead(404);
       res.end();
@@ -116,6 +123,46 @@ describe("worker end-to-end", () => {
       }, 45_000);
       expect((hb.stats as { emailConfigured: boolean }).emailConfigured).toBe(true);
     } finally {
+      await worker.stop();
+    }
+  }, 90_000);
+
+  it("Business : contrôle de disponibilité à la minute par le worker, incident après confirmation", async () => {
+    const u = await createTestUser(t, "pro@example.test");
+    await t.db.insert(subscriptions).values({
+      userId: u.id,
+      planId: "business",
+      stripeSubscriptionId: `sub_${u.id}`,
+      stripeCustomerId: `cus_${u.id}`,
+      status: "active",
+      currentPeriodEnd: new Date(Date.now() + 20 * 86_400_000),
+    });
+    await recomputeEntitlements(t.db, u.id);
+    const site = await createSite(t.db, u.id, { name: "Ma boutique", domain: "ma-boutique.test" });
+    await t.db.update(businessSites).set({ status: "verified" }).where(eq(businessSites.id, site.id));
+    const ep = await createEndpoint(t.db, u.id, site.id, { name: "Santé", url: `http://127.0.0.1:${shopPort}/sante` }, { allowLoopback: true, allowAnyPort: true });
+
+    siteUp = false;
+    const worker = await startWorker({
+      NODE_ENV: "test",
+      DATABASE_URL: t.url,
+      WORKER_ID: "business-worker",
+      WORKER_ROLES: "business",
+      WORKER_BROWSER_CONCURRENCY: "0",
+      WATCHLY_ALLOW_PRIVATE_TARGETS: "1",
+      LOG_LEVEL: "error",
+    });
+    try {
+      // Premier échec, puis re-vérification ~20 s plus tard : l'incident n'est ouvert qu'à ce moment.
+      const first = await waitFor(async () => (await t.db.select().from(businessChecks).where(eq(businessChecks.endpointId, ep.id)))[0]);
+      expect(first).toMatchObject({ ok: false, statusCode: 500, isConfirmation: false });
+      expect(await t.db.select().from(incidents).where(eq(incidents.endpointId, ep.id))).toHaveLength(0);
+      const inc = await waitFor(async () => (await t.db.select().from(incidents).where(eq(incidents.endpointId, ep.id)))[0], 40_000);
+      expect(inc).toMatchObject({ kind: "downtime", status: "open" });
+      const alert = await waitFor(async () => (await t.db.select().from(notifications).where(eq(notifications.incidentId, inc.id)))[0]);
+      expect(alert).toMatchObject({ type: "business_down", priority: "critical" });
+    } finally {
+      siteUp = true;
       await worker.stop();
     }
   }, 90_000);

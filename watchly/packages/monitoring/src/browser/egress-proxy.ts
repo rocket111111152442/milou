@@ -51,6 +51,13 @@ export async function startEgressProxy(opts: EgressProxyOptions = {}): Promise<E
     opts.onBlocked?.(host, reason);
   };
 
+  // Toutes les connexions sont suivies pour pouvoir être coupées à l'arrêt (arrêt propre du worker).
+  const sockets = new Set<Socket>();
+  const track = (sock: Socket) => {
+    sockets.add(sock);
+    sock.once("close", () => sockets.delete(sock));
+  };
+
   const server: Server = createServer(async (req: IncomingMessage, res) => {
     // Requête HTTP en clair (forme absolue de l'URL).
     try {
@@ -60,12 +67,14 @@ export async function startEgressProxy(opts: EgressProxyOptions = {}): Promise<E
       if (!portAllowed(port, opts)) throw new Error("blocked_port");
       const ip = await resolveSafe(target.hostname, opts);
       const upstream = httpRequest(
-        { host: ip, port, method: req.method, path: target.pathname + target.search, headers: { ...req.headers, host: target.host }, timeout: 30_000 },
+        // agent: false : pas de connexion réutilisée d'une requête (ou d'un client) à l'autre.
+        { host: ip, port, method: req.method, path: target.pathname + target.search, headers: { ...req.headers, host: target.host }, timeout: 30_000, agent: false },
         (up) => {
           res.writeHead(up.statusCode ?? 502, up.headers);
           up.pipe(res);
         },
       );
+      upstream.on("socket", track);
       upstream.on("error", () => res.destroy());
       req.pipe(upstream);
     } catch (err) {
@@ -82,7 +91,7 @@ export async function startEgressProxy(opts: EgressProxyOptions = {}): Promise<E
     try {
       if (!portAllowed(port, opts)) throw new Error("blocked_port");
       const ip = await resolveSafe(host, opts);
-      const upstream = connect({ host: ip, port, timeout: 30_000 }, () => {
+      const upstream: Socket = connect({ host: ip, port, timeout: 30_000 }, () => {
         client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
         if (head.length) upstream.write(head);
         let bytes = 0;
@@ -98,6 +107,8 @@ export async function startEgressProxy(opts: EgressProxyOptions = {}): Promise<E
         upstream.pipe(client);
         client.pipe(upstream);
       });
+      track(upstream);
+      track(client);
       upstream.on("error", () => client.destroy());
       upstream.on("timeout", () => upstream.destroy());
     } catch (err) {
@@ -106,6 +117,7 @@ export async function startEgressProxy(opts: EgressProxyOptions = {}): Promise<E
     }
   });
 
+  server.on("connection", track);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
   const port = (server.address() as { port: number }).port;
   return {
@@ -116,6 +128,7 @@ export async function startEgressProxy(opts: EgressProxyOptions = {}): Promise<E
     },
     close: () =>
       new Promise<void>((resolve) => {
+        for (const sock of sockets) sock.destroy();
         server.closeAllConnections?.();
         server.close(() => resolve());
       }),

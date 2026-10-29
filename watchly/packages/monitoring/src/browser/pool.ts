@@ -125,8 +125,10 @@ export class BrowserPool {
   }
 
   async close(): Promise<void> {
-    await this.browser?.close().catch(() => undefined);
-    await this.proxy?.close().catch(() => undefined);
+    // Arrêt borné : un navigateur bloqué ne doit pas empêcher l'arrêt du worker.
+    const bounded = (p: Promise<unknown> | undefined) => Promise.race([p?.catch(() => undefined), new Promise((r) => setTimeout(r, 5000).unref())]);
+    await bounded(this.browser?.close());
+    await bounded(this.proxy?.close());
     this.browser = null;
     this.proxy = null;
   }
