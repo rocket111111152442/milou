@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
+import { publicAppUrl } from "./site";
 
 /** Adresse IP du client (premier élément de x-forwarded-for, posé par Vercel). */
 export async function clientIp(): Promise<string> {
@@ -28,5 +29,5 @@ export function safeNext(next: string | null | undefined, fallback = "/app"): st
 }
 
 export function appUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return publicAppUrl();
 }

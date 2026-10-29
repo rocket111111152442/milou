@@ -1,6 +1,14 @@
+/**
+ * URL publique : NEXT_PUBLIC_APP_URL, sinon l'URL du déploiement Vercel (Preview), sinon le poste local.
+ */
+export function publicAppUrl(): string {
+  const vercel = process.env.NEXT_PUBLIC_VERCEL_URL;
+  return (process.env.NEXT_PUBLIC_APP_URL ?? (vercel ? `https://${vercel}` : "http://localhost:3000")).replace(/\/$/, "");
+}
+
 export const siteConfig = {
   name: "Watchly",
-  url: (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, ""),
+  url: publicAppUrl(),
   description:
     "Watchly surveille pour vous les prix, les stocks, les annonces, les nouveautés et vos sites internet, et vous prévient quand quelque chose d'important se produit.",
   publisher: "LULLIN WEB",
