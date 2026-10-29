@@ -62,7 +62,7 @@ export function HowItWorks() {
           {steps.map((s, i) => (
             <Reveal as="li" key={s.title} delay={i * 0.08}>
               <Card interactive className="relative h-full p-7">
-                <span className="font-display text-sm font-bold text-muted">0{i + 1}</span>
+                <span className="font-display text-sm font-bold text-muted-fg">0{i + 1}</span>
                 <span className="mt-5 grid size-12 place-items-center rounded-2xl border border-line bg-surface text-ink [&_svg]:size-5">
                   {s.icon}
                 </span>
@@ -243,7 +243,7 @@ const demoUptime = Array.from({ length: 30 }, (_, i) => {
   return { day: label, uptime };
 });
 
-export function BusinessSection() {
+export function BusinessSection({ standalone = false }: { standalone?: boolean }) {
   return (
     <section id="entreprises" aria-labelledby="business-title" className="relative overflow-hidden bg-ink py-24 text-white sm:py-32">
       <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-watchly-gradient opacity-70" />
@@ -257,9 +257,15 @@ export function BusinessSection() {
             <span aria-hidden="true" className="size-1.5 rounded-full bg-watchly-gradient" />
             Watchly Business
           </span>
-          <h2 id="business-title" className="font-display text-[32px] font-bold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">
-            Votre site tombe en panne ? Vous le savez avant vos clients.
-          </h2>
+          {standalone ? (
+            <h1 id="business-title" className="font-display text-[32px] font-bold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">
+              Votre site tombe en panne ? Vous le savez avant vos clients.
+            </h1>
+          ) : (
+            <h2 id="business-title" className="font-display text-[32px] font-bold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">
+              Votre site tombe en panne ? Vous le savez avant vos clients.
+            </h2>
+          )}
           <p className="text-lg leading-relaxed text-white/75">
             Watchly Business contrôle la disponibilité de votre site professionnel, ses formulaires et ses parcours clés, et
             vous prévient dès qu'une panne est confirmée — puis quand tout est rétabli.

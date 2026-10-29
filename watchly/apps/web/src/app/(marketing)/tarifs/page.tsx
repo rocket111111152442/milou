@@ -16,7 +16,7 @@ export default async function TarifsPage() {
   const plans = await getPublicPlans();
   return (
     <>
-      <PricingSection plans={planOrder(plans)} />
+      <PricingSection plans={planOrder(plans)} standalone />
       <FaqSection />
     </>
   );

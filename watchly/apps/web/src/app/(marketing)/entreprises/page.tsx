@@ -29,7 +29,7 @@ const onboarding = [
 export default function EntreprisesPage() {
   return (
     <>
-      <BusinessSection />
+      <BusinessSection standalone />
       <section aria-labelledby="onboarding-title" className="py-24">
         <Container>
           <SectionHeading
@@ -41,7 +41,7 @@ export default function EntreprisesPage() {
           <ol className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {onboarding.map((o, i) => (
               <li key={o.title} className="rounded-2xl border border-line bg-white p-6">
-                <span className="text-sm font-bold text-muted">0{i + 1}</span>
+                <span className="text-sm font-bold text-muted-fg">0{i + 1}</span>
                 <span className="mt-4 grid size-11 place-items-center rounded-2xl bg-surface [&_svg]:size-5">{o.icon}</span>
                 <h3 className="mt-5 font-display text-lg font-semibold">{o.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-fg">{o.text}</p>

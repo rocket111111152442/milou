@@ -19,6 +19,7 @@ export function DownloadSection({ releases, standalone = false }: { releases: Pu
     <section id="telecharger" aria-labelledby="download-title" className="py-24 sm:py-32">
       <Container>
         <SectionHeading
+          as={standalone ? "h1" : "h2"}
           id="download-title"
           eyebrow="Télécharger"
           title="Watchly sur votre ordinateur"

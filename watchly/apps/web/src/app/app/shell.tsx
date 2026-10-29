@@ -1,4 +1,5 @@
 "use client";
+import { useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -31,6 +32,8 @@ export function DashboardShell({
   unread: number;
 }) {
   const pathname = usePathname();
+  // Le formulaire reste hors du menu : le menu se démonte à la sélection, ce qui annulerait l'envoi.
+  const logoutForm = useRef<HTMLFormElement>(null);
   const active = (href: string, exact = false) => (exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
   const nav: NavItem[] = [
     { href: "/app", label: "Vue d'ensemble", icon: <LayoutDashboard />, active: active("/app", true) },
@@ -95,15 +98,12 @@ export function DashboardShell({
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <form action="/auth/deconnexion" method="post">
-                <DropdownMenuItem asChild>
-                  <button type="submit" className="w-full">
-                    <LogOut /> Déconnexion
-                  </button>
-                </DropdownMenuItem>
-              </form>
+              <DropdownMenuItem onSelect={() => logoutForm.current?.requestSubmit()}>
+                <LogOut /> Déconnexion
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <form ref={logoutForm} action="/auth/deconnexion" method="post" hidden />
         </>
       }
     >

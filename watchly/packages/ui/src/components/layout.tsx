@@ -12,6 +12,7 @@ export function SectionHeading({
   align = "center",
   className,
   id,
+  as: Tag = "h2",
 }: {
   eyebrow?: string;
   title: React.ReactNode;
@@ -19,6 +20,8 @@ export function SectionHeading({
   align?: "center" | "left";
   className?: string;
   id?: string;
+  /** h1 quand la section ouvre une page autonome (SEO, accessibilité). */
+  as?: "h1" | "h2";
 }) {
   return (
     <div className={cn("flex flex-col gap-4", align === "center" ? "mx-auto max-w-2xl items-center text-center" : "max-w-2xl", className)}>
@@ -28,9 +31,9 @@ export function SectionHeading({
           {eyebrow}
         </span>
       ) : null}
-      <h2 id={id} className="font-display text-[32px] font-bold leading-[1.1] tracking-[-0.03em] text-ink sm:text-[44px]">
+      <Tag id={id} className="font-display text-[32px] font-bold leading-[1.1] tracking-[-0.03em] text-ink sm:text-[44px]">
         {title}
-      </h2>
+      </Tag>
       {description ? <p className="text-base leading-relaxed text-muted-fg sm:text-lg">{description}</p> : null}
     </div>
   );

@@ -9,7 +9,9 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const isPrivate = request.nextUrl.pathname.startsWith("/app") || request.nextUrl.pathname.startsWith("/admin");
+  // /admin n'est pas redirigé vers la connexion : requireAdmin() répond 404 à tout non-administrateur,
+  // pour ne pas révéler l'existence de l'administration.
+  const isPrivate = request.nextUrl.pathname.startsWith("/app");
   if (!url || !key) {
     if (isPrivate) return NextResponse.redirect(new URL("/connexion?erreur=configuration", request.url));
     return NextResponse.next();

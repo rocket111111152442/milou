@@ -131,11 +131,12 @@ export function PricingComparison({ plans }: { plans: PlanDefinition[] }) {
   );
 }
 
-export function PricingSection({ plans }: { plans: PlanDefinition[] }) {
+export function PricingSection({ plans, standalone = false }: { plans: PlanDefinition[]; standalone?: boolean }) {
   return (
     <section id="tarifs" aria-labelledby="pricing-title" className="border-y border-line bg-surface py-24 sm:py-32">
       <Container className="flex flex-col gap-14">
         <SectionHeading
+          as={standalone ? "h1" : "h2"}
           id="pricing-title"
           eyebrow="Tarifs"
           title="Une formule pour chaque besoin"
@@ -143,7 +144,7 @@ export function PricingSection({ plans }: { plans: PlanDefinition[] }) {
         />
         <PricingCards plans={plans} />
         <div className="flex flex-col gap-4">
-          <h3 className="font-display text-xl font-bold">Comparatif détaillé</h3>
+          <h2 className="font-display text-xl font-bold">Comparatif détaillé</h2>
           <PricingComparison plans={plans} />
           <p className="text-sm text-muted-fg">
             Prix TTC en euros, facturés chaque mois. Essai de 72 heures sur Plus, Pro et Business : la carte est enregistrée
