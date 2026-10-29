@@ -26,3 +26,6 @@ export const POST = withAdmin(async (req, admin, ctx) => {
     return json({ ok: true });
   });
 });
+
+/** Aucune autre méthode : 404 (et non 405) pour ne pas révéler l'existence de la route. */
+export const GET = () => apiError(404, "not_found");
