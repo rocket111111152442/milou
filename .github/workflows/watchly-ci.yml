@@ -82,23 +82,7 @@ jobs:
       - name: Supabase local (Auth, Postgres, Mailpit)
         run: supabase start -x studio,imgproxy,vector,logflare,edge-runtime,realtime,storage-api,postgres-meta,supavisor
       - name: Configuration de test
-        run: |
-          eval "$(supabase status -o env)"
-          DB=postgresql://postgres:postgres@127.0.0.1:54322/postgres
-          DATABASE_URL="$DB" pnpm db:migrate
-          DATABASE_URL="$DB" STRIPE_PRICE_PLUS=price_1PlusLocal STRIPE_PRICE_PRO=price_1ProLocal STRIPE_PRICE_BUSINESS=price_1BusinessLocal STRIPE_PRICE_BUSINESS_EXTRA_SITE=price_1ExtraLocal pnpm db:seed
-          {
-            echo "NEXT_PUBLIC_APP_URL=http://localhost:3000"
-            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
-            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
-            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
-            echo "DATABASE_URL=$DB"
-            echo "WATCHLY_HASH_PEPPER=$(openssl rand -hex 32)"
-            echo "STRIPE_SECRET_KEY=sk_test_123"
-            echo "STRIPE_API_BASE=http://localhost:12111"
-            echo "STRIPE_WEBHOOK_SECRET=whsec_ci_$(openssl rand -hex 16)"
-          } > apps/web/.env.local
-          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+        run: bash infra/ci/e2e-env.sh
       - run: pnpm --filter @watchly/web exec playwright install --with-deps chromium
       - run: pnpm --filter @watchly/web build
       - run: pnpm --filter @watchly/web test:e2e
@@ -110,10 +94,14 @@ jobs:
           retention-days: 7
 
   desktop:
-    name: Application desktop — tests Rust, interface et E2E (Linux)
+    name: Application desktop — tests Rust et E2E du binaire réel (Linux)
     runs-on: ubuntu-24.04
     needs: tests
     timeout-minutes: 60
+    services:
+      stripe-mock:
+        image: stripe/stripe-mock:latest
+        ports: ["12111:12111"]
     steps:
       - uses: actions/checkout@v4
       - name: Dépendances système (WebKitGTK, WebDriver, écran virtuel)
@@ -141,3 +129,25 @@ jobs:
         run: |
           cargo clippy --all-targets -- -D warnings
           cargo test
+      # E2E : binaire Tauri réel piloté par WebDriver contre le site et la pile Supabase locaux.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - name: Supabase local (Auth, Postgres)
+        run: supabase start -x studio,imgproxy,vector,logflare,edge-runtime,realtime,storage-api,postgres-meta,supavisor
+      - name: Configuration de test
+        run: bash infra/ci/e2e-env.sh
+      - name: Site web local
+        run: |
+          pnpm --filter @watchly/web build
+          nohup pnpm --filter @watchly/web start > "$RUNNER_TEMP/web.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://localhost:3000/api/health > /dev/null && exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/web.log"; exit 1
+      - name: Chromium (validation du code de liaison) et tauri-driver
+        run: |
+          pnpm --filter @watchly/desktop exec playwright install --with-deps chromium
+          cargo install tauri-driver --version 2.1.0 --locked
+      - name: Binaire desktop (debug)
+        run: pnpm --filter @watchly/desktop tauri build --debug --no-bundle
+      - name: E2E desktop
+        run: DESKTOP_E2E=1 pnpm --filter @watchly/desktop test:e2e
