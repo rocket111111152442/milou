@@ -26,7 +26,9 @@ export async function POST(req: Request) {
     );
     if (!body.ok) return body.res;
     if (body.data.website) return json({ ok: true }); // champ piège rempli par un robot
-    const user = await getCurrentUser().catch(() => null);
+    const current = await getCurrentUser().catch(() => null);
+    // Une session dont le code de double authentification n'a pas été saisi n'est pas rattachée au compte.
+    const user = current && !(current.mfa.enrolled && !current.mfa.verified) ? current : null;
     const db = getDb();
     const ticketId = await db.transaction(async (tx) => {
       const [t] = await tx

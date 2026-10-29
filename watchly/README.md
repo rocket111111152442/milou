@@ -76,4 +76,4 @@ DATABASE_URL=… pnpm admin:grant prenom@lullin-web.com
 | Mentions légales, CGV/CGU, politique de confidentialité | Modèles à compléter et à faire valider (aucune information inventée) |
 
 Documentation : `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`, `docs/SECURITY.md`,
-`docs/TESTING.md`, `docs/ROADMAP.md`, `docs/LOAD-TEST-RESULTS.md`.
+`docs/TESTING.md`, `docs/ROADMAP.md`, `docs/LOAD-TEST-RESULTS.md`, `docs/RAPPORT-FINAL.md` (état détaillé).

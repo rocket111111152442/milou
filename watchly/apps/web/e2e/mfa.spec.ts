@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createConfirmedUser, enableMfa, login, PASSWORD, resetRateLimits, totp, uniqueEmail } from "./helpers";
+import { createConfirmedUser, enableMfa, login, PASSWORD, resetRateLimits, sql, totp, uniqueEmail } from "./helpers";
 
 const ORIGIN = { origin: "http://localhost:3000" };
 
@@ -26,6 +26,12 @@ test.describe("double authentification (TOTP)", () => {
     await login(other, u.email, `${PASSWORD}-2`);
     await other.waitForURL(/\/connexion\/double-authentification/);
     expect((await other.request.get("/api/monitors")).status()).toBe(401);
+    // Une demande d'assistance envoyée sans le code n'est pas rattachée au compte.
+    const subject = `Sans code ${Date.now()}`;
+    const ticket = await other.request.post("/api/support", { data: { email: "tiers@example.test", subject, message: "Message envoyé avant le code." }, headers: ORIGIN });
+    expect(ticket.status()).toBe(201);
+    const [row] = await sql<{ user_id: string | null }[]>`select user_id from support_tickets where subject = ${subject}`;
+    expect(row).toEqual({ user_id: null });
     await other.goto("/app/surveillances");
     await expect(other).toHaveURL(/\/connexion\/double-authentification\?suivant=%2Fapp%2Fsurveillances/);
     await other.getByLabel(/^Code à 6 chiffres/).fill(totp(secret) === "000000" ? "111111" : "000000");

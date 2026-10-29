@@ -41,4 +41,4 @@ Les tests E2E remettent à zéro les limites de débit de la base locale avant c
 
 ## Résultats de la dernière exécution complète
 
-Voir le rapport final du projet et `docs/LOAD-TEST-RESULTS.md`.
+Voir `docs/RAPPORT-FINAL.md` et `docs/LOAD-TEST-RESULTS.md`.
