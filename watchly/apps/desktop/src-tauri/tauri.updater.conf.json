@@ -1,0 +1,9 @@
+{
+  "bundle": { "createUpdaterArtifacts": true },
+  "plugins": {
+    "updater": {
+      "pubkey": "REMPLACÉ_PAR_LA_CI_À_PARTIR_DU_SECRET_TAURI_UPDATER_PUBKEY",
+      "endpoints": ["https://github.com/rocket111111152442/milou/releases/latest/download/latest.json"]
+    }
+  }
+}

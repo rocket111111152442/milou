@@ -181,6 +181,18 @@ describe("hybrid job queue", () => {
     expect(relayed.map((c) => c.taskId)).toContain(m.id);
   });
 
+  it("treats a PC paused by its user as unavailable: the cloud relays immediately", async () => {
+    const u = await paidUser();
+    const dev = await device(u.id, true);
+    await t.db.update(agentDevices).set({ lastState: "paused" }).where(eq(agentDevices.id, dev));
+    const m = await createMonitor(t.db, u.id, pageInput(35));
+    await settleInitialJobs(u.id);
+    await t.db.update(monitoringSchedules).set({ nextRunAt: new Date(Date.now() - 1000) }).where(eq(monitoringSchedules.taskId, m.id));
+    const created = await scheduleDueTasks(t.db, { agentGraceSeconds: 600 });
+    expect(created.find((c) => c.taskId === m.id)).toMatchObject({ preferredExecutor: "cloud" });
+    expect((await claimCloudJobs(t.db, { workerId: "w", max: 50 })).map((c) => c.taskId)).toContain(m.id);
+  });
+
   it("guarantees that PC and server never run the same check twice (concurrent claims)", async () => {
     const u = await paidUser();
     const dev = await device(u.id);

@@ -1,0 +1,156 @@
+# Construction des installateurs Watchly (Windows, macOS, Linux).
+#
+# Garde-fous :
+# - déclenchement MANUEL uniquement ; les tests doivent passer avant toute construction ;
+# - la version GitHub est créée en BROUILLON (draft) : rien n'est publié automatiquement ;
+# - signature Windows/macOS et mises à jour signées UNIQUEMENT si les secrets existent ;
+#   sinon les installateurs sont construits NON SIGNÉS et la note de version le dit ;
+# - un fichier SHA256SUMS.txt accompagne les installateurs.
+#
+# Variables / secrets attendus (Settings > Secrets and variables > Actions) :
+#   vars.WATCHLY_API_URL                       (obligatoire, https://…)
+#   secrets.TAURI_SIGNING_PRIVATE_KEY (+ _PASSWORD), vars.TAURI_UPDATER_PUBKEY   (mises à jour signées)
+#   secrets.APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+#           APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID                               (signature + notarisation macOS)
+#   secrets.WINDOWS_CERTIFICATE, WINDOWS_CERTIFICATE_PASSWORD                     (signature Authenticode)
+name: Watchly Desktop — installateurs
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (ex. 0.1.0) — doit correspondre à tauri.conf.json"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Vérifications avant construction
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: watchly
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version cohérente
+        run: |
+          CONF=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          test "$CONF" = "${{ inputs.version }}" || { echo "tauri.conf.json=$CONF ≠ ${{ inputs.version }}"; exit 1; }
+      - name: Serveur cible défini
+        run: test -n "${{ vars.WATCHLY_API_URL }}" && [[ "${{ vars.WATCHLY_API_URL }}" == https://* ]]
+      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: watchly/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: watchly/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run --project unit
+      - run: pnpm --filter @watchly/desktop build
+      - working-directory: watchly/apps/desktop/src-tauri
+        run: cargo test
+
+  build:
+    name: Installateur ${{ matrix.label }}
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, label: Linux, args: "" }
+          - { os: windows-latest, label: Windows, args: "" }
+          - { os: macos-latest, label: macOS (Apple Silicon), args: "--target aarch64-apple-darwin" }
+          - { os: macos-latest, label: macOS (Intel), args: "--target x86_64-apple-darwin" }
+    runs-on: ${{ matrix.os }}
+    env:
+      WATCHLY_API_URL: ${{ vars.WATCHLY_API_URL }}
+      HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
+      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: watchly/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: watchly/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: watchly
+      - name: Mises à jour signées (si la clé existe)
+        if: env.HAS_UPDATER_KEY == 'true'
+        shell: bash
+        working-directory: watchly/apps/desktop/src-tauri
+        run: |
+          node -e "
+            const fs = require('fs');
+            const c = JSON.parse(fs.readFileSync('tauri.updater.conf.json', 'utf8'));
+            c.plugins.updater.pubkey = process.env.PUBKEY;
+            fs.writeFileSync('tauri.updater.ci.json', JSON.stringify(c));
+          "
+          echo "UPDATER_ARGS=--features updater --config src-tauri/tauri.updater.ci.json" >> "$GITHUB_ENV"
+        env:
+          PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+      - name: Certificat Windows (si disponible)
+        if: runner.os == 'Windows' && env.HAS_WINDOWS_CERT == 'true'
+        shell: pwsh
+        run: |
+          $bytes = [Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE }}")
+          [IO.File]::WriteAllBytes("cert.pfx", $bytes)
+          Import-PfxCertificate -FilePath cert.pfx -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString -String "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" -AsPlainText -Force)
+          Remove-Item cert.pfx
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: watchly/apps/desktop
+          tauriScript: pnpm tauri
+          args: ${{ matrix.args }} ${{ env.UPDATER_ARGS }}
+          tagName: watchly-desktop-v${{ inputs.version }}
+          releaseName: Watchly ${{ inputs.version }} (brouillon)
+          releaseBody: |
+            Brouillon généré automatiquement — à vérifier et tester manuellement avant toute publication.
+            Signature Windows : ${{ env.HAS_WINDOWS_CERT == 'true' && 'oui' || 'NON (installateur non signé)' }}
+            Signature et notarisation macOS : ${{ env.HAS_APPLE_CERT == 'true' && 'oui' || 'NON (application non signée)' }}
+            Mises à jour automatiques signées : ${{ env.HAS_UPDATER_KEY == 'true' && 'oui' || 'non activées' }}
+            Sommes de contrôle : SHA256SUMS.txt
+          releaseDraft: true
+          prerelease: true
+
+  checksums:
+    name: Sommes de contrôle SHA-256
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Téléchargement des installateurs du brouillon et calcul des empreintes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: watchly-desktop-v${{ inputs.version }}
+        run: |
+          mkdir assets && cd assets
+          gh release download "$TAG" --repo "${{ github.repository }}" --pattern "*" --skip-existing
+          rm -f SHA256SUMS.txt
+          sha256sum -- * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release upload "$TAG" SHA256SUMS.txt --repo "${{ github.repository }}" --clobber

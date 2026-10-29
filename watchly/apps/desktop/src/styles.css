@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "@watchly/ui/styles.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/manrope";
+
+@source "../../../packages/ui/src";
+@source "./";
+
+html,
+body,
+#root {
+  height: 100%;
+}

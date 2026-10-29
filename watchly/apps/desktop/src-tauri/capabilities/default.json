@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissions minimales de la fenêtre principale : événements, notifications et démarrage automatique (sur demande). Les accès réseau passent exclusivement par les commandes Rust contrôlées.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "notification:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
+  ]
+}

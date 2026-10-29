@@ -76,7 +76,7 @@ describe.skipIf(process.env.SKIP_BROWSER_TESTS === "1")("browser pool", () => {
   }, 60_000);
 
   it("refuses to navigate to private addresses", async () => {
-    const pool = new BrowserPool({ maxConcurrency: 1, executablePath: "/opt/pw-browsers/chromium" });
+    const pool = new BrowserPool({ maxConcurrency: 1, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ?? "/opt/pw-browsers/chromium" });
     try {
       await expect(pool.render("http://169.254.169.254/", { timeoutMs: 5000 })).rejects.toThrow();
     } finally {

@@ -186,7 +186,7 @@ function summarizeResult(r: typeof monitoringResults.$inferSelect): string {
     const p = change.price as { from: number; to: number };
     return `Prix : ${formatPrice(p.from)} → ${formatPrice(p.to)}`;
   }
-  if (r.outcome === "triggered") return "Condition remplie";
+  if (r.outcome === "triggered") return "Alerte envoyée";
   if (typeof change?.ratio === "number") return `Contenu modifié (${Math.round((change.ratio as number) * 100)} %)`;
   return r.fromCache ? "Aucun changement (résultat mutualisé récent)" : "Aucun changement";
 }

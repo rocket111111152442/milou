@@ -66,6 +66,8 @@ async function onlineAgentUsers(db: Executor, userIds: string[], now: Date): Pro
         eq(agentDevices.monitoringEnabled, true),
         isNotNull(agentDevices.consentLocalAt),
         gt(agentDevices.lastSeenAt, new Date(now.getTime() - AGENT_ONLINE_WINDOW_MS)),
+        // Un ordinateur mis en pause par son utilisateur n'est pas disponible pour les contrôles.
+        sql`${agentDevices.lastState} is distinct from 'paused'`,
       ),
     );
   return new Set(rows.map((r) => r.userId));
