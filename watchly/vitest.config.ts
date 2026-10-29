@@ -6,6 +6,7 @@ export default defineConfig({
       {
         test: {
           name: "unit",
+          sequence: { groupOrder: 0 },
           include: ["packages/**/test/**/*.unit.test.ts", "apps/**/test/**/*.unit.test.ts"],
           environment: "node",
         },
@@ -13,6 +14,7 @@ export default defineConfig({
       {
         test: {
           name: "integration",
+          sequence: { groupOrder: 1 },
           include: ["packages/**/test/**/*.int.test.ts", "apps/**/test/**/*.int.test.ts"],
           environment: "node",
           testTimeout: 60_000,
