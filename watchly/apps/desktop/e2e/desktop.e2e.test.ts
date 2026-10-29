@@ -44,6 +44,13 @@ function shopHandler(req: http.IncomingMessage, res: http.ServerResponse) {
   res.writeHead(404).end();
 }
 
+async function stopProcess(p: ChildProcess | undefined): Promise<void> {
+  if (!p || p.exitCode !== null || p.signalCode !== null) return;
+  const exited = new Promise<void>((resolve) => p.once("exit", () => resolve()));
+  p.kill();
+  await Promise.race([exited, new Promise((r) => setTimeout(r, 5_000))]);
+}
+
 describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
   const sql = postgres(DB_URL, { max: 2, onnotice: () => undefined });
   const { db, close: closeDb } = createDb(DB_URL, { max: 2 });
@@ -103,8 +110,8 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
 
   afterAll(async () => {
     await app?.deleteSession().catch(() => undefined);
-    driver?.kill();
-    xvfb?.kill();
+    // Attend la fin réelle des processus : l'application écrit encore dans HOME (cache Mesa) en se fermant.
+    await Promise.all([driver, xvfb].map((p) => stopProcess(p)));
     await browser?.close();
     shop?.close();
     if (userId) {
@@ -115,7 +122,7 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
     }
     await sql.end();
     await closeDb();
-    if (home) rmSync(home, { recursive: true, force: true });
+    if (home) rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   });
 
   const text = async () => (await app.$("body")).getText();
