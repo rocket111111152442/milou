@@ -23,6 +23,22 @@ export default defineConfig({
           maxWorkers: 4,
         },
       },
+      // Tests de charge : lancés explicitement (pnpm test:load), jamais dans la suite par défaut.
+      ...(process.env.WATCHLY_LOAD_TESTS === "1"
+        ? [
+            {
+              test: {
+                name: "load",
+                sequence: { groupOrder: 2 },
+                include: ["packages/**/test/**/*.load.test.ts"],
+                environment: "node",
+                testTimeout: 600_000,
+                hookTimeout: 300_000,
+                maxWorkers: 1,
+              },
+            },
+          ]
+        : []),
     ],
   },
 });

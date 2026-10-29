@@ -20,7 +20,8 @@
     "db:seed": "tsx packages/database/scripts/seed.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "admin:grant": "tsx packages/database/scripts/grant-admin.ts"
+    "admin:grant": "tsx packages/database/scripts/grant-admin.ts",
+    "test:load": "WATCHLY_LOAD_TESTS=1 vitest run --project load"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
