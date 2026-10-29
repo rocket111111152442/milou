@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
@@ -75,3 +75,8 @@ export function pgErrorCode(err: unknown): string | undefined {
 
 export const PG_INSUFFICIENT_PRIVILEGE = "42501";
 export const PG_UNIQUE_VIOLATION = "23505";
+
+/** Paramètre horodaté pour le SQL brut (le pilote attend des chaînes pour les types date). */
+export function tsParam(d: Date): SQL {
+  return sql`${d.toISOString()}::timestamptz`;
+}

@@ -17,7 +17,7 @@ export async function rateLimit(bucket: string, limit: number, windowSec: number
   const windowMs = windowSec * 1000;
   const start = Math.floor(Date.now() / windowMs) * windowMs;
   const rows = await getDb().execute<{ hits: number }>(sql`
-    insert into rate_limits (bucket, window_start, hits) values (${bucket}, ${new Date(start)}, 1)
+    insert into rate_limits (bucket, window_start, hits) values (${bucket}, ${new Date(start).toISOString()}::timestamptz, 1)
     on conflict (bucket, window_start) do update set hits = rate_limits.hits + 1
     returning hits`);
   const hits = Number(rows[0]?.hits ?? 1);
