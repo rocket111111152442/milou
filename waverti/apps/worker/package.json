@@ -1,0 +1,28 @@
+{
+  "name": "@waverti/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "node build.mjs",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@waverti/billing": "workspace:*",
+    "@waverti/config": "workspace:*",
+    "@waverti/database": "workspace:*",
+    "@waverti/monitoring": "workspace:*",
+    "@waverti/notifications": "workspace:*",
+    "@waverti/types": "workspace:*",
+    "pino": "^10.4.0",
+    "playwright": "1.63.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "@waverti/database": "workspace:*"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@waverti/billing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./catalog": "./src/catalog.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src scripts"
+  },
+  "dependencies": {
+    "@waverti/database": "workspace:*",
+    "@waverti/config": "workspace:*",
+    "@waverti/types": "workspace:*",
+    "stripe": "^23.0.1",
+    "zod": "^4.6.7",
+    "@waverti/auth": "workspace:*",
+    "@waverti/notifications": "workspace:*",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@waverti/database": "workspace:*"
+  }
+}

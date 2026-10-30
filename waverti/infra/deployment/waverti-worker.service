@@ -1,0 +1,28 @@
+# Alternative sans Docker : service systemd (Node 22 et Chromium installés sur le serveur).
+# Installation : copier dans /etc/systemd/system/, puis
+#   systemctl daemon-reload && systemctl enable --now waverti-worker
+[Unit]
+Description=Waverti worker (LULLIN WEB)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=waverti
+WorkingDirectory=/opt/waverti/worker
+EnvironmentFile=/etc/waverti/worker.env
+ExecStart=/usr/bin/node --enable-source-maps /opt/waverti/worker/dist/index.js
+Restart=always
+RestartSec=5
+# Arrêt propre : les contrôles en cours sont remis en file avant l'arrêt.
+KillSignal=SIGTERM
+TimeoutStopSec=60
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/waverti/worker
+MemoryMax=3G
+
+[Install]
+WantedBy=multi-user.target

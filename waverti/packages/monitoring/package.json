@@ -1,0 +1,43 @@
+{
+  "name": "@waverti/monitoring",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./extract": "./src/extract/index.ts",
+    "./net": "./src/net/index.ts",
+    "./search": "./src/search/index.ts",
+    "./business": "./src/business/index.ts",
+    "./browser": "./src/browser/index.ts",
+    "./engine": "./src/engine.ts",
+    "./robots-rules": "./src/net/robots-rules.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@waverti/config": "workspace:*",
+    "@waverti/database": "workspace:*",
+    "@waverti/notifications": "workspace:*",
+    "@waverti/types": "workspace:*",
+    "cheerio": "^1.2.0",
+    "ipaddr.js": "^2.5.0",
+    "undici": "^8.12.3",
+    "@noble/hashes": "^2.4.0",
+    "@waverti/billing": "workspace:*"
+  },
+  "peerDependencies": {
+    "playwright": "*"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@waverti/database": "workspace:*",
+    "playwright": "1.63.0"
+  }
+}
