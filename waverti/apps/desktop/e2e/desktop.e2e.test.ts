@@ -78,6 +78,9 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
     expect(created.status, await created.clone().text()).toBe(200);
     userId = ((await created.json()) as { id: string }).id;
     await sql`update profiles set onboarding_completed_at = now() where id = ${userId}`;
+    // Abonné Plus actif (état équivalent à un webhook Stripe) : il n'existe plus de formule gratuite.
+    await sql`insert into subscriptions (user_id, plan_id, stripe_subscription_id, stripe_customer_id, status, current_period_end)
+              values (${userId}, 'plus', ${"sub_desk_" + userId}, ${"cus_desk_" + userId}, 'active', now() + interval '20 days')`;
     await sql`delete from rate_limits`;
 
     home = mkdtempSync(join(tmpdir(), "waverti-desktop-e2e-"));
@@ -178,7 +181,7 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
   }, 60_000);
 
   it("contrôle exécuté par l'ordinateur, résultat et alerte remontés au serveur", async () => {
-    // Formule Découverte : uniquement en local. Cible locale autorisée pour ce test seulement.
+    // Contrôle réservé à l'ordinateur (local_only). Cible locale autorisée pour ce test seulement.
     const created = await createMonitor(
       db,
       userId,
@@ -188,7 +191,7 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
         url: `http://127.0.0.1:${shopPort}/casque`,
         renderMode: "auto",
         condition: { type: "price_below", threshold: 130 },
-        executionMode: "auto",
+        executionMode: "local_only",
         notify: { inapp: true, email: false, desktop: true },
       },
       new Date(),
