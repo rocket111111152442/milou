@@ -12,11 +12,12 @@ export const GET = withDevice(async (_req, device) => {
     .from(agentDevices)
     .where(eq(agentDevices.id, device.deviceId));
   const ent = await getEntitlements(db, device.userId);
-  const [plan] = await db.select({ name: plans.name }).from(plans).where(eq(plans.id, ent.planId));
+  const [plan] = ent.planId ? await db.select({ name: plans.name }).from(plans).where(eq(plans.id, ent.planId)) : [];
   return noStore({
     user: { email: p?.email ?? "", displayName: p?.displayName ?? null },
     device: d,
-    plan: { id: ent.planId, name: plan?.name ?? ent.planId, cloudRelay: ent.cloudRelay, maxMonitors: ent.maxMonitors, pageIntervalMinutes: ent.pageIntervalMinutes, isTrial: ent.source === "trial" },
+    // plan.id null : aucun abonnement ; l'application n'exécute alors aucun contrôle et invite à s'abonner.
+    plan: { id: ent.planId, name: plan?.name ?? null, cloudRelay: ent.cloudRelay, maxMonitors: ent.maxMonitors, pageIntervalMinutes: ent.pageIntervalMinutes, isTrial: ent.source === "trial" },
     consent: { version: LOCAL_CONSENT_VERSION, text: LOCAL_CONSENT_TEXT, accepted: Boolean(d?.consentLocalAt) && d?.consentVersion === LOCAL_CONSENT_VERSION },
   });
 });

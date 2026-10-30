@@ -365,8 +365,7 @@ export function HybridSection() {
             </span>
             <h3 className="mt-5 font-display text-lg font-semibold">Quand il est indisponible</h3>
             <p className="mt-2 text-[15px] leading-relaxed text-muted-fg">
-              Formules Plus, Pro et Business : nos serveurs reprennent les contrôles éligibles, sans doublon. Formule
-              Découverte : les contrôles sont simplement suspendus jusqu'au retour de l'application.
+              Nos serveurs reprennent automatiquement vos contrôles, sans doublon : vos alertes continuent d'arriver.
             </p>
           </Card>
           <Card className="p-7">
@@ -407,14 +406,17 @@ export function FinalCta() {
           </h2>
           <p className="text-lg text-muted-fg">Créez votre première surveillance en moins d'une minute.</p>
           <div className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
-            <Button asChild size="lg">
-              <Link href="/inscription">Commencer gratuitement</Link>
-            </Button>
             <Button asChild size="lg" variant="gradient">
-              <Link href="/inscription?formule=pro">Essayer Watchly Premium</Link>
+              <Link href="/tarifs">Essayer gratuitement pendant 3 jours</Link>
+            </Button>
+            <Button asChild size="lg" variant="secondary">
+              <Link href="#tarifs">Voir les abonnements</Link>
             </Button>
           </div>
-          <p className="text-[13px] text-muted-fg">Essai de 72 heures sur les formules Plus, Pro et Business. Carte bancaire requise pour l'essai.</p>
+          <p className="text-[13px] text-muted-fg">
+            3 jours d'essai gratuit sur Plus, Pro et Business. Carte bancaire requise pour l'essai, aucun prélèvement si vous
+            résiliez avant la fin.
+          </p>
         </div>
       </div>
     </section>

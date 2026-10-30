@@ -31,10 +31,10 @@ export default async function EssaiPage({ searchParams }: { searchParams: Promis
   const rows: Array<[string, string]> = [
     ["Formule", `${preview.planName}`],
     ["Prix après l'essai", `${formatCents(preview.priceCents)} TTC par mois`],
-    ["Durée de l'essai", preview.trial ? "72 heures" : "Pas d'essai (déjà utilisé)"],
+    ["Durée de l'essai", preview.trial ? "3 jours (72 heures), gratuit" : "Pas d'essai (déjà utilisé)"],
     ["Premier prélèvement", preview.trial ? formatDateTime(preview.firstChargeAt, user.timezone) : "Immédiatement, à la validation"],
     ["Renouvellement", "Chaque mois à la même date, sans engagement"],
-    ["Résiliation", "En ligne depuis la page Abonnement, à tout moment"],
+    ["Résiliation", "En ligne depuis la page Abonnement, à tout moment (avant la fin de l'essai : aucun prélèvement)"],
   ];
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -61,9 +61,11 @@ export default async function EssaiPage({ searchParams }: { searchParams: Promis
       </Card>
       {preview.trial ? (
         <Callout tone="info" title="Pendant l'essai">
-          Limites de l'essai : 3 surveillances actives, recherche sur Internet limitée
+          Limites de l'essai : 3 surveillances actives, 1 sujet de recherche sur Internet vérifié une fois par jour, 10 alertes
+          par e-mail
           {preview.planId === "business" ? ", un site professionnel vérifié" : ""}. Les quotas complets s'activent après le premier
-          paiement réussi. Un rappel vous est envoyé par e-mail environ 24 heures avant le prélèvement.
+          paiement réussi. Un rappel vous est envoyé par e-mail environ 24 heures avant le prélèvement. Désinstaller
+          l'application ne résilie pas l'abonnement.
         </Callout>
       ) : null}
       <Card>

@@ -41,7 +41,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                   </Link>
                   {u.role !== "user" ? <Badge className="ml-2">{u.role}</Badge> : null}
                 </th>
-                <td className="px-4 py-3">{u.plan_id && u.sub_status ? `${u.plan_id} · ${STATUS[u.sub_status] ?? u.sub_status}` : "Découverte"}</td>
+                <td className="px-4 py-3">{u.plan_id && u.sub_status ? `${u.plan_id} · ${STATUS[u.sub_status] ?? u.sub_status}` : "Sans abonnement"}</td>
                 <td className="px-4 py-3">{formatDateTime(u.created_at)}</td>
                 <td className="px-4 py-3">{u.last_seen_at ? formatRelative(new Date(u.last_seen_at).toISOString()) : "—"}</td>
                 <td className="px-4 py-3">{u.suspended_at ? <Badge tone="danger">Suspendu</Badge> : <Badge tone="success">Actif</Badge>}</td>

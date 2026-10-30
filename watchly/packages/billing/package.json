@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint src"
+    "lint": "eslint src scripts"
   },
   "dependencies": {
     "@watchly/database": "workspace:*",
@@ -18,7 +18,8 @@
     "stripe": "^23.0.1",
     "zod": "^4.6.7",
     "@watchly/auth": "workspace:*",
-    "@watchly/notifications": "workspace:*"
+    "@watchly/notifications": "workspace:*",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@watchly/database": "workspace:*"

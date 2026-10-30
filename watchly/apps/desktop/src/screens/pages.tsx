@@ -407,6 +407,7 @@ export function AlertsPage() {
 export const PHASE_LABEL: Record<AgentSnapshot["phase"], string> = {
   starting: "Démarrage de l'agent local…",
   needs_consent: "Contrôles locaux en attente de votre accord",
+  no_subscription: "Aucun abonnement actif — surveillances en pause",
   disabled: "Contrôles locaux désactivés",
   paused: "Contrôles locaux en pause",
   idle: "Contrôles locaux actifs",

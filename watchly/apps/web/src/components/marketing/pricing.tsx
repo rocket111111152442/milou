@@ -30,16 +30,14 @@ export function PricingCards({ plans }: { plans: PlanDefinition[] }) {
             <p className="mt-2 min-h-12 text-sm text-muted-fg">{p.description}</p>
             <p className="mt-6 flex items-baseline gap-1.5">
               <span className="font-display text-4xl font-extrabold tracking-tight tabular-nums">
-                {p.priceCents === 0 ? "0 €" : formatCents(p.priceCents)}
+                {formatCents(p.priceCents)}
               </span>
-              <span className="text-sm text-muted-fg">{p.priceCents === 0 ? "pour toujours" : "/ mois TTC"}</span>
+              <span className="text-sm text-muted-fg">/ mois TTC</span>
             </p>
-            <p className="mt-1 h-5 text-xs text-muted-fg">
-              {p.trialHours ? "Essai gratuit de 72 h · carte bancaire requise" : "Aucune carte bancaire"}
-            </p>
+            <p className="mt-1 text-xs text-muted-fg">Essai gratuit de 3 jours · carte bancaire requise · sans engagement</p>
             <Button asChild className="mt-6" variant={highlighted ? "primary" : "secondary"}>
-              <Link href={p.id === "discovery" ? "/inscription" : `/inscription?formule=${p.id}`}>
-                {p.id === "discovery" ? "Commencer gratuitement" : `Essayer ${p.name} 72 h`}
+              <Link href={`/inscription?formule=${p.id}`} aria-label={`Essayer ${p.name} gratuitement pendant 3 jours`}>
+                Essayer gratuitement pendant 3 jours
               </Link>
             </Button>
             <ul className="mt-7 flex flex-col gap-3 border-t border-line pt-6 text-sm">
@@ -69,21 +67,27 @@ const rows: Row[] = [
   { label: "Surveillances au total", value: (p) => String(p.maxMonitors) },
   { label: "Dont sujets de recherche sur Internet", value: (p) => (p.maxWebTopics ? String(p.maxWebTopics) : false) },
   { label: "Fréquence de vérification des pages", value: (p) => formatInterval(p.pageIntervalMinutes) },
-  { label: "Recherche Web par sujet", value: (p) => (p.webIntervalMinutes ? formatInterval(p.webIntervalMinutes) : false) },
-  { label: "Contrôles sur votre ordinateur", value: () => true },
-  { label: "Relais par les serveurs Watchly", value: (p) => p.cloudRelay },
+  {
+    label: "Recherches sur Internet par jour et par sujet",
+    value: (p) => (p.webIntervalMinutes ? String(Math.max(1, Math.round(1440 / p.webIntervalMinutes))) : false),
+  },
+  { label: "Application ordinateur, web et mobile", value: () => true },
+  { label: "Surveillance continue par les serveurs Watchly", value: (p) => p.cloudRelay },
   { label: "Notifications dans l'application", value: () => true },
-  { label: "Alertes par e-mail", value: (p) => p.emailAlerts },
+  { label: "Alertes par e-mail (par mois)", value: (p) => (p.emailAlerts ? String(p.monthlyEmailAlerts) : false) },
   { label: "Historique", value: (p) => `${p.historyDays} jours${p.advancedHistory ? " (avancé)" : ""}` },
   { label: "Exports de données", value: (p) => p.dataExports },
   { label: "Sites professionnels inclus", value: (p) => (p.businessSitesIncluded ? String(p.businessSitesIncluded) : false) },
   { label: "Points de contrôle par site", value: (p) => (p.businessEndpointsPerSite ? String(p.businessEndpointsPerSite) : false) },
   { label: "Vérification HTTP à la minute", value: (p) => p.businessSitesIncluded > 0 },
-  { label: "Scénario navigateur", value: (p) => (p.businessScenariosPerSite ? `${p.businessScenariosPerSite} toutes les 2 h` : false) },
+  {
+    label: "Scénario navigateur (site inclus)",
+    value: (p) => (p.businessScenariosPerSite ? `${p.businessScenariosPerSite} toutes les 2 h` : false),
+  },
   { label: "Vérification du certificat HTTPS", value: (p) => p.businessTlsChecks },
   { label: "Confirmation des pannes avant alerte", value: (p) => p.businessSitesIncluded > 0 },
   { label: "Alertes prioritaires", value: (p) => p.priorityAlerts },
-  { label: "Essai gratuit", value: (p) => (p.trialHours ? "72 heures" : false) },
+  { label: "Essai gratuit avec carte bancaire", value: () => "3 jours" },
 ];
 
 export function PricingComparison({ plans }: { plans: PlanDefinition[] }) {
@@ -140,16 +144,18 @@ export function PricingSection({ plans, standalone = false }: { plans: PlanDefin
           id="pricing-title"
           eyebrow="Tarifs"
           title="Une formule pour chaque besoin"
-          description="Commencez gratuitement. Passez à une formule payante quand vous voulez plus de surveillances, le relais cloud ou la surveillance de votre site professionnel."
+          description="Trois formules mensuelles, sans engagement. Chacune s'essaie gratuitement pendant 3 jours : vous pouvez résilier en ligne avant la fin de l'essai sans être prélevé."
         />
         <PricingCards plans={plans} />
         <div className="flex flex-col gap-4">
           <h2 className="font-display text-xl font-bold">Comparatif détaillé</h2>
           <PricingComparison plans={plans} />
           <p className="text-sm text-muted-fg">
-            Prix TTC en euros, facturés chaque mois. Essai de 72 heures sur Plus, Pro et Business : la carte est enregistrée
-            par Stripe et le premier prélèvement a lieu à la fin de l'essai, sauf résiliation avant cette date. Résiliation
-            en ligne à tout moment, effective à la fin de la période en cours.
+            Prix TTC en euros, facturés chaque mois, renouvelés automatiquement jusqu'à résiliation. Essai gratuit de 3 jours
+            (72 heures) : la carte est enregistrée par Stripe et le premier prélèvement a lieu à la fin de l'essai, sauf
+            résiliation avant cette date. Pendant l'essai : 3 surveillances actives, 1 sujet de recherche et 1 site
+            professionnel (Business) au maximum. Résiliation en ligne à tout moment, effective à la fin de la période en
+            cours. Désinstaller l'application ne résilie pas l'abonnement.
           </p>
         </div>
       </Container>
@@ -158,6 +164,6 @@ export function PricingSection({ plans, standalone = false }: { plans: PlanDefin
 }
 
 export function planOrder(plans: PlanDefinition[]): PlanDefinition[] {
-  const order: PlanId[] = ["discovery", "plus", "pro", "business"];
+  const order: PlanId[] = ["plus", "pro", "max", "business"];
   return [...plans].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
 }

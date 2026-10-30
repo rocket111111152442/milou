@@ -16,6 +16,7 @@ const loadPlans = unstable_cache(
         priceCents: r.priceCents,
         trialHours: r.trialHours,
         sortOrder: r.sortOrder,
+        stripeLookupKey: r.stripeLookupKey ?? PLAN_CATALOG[r.id as PlanId]?.stripeLookupKey ?? "",
         maxMonitors: r.maxMonitors,
         maxWebTopics: r.maxWebTopics,
         pageIntervalMinutes: r.pageIntervalMinutes,
@@ -26,6 +27,7 @@ const loadPlans = unstable_cache(
         advancedHistory: r.advancedHistory,
         dataExports: r.dataExports,
         monthlySearchCalls: r.monthlySearchCalls,
+        monthlyEmailAlerts: r.monthlyEmailAlerts,
         businessSitesIncluded: r.businessSitesIncluded,
         businessEndpointsPerSite: r.businessEndpointsPerSite,
         businessHttpIntervalSeconds: r.businessHttpIntervalSeconds,
@@ -37,6 +39,7 @@ const loadPlans = unstable_cache(
         trialMaxWebTopics: r.trialMaxWebTopics,
         trialMaxBusinessSites: r.trialMaxBusinessSites,
         trialDailySearchCalls: r.trialDailySearchCalls,
+        trialEmailAlerts: r.trialEmailAlerts,
       }));
     } catch (err) {
       console.error("plans: lecture impossible, repli sur le catalogue", (err as Error).message);

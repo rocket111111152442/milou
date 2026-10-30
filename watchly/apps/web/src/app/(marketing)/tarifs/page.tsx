@@ -6,7 +6,7 @@ import { getPublicPlans } from "@/lib/plans";
 export const metadata: Metadata = {
   title: "Tarifs",
   description:
-    "Formules Watchly : Découverte gratuite, Plus 5,99 €/mois, Pro 14,99 €/mois et Business 39,99 €/mois. Essai de 72 heures sur les formules payantes.",
+    "Formules Watchly : Plus 5,99 €/mois, Pro 14,99 €/mois et Business 39,99 €/mois, sans engagement. Chaque formule s'essaie gratuitement pendant 3 jours.",
   alternates: { canonical: "/tarifs" },
 };
 

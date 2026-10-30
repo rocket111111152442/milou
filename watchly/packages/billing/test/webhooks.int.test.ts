@@ -157,7 +157,7 @@ describe("stripe webhooks", () => {
     expect(fake.state.calls.some((c) => c.method === "subscriptions.cancel" && c.args[0] === s2.id)).toBe(true);
     const [row] = await t.db.select().from(subscriptions).where(eq(subscriptions.stripeSubscriptionId, s2.id));
     expect(row!.status).toBe("canceled");
-    expect((await getEntitlements(t.db, second.id)).planId).toBe("discovery");
+    expect((await getEntitlements(t.db, second.id)).planId).toBeNull();
     const blocked = await t.db.select().from(trialUsage).where(eq(trialUsage.userId, second.id));
     expect(blocked.map((b) => b.status)).toEqual(["blocked_duplicate"]);
     const n = await t.db.select().from(notifications).where(eq(notifications.userId, second.id));
@@ -173,7 +173,7 @@ describe("stripe webhooks", () => {
     await handleStripeWebhook(deps, late.payload, late.signature);
     const [row] = await t.db.select().from(subscriptions).where(eq(subscriptions.stripeSubscriptionId, sub.id));
     expect(row!.status).toBe("canceled");
-    expect((await getEntitlements(t.db, u.id)).planId).toBe("discovery");
+    expect((await getEntitlements(t.db, u.id)).planId).toBeNull();
   });
 
   it("activates full quotas after the first successful payment and marks the trial converted", async () => {
@@ -203,7 +203,7 @@ describe("stripe webhooks", () => {
     expect(evt!.summary).toMatchObject({ amount_paid: 3999, livemode: false });
   });
 
-  it("pauses monitors above quota when the subscription ends, then resumes them on upgrade", async () => {
+  it("pauses every monitor when the subscription ends (no free plan), then resumes them on resubscription", async () => {
     const u = await newCustomer();
     const sub = makeSubscription({ customer: u.customer, priceId: PRICES.plus, status: "active", userId: u.id, planId: "plus" });
     fake.state.subscriptions.set(sub.id, sub);
@@ -216,8 +216,8 @@ describe("stripe webhooks", () => {
     ev = signedEvent(fake.stripe, "customer.subscription.deleted", sub);
     await handleStripeWebhook(deps, ev.payload, ev.signature);
     let tasks = await t.db.select().from(monitoringTasks).where(eq(monitoringTasks.userId, u.id));
-    expect(tasks.filter((x) => x.status === "paused_quota")).toHaveLength(2);
-    expect(tasks.filter((x) => x.status === "active")).toHaveLength(3);
+    expect(tasks.filter((x) => x.status === "paused_quota")).toHaveLength(5);
+    expect((await getEntitlements(t.db, u.id)).planId).toBeNull();
 
     const sub2 = makeSubscription({ customer: u.customer, priceId: PRICES.pro, status: "active", userId: u.id, planId: "pro" });
     fake.state.subscriptions.set(sub2.id, sub2);
@@ -319,6 +319,6 @@ describe("checkout", () => {
       createSubscriptionCheckout(t.db, fake.stripe, { userId: u.id, email: u.email, planId: "admin'--", appUrl: "https://app.test", pepper: PEPPER }),
     ).rejects.toThrow(/Formule inconnue/);
     const ent = await t.db.select().from(entitlements).where(eq(entitlements.userId, u.id));
-    expect(ent.every((e) => e.planId === "discovery")).toBe(true);
+    expect(ent.every((e) => e.planId === null)).toBe(true);
   });
 });

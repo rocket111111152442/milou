@@ -1,6 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { PAID_PLAN_IDS } from "@watchly/billing/catalog";
 import { mfaChallengePath } from "@/lib/auth";
 import { appUrl, clientIp, ipKey, safeNext } from "@/lib/request";
 import { rateLimit } from "@/lib/rate-limit";
@@ -41,7 +42,7 @@ export async function signUpAction(_: FormState, form: FormData): Promise<FormSt
       password: passwordSchema,
       displayName: z.string().trim().max(80).optional(),
       terms: z.literal("on", { message: "Vous devez accepter les conditions pour créer un compte" }),
-      formule: z.enum(["plus", "pro", "business"]).optional().or(z.literal("")),
+      formule: z.enum(PAID_PLAN_IDS).optional().or(z.literal("")),
     })
     .safeParse(Object.fromEntries(form));
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), values };

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createSubscriptionCheckout } from "@watchly/billing";
+import { PAID_PLAN_IDS } from "@watchly/billing/catalog";
 import { json, readJson, withActor } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
@@ -8,7 +9,7 @@ import { getStripe } from "@/lib/stripe";
 
 export const POST = withActor(
   async (req, actor) => {
-    const body = await readJson(req, z.object({ planId: z.enum(["plus", "pro", "business"]), acknowledged: z.literal(true) }));
+    const body = await readJson(req, z.object({ planId: z.enum(PAID_PLAN_IDS), acknowledged: z.literal(true) }));
     if (!body.ok) return body.res;
     const user = await getCurrentUser();
     const res = await createSubscriptionCheckout(getDb(), getStripe(), {

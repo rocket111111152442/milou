@@ -16,6 +16,11 @@ export async function processWebJobs(ctx: WorkerContext): Promise<number> {
     const [target] = await ctx.db.select().from(monitoringTargets).where(eq(monitoringTargets.taskId, claim.taskId)).limit(1);
     if (!task || !target) return;
     const ent = await getEntitlements(ctx.db, claim.userId);
+    if (!ent.planId) {
+      // Droits retirés entre la réservation et l'exécution : aucune recherche payante.
+      await submitResult(ctx.db, { jobId: claim.jobId, claimToken: claim.claimToken, executor: "cloud", durationMs: 0, error: { code: "subscription_required", message: "Aucun abonnement actif." } }).catch(() => undefined);
+      return;
+    }
     const [runs] = await ctx.db.select({ n: count() }).from(monitoringResults).where(eq(monitoringResults.taskId, task.id));
     const submitError = (code: string, message: string) =>
       submitResult(ctx.db, { jobId: claim.jobId, claimToken: claim.claimToken, executor: "cloud", durationMs: Date.now() - started, error: { code, message } });

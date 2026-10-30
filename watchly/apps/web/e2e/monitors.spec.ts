@@ -7,11 +7,10 @@ test.describe("surveillances (moteurs A et B)", () => {
   test.beforeEach(resetRateLimits);
 
   test("création par le formulaire, pause, reprise et suppression", async ({ page }) => {
-    const u = await createConfirmedUser(uniqueEmail("mon"));
+    const u = await createConfirmedUser(uniqueEmail("mon"), { plan: "plus" });
     await login(page, u.email, undefined, "/app/surveillances/nouvelle");
     await page.waitForURL(/surveillances\/nouvelle/);
-    // Formule Découverte : la recherche sur Internet est réservée aux formules payantes.
-    await expect(page.getByRole("radio", { name: /Un sujet sur Internet/ })).toBeDisabled();
+    await expect(page.getByRole("radio", { name: /Un sujet sur Internet/ })).toBeEnabled();
     await page.getByLabel(/^Adresse de la page/).fill("https://boutique.example.com/casque");
     await page.getByLabel(/^Seuil de prix/).fill("99");
     await page.getByLabel(/^Nom de la surveillance/).fill("Casque <script>alert(1)</script>");
@@ -23,8 +22,8 @@ test.describe("surveillances (moteurs A et B)", () => {
 
     const id = page.url().split("/").pop()!;
     const [task] = await sql<{ status: string; execution_mode: string }[]>`select status, execution_mode from monitoring_tasks where id = ${id}`;
-    // Sans relais cloud (Découverte), les contrôles se font uniquement sur l'ordinateur relié.
-    expect(task).toEqual({ status: "active", execution_mode: "local_only" });
+    // Fonctionnement hybride par défaut : ordinateur en priorité, serveurs en relais.
+    expect(task).toEqual({ status: "active", execution_mode: "auto" });
 
     await page.getByRole("button", { name: "Autres actions" }).click();
     await page.getByRole("menuitem", { name: "Mettre en pause" }).click();
@@ -33,7 +32,7 @@ test.describe("surveillances (moteurs A et B)", () => {
     await page.getByRole("menuitem", { name: "Reprendre" }).click();
     await expect(page.getByText("Surveillance reprise").first()).toBeVisible();
 
-    // Export réservé aux formules qui l'incluent.
+    // Export réservé aux formules qui l'incluent (Pro, Max, Business).
     expect((await page.request.get(`/api/monitors/${id}/export`)).status()).toBe(403);
 
     const del = await page.request.delete(`/api/monitors/${id}`, { headers: ORIGIN });
@@ -41,8 +40,25 @@ test.describe("surveillances (moteurs A et B)", () => {
     expect(await sql`select 1 from monitoring_tasks where id = ${id}`).toHaveLength(0);
   });
 
-  test("quotas appliqués par le serveur (formule Découverte : 3 surveillances)", async ({ page }) => {
-    const u = await createConfirmedUser(uniqueEmail("quota"));
+  test("sans abonnement : aucune surveillance possible (pas de formule gratuite)", async ({ page }) => {
+    const u = await createConfirmedUser(uniqueEmail("noplan"), { plan: null });
+    await login(page, u.email);
+    // Sans formule, l'accueil mène au choix d'un abonnement avec essai de 3 jours.
+    await page.goto("/app/bienvenue");
+    await expect(page).toHaveURL(/\/app\/abonnement\?bienvenue=1/);
+    for (const name of ["Plus", "Pro", "Max", "Business"]) {
+      await expect(page.getByRole("link", { name: `Essayer ${name} 3 jours` })).toBeVisible();
+    }
+    const r = await page.request.post("/api/monitors", {
+      data: { kind: "page", name: "x", url: "https://shop.example.com/p", condition: { type: "page_changed", sensitivity: "any" }, notify: { inapp: true, email: false, desktop: true } },
+      headers: ORIGIN,
+    });
+    expect(r.status()).toBe(403);
+    expect((await r.json()).error).toBe("subscription_required");
+  });
+
+  test("quotas appliqués par le serveur (essai : 3 surveillances, 1 sujet)", async ({ page }) => {
+    const u = await createConfirmedUser(uniqueEmail("quota"), { plan: "pro", status: "trialing" });
     await login(page, u.email);
     await page.waitForURL(/\/app/);
     const body = (n: number) => ({
@@ -59,12 +75,13 @@ test.describe("surveillances (moteurs A et B)", () => {
     // Fréquence plus rapide que la formule : refusée.
     const fast = await page.request.post("/api/monitors", { data: { ...body(5), intervalMinutes: 5 }, headers: ORIGIN });
     expect(fast.status()).toBeGreaterThanOrEqual(400);
-    // Recherche sur Internet : non incluse.
+    // Essai : le quota de 3 surveillances inclut les sujets de recherche.
     const topic = await page.request.post("/api/monitors", {
       data: { kind: "web_topic", name: "Sortie", request: "Préviens-moi de la date de sortie officielle de Projet Aurora", notify: { inapp: true, email: false, desktop: true } },
       headers: ORIGIN,
     });
     expect(topic.status()).toBe(403);
+    expect((await topic.json()).error).toBe("monitor_limit");
   });
 
   test("adresses internes refusées à la création (protection SSRF)", async ({ page }) => {

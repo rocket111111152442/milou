@@ -15,7 +15,7 @@ export const HEARTBEAT_MS = 60_000;
 export const HOST_SPACING_MS = 5_000;
 export const MAX_PARALLEL = 2;
 
-export type AgentPhase = "starting" | "needs_consent" | "disabled" | "paused" | "idle" | "running" | "offline";
+export type AgentPhase = "starting" | "needs_consent" | "no_subscription" | "disabled" | "paused" | "idle" | "running" | "offline";
 
 export interface ActivityEntry {
   at: number;
@@ -30,7 +30,8 @@ export interface AgentSnapshot {
   running: number;
   lastContactAt: number | null;
   lastError: string | null;
-  plan: { id: string; cloudRelay: boolean; pageIntervalMinutes: number } | null;
+  /** plan.id null : aucun abonnement ni essai, aucun contrôle n'est exécuté. */
+  plan: { id: string | null; cloudRelay: boolean; pageIntervalMinutes: number } | null;
   activity: ActivityEntry[];
 }
 
@@ -48,7 +49,7 @@ export interface AgentDeps {
 interface HeartbeatResponse {
   monitoringEnabled: boolean;
   consent: boolean;
-  plan: { id: string; cloudRelay: boolean; pageIntervalMinutes: number };
+  plan: { id: string | null; cloudRelay: boolean; pageIntervalMinutes: number };
   pendingNotifications: number;
 }
 
@@ -68,6 +69,7 @@ function errorInfo(e: unknown): { code: string; message: string } {
 const STATUS_TEXT: Record<AgentPhase, string> = {
   starting: "Démarrage…",
   needs_consent: "En attente de votre accord",
+  no_subscription: "Aucun abonnement actif",
   disabled: "Contrôles locaux désactivés",
   paused: "Contrôles locaux en pause",
   idle: "Contrôles locaux actifs",
@@ -131,12 +133,14 @@ export class LocalAgent {
         this.lastHeartbeat = now;
         this.set({ lastContactAt: now, plan: hb.plan, lastError: null });
         if (!hb.consent) this.set({ phase: "needs_consent" });
+        else if (!hb.plan?.id) this.set({ phase: "no_subscription" });
         else if (!hb.monitoringEnabled) this.set({ phase: "disabled" });
         else this.set({ phase: this.paused ? "paused" : "idle" });
         if (hb.pendingNotifications > 0) await this.deliverNotifications();
       }
       this.failures = 0;
-      if (this.paused || this.snap.phase === "needs_consent" || this.snap.phase === "disabled") return;
+      // Aucune réservation sans accord, sans abonnement ou en pause (le serveur refuserait de toute façon).
+      if (this.paused || this.snap.phase === "needs_consent" || this.snap.phase === "no_subscription" || this.snap.phase === "disabled") return;
 
       const { jobs } = await this.deps.api<{ jobs: AgentJob[] }>("POST", "/api/agent/jobs/claim", { max: MAX_PARALLEL });
       if (jobs.length) {

@@ -9,9 +9,12 @@
 import { createHash } from "node:crypto";
 import {
   and,
+  consumeUsage,
   eq,
   monitoringSeenItems,
+  releaseUsage,
   sql,
+  usagePeriod,
   type Database,
 } from "@watchly/database";
 import type { Evaluation } from "../compare/evaluate";
@@ -63,8 +66,14 @@ async function settingNumber(db: Database, key: string, fallback: number): Promi
   return Number.isFinite(v) ? v : fallback;
 }
 
-async function assertBudget(deps: WebRunDeps, userId: string, costMicros: number): Promise<void> {
+/**
+ * Réserve un appel facturable avant de l'effectuer : budget global de la plateforme (en euros), puis
+ * compteurs atomiques par utilisateur (mois, et jour pendant l'essai). Renvoie la fonction qui restitue
+ * la réservation si l'appel n'a finalement pas lieu.
+ */
+async function reserveSearch(deps: WebRunDeps, userId: string, costMicros: number): Promise<() => Promise<void>> {
   const db = deps.db;
+  const now = deps.now ?? new Date();
   const budgetEur = await settingNumber(db, "budget.monthly_api_eur", 50);
   const [g] = await db.execute<{ spent: string | null }>(sql`
     select coalesce(sum(estimated_cost_micros), 0)::text as spent from api_usage
@@ -72,14 +81,22 @@ async function assertBudget(deps: WebRunDeps, userId: string, costMicros: number
   if (Number(g?.spent ?? 0) + costMicros > budgetEur * 1_000_000) {
     throw new BudgetExceededError("global", "Budget mensuel des recherches atteint");
   }
-  const [u] = await db.execute<{ month: number; day: number }>(sql`
-    select count(*) filter (where occurred_at >= date_trunc('month', now()))::int as month,
-           count(*) filter (where occurred_at >= date_trunc('day', now()))::int as day
-    from api_usage where user_id = ${userId} and provider = 'brave_search' and not cache_hit`);
-  if ((u?.month ?? 0) >= deps.monthlyCallLimit) throw new BudgetExceededError("user_month", "Quota mensuel de recherches atteint pour votre formule");
-  if (deps.dailyCallLimit !== null && (u?.day ?? 0) >= deps.dailyCallLimit) {
-    throw new BudgetExceededError("user_day", "Quota journalier de recherches atteint (période d'essai)");
+  const month = usagePeriod("month", now);
+  const monthOk = await consumeUsage(db, { userId, metric: "brave_search", period: month, limit: deps.monthlyCallLimit });
+  if (monthOk === null) throw new BudgetExceededError("user_month", "Quota mensuel de recherches atteint pour votre formule");
+  const releases = [() => releaseUsage(db, { userId, metric: "brave_search", period: month })];
+  if (deps.dailyCallLimit !== null) {
+    const day = usagePeriod("day", now);
+    const dayOk = await consumeUsage(db, { userId, metric: "brave_search", period: day, limit: deps.dailyCallLimit });
+    if (dayOk === null) {
+      await releases[0]!();
+      throw new BudgetExceededError("user_day", "Quota journalier de recherches atteint (période d'essai)");
+    }
+    releases.push(() => releaseUsage(db, { userId, metric: "brave_search", period: day }));
   }
+  return async () => {
+    for (const r of releases) await r();
+  };
 }
 
 /** Recherche avec cache partagé ; enregistre la consommation (coût estimé) dans api_usage. */
@@ -95,8 +112,15 @@ export async function cachedSearch(deps: WebRunDeps, userId: string, query: stri
     return { items: hit[0].results, fromCache: true };
   }
   const cost = await settingNumber(deps.db, "cost.brave_search_call_micros", 5000);
-  await assertBudget(deps, userId, cost);
-  const items = await deps.provider.search(query, { count: 10 });
+  const release = await reserveSearch(deps, userId, cost);
+  let items: SearchResultItem[];
+  try {
+    items = await deps.provider.search(query, { count: 10 });
+  } catch (err) {
+    // Appel non abouti : la réservation est rendue (ni facturé par Brave, ni décompté à l'utilisateur).
+    await release();
+    throw err;
+  }
   await deps.db.execute(sql`
     insert into search_cache (query_hash, provider, query, results, fetched_at, expires_at)
     values (${hash}, ${deps.provider.name}, ${query.slice(0, 400)}, ${JSON.stringify(items)}::jsonb, now(), now() + make_interval(secs => ${SEARCH_CACHE_TTL_SECONDS}))

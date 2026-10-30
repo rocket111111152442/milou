@@ -1,6 +1,7 @@
 /**
- * Renseigne les identifiants de prix Stripe (mode test) dans la table plans à partir de l'environnement.
+ * Renseigne les identifiants de prix Stripe dans la table plans à partir de l'environnement.
  * Usage : DATABASE_URL=... STRIPE_PRICE_PLUS=price_... pnpm db:seed
+ * Pour récupérer et vérifier les vrais price_ chez Stripe : `pnpm stripe:prices` (voir docs/STRIPE.md).
  */
 import postgres from "postgres";
 
@@ -12,6 +13,7 @@ if (!url) {
 const mapping: Array<[table: "plans" | "plan_addons", id: string, env: string]> = [
   ["plans", "plus", "STRIPE_PRICE_PLUS"],
   ["plans", "pro", "STRIPE_PRICE_PRO"],
+  ["plans", "max", "STRIPE_PRICE_MAX"],
   ["plans", "business", "STRIPE_PRICE_BUSINESS"],
   ["plan_addons", "business_extra_site", "STRIPE_PRICE_BUSINESS_EXTRA_SITE"],
 ];

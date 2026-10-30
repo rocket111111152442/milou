@@ -55,7 +55,14 @@ export async function runMaintenance(ctx: WorkerContext): Promise<void> {
   await ctx.db.execute(sql`update agent_link_requests set status = 'expired' where status = 'pending' and expires_at < now()`);
   await ctx.db.execute(sql`delete from agent_link_requests where created_at < now() - interval '7 days'`);
   await ctx.db.execute(sql`delete from email_outbox where status in ('sent', 'canceled') and created_at < now() - interval '30 days'`);
+}
 
+/**
+ * Fin d'essai ou de période sans webhook Stripe : recalcule les droits expirés (suspension des
+ * surveillances, arrêt des tâches locales et serveur). Exécuté toutes les 5 minutes.
+ */
+export async function recomputeExpiredEntitlements(ctx: WorkerContext): Promise<number> {
   const expired = await ctx.db.execute<{ user_id: string }>(sql`select user_id from entitlements where valid_until < now() limit 500`);
   for (const e of expired) await recomputeEntitlements(ctx.db, e.user_id);
+  return expired.length;
 }

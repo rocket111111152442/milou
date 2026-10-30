@@ -81,7 +81,15 @@ function serviceRoleKey(): string {
 }
 
 /** Compte confirmé créé via l'API d'administration de Supabase locale (plus rapide que l'inscription). */
-export async function createConfirmedUser(email = uniqueEmail(), opts: { plan?: "plus" | "pro" | "business" } = {}): Promise<{ id: string; email: string }> {
+/**
+ * Compte confirmé. Par défaut abonné Plus actif (il n'existe pas de formule gratuite) ;
+ * `plan: null` pour un compte sans abonnement, `status: "trialing"` pour un essai en cours.
+ */
+export async function createConfirmedUser(
+  email = uniqueEmail(),
+  opts: { plan?: "plus" | "pro" | "max" | "business" | null; status?: "active" | "trialing" } = {},
+): Promise<{ id: string; email: string }> {
+  const plan = opts.plan === undefined ? "plus" : opts.plan;
   const key = serviceRoleKey();
   const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: "POST",
@@ -91,12 +99,17 @@ export async function createConfirmedUser(email = uniqueEmail(), opts: { plan?: 
   if (!res.ok) throw new Error(`création du compte impossible : ${res.status} ${await res.text()}`);
   const { id } = (await res.json()) as { id: string };
   await sql`update profiles set onboarding_completed_at = now() where id = ${id}`;
-  if (opts.plan) {
-    // Équivaut au résultat d'un webhook Stripe « abonnement actif » (mode test).
-    await sql`insert into subscriptions (user_id, plan_id, stripe_subscription_id, stripe_customer_id, status, current_period_end)
-              values (${id}, ${opts.plan}, ${"sub_e2e_" + id}, ${"cus_e2e_" + id}, 'active', now() + interval '20 days')`;
-    await sql`delete from entitlements where user_id = ${id}`;
+  if (plan) {
+    // Équivaut au résultat d'un webhook Stripe « abonnement actif » ou « essai démarré » (mode test).
+    if (opts.status === "trialing") {
+      await sql`insert into subscriptions (user_id, plan_id, stripe_subscription_id, stripe_customer_id, status, trial_start, trial_end, current_period_end)
+                values (${id}, ${plan}, ${"sub_e2e_" + id}, ${"cus_e2e_" + id}, 'trialing', now(), now() + interval '72 hours', now() + interval '72 hours')`;
+    } else {
+      await sql`insert into subscriptions (user_id, plan_id, stripe_subscription_id, stripe_customer_id, status, current_period_end)
+                values (${id}, ${plan}, ${"sub_e2e_" + id}, ${"cus_e2e_" + id}, 'active', now() + interval '20 days')`;
+    }
   }
+  await sql`delete from entitlements where user_id = ${id}`;
   return { id, email };
 }
 

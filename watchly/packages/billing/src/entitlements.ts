@@ -17,6 +17,7 @@ export interface PlanRow {
   advancedHistory: boolean;
   dataExports: boolean;
   monthlySearchCalls: number;
+  monthlyEmailAlerts: number;
   businessSitesIncluded: number;
   businessEndpointsPerSite: number;
   businessHttpIntervalSeconds: number;
@@ -28,6 +29,7 @@ export interface PlanRow {
   trialMaxWebTopics: number;
   trialMaxBusinessSites: number;
   trialDailySearchCalls: number;
+  trialEmailAlerts: number;
 }
 
 export interface SubscriptionSnapshot {
@@ -39,8 +41,9 @@ export interface SubscriptionSnapshot {
 }
 
 export interface Entitlements {
-  planId: string;
-  source: "free" | "trial" | "subscription" | "grace" | "admin_grant";
+  /** null : aucun abonnement valide (il n'existe plus de formule gratuite). */
+  planId: string | null;
+  source: "none" | "trial" | "subscription" | "grace" | "admin_grant";
   subscriptionStatus: SubscriptionStatus | null;
   maxMonitors: number;
   maxWebTopics: number;
@@ -53,19 +56,25 @@ export interface Entitlements {
   dataExports: boolean;
   monthlySearchCalls: number;
   dailySearchCalls: number | null;
+  /** Alertes envoyées par e-mail ce mois-ci (les alertes dans l'application ne sont pas limitées). */
+  monthlyEmailAlerts: number;
   businessSites: number;
   businessEndpointsPerSite: number;
   businessHttpIntervalSeconds: number;
   businessScenariosPerSite: number;
+  /** Scénarios navigateur pour tout le compte : ceux des sites inclus (les sites supplémentaires n'en apportent pas). */
+  businessScenarios: number;
   businessScenarioIntervalMinutes: number;
   businessTlsChecks: boolean;
   priorityAlerts: boolean;
   validUntil: Date | null;
 }
 
-/** Délai de grâce après un échec de paiement (past_due) avant de repasser en Découverte. */
+/** Pendant l'essai : recherche sur Internet au plus une fois par jour et par sujet. */
+export const TRIAL_MIN_WEB_INTERVAL_MINUTES = 1440;
+
+/** Délai de grâce après un échec de paiement (past_due) avant la suspension des surveillances. */
 export const PAST_DUE_GRACE_DAYS = 7;
-export const FREE_PLAN_ID = "discovery";
 /** Marge laissée aux webhooks Stripe pour confirmer une conversion d'essai ou un renouvellement. */
 export const WEBHOOK_LAG_MS = 2 * 3_600_000;
 
@@ -82,13 +91,48 @@ function fromPlan(plan: PlanRow): Omit<Entitlements, "planId" | "source" | "subs
     dataExports: plan.dataExports,
     monthlySearchCalls: plan.monthlySearchCalls,
     dailySearchCalls: null,
+    monthlyEmailAlerts: plan.monthlyEmailAlerts,
     businessSites: plan.businessSitesIncluded,
     businessEndpointsPerSite: plan.businessEndpointsPerSite,
     businessHttpIntervalSeconds: plan.businessHttpIntervalSeconds,
     businessScenariosPerSite: plan.businessScenariosPerSite,
+    businessScenarios: plan.businessScenariosPerSite * plan.businessSitesIncluded,
     businessScenarioIntervalMinutes: plan.businessScenarioIntervalMinutes,
     businessTlsChecks: plan.businessTlsChecks,
     priorityAlerts: plan.priorityAlerts,
+  };
+}
+
+/**
+ * Droits d'un compte sans abonnement valide : aucun. Les données restent consultables (historique),
+ * mais aucune surveillance n'est exécutée, ni sur l'ordinateur ni sur les serveurs.
+ */
+export function noEntitlements(subscriptionStatus: SubscriptionStatus | null = null): Entitlements {
+  return {
+    planId: null,
+    source: "none",
+    subscriptionStatus,
+    validUntil: null,
+    maxMonitors: 0,
+    maxWebTopics: 0,
+    pageIntervalMinutes: 0,
+    webIntervalMinutes: null,
+    cloudRelay: false,
+    emailAlerts: false,
+    historyDays: 30,
+    advancedHistory: false,
+    dataExports: false,
+    monthlySearchCalls: 0,
+    dailySearchCalls: 0,
+    monthlyEmailAlerts: 0,
+    businessSites: 0,
+    businessEndpointsPerSite: 0,
+    businessHttpIntervalSeconds: 60,
+    businessScenariosPerSite: 0,
+    businessScenarios: 0,
+    businessScenarioIntervalMinutes: 120,
+    businessTlsChecks: false,
+    priorityAlerts: false,
   };
 }
 
@@ -97,25 +141,17 @@ export function computeEntitlements(
   subscription: SubscriptionSnapshot | null,
   now: Date = new Date(),
 ): Entitlements {
-  const free = plans.get(FREE_PLAN_ID);
-  if (!free) throw new Error("La formule gratuite « discovery » est introuvable");
-  const freeEntitlements: Entitlements = {
-    planId: FREE_PLAN_ID,
-    source: "free",
-    subscriptionStatus: subscription?.status ?? null,
-    validUntil: null,
-    ...fromPlan(free),
-  };
-  if (!subscription) return { ...freeEntitlements, subscriptionStatus: null };
+  if (!subscription) return noEntitlements();
+  const none = noEntitlements(subscription.status);
   const plan = plans.get(subscription.planId);
-  if (!plan) return freeEntitlements;
+  if (!plan) return none;
 
   switch (subscription.status) {
     case "trialing": {
       const trialLimit = subscription.trialEnd ? new Date(subscription.trialEnd.getTime() + WEBHOOK_LAG_MS) : null;
       if (trialLimit && trialLimit.getTime() <= now.getTime()) {
-        // Essai terminé depuis longtemps sans confirmation de Stripe : prudence, droits gratuits.
-        return freeEntitlements;
+        // Essai terminé depuis longtemps sans confirmation de Stripe : prudence, aucun droit.
+        return none;
       }
       const base = fromPlan(plan);
       return {
@@ -125,9 +161,12 @@ export function computeEntitlements(
         subscriptionStatus: "trialing",
         maxMonitors: Math.min(plan.maxMonitors, plan.trialMaxMonitors),
         maxWebTopics: Math.min(plan.maxWebTopics, plan.trialMaxWebTopics),
+        webIntervalMinutes: base.webIntervalMinutes === null ? null : Math.max(base.webIntervalMinutes, TRIAL_MIN_WEB_INTERVAL_MINUTES),
         businessSites: Math.min(plan.businessSitesIncluded, plan.trialMaxBusinessSites),
+        businessScenarios: Math.min(base.businessScenarios, plan.trialMaxBusinessSites * plan.businessScenariosPerSite),
         dailySearchCalls: plan.trialDailySearchCalls,
         monthlySearchCalls: Math.min(plan.monthlySearchCalls, plan.trialDailySearchCalls * 3),
+        monthlyEmailAlerts: Math.min(plan.monthlyEmailAlerts, plan.trialEmailAlerts),
         validUntil: trialLimit,
       };
     }
@@ -154,11 +193,11 @@ export function computeEntitlements(
           validUntil: graceEnd,
         };
       }
-      return freeEntitlements;
+      return none;
     }
     default:
-      // canceled, unpaid, incomplete, incomplete_expired, paused : aucun droit payant.
-      return freeEntitlements;
+      // canceled, unpaid, incomplete, incomplete_expired, paused : aucun droit.
+      return none;
   }
 }
 

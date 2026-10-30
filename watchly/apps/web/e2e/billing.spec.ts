@@ -10,7 +10,7 @@ test.describe("abonnements (Stripe en mode test)", () => {
   test.beforeEach(resetRateLimits);
 
   test("essai de 72 h : conditions affichées, confirmation obligatoire, paiement hébergé par Stripe", async ({ page }) => {
-    const u = await createConfirmedUser(uniqueEmail("trial"));
+    const u = await createConfirmedUser(uniqueEmail("trial"), { plan: null });
     await login(page, u.email, undefined, "/app/abonnement/essai?formule=plus");
     await page.waitForURL(/abonnement\/essai/);
     await expect(page.getByRole("heading", { name: "Démarrer l'essai Plus" })).toBeVisible();
@@ -33,7 +33,7 @@ test.describe("abonnements (Stripe en mode test)", () => {
   });
 
   test("formule inconnue ou gratuite : aucune session de paiement", async ({ page }) => {
-    const u = await createConfirmedUser(uniqueEmail("plan"));
+    const u = await createConfirmedUser(uniqueEmail("plan"), { plan: null });
     await login(page, u.email);
     await page.waitForURL(/\/app/);
     const headers = { origin: "http://localhost:3000" };
@@ -45,12 +45,12 @@ test.describe("abonnements (Stripe en mode test)", () => {
     // Les droits ne peuvent pas être modifiés depuis le navigateur.
     const forged = await page.request.patch("/api/account/profile", { data: { planId: "business", role: "admin" }, headers });
     expect(forged.status()).toBe(400);
-    const [ent] = await sql<{ plan_id: string }[]>`select plan_id from entitlements where user_id = ${u.id}`;
-    expect(ent?.plan_id ?? "discovery").toBe("discovery");
+    const [ent] = await sql<{ plan_id: string | null }[]>`select plan_id from entitlements where user_id = ${u.id}`;
+    expect(ent?.plan_id ?? null).toBeNull();
   });
 
   test("essai en cours : date du premier prélèvement et résiliation sans frais", async ({ page }) => {
-    const u = await createConfirmedUser(uniqueEmail("cancel"));
+    const u = await createConfirmedUser(uniqueEmail("cancel"), { plan: null });
     // État équivalent à la réception du webhook « essai démarré » (testé en intégration).
     await sql`insert into subscriptions (user_id, plan_id, stripe_subscription_id, stripe_customer_id, status, trial_start, trial_end, current_period_end)
               values (${u.id}, 'pro', ${"sub_e2e_" + u.id}, ${"cus_e2e_" + u.id}, 'trialing', now(), now() + interval '72 hours', now() + interval '72 hours')`;

@@ -6,7 +6,8 @@ import { api } from "../lib/api";
 export interface Me {
   user: { email: string; displayName: string | null };
   device: { id: string; name: string; platform: string; monitoringEnabled: boolean; consentLocalAt: string | null } | undefined;
-  plan: { id: string; name: string; cloudRelay: boolean; maxMonitors: number; pageIntervalMinutes: number; isTrial: boolean };
+  /** id/name null : aucun abonnement ni essai en cours. */
+  plan: { id: string | null; name: string | null; cloudRelay: boolean; maxMonitors: number; pageIntervalMinutes: number; isTrial: boolean };
   consent: { version: string; text: string; accepted: boolean };
 }
 
@@ -44,7 +45,7 @@ export function ConsentScreen({ me, onDone }: { me: Me; onDone: (accepted: boole
           <h1 className="font-display text-2xl font-bold tracking-tight">Fonctionnement sur cet ordinateur</h1>
         </div>
         <p className="mt-3 text-sm text-muted-fg">
-          Compte : <span className="font-medium text-ink">{me.user.email}</span> · Formule {me.plan.name}
+          Compte : <span className="font-medium text-ink">{me.user.email}</span> · {me.plan.name ? `Formule ${me.plan.name}` : "Aucun abonnement actif"}
         </p>
         <div className="mt-6 whitespace-pre-line rounded-xl border border-line bg-white p-5 text-sm leading-relaxed">{me.consent.text}</div>
         <ul className="mt-5 list-disc space-y-1 pl-5 text-sm text-muted-fg">
@@ -71,11 +72,6 @@ export function ConsentScreen({ me, onDone }: { me: Me; onDone: (accepted: boole
             Accepter et activer
           </Button>
         </div>
-        {!me.plan.cloudRelay ? (
-          <p className="mt-5 text-xs text-muted-fg">
-            Avec la formule {me.plan.name}, vos pages ne sont contrôlées que par cet ordinateur : si vous refusez, elles ne seront pas vérifiées.
-          </p>
-        ) : null}
       </Card>
     </main>
   );

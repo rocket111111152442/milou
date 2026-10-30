@@ -60,8 +60,9 @@ export interface QuotaView {
 }
 
 export interface SubscriptionView {
-  planId: string;
-  planName: string;
+  /** null : aucun abonnement ni essai en cours (il n'existe pas de formule gratuite). */
+  planId: string | null;
+  planName: string | null;
   status: string | null;
   isTrial: boolean;
   trialEndsAt: string | null;

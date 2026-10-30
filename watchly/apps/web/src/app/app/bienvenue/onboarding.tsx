@@ -64,7 +64,7 @@ export function Onboarding({ displayName, hasDevice, entitlements }: { displayNa
               <li className="rounded-xl border border-line p-4">
                 <Search className="size-5" aria-hidden="true" />
                 <p className="mt-3 font-medium">Un sujet sur Internet</p>
-                <p className="mt-1 text-sm text-muted-fg">Une date de sortie, une annonce, une offre de stage (formules payantes).</p>
+                <p className="mt-1 text-sm text-muted-fg">Une date de sortie, une annonce, une offre de stage.</p>
               </li>
             </ul>
             <Button onClick={next} className="self-start">
@@ -78,10 +78,9 @@ export function Onboarding({ displayName, hasDevice, entitlements }: { displayNa
             <Laptop className="size-7" aria-hidden="true" />
             <h2 className="font-display text-2xl font-bold">L'application pour votre ordinateur</h2>
             <p className="leading-relaxed text-muted-fg">
-              L'application Watchly effectue vos contrôles depuis votre ordinateur et affiche des notifications sur votre bureau.
-              {entitlements.cloudRelay
-                ? " Avec votre formule, nos serveurs prennent le relais si elle n'est pas ouverte : elle est utile mais pas indispensable."
-                : " Avec la formule Découverte, elle est nécessaire pour que vos surveillances s'exécutent."}
+              Recevez vos alertes directement sur votre bureau et gérez vos surveillances depuis l'application Watchly pour
+              Windows, macOS ou Linux. Elle est facultative : vos surveillances continuent sur nos serveurs, et vous pouvez
+              aussi installer Watchly sur votre téléphone depuis le navigateur.
             </p>
             {hasDevice ? <Callout tone="success">Un appareil est déjà relié à votre compte.</Callout> : null}
             <div className="flex flex-wrap gap-2">
@@ -173,7 +172,7 @@ function InitialResult({ monitorId, cloud, onNext }: { monitorId: string | null;
         <Callout tone="info" title="Contrôle en attente">
           {cloud
             ? "Le premier contrôle prend plus de temps que prévu. Il apparaîtra dans le détail de la surveillance."
-            : "Formule Découverte : le premier contrôle sera effectué par l'application Watchly dès qu'elle sera ouverte sur votre ordinateur."}
+            : "Le premier contrôle sera effectué dans les prochaines minutes ; il apparaîtra dans le détail de la surveillance."}
         </Callout>
       ) : (
         <p className="flex items-center gap-3 text-muted-fg" role="status">

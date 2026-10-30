@@ -30,8 +30,9 @@ export default async function ResilierPage() {
             </p>
           )}
           <p className="text-muted-fg">
-            Ensuite, votre compte repassera en formule Découverte : les surveillances au-delà de 3 seront mises en pause, sans
-            être supprimées. Vous pourrez revenir à tout moment.
+            Ensuite, vos surveillances seront mises en pause (sur vos appareils comme sur nos serveurs) et vos données
+            resteront consultables pendant 90 jours, puis seront supprimées. Vous pourrez vous réabonner à tout moment
+            pendant cette période et tout reprendra à l'identique.
           </p>
           {sub.cancelAtPeriodEnd ? <Callout tone="info">La résiliation est déjà enregistrée.</Callout> : <CancelButton />}
         </CardContent>

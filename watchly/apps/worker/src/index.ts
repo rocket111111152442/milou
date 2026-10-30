@@ -15,7 +15,7 @@ import { logger } from "./logger";
 import { startLoop, type LoopHandle } from "./loop";
 import { processEmails } from "./jobs/email";
 import { writeHeartbeat } from "./jobs/heartbeat";
-import { runMaintenance } from "./jobs/maintenance";
+import { recomputeExpiredEntitlements, runMaintenance } from "./jobs/maintenance";
 import { processPageJobs } from "./jobs/pages";
 import { sendTrialReminders } from "./jobs/trial-reminders";
 import { processWebJobs } from "./jobs/web";
@@ -52,6 +52,7 @@ export async function startWorker(env: Record<string, string | undefined> = proc
   if (r.has("scheduler")) {
     loops.push(startLoop("schedule", 10_000, () => scheduleDueTasks(ctx.db, { limit: 1000 })));
     loops.push(startLoop("recover", 15_000, () => recoverJobs(ctx.db)));
+    loops.push(startLoop("entitlements", 5 * 60_000, () => recomputeExpiredEntitlements(ctx)));
     loops.push(startLoop("trial-reminders", 10 * 60_000, () => sendTrialReminders(ctx)));
   }
   if (r.has("pages")) loops.push(startLoop("pages", 2_000, () => processPageJobs(ctx)));

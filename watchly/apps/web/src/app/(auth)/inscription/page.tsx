@@ -19,14 +19,14 @@ export default async function InscriptionPage({ searchParams }: { searchParams: 
           <span className="flex flex-col gap-2">
             <span>
               Vous avez choisi <strong className="text-ink">{plan.name}</strong> ({formatCents(plan.priceCents)}/mois). Après
-              vérification de votre e-mail, vous pourrez démarrer l'essai de 72 heures.
+              vérification de votre e-mail, vous pourrez démarrer l'essai gratuit de 3 jours.
             </span>
             <Badge tone="info" className="w-fit">
               Carte bancaire demandée à l'étape suivante, via Stripe
             </Badge>
           </span>
         ) : (
-          "Formule Découverte gratuite, sans carte bancaire. Vous pourrez changer de formule à tout moment."
+          "Créez votre compte, puis choisissez Plus, Pro ou Business pour démarrer votre essai gratuit de 3 jours."
         )
       }
       footer={

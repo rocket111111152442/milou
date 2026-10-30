@@ -26,7 +26,7 @@ interface Call {
 }
 
 function setup(opts: {
-  heartbeat?: Partial<{ consent: boolean; monitoringEnabled: boolean; pendingNotifications: number }>;
+  heartbeat?: Partial<{ consent: boolean; monitoringEnabled: boolean; pendingNotifications: number; plan: { id: string | null; cloudRelay: boolean; pageIntervalMinutes: number } }>;
   jobs?: ReturnType<typeof job>[];
   robots?: string | null;
   fetchPage?: AgentDeps["fetchPage"];
@@ -48,7 +48,7 @@ function setup(opts: {
           consent: true,
           monitoringEnabled: true,
           pendingNotifications: 0,
-          plan: { id: "discovery", cloudRelay: false, pageIntervalMinutes: 1440 },
+          plan: { id: "plus", cloudRelay: true, pageIntervalMinutes: 360 },
           ...opts.heartbeat,
         };
       if (path === "/api/agent/jobs/claim") {
@@ -101,6 +101,14 @@ describe("agent local (application desktop)", () => {
     await t.agent.tick();
     expect(t.calls.map((c) => c.path)).toEqual(["/api/agent/heartbeat"]);
     expect(t.agent.snapshot().phase).toBe("needs_consent");
+  });
+
+  it("sans abonnement ni essai : aucun contrôle réservé, état explicite", async () => {
+    const t = setup({ heartbeat: { plan: { id: null, cloudRelay: false, pageIntervalMinutes: 0 } }, jobs: [job("j1", "https://boutique.example/a")] });
+    await t.agent.tick();
+    expect(t.calls.map((c) => c.path)).toEqual(["/api/agent/heartbeat"]);
+    expect(t.agent.snapshot().phase).toBe("no_subscription");
+    expect(t.status).toContain("Aucun abonnement actif");
   });
 
   it("en pause : signale l'état « paused » et ne réserve rien", async () => {

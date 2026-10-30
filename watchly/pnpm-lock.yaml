@@ -263,6 +263,9 @@ importers:
       '@watchly/types':
         specifier: workspace:*
         version: link:../types
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
       stripe:
         specifier: ^23.0.1
         version: 23.0.1(@types/node@24.19.2)

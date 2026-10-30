@@ -200,7 +200,8 @@ export async function createScenario(
     const steps = data.steps.map((s) => (s.action === "goto" ? { ...s, url: assertUrlInDomain(s.url, site.domain, policy) } : s));
     const ent = await getEntitlements(tx as unknown as Database, userId);
     const [{ n } = { n: 0 }] = await tx.select({ n: count() }).from(browserTestScenarios).where(eq(browserTestScenarios.siteId, siteId));
-    checkNewScenario(ent, n);
+    const [{ total } = { total: 0 }] = await tx.select({ total: count() }).from(browserTestScenarios).where(eq(browserTestScenarios.userId, userId));
+    checkNewScenario(ent, n, total);
     const [row] = await tx
       .insert(browserTestScenarios)
       .values({

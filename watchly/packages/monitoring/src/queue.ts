@@ -98,6 +98,9 @@ export async function scheduleDueTasks(db: Database, opts: ScheduleOptions = {})
       from monitoring_schedules s
       join monitoring_tasks t on t.id = s.task_id
       join profiles p on p.id = s.user_id
+      -- Sans abonnement ni essai valide, rien n'est planifié (la tâche reprendra dès le retour des droits).
+      join entitlements en on en.user_id = s.user_id and en.plan_id is not null
+        and (en.valid_until is null or en.valid_until > ${tsParam(now)})
       where s.next_run_at <= ${tsParam(now)} and t.status in ('active', 'error') and p.suspended_at is null
       order by s.next_run_at
       limit ${opts.limit ?? 500}
@@ -202,6 +205,9 @@ export async function claimAgentJobs(
     where id in (
       select j.id from monitoring_jobs j
       join monitoring_tasks t on t.id = j.task_id
+      -- Abonnement ou essai valide exigé au moment de la réservation (pas seulement à la planification).
+      join entitlements en on en.user_id = j.user_id and en.plan_id is not null
+        and (en.valid_until is null or en.valid_until > ${tsParam(now)})
       where j.user_id = ${params.userId} and j.status = 'pending' and j.allow_agent and j.kind = 'page'
         and j.slot_at <= ${tsParam(now)} and t.status in ('active', 'error')
       order by j.priority, j.slot_at
@@ -234,6 +240,9 @@ export async function claimCloudJobs(
     where id in (
       select j.id from monitoring_jobs j
       join monitoring_tasks t on t.id = j.task_id
+      join entitlements en on en.user_id = j.user_id and en.plan_id is not null
+        and (en.valid_until is null or en.valid_until > ${tsParam(now)})
+        and (j.kind = 'web_topic' or en.cloud_relay)
       where j.status = 'pending' and j.allow_cloud and j.slot_at <= ${tsParam(now)} and j.kind in ${kinds}
         and t.status in ('active', 'error')
         and (j.preferred_executor = 'cloud' or j.agent_deadline_at <= ${tsParam(now)})

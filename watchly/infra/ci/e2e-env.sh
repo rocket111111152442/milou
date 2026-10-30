@@ -6,7 +6,7 @@ set -euo pipefail
 eval "$(supabase status -o env)"
 DB=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 DATABASE_URL="$DB" pnpm db:migrate
-DATABASE_URL="$DB" STRIPE_PRICE_PLUS=price_1PlusLocal STRIPE_PRICE_PRO=price_1ProLocal STRIPE_PRICE_BUSINESS=price_1BusinessLocal STRIPE_PRICE_BUSINESS_EXTRA_SITE=price_1ExtraLocal pnpm db:seed
+DATABASE_URL="$DB" STRIPE_PRICE_PLUS=price_1PlusLocal STRIPE_PRICE_PRO=price_1ProLocal STRIPE_PRICE_MAX=price_1MaxLocal STRIPE_PRICE_BUSINESS=price_1BusinessLocal STRIPE_PRICE_BUSINESS_EXTRA_SITE=price_1ExtraLocal pnpm db:seed
 {
   echo "NEXT_PUBLIC_APP_URL=http://localhost:3000"
   echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"

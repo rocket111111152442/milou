@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarClock, CreditCard } from "lucide-react";
 import { Badge, Button, Callout, Card, CardContent, CardHeader, CardTitle, PageHeader, Progress } from "@watchly/ui";
-import { PLAN_CATALOG, EXTRA_SITE_ADDON } from "@watchly/billing/catalog";
+import { EXTRA_SITE_ADDON, PAID_PLAN_IDS, PLAN_CATALOG } from "@watchly/billing/catalog";
 import { formatCents, formatDateTime } from "@watchly/types";
 import { requireUser } from "@/lib/auth";
 import { getQuotaViews, getSubscriptionView, loadEntitlements } from "@/lib/data/account";
@@ -18,9 +18,9 @@ const STATUS: Record<string, { label: string; tone: "success" | "info" | "warnin
   unpaid: { label: "Impayé", tone: "danger" },
 };
 
-export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
+export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ checkout?: string; bienvenue?: string }> }) {
   const user = await requireUser("/app/abonnement");
-  const { checkout } = await searchParams;
+  const { checkout, bienvenue } = await searchParams;
   const [sub, ent] = await Promise.all([getSubscriptionView(user.id), loadEntitlements(user.id)]);
   const quotas = await getQuotaViews(user.id, ent);
   const billing = isBillingConfigured();
@@ -29,6 +29,12 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Abonnement" description="Votre formule, vos quotas et votre facturation." />
+      {bienvenue && !sub.planId ? (
+        <Callout tone="info" title="Bienvenue sur Watchly">
+          Choisissez la formule qui vous convient : vous l'essayez gratuitement pendant 3 jours et vous pouvez résilier en ligne
+          avant la fin de l'essai, sans aucun prélèvement.
+        </Callout>
+      ) : null}
       {checkout === "success" ? (
         <Callout tone="success" title="Paiement enregistré par Stripe" role="status">
           La confirmation de Stripe peut prendre quelques secondes. Votre formule se met à jour automatiquement dès réception.
@@ -48,14 +54,14 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         <Card>
           <CardHeader className="flex-row items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
-              <CardTitle as="h2">Formule {sub.planName}</CardTitle>
+              <CardTitle as="h2">{sub.planName ? `Formule ${sub.planName}` : "Aucun abonnement en cours"}</CardTitle>
               <p className="text-sm text-muted-fg">
-                {sub.planId === "discovery"
-                  ? "Gratuit · surveillances locales uniquement"
-                  : `${formatCents(PLAN_CATALOG[sub.planId as keyof typeof PLAN_CATALOG]?.priceCents ?? 0)} / mois TTC`}
+                {sub.planId
+                  ? `${formatCents(PLAN_CATALOG[sub.planId as keyof typeof PLAN_CATALOG]?.priceCents ?? 0)} / mois TTC, renouvelé chaque mois jusqu'à résiliation`
+                  : "Vos surveillances sont en pause. Choisissez une formule pour démarrer un essai gratuit de 3 jours."}
               </p>
             </div>
-            {status ? <Badge tone={status.tone}>{status.label}</Badge> : <Badge tone="neutral">Gratuit</Badge>}
+            {status ? <Badge tone={status.tone}>{status.label}</Badge> : <Badge tone="neutral">Inactif</Badge>}
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             {sub.isTrial && sub.trialEndsAt ? (
@@ -78,6 +84,10 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
             {sub.status === "past_due" ? (
               <Callout tone="warning">Le dernier paiement a échoué. Mettez à jour votre carte pour conserver vos fonctionnalités.</Callout>
             ) : null}
+            <p className="text-xs text-muted-fg">
+              Désinstaller l'application ou supprimer vos surveillances ne résilie pas l'abonnement : utilisez le bouton
+              « Résilier » ci-dessous.
+            </p>
             <div className="flex flex-wrap gap-2">
               {sub.subscriptionId ? (
                 <>
@@ -104,7 +114,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
             ))}
             <p className="text-xs text-muted-fg">
               Fréquence minimale : pages toutes les {ent.pageIntervalMinutes >= 60 ? `${ent.pageIntervalMinutes / 60} h` : `${ent.pageIntervalMinutes} min`}.
-              {ent.cloudRelay ? " Relais cloud inclus." : " Sans relais cloud."}
+              {ent.cloudRelay ? " Surveillance continue par nos serveurs incluse." : ""}
             </p>
           </CardContent>
         </Card>
@@ -125,12 +135,12 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         </Card>
       ) : null}
 
-      <section aria-labelledby="change-title" className="flex flex-col gap-4">
+      <section id="formules" aria-labelledby="change-title" className="flex scroll-mt-24 flex-col gap-4">
         <h2 id="change-title" className="font-display text-lg font-semibold">
-          {sub.subscriptionId ? "Changer de formule" : "Passer à une formule payante"}
+          {sub.subscriptionId ? "Changer de formule" : "Choisir une formule — 3 jours d'essai gratuit"}
         </h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {(["plus", "pro", "business"] as const).map((id) => {
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {PAID_PLAN_IDS.map((id) => {
             const p = PLAN_CATALOG[id];
             const current = sub.planId === id && sub.subscriptionId;
             return (
@@ -153,7 +163,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
                     ) : (
                       <Button asChild className="w-full">
                         <Link href={`/app/abonnement/essai?formule=${id}`}>
-                          <CreditCard aria-hidden="true" /> Choisir {p.name}
+                          <CreditCard aria-hidden="true" /> Essayer {p.name} 3 jours
                         </Link>
                       </Button>
                     )}

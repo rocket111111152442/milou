@@ -219,13 +219,16 @@ function Main({
       }
       sidebarFooter={<p className="px-3 text-xs text-muted-fg">{me.user.email}</p>}
     >
-      {snapshot.phase === "needs_consent" || snapshot.phase === "disabled" ? (
+      {snapshot.phase === "no_subscription" || (!snapshot.plan && !me.plan.id) ? (
+        <Callout tone="info" className="mb-6" title="Aucun abonnement actif">
+          <p>Vos surveillances sont en pause. Choisissez une formule pour démarrer votre essai gratuit de 3 jours.</p>
+          <Button size="sm" className="mt-2 self-start" onClick={() => void native.openExternal(`${info.apiBase}/app/abonnement`)}>
+            Choisir une formule
+          </Button>
+        </Callout>
+      ) : snapshot.phase === "needs_consent" || snapshot.phase === "disabled" ? (
         <Callout tone="warning" className="mb-6" title="Aucun contrôle n'est effectué sur cet ordinateur">
-          <p>
-            {me.plan.cloudRelay
-              ? "Vos pages sont contrôlées par les serveurs Watchly."
-              : `Avec la formule ${me.plan.name}, vos pages ne sont contrôlées que par votre ordinateur : elles ne sont pas vérifiées en ce moment.`}
-          </p>
+          <p>Vos pages restent contrôlées par les serveurs Watchly.</p>
           <Button size="sm" className="mt-2 self-start" onClick={onConsent}>
             Activer les contrôles locaux
           </Button>

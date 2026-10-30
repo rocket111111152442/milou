@@ -19,7 +19,7 @@ export const faqItems: Array<{ q: string; a: string }> = [
   },
   {
     q: "Que se passe-t-il quand mon PC est éteint ?",
-    a: "Avec les formules Plus, Pro et Business, les serveurs Watchly reprennent automatiquement les contrôles éligibles, sans doublon. Avec la formule Découverte, les contrôles sont suspendus et reprennent au prochain lancement de l'application. Les contrôles Business sont toujours effectués par nos serveurs.",
+    a: "Vos surveillances continuent : les serveurs Watchly reprennent automatiquement les contrôles, sans doublon, et vous recevez vos alertes par e-mail ou sur votre téléphone. Les contrôles Business sont toujours effectués par nos serveurs.",
   },
   {
     q: "Mes données sont-elles confidentielles ?",
@@ -27,7 +27,7 @@ export const faqItems: Array<{ q: string; a: string }> = [
   },
   {
     q: "Combien coûte Watchly ?",
-    a: "La formule Découverte est gratuite. Plus coûte 5,99 € par mois, Pro 14,99 € par mois et Business 39,99 € par mois (14,99 € par site professionnel supplémentaire). Les prix sont indiqués TTC.",
+    a: "Plus coûte 5,99 € par mois, Pro 14,99 € par mois et Business 39,99 € par mois (14,99 € par site professionnel supplémentaire). Les prix sont indiqués TTC, sans engagement. Chaque formule s'essaie gratuitement pendant 3 jours.",
   },
   {
     q: "Comment se passent les paiements ?",
@@ -35,11 +35,11 @@ export const faqItems: Array<{ q: string; a: string }> = [
   },
   {
     q: "Comment fonctionne l'essai gratuit ?",
-    a: "Les formules Plus, Pro et Business proposent 72 heures d'essai. Vous enregistrez une carte via Stripe ; l'essai commence immédiatement, avec des limites (3 surveillances, recherche Web limitée, un site professionnel pour Business). Un rappel vous est envoyé avant le premier prélèvement, qui n'a lieu qu'à la fin de l'essai si vous n'avez pas résilié. Un seul essai est possible par personne.",
+    a: "Chaque formule (Plus, Pro, Business) s'essaie gratuitement pendant 3 jours (72 heures). Vous enregistrez une carte via Stripe ; l'essai commence immédiatement, avec des limites (3 surveillances actives, 1 sujet de recherche sur Internet vérifié au plus une fois par jour, un site professionnel pour Business). Un rappel vous est envoyé avant le premier prélèvement, qui n'a lieu qu'à la fin de l'essai si vous n'avez pas résilié. Un seul essai est possible par personne.",
   },
   {
     q: "Puis-je résilier facilement ?",
-    a: "Oui, en deux clics depuis la page Abonnement. Une résiliation pendant l'essai empêche tout prélèvement. Après l'essai, l'abonnement reste actif jusqu'à la fin de la période déjà payée, puis votre compte repasse en formule Découverte.",
+    a: "Oui, en deux clics depuis la page Abonnement. Une résiliation pendant l'essai empêche tout prélèvement. Après l'essai, l'abonnement reste actif jusqu'à la fin de la période déjà payée ; ensuite, vos surveillances sont mises en pause et vos données restent consultables pendant 90 jours, le temps de vous réabonner si vous le souhaitez. Attention : désinstaller l'application ne résilie pas l'abonnement.",
   },
   {
     q: "Les recherches sont-elles fiables ?",

@@ -21,7 +21,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "admin:grant": "tsx packages/database/scripts/grant-admin.ts",
-    "test:load": "WATCHLY_LOAD_TESTS=1 vitest run --project load"
+    "test:load": "WATCHLY_LOAD_TESTS=1 vitest run --project load",
+    "stripe:prices": "tsx packages/billing/scripts/stripe-prices.ts"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

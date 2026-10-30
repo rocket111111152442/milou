@@ -28,7 +28,7 @@ export async function getSubscriptionView(userId: string): Promise<SubscriptionV
   const ent = await getEntitlements(db, userId);
   return withUser(db, userId, async (tx) => {
     const [sub] = await tx.select().from(subscriptions).orderBy(desc(subscriptions.createdAt)).limit(1);
-    const [plan] = await tx.select({ name: plans.name }).from(plans).where(eq(plans.id, ent.planId)).limit(1);
+    const [plan] = ent.planId ? await tx.select({ name: plans.name }).from(plans).where(eq(plans.id, ent.planId)).limit(1) : [];
     const live = sub && ["trialing", "active", "past_due", "unpaid"].includes(sub.status);
     return {
       subscriptionId: live ? sub.id : null,

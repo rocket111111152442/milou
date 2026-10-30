@@ -8,7 +8,7 @@ import { adminAuditLogs, sql, type Executor } from "@watchly/database";
 import { getDb } from "../db";
 
 export interface AdminKpis {
-  users: { total: number; new7d: number; new30d: number; suspended: number };
+  users: { total: number; new7d: number; new30d: number; suspended: number; withoutSubscription: number };
   plans: Array<{ planId: string; name: string; active: number; trialing: number; pastDue: number }>;
   trials: { started30d: number; converted30d: number; canceled30d: number; inProgress: number; blockedDuplicates30d: number };
   cancellations30d: number;
@@ -105,11 +105,11 @@ export async function getAdminKpis(db: Executor = getDb()): Promise<AdminKpis> {
   const [tickets] = await db.execute(sql`select count(*) as n from support_tickets where status <> 'closed'`);
 
   return {
-    users: { total: n(users?.total), new7d: n(users?.new7d), new30d: n(users?.new30d), suspended: n(users?.suspended) },
+    users: { total: n(users?.total), new7d: n(users?.new7d), new30d: n(users?.new30d), suspended: n(users?.suspended), withoutSubscription: n(free?.n) },
     plans: plans.map((p) => ({
       planId: String(p.plan_id),
       name: String(p.name),
-      active: p.plan_id === "discovery" ? n(free?.n) : n(p.active),
+      active: n(p.active),
       trialing: n(p.trialing),
       pastDue: n(p.past_due),
     })),

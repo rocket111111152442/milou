@@ -6,13 +6,10 @@ test.describe("authentification (Supabase réel)", () => {
 
   test("inscription, vérification de l'e-mail puis onboarding", async ({ page }) => {
     await signUpAndConfirm(page);
-    await expect(page).toHaveURL(/\/app\/bienvenue/);
-    await expect(page.getByRole("heading", { name: /Bienvenue sur Watchly, Camille/ })).toBeVisible();
-    await page.getByRole("button", { name: /Commencer/ }).click();
-    await expect(page.getByRole("heading", { name: "Ce que Watchly fait pour vous" })).toBeVisible();
-    await page.getByRole("button", { name: "Passer l'introduction" }).click();
-    await expect(page).toHaveURL(/\/app$/);
-    await expect(page.getByRole("heading", { name: /Bonjour Camille/ })).toBeVisible();
+    // Aucune formule gratuite : sans formule choisie, l'accueil mène au choix d'un abonnement.
+    await expect(page).toHaveURL(/\/app\/abonnement\?bienvenue=1/);
+    await expect(page.getByText(/Choisissez la formule qui vous convient/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Essayer Max 3 jours" })).toBeVisible();
   });
 
   test("validations d'inscription côté serveur", async ({ page }) => {

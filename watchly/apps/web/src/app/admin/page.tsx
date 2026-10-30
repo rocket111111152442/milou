@@ -84,7 +84,9 @@ export default async function AdminHome() {
                 ))}
               </tbody>
             </table>
-            <p className="mt-3 text-xs text-muted-fg">Découverte = comptes sans abonnement actif. Résiliations sur 30 jours : {k.cancellations30d}.</p>
+            <p className="mt-3 text-xs text-muted-fg">
+              Comptes sans abonnement ni essai : {k.users.withoutSubscription}. Résiliations sur 30 jours : {k.cancellations30d}.
+            </p>
           </CardContent>
         </Card>
 

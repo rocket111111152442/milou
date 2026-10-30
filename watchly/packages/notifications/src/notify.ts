@@ -1,11 +1,13 @@
 import {
   and,
+  consumeUsage,
   emailOutbox,
   entitlements,
   eq,
   monitoringTasks,
   notifications,
   profiles,
+  usagePeriod,
   type Executor,
   type NotificationType,
   type Priority,
@@ -40,7 +42,15 @@ export interface NotifyResult {
   notificationId: string;
   email: "pending" | "skipped" | "none";
   desktop: "pending" | "none";
+  /** true : e-mail non envoyé car le quota mensuel d'alertes e-mail de la formule est atteint. */
+  emailQuotaReached?: boolean;
 }
+
+/**
+ * Alertes Business de panne et de rétablissement : jamais bloquées par le quota mensuel d'e-mails
+ * (cœur de l'offre Business ; leur nombre est déjà borné par la confirmation des incidents).
+ */
+const EMAIL_QUOTA_EXEMPT = new Set<NotificationType>(["business_down", "business_recovered"]);
 
 const SAFE_URL = /^https?:\/\//i;
 
@@ -74,14 +84,16 @@ export async function notify(db: Executor, input: NotifyInput): Promise<NotifyRe
 
   const policy = input.emailPolicy ?? "alert";
   let wantsEmail = false;
+  let emailQuota: number | null = null;
   if (policy === "transactional") wantsEmail = true;
   else if (policy === "alert") {
     const [ent] = await db
-      .select({ emailAlerts: entitlements.emailAlerts })
+      .select({ emailAlerts: entitlements.emailAlerts, monthlyEmailAlerts: entitlements.monthlyEmailAlerts })
       .from(entitlements)
       .where(eq(entitlements.userId, input.userId))
       .limit(1);
     wantsEmail = Boolean(ent?.emailAlerts) && profile.notifyEmail && taskPrefs.email;
+    if (!EMAIL_QUOTA_EXEMPT.has(input.type)) emailQuota = ent?.monthlyEmailAlerts ?? 0;
   }
   if (profile.suspendedAt && policy !== "transactional") wantsEmail = false;
   const wantsDesktop = profile.notifyDesktop && taskPrefs.desktop && policy !== "transactional";
@@ -110,6 +122,33 @@ export async function notify(db: Executor, input: NotifyInput): Promise<NotifyRe
   const notificationId = inserted[0]?.id;
   if (!notificationId) return null;
 
+  // Quota mensuel d'alertes e-mail : réservé atomiquement, uniquement pour une notification nouvelle.
+  let emailQuotaReached = false;
+  if (wantsEmail && emailQuota !== null) {
+    const period = usagePeriod("month");
+    const ok = await consumeUsage(db, { userId: input.userId, metric: "email_alert", period, limit: emailQuota });
+    if (ok === null) {
+      wantsEmail = false;
+      emailQuotaReached = true;
+      await db.update(notifications).set({ emailStatus: "skipped" }).where(eq(notifications.id, notificationId));
+      // Une seule information par mois : l'alerte reste visible dans l'application et sur le bureau.
+      await db
+        .insert(notifications)
+        .values({
+          userId: input.userId,
+          type: "system",
+          priority: "normal",
+          title: "Quota d'alertes e-mail atteint ce mois-ci",
+          body: `Vos ${emailQuota} alertes e-mail mensuelles ont été envoyées. Les alertes suivantes restent visibles dans l'application et sur votre bureau jusqu'au 1er du mois prochain.`,
+          linkPath: "/app/abonnement",
+          dedupKey: `email_quota:${period}`,
+          emailStatus: "none",
+          desktopStatus: "none",
+        })
+        .onConflictDoNothing();
+    }
+  }
+
   if (wantsEmail && profile.email) {
     await db
       .insert(emailOutbox)
@@ -137,6 +176,7 @@ export async function notify(db: Executor, input: NotifyInput): Promise<NotifyRe
     notificationId,
     email: policy === "none" ? "none" : wantsEmail ? "pending" : "skipped",
     desktop: wantsDesktop ? "pending" : "none",
+    ...(emailQuotaReached ? { emailQuotaReached } : {}),
   };
 }
 

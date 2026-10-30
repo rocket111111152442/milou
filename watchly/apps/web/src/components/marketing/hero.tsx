@@ -50,8 +50,8 @@ export function Hero() {
             className="animate-fade-up mt-9 flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row"
           >
             <Button asChild size="lg" className="w-full sm:w-auto">
-              <Link href="/inscription">
-                Commencer gratuitement <ArrowRight aria-hidden="true" />
+              <Link href="/tarifs">
+                Essayer gratuitement pendant 3 jours <ArrowRight aria-hidden="true" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="secondary" className="w-full sm:w-auto">
@@ -59,7 +59,10 @@ export function Hero() {
             </Button>
           </div>
           <p style={delay(0.3)} className="animate-fade-up mt-4 text-[13px] text-muted-fg">
-            Formule Découverte gratuite, sans carte bancaire.
+            3 jours d'essai gratuit, puis à partir de 5,99 € par mois. Sans engagement.{" "}
+            <Link href="#tarifs" className="font-medium text-ink underline-offset-4 hover:underline">
+              Voir les abonnements
+            </Link>
           </p>
         </div>
 

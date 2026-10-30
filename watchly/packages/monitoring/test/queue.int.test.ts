@@ -28,13 +28,29 @@ afterAll(async () => {
   await t?.drop();
 });
 
-async function freeUser() {
+/** Compte sans abonnement ni essai : aucun droit (il n'existe plus de formule gratuite). */
+async function noPlanUser() {
   const u = await createTestUser(t);
   await recomputeEntitlements(t.db, u.id);
   return u;
 }
 
-async function paidUser(planId: "plus" | "pro" = "plus") {
+/** Essai en cours (72 h) : 3 surveillances au maximum, 1 sujet. */
+async function trialUser(planId: "plus" | "pro" | "max" = "plus") {
+  const u = await createTestUser(t);
+  await t.db.insert(subscriptions).values({
+    userId: u.id,
+    planId,
+    stripeSubscriptionId: `sub_${u.id}`,
+    stripeCustomerId: `cus_${u.id}`,
+    status: "trialing",
+    trialEnd: new Date(Date.now() + 2 * 86_400_000),
+  });
+  await recomputeEntitlements(t.db, u.id);
+  return u;
+}
+
+async function paidUser(planId: "plus" | "pro" | "max" = "plus") {
   const u = await createTestUser(t);
   await t.db.insert(subscriptions).values({
     userId: u.id,
@@ -103,29 +119,33 @@ async function settleInitialJobs(userId: string) {
 }
 
 describe("monitor service — quotas and validation", () => {
-  it("enforces the free plan limit and forces local execution", async () => {
-    const u = await freeUser();
-    for (let i = 0; i < 3; i++) {
-      const m = await createMonitor(t.db, u.id, pageInput(i, { executionMode: "cloud_only" }));
-      expect(m).toMatchObject({ executionMode: "local_only", intervalMinutes: 720 });
-    }
+  it("refuses any monitor without a subscription or trial (no free plan)", async () => {
+    const u = await noPlanUser();
+    await expect(createMonitor(t.db, u.id, pageInput(1))).rejects.toThrow(/essai gratuit de 3 jours/);
+  });
+
+  it("limits a trial to 3 active monitors", async () => {
+    const u = await trialUser("max");
+    for (let i = 0; i < 3; i++) await createMonitor(t.db, u.id, pageInput(i));
     await expect(createMonitor(t.db, u.id, pageInput(4))).rejects.toBeInstanceOf(QuotaError);
   });
 
   it("cannot be bypassed by concurrent creations (row lock)", async () => {
-    const u = await freeUser();
+    const u = await trialUser();
     const results = await Promise.allSettled(Array.from({ length: 10 }, (_, i) => createMonitor(t.db, u.id, pageInput(i))));
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(3);
     const [c] = await t.db.execute<{ n: number }>(sql`select count(*)::int as n from monitoring_tasks where user_id = ${u.id}`);
     expect(c!.n).toBe(3);
   });
 
-  it("rejects intervals shorter than the plan and web topics on the free plan", async () => {
-    const u = await freeUser();
+  it("rejects intervals shorter than the plan, and more than one web topic during a trial", async () => {
+    const u = await trialUser("pro");
     await expect(createMonitor(t.db, u.id, pageInput(1, { intervalMinutes: 5 }))).rejects.toThrow(/fréquence minimale/);
-    await expect(
-      createMonitor(t.db, u.id, { kind: "web_topic", name: "Sortie", request: "Préviens-moi de la date de sortie officielle", officialDomains: [], notify: { inapp: true, email: true, desktop: true } }),
-    ).rejects.toBeInstanceOf(QuotaError);
+    const topic = { kind: "web_topic" as const, name: "Sortie", request: "Préviens-moi de la date de sortie officielle", officialDomains: [], notify: { inapp: true, email: true, desktop: true } };
+    const first = await createMonitor(t.db, u.id, topic);
+    // Essai : recherche au plus une fois par jour, même en Pro.
+    expect(first.intervalMinutes).toBe(1440);
+    await expect(createMonitor(t.db, u.id, { ...topic, name: "Autre" })).rejects.toBeInstanceOf(QuotaError);
   });
 
   it.each([
@@ -136,33 +156,54 @@ describe("monitor service — quotas and validation", () => {
     "http://exemple.fr:6379/",
     "gopher://exemple.fr/",
   ])("refuses unsafe target %s", async (url) => {
-    const u = await freeUser();
+    const u = await paidUser();
     await expect(createMonitor(t.db, u.id, pageInput(1, { url }))).rejects.toBeInstanceOf(MonitorError);
   });
 });
 
 describe("hybrid job queue", () => {
-  it("lets a paid user's first check run in the cloud immediately, and a free user's only on their PC", async () => {
+  it("runs a subscriber's first check in the cloud immediately; a local-only monitor only on their PC", async () => {
     const paid = await paidUser();
-    const free = await freeUser();
-    const mPaid = await createMonitor(t.db, paid.id, pageInput(10));
-    const mFree = await createMonitor(t.db, free.id, pageInput(11));
+    const mCloud = await createMonitor(t.db, paid.id, pageInput(10));
+    const mLocal = await createMonitor(t.db, paid.id, pageInput(11, { executionMode: "local_only" }));
     const cloud = await claimCloudJobs(t.db, { workerId: "w1", max: 50 });
     const taskIds = cloud.map((c) => c.taskId);
-    expect(taskIds).toContain(mPaid.id);
-    expect(taskIds).not.toContain(mFree.id);
-    const dev = await device(free.id);
-    const agent = await claimAgentJobs(t.db, { userId: free.id, deviceId: dev, max: 3 });
-    expect(agent.map((a) => a.taskId)).toEqual([mFree.id]);
+    expect(taskIds).toContain(mCloud.id);
+    expect(taskIds).not.toContain(mLocal.id);
+    const dev = await device(paid.id);
+    const agent = await claimAgentJobs(t.db, { userId: paid.id, deviceId: dev, max: 3 });
+    expect(agent.map((a) => a.taskId)).toEqual([mLocal.id]);
   });
 
   it("never hands a user's jobs to another user's computer", async () => {
-    const a = await freeUser();
-    const b = await freeUser();
-    await createMonitor(t.db, a.id, pageInput(20));
+    const a = await paidUser();
+    const b = await paidUser();
+    await createMonitor(t.db, a.id, pageInput(20, { executionMode: "local_only" }));
     const devB = await device(b.id);
     const claimed = await claimAgentJobs(t.db, { userId: b.id, deviceId: devB, max: 3 });
     expect(claimed).toHaveLength(0);
+  });
+
+  it("stops every local and cloud check as soon as the rights end, even for jobs already queued", async () => {
+    const u = await trialUser();
+    const dev = await device(u.id);
+    const mLocal = await createMonitor(t.db, u.id, pageInput(30, { executionMode: "local_only" }));
+    const mCloud = await createMonitor(t.db, u.id, pageInput(31, { executionMode: "cloud_only" }));
+    // Fin des droits sans recalcul encore effectué : les tâches sont toujours « actives » et leurs travaux en file.
+    await t.db.execute(sql`update entitlements set plan_id = null, source = 'none' where user_id = ${u.id}`);
+    expect(await claimAgentJobs(t.db, { userId: u.id, deviceId: dev, max: 3 })).toHaveLength(0);
+    const cloud = await claimCloudJobs(t.db, { workerId: "w-end", max: 50 });
+    expect(cloud.map((c) => c.taskId)).not.toContain(mCloud.id);
+    // Après recalcul (abonnement annulé), les surveillances passent en pause, données conservées.
+    await t.db.update(subscriptions).set({ status: "canceled" }).where(eq(subscriptions.userId, u.id));
+    await recomputeEntitlements(t.db, u.id);
+    const tasks = await t.db.select().from(monitoringTasks).where(eq(monitoringTasks.userId, u.id));
+    expect(tasks.map((x) => x.status).sort()).toEqual(["paused_quota", "paused_quota"]);
+    expect(tasks.map((x) => x.id).sort()).toEqual([mLocal.id, mCloud.id].sort());
+    // Rien n'est planifié pour un compte sans droits.
+    await t.db.update(monitoringSchedules).set({ nextRunAt: new Date(Date.now() - 1000) }).where(eq(monitoringSchedules.taskId, mCloud.id));
+    await t.db.update(monitoringTasks).set({ status: "active" }).where(eq(monitoringTasks.id, mCloud.id));
+    expect((await scheduleDueTasks(t.db)).map((c) => c.taskId)).not.toContain(mCloud.id);
   });
 
   it("prefers the online PC, then relays to the cloud after the grace period", async () => {
@@ -278,30 +319,32 @@ describe("hybrid job queue", () => {
     expect(task!.lastStatus).toBe("triggered");
   });
 
-  it("does not send e-mail alerts on the free plan", async () => {
-    const u = await freeUser();
+  it("does not send e-mail alerts when the user turned them off for a monitor", async () => {
+    const u = await paidUser();
     const dev = await device(u.id);
-    const m = await createMonitor(t.db, u.id, pageInput(80));
+    const m = await createMonitor(t.db, u.id, pageInput(80, { executionMode: "local_only", notify: { inapp: true, email: false, desktop: true } }));
     const [claim] = await claimAgentJobs(t.db, { userId: u.id, deviceId: dev, max: 1 });
     await submitResult(t.db, { jobId: claim!.jobId, claimToken: claim!.claimToken, executor: "agent", deviceId: dev, durationMs: 50, observation: observation(50) });
     const [n] = await t.db.select().from(notifications).where(eq(notifications.taskId, m.id));
-    expect(n!.emailStatus).toBe("skipped");
+    expect(n).toBeDefined();
+    expect(n!.emailStatus).not.toBe("pending");
+    expect(await t.db.select().from(emailOutbox).where(eq(emailOutbox.notificationId, n!.id))).toHaveLength(0);
   });
 
   it("rejects results from another device than the one holding the claim", async () => {
-    const u = await freeUser();
+    const u = await paidUser();
     const dev1 = await device(u.id);
     const dev2 = await device(u.id);
-    await createMonitor(t.db, u.id, pageInput(90));
+    await createMonitor(t.db, u.id, pageInput(90, { executionMode: "local_only" }));
     const [claim] = await claimAgentJobs(t.db, { userId: u.id, deviceId: dev1, max: 1 });
     await expect(
       submitResult(t.db, { jobId: claim!.jobId, claimToken: claim!.claimToken, executor: "agent", deviceId: dev2, durationMs: 1, observation: observation(1) }),
     ).rejects.toBeInstanceOf(StaleClaimError);
   });
 
-  it("suspends local checks of the free plan when the computer stays offline", async () => {
-    const u = await freeUser();
-    const m = await createMonitor(t.db, u.id, pageInput(100));
+  it("skips local-only checks when the computer stays offline (never relayed to the cloud)", async () => {
+    const u = await paidUser();
+    const m = await createMonitor(t.db, u.id, pageInput(100, { executionMode: "local_only" }));
     const muchLater = new Date(Date.now() + 13 * 3_600_000);
     const r = await recoverJobs(t.db, muchLater);
     expect(r.skipped).toBeGreaterThanOrEqual(1);
@@ -325,7 +368,7 @@ describe("hybrid job queue", () => {
     await setMonitorPaused(t.db, u.id, m.id, true);
     const jobs = await t.db.select().from(monitoringJobs).where(eq(monitoringJobs.taskId, m.id));
     expect(jobs.every((j) => j.status === "canceled")).toBe(true);
-    const other = await freeUser();
+    const other = await paidUser();
     await expect(deleteMonitor(t.db, other.id, m.id)).rejects.toBeInstanceOf(MonitorError);
     await deleteMonitor(t.db, u.id, m.id);
     expect(await t.db.select().from(monitoringJobs).where(eq(monitoringJobs.taskId, m.id))).toHaveLength(0);

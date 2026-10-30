@@ -42,7 +42,7 @@ export const seoPages: Record<string, SeoContent & { title: string; description:
     faqs: [
       {
         q: "À quelle fréquence le prix est-il vérifié ?",
-        a: "Toutes les 12 heures en formule Découverte, toutes les 6 heures en Plus et toutes les 2 heures en Pro et Business.",
+        a: "Toutes les 6 heures en formule Plus et toutes les 2 heures en Pro et Business.",
       },
       {
         q: "Est-ce que je reçois une alerte à chaque contrôle ?",
@@ -53,7 +53,7 @@ export const seoPages: Record<string, SeoContent & { title: string; description:
         a: "Sur la plupart des pages publiques, oui. Les pages qui exigent une connexion ou interdisent les robots ne sont pas consultées.",
       },
     ],
-    cta: { label: "Surveiller un prix gratuitement", href: "/inscription" },
+    cta: { label: "Essayer gratuitement pendant 3 jours", href: "/tarifs" },
   },
   "alerte-retour-en-stock": {
     slug: "alerte-retour-en-stock",
@@ -95,7 +95,7 @@ export const seoPages: Record<string, SeoContent & { title: string; description:
         a: "Si la disponibilité ne peut plus être lue, le contrôle est marqué en erreur et vous êtes informé, plutôt que de recevoir une fausse alerte.",
       },
     ],
-    cta: { label: "Créer une alerte de stock", href: "/inscription" },
+    cta: { label: "Essayer gratuitement pendant 3 jours", href: "/tarifs" },
   },
   "surveiller-changements-site": {
     slug: "surveiller-changements-site",
@@ -135,7 +135,7 @@ export const seoPages: Record<string, SeoContent & { title: string; description:
         a: "Non. Watchly ne consulte que des pages publiques, sans identifiant.",
       },
     ],
-    cta: { label: "Suivre une page", href: "/inscription" },
+    cta: { label: "Essayer gratuitement pendant 3 jours", href: "/tarifs" },
   },
   "detecter-panne-site-internet": {
     slug: "detecter-panne-site-internet",
@@ -180,7 +180,7 @@ export const seoPages: Record<string, SeoContent & { title: string; description:
         a: "Des contrôles à la minute et des tests de parcours ne doivent viser que des sites dont vous êtes responsable : c'est une protection pour les sites tiers.",
       },
     ],
-    cta: { label: "Essayer Business 72 h", href: "/inscription?formule=business" },
+    cta: { label: "Essayer Business gratuitement pendant 3 jours", href: "/inscription?formule=business" },
   },
   "surveillance-site-entreprise": {
     slug: "surveillance-site-entreprise",

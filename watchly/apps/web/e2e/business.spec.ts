@@ -5,7 +5,7 @@ test.describe("Business (moteur C)", () => {
   test.beforeEach(resetRateLimits);
 
   test("formule sans Business : présentation honnête, aucune création possible", async ({ page }) => {
-    const u = await createConfirmedUser(uniqueEmail("free"));
+    const u = await createConfirmedUser(uniqueEmail("max"), { plan: "max" });
     await login(page, u.email);
     await page.waitForURL(/\/app/);
     await page.goto("/app/business");

@@ -4,6 +4,7 @@
 import type { Entitlements } from "./entitlements";
 
 export type QuotaErrorCode =
+  | "subscription_required"
   | "monitor_limit"
   | "web_topic_limit"
   | "web_topics_not_included"
@@ -45,6 +46,7 @@ export interface ResolvedMonitorSettings {
  * (fréquence minimale de la formule, mode d'exécution compatible).
  */
 export function checkNewMonitor(e: Entitlements, counts: MonitorCounts, req: MonitorRequest): ResolvedMonitorSettings {
+  requireSubscription(e);
   if (counts.total >= e.maxMonitors) {
     throw new QuotaError("monitor_limit", `Votre formule permet ${e.maxMonitors} surveillance(s) au maximum.`);
   }
@@ -59,6 +61,16 @@ export function checkNewMonitor(e: Entitlements, counts: MonitorCounts, req: Mon
   return resolveSettings(e, req);
 }
 
+/** Aucune surveillance sans abonnement ou essai en cours (il n'existe pas de formule gratuite). */
+export function requireSubscription(e: Entitlements): void {
+  if (e.source === "none" || e.planId === null) {
+    throw new QuotaError(
+      "subscription_required",
+      "Un abonnement ou un essai gratuit de 3 jours est nécessaire. Choisissez une formule pour commencer.",
+    );
+  }
+}
+
 export function resolveSettings(e: Entitlements, req: MonitorRequest): ResolvedMonitorSettings {
   const minInterval = req.kind === "web_topic" ? (e.webIntervalMinutes ?? 1440) : e.pageIntervalMinutes;
   const intervalMinutes = req.intervalMinutes ?? minInterval;
@@ -68,12 +80,13 @@ export function resolveSettings(e: Entitlements, req: MonitorRequest): ResolvedM
   let executionMode = req.executionMode ?? "auto";
   // Les clés d'API de recherche restent sur le serveur : les sujets Web sont toujours exécutés côté cloud.
   if (req.kind === "web_topic") executionMode = "cloud_only";
-  // Sans relais cloud (Découverte), les contrôles de pages sont exclusivement locaux.
+  // Sans relais cloud (droit non accordé), les contrôles de pages sont exclusivement locaux.
   else if (!e.cloudRelay) executionMode = "local_only";
   return { intervalMinutes, executionMode };
 }
 
 export function checkNewSite(e: Entitlements, siteCount: number): void {
+  requireSubscription(e);
   if (e.businessSites === 0) {
     throw new QuotaError("business_not_included", "La surveillance de site professionnel nécessite la formule Business.");
   }
@@ -89,10 +102,20 @@ export function checkNewEndpoint(e: Entitlements, endpointCountForSite: number):
   }
 }
 
-export function checkNewScenario(e: Entitlements, scenarioCountForSite: number): void {
+/**
+ * Scénarios navigateur : au plus `businessScenariosPerSite` par site, et au plus `businessScenarios` pour tout le
+ * compte (les sites supplémentaires à 14,99 € n'incluent pas de scénario).
+ */
+export function checkNewScenario(e: Entitlements, scenarioCountForSite: number, scenarioCountForAccount = scenarioCountForSite): void {
   if (e.businessSites === 0) throw new QuotaError("business_not_included", "Formule Business requise.");
   if (scenarioCountForSite >= e.businessScenariosPerSite) {
     throw new QuotaError("scenario_limit", `${e.businessScenariosPerSite} scénario(s) navigateur maximum par site.`);
+  }
+  if (scenarioCountForAccount >= e.businessScenarios) {
+    throw new QuotaError(
+      "scenario_limit",
+      `Votre abonnement inclut ${e.businessScenarios} scénario(s) navigateur au total : les sites supplémentaires n'en incluent pas.`,
+    );
   }
 }
 

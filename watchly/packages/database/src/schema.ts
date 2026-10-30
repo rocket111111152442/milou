@@ -44,6 +44,7 @@ export const plans = pgTable("plans", {
   currency: text("currency").notNull(),
   billingInterval: text("billing_interval").notNull(),
   stripePriceId: text("stripe_price_id"),
+  stripeLookupKey: text("stripe_lookup_key"),
   trialHours: integer("trial_hours").notNull(),
   isPublic: boolean("is_public").notNull(),
   sortOrder: integer("sort_order").notNull(),
@@ -57,6 +58,7 @@ export const plans = pgTable("plans", {
   advancedHistory: boolean("advanced_history").notNull(),
   dataExports: boolean("data_exports").notNull(),
   monthlySearchCalls: integer("monthly_search_calls").notNull(),
+  monthlyEmailAlerts: integer("monthly_email_alerts").notNull(),
   businessSitesIncluded: integer("business_sites_included").notNull(),
   businessEndpointsPerSite: integer("business_endpoints_per_site").notNull(),
   businessHttpIntervalSeconds: integer("business_http_interval_seconds").notNull(),
@@ -68,6 +70,7 @@ export const plans = pgTable("plans", {
   trialMaxWebTopics: integer("trial_max_web_topics").notNull(),
   trialMaxBusinessSites: integer("trial_max_business_sites").notNull(),
   trialDailySearchCalls: integer("trial_daily_search_calls").notNull(),
+  trialEmailAlerts: integer("trial_email_alerts").notNull(),
   createdAt: ts("created_at").notNull(),
   updatedAt: ts("updated_at").notNull(),
 });
@@ -78,6 +81,7 @@ export const planAddons = pgTable("plan_addons", {
   priceCents: integer("price_cents").notNull(),
   currency: text("currency").notNull(),
   stripePriceId: text("stripe_price_id"),
+  stripeLookupKey: text("stripe_lookup_key"),
   requiresPlanId: text("requires_plan_id").notNull(),
   grantsBusinessSites: integer("grants_business_sites").notNull(),
   isPublic: boolean("is_public").notNull(),
@@ -139,8 +143,9 @@ export const subscriptions = pgTable("subscriptions", {
 
 export const entitlements = pgTable("entitlements", {
   userId: uuid("user_id").primaryKey(),
-  planId: text("plan_id").notNull(),
-  source: text("source").$type<"free" | "trial" | "subscription" | "grace" | "admin_grant">().notNull(),
+  /** null : aucun abonnement valide (pas de formule gratuite). */
+  planId: text("plan_id"),
+  source: text("source").$type<"none" | "trial" | "subscription" | "grace" | "admin_grant">().notNull(),
   subscriptionStatus: text("subscription_status"),
   maxMonitors: integer("max_monitors").notNull(),
   maxWebTopics: integer("max_web_topics").notNull(),
@@ -153,15 +158,26 @@ export const entitlements = pgTable("entitlements", {
   dataExports: boolean("data_exports").notNull(),
   monthlySearchCalls: integer("monthly_search_calls").notNull(),
   dailySearchCalls: integer("daily_search_calls"),
+  monthlyEmailAlerts: integer("monthly_email_alerts").notNull(),
   businessSites: integer("business_sites").notNull(),
   businessEndpointsPerSite: integer("business_endpoints_per_site").notNull(),
   businessHttpIntervalSeconds: integer("business_http_interval_seconds").notNull(),
   businessScenariosPerSite: integer("business_scenarios_per_site").notNull(),
+  businessScenariosTotal: integer("business_scenarios_total").notNull(),
   businessScenarioIntervalMinutes: integer("business_scenario_interval_minutes").notNull(),
   businessTlsChecks: boolean("business_tls_checks").notNull(),
   priorityAlerts: boolean("priority_alerts").notNull(),
   validUntil: ts("valid_until"),
   computedAt: ts("computed_at").notNull().defaultNow(),
+});
+
+/** Compteurs de consommation (recherches, alertes e-mail…) — incrément atomique conditionnel. */
+export const usageCounters = pgTable("usage_counters", {
+  userId: uuid("user_id"),
+  metric: text("metric").notNull(),
+  period: text("period").notNull(),
+  value: bigint("value", { mode: "number" }).notNull(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
 });
 
 export const trialUsage = pgTable("trial_usage", {

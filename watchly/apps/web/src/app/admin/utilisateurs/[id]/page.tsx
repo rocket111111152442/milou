@@ -56,7 +56,7 @@ export default async function AdminUser({ params }: { params: Promise<{ id: stri
                 ))}
               </ul>
             ) : (
-              <p className="text-muted-fg">Aucun abonnement (formule Découverte).</p>
+              <p className="text-muted-fg">Aucun abonnement ni essai en cours.</p>
             )}
             {ent ? (
               <p className="mt-3 text-muted-fg">

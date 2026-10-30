@@ -40,7 +40,7 @@ export function DeviceStatusList({ devices, cloudRelay, now }: { devices: Device
           ? online.length
             ? "Relais cloud prêt si votre ordinateur devient indisponible."
             : "Relais cloud actif : les serveurs Watchly prennent le relais."
-          : "Formule Découverte : pas de relais cloud, les contrôles reprennent quand l'application est ouverte."}
+          : "Aucun abonnement actif : vos surveillances sont en pause."}
       </p>
     </div>
   );

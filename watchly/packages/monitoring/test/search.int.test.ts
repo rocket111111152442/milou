@@ -89,6 +89,25 @@ describe("web topic engine", () => {
     await t.db.execute(sql`update app_settings set value = '50'::jsonb where key = 'budget.monthly_api_eur'`);
   });
 
+  it("never exceeds the monthly quota under concurrency, and refunds failed API calls", async () => {
+    const u = await createTestUser(t);
+    const provider = fakeProvider([]);
+    const deps: WebRunDeps = { db: t.db, provider, planId: "plus", monthlyCallLimit: 5, dailyCallLimit: null };
+    const tasks = await Promise.all(Array.from({ length: 20 }, (_, i) => task(u.id, { queries: [`concurrent q${i}`] })));
+    const results = await Promise.allSettled(tasks.map((tk) => runWebTopic(deps, tk)));
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(5);
+    expect(provider.calls).toBe(5);
+    const [c] = await t.client<{ value: string }[]>`select value from usage_counters where user_id = ${u.id} and metric = 'brave_search' and length(period) = 7`;
+    expect(Number(c!.value)).toBe(5);
+
+    // Un appel qui échoue chez le fournisseur n'est pas décompté.
+    const v = await createTestUser(t);
+    const failing: SearchProvider = { name: "fake", async search() { throw new Error("réseau"); } };
+    await expect(runWebTopic({ ...deps, provider: failing }, await task(v.id, { queries: ["failing q"] }))).rejects.toThrow(/réseau/);
+    const [d] = await t.client<{ value: string }[]>`select value from usage_counters where user_id = ${v.id} and metric = 'brave_search' and length(period) = 7`;
+    expect(Number(d?.value ?? 0)).toBe(0);
+  });
+
   it("fails clearly when no search provider is configured", async () => {
     const u = await createTestUser(t);
     await expect(runWebTopic({ db: t.db, provider: null, planId: "pro", monthlyCallLimit: 10, dailyCallLimit: null }, await task(u.id, { queries: ["no provider"] }))).rejects.toThrow(/BRAVE_SEARCH_API_KEY/);

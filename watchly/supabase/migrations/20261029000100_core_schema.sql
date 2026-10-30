@@ -32,10 +32,12 @@ create table public.plans (
   id text primary key check (id ~ '^[a-z_]+$'),
   name text not null,
   description text not null default '',
-  price_cents integer not null check (price_cents >= 0),
+  price_cents integer not null check (price_cents > 0), -- aucune formule gratuite permanente
   currency text not null default 'eur',
   billing_interval text not null default 'month' check (billing_interval in ('month', 'year')),
   stripe_price_id text unique,
+  -- Clé de recherche (lookup_key) du prix Stripe : permet de retrouver le price_ réel sans le saisir à la main.
+  stripe_lookup_key text unique,
   trial_hours integer not null default 0 check (trial_hours >= 0),
   is_public boolean not null default true,
   sort_order integer not null default 0,
@@ -50,7 +52,8 @@ create table public.plans (
   advanced_history boolean not null default false,
   data_exports boolean not null default false,
   monthly_search_calls integer not null default 0 check (monthly_search_calls >= 0),
-  -- quotas Business (par site)
+  monthly_email_alerts integer not null default 0 check (monthly_email_alerts >= 0),
+  -- quotas Business (par site ; les scénarios ne concernent que les sites inclus, pas les sites supplémentaires)
   business_sites_included integer not null default 0 check (business_sites_included >= 0),
   business_endpoints_per_site integer not null default 0,
   business_http_interval_seconds integer not null default 60 check (business_http_interval_seconds >= 60),
@@ -62,7 +65,8 @@ create table public.plans (
   trial_max_monitors integer not null default 3,
   trial_max_web_topics integer not null default 1,
   trial_max_business_sites integer not null default 1,
-  trial_daily_search_calls integer not null default 5,
+  trial_daily_search_calls integer not null default 2,
+  trial_email_alerts integer not null default 10 check (trial_email_alerts >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -75,6 +79,7 @@ create table public.plan_addons (
   price_cents integer not null check (price_cents >= 0),
   currency text not null default 'eur',
   stripe_price_id text unique,
+  stripe_lookup_key text unique,
   requires_plan_id text not null references public.plans (id),
   grants_business_sites integer not null default 0,
   is_public boolean not null default true,
@@ -146,8 +151,9 @@ create trigger subscriptions_touch before update on public.subscriptions
 -- Droits effectifs, recalculés côté serveur uniquement (jamais par le client).
 create table public.entitlements (
   user_id uuid primary key references public.profiles (id) on delete cascade,
-  plan_id text not null references public.plans (id),
-  source text not null check (source in ('free', 'trial', 'subscription', 'grace', 'admin_grant')),
+  plan_id text references public.plans (id), -- null : aucun abonnement valide (pas de formule gratuite)
+  source text not null check (source in ('none', 'trial', 'subscription', 'grace', 'admin_grant')),
+  check ((source = 'none') = (plan_id is null)),
   subscription_status text,
   max_monitors integer not null,
   max_web_topics integer not null,
@@ -160,16 +166,31 @@ create table public.entitlements (
   data_exports boolean not null,
   monthly_search_calls integer not null,
   daily_search_calls integer,
+  monthly_email_alerts integer not null default 0,
   business_sites integer not null,
   business_endpoints_per_site integer not null,
   business_http_interval_seconds integer not null,
   business_scenarios_per_site integer not null,
+  business_scenarios_total integer not null default 0, -- scénarios inclus pour tout le compte (sites supplémentaires : aucun)
   business_scenario_interval_minutes integer not null,
   business_tls_checks boolean not null,
   priority_alerts boolean not null,
   valid_until timestamptz,
   computed_at timestamptz not null default now()
 );
+
+-- Compteurs de consommation des ressources facturables (recherches, alertes e-mail, appels IA…).
+-- Incrément atomique conditionnel : la réservation échoue si la limite serait dépassée (pas de dépassement
+-- même avec plusieurs workers en parallèle). user_id null : compteur global (budget de la plateforme).
+create table public.usage_counters (
+  user_id uuid references public.profiles (id) on delete cascade,
+  metric text not null check (metric ~ '^[a-z_]+$'),
+  period text not null check (period ~ '^[0-9]{4}-[0-9]{2}(-[0-9]{2})?$'),
+  value bigint not null default 0 check (value >= 0),
+  updated_at timestamptz not null default now(),
+  constraint usage_counters_key unique nulls not distinct (user_id, metric, period)
+);
+create index usage_counters_metric_period_idx on public.usage_counters (metric, period);
 
 -- Prévention des essais répétés : empreintes hachées (pas d'e-mail ni de numéro de carte en clair).
 create table public.trial_usage (

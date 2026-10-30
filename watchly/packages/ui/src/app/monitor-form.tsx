@@ -362,7 +362,7 @@ export function MonitorForm({
                   )}
                 </Field>
               ) : (
-                <p className="text-sm text-muted-fg">Formule Découverte : les contrôles s'exécutent sur votre ordinateur, quand l'application Watchly est ouverte.</p>
+                <p className="text-sm text-muted-fg">Les contrôles s'exécutent sur votre ordinateur, quand l'application Watchly est ouverte.</p>
               )}
             </div>
           </details>

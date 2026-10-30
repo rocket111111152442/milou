@@ -72,7 +72,7 @@ export function SettingsPage({
       <PageHeader title="Paramètres" />
 
       <Card className="px-5">
-        <Row title="Compte" description={`${me.user.email} · Formule ${me.plan.name}${me.plan.isTrial ? " (essai)" : ""}`}>
+        <Row title="Compte" description={`${me.user.email} · ${me.plan.name ? `Formule ${me.plan.name}${me.plan.isTrial ? " (essai)" : ""}` : "Aucun abonnement actif"}`}>
           <Button variant="secondary" size="sm" onClick={() => void native.openExternal(`${info.apiBase}/app/abonnement`)}>
             Gérer l'abonnement <ExternalLink aria-hidden="true" />
           </Button>

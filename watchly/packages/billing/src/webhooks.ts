@@ -328,7 +328,7 @@ async function registerTrial(
   return "started";
 }
 
-const PLAN_NAMES: Record<string, string> = { plus: "Plus", pro: "Pro", business: "Business", discovery: "Découverte" };
+const PLAN_NAMES: Record<string, string> = { plus: "Plus", pro: "Pro", business: "Business" };
 
 async function notifyTransition(tx: Transaction, userId: string, before: StoredSub | null, sub: Stripe.Subscription): Promise<void> {
   const now = sub.status;

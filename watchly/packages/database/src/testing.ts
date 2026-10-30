@@ -2,12 +2,22 @@
  * Outils de test : crée une base PostgreSQL isolée et migrée par suite de tests.
  * Nécessite TEST_DATABASE_URL pointant vers un serveur où l'utilisateur peut créer des bases.
  */
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import postgres from "postgres";
 import { createDb, type DbHandle } from "./client";
-import { runMigrations } from "./migrations";
+import { listMigrations, runMigrations, SHIM_FILE } from "./migrations";
 
-const TEMPLATE = "watchly_test_template";
+/**
+ * Nom de la base modèle dérivé du contenu des migrations : toute modification du schéma produit
+ * automatiquement un nouveau modèle (jamais de tests exécutés sur un schéma périmé).
+ */
+function templateName(): string {
+  const h = createHash("sha256");
+  for (const f of [...listMigrations().map((m) => m.path), SHIM_FILE]) h.update(readFileSync(f));
+  return `watchly_test_tpl_${h.digest("hex").slice(0, 12)}`;
+}
+const TEMPLATE = templateName();
 
 export function testAdminUrl(): string {
   return process.env.TEST_DATABASE_URL ?? "postgres://postgres:postgres@127.0.0.1:5432/postgres";
