@@ -81,5 +81,8 @@ jobs:
           WORKER_ID: github-preview-${{ github.run_id }}
           WORKER_ROLES: scheduler,pages,web,email,maintenance
           WORKER_BROWSER_CONCURRENCY: "0"
-          WORKER_RUN_FOR_SECONDS: ${{ inputs.minutes * 60 }}
-        run: pnpm --filter @waverti/worker exec tsx src/index.ts
+          MINUTES: ${{ inputs.minutes }}
+        run: |
+          m="${MINUTES:-10}"
+          if ! [ "$m" -ge 1 ] 2>/dev/null || [ "$m" -gt 60 ]; then m=10; fi
+          WORKER_RUN_FOR_SECONDS=$(( m * 60 )) pnpm --filter @waverti/worker exec tsx src/index.ts
