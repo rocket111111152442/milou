@@ -9,7 +9,7 @@ import { and, eq, monitoringResults, notifications, sql, subscriptions } from "@
 import { createTestDatabase, createTestUser, type TestDatabase } from "@waverti/database/testing";
 import { recomputeEntitlements } from "@waverti/billing";
 import type { PageCondition } from "@waverti/types";
-import { claimCloudJobs, createMonitor, enqueueImmediate, HostPoliteness, RobotsCache, runPageCheck, submitResult } from "../src";
+import { claimCloudJobs, compactPageResults, createMonitor, enqueueImmediate, HostPoliteness, RobotsCache, runPageCheck, submitResult } from "../src";
 
 let t: TestDatabase;
 let server: Server;
@@ -171,4 +171,32 @@ describe("moteur A — scénarios sur pages contrôlées", () => {
     expect(errors.length).toBe(2);
     expect(errors.every((e) => typeof e.code === "string" && e.code.length > 0)).toBe(true);
   }, 30_000);
+
+  it("compaction de l'historique : extraits vidés sauf le dernier, détection des changements intacte", async () => {
+    const u = await subscriber();
+    Object.assign(shop, { price: "129,99", stock: true, status: 200, delayMs: 0, text: "Texte initial de la fiche produit." });
+    const m = await monitor(u.id, "/casque-compact", { type: "page_changed", sensitivity: "significant" });
+    paths.set(m.id, "/casque-compact");
+    await check(m.id, u.id);
+    await check(m.id, u.id);
+    await check(m.id, u.id);
+    await t.db.execute(sql`update monitoring_results set checked_at = checked_at - interval '2 days' where task_id = ${m.id}`);
+    expect(await compactPageResults(t.db)).toBeGreaterThanOrEqual(2);
+    const rows = await t.db
+      .select({ obs: monitoringResults.observation })
+      .from(monitoringResults)
+      .where(eq(monitoringResults.taskId, m.id))
+      .orderBy(monitoringResults.checkedAt);
+    const excerpts = rows.map((r) => (r.obs as { excerpt: string }).excerpt.length);
+    expect(excerpts.slice(0, -1).every((n) => n === 0)).toBe(true);
+    expect(excerpts.at(-1)).toBeGreaterThan(100);
+    // Prix et empreinte conservés partout.
+    expect(rows.every((r) => (r.obs as { price: number; textHash: string }).price === 129.99 && (r.obs as { textHash: string }).textHash.length === 64)).toBe(true);
+    // Le contrôle suivant compare toujours avec un extrait complet.
+    shop.text = "Nouvelle fiche : caractéristiques entièrement réécrites, nouvelle gamme, nouveaux accessoires inclus. ".repeat(5);
+    expect((await check(m.id, u.id)).triggered).toBe(true);
+    // L'ancien « dernier résultat » (daté de 2 jours) devient compactable ; le nouveau est conservé.
+    expect(await compactPageResults(t.db)).toBe(1);
+    expect(await compactPageResults(t.db)).toBe(0);
+  });
 });

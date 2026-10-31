@@ -11,13 +11,26 @@ const VERSION = "waverti-v1";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/hors-ligne";
 const PRECACHE = [OFFLINE_URL, "/brand/icon-192.png", "/brand/icon-512.png"];
+/** Chaque mise en ligne produit de nouveaux fichiers versionnés : le cache est borné pour ne pas grossir sans fin. */
+const MAX_STATIC_ENTRIES = 150;
+
+async function trimStaticCache(cache) {
+  const keys = await cache.keys();
+  const excess = keys.length - MAX_STATIC_ENTRIES;
+  // Les plus anciennes entrées d'abord ; la page hors ligne et les icônes préchargées sont conservées.
+  for (const req of keys.slice(0, Math.max(0, excess))) {
+    if (!PRECACHE.includes(new URL(req.url).pathname)) await cache.delete(req);
+  }
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(STATIC_CACHE)
       .then((cache) => cache.addAll(PRECACHE.map((u) => new Request(u, { cache: "reload" }))))
-      .then(() => self.skipWaiting()),
+      // Première installation : actif tout de suite. Mise à jour : attend l'accord de la page (bandeau « Recharger »)
+      // pour ne jamais changer de version au milieu d'une saisie.
+      .then(() => (self.registration.active ? undefined : self.skipWaiting())),
   );
 });
 
@@ -59,7 +72,10 @@ self.addEventListener("fetch", (event) => {
         const hit = await cache.match(req);
         if (hit) return hit;
         const res = await fetch(req);
-        if (res.ok && res.type === "basic") cache.put(req, res.clone());
+        if (res.ok && res.type === "basic") {
+          await cache.put(req, res.clone());
+          trimStaticCache(cache).catch(() => undefined);
+        }
         return res;
       }),
     );
@@ -69,6 +85,10 @@ self.addEventListener("fetch", (event) => {
 
 // À la déconnexion, la page demande l'effacement des caches.
 self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "waverti:skip-waiting") {
+    self.skipWaiting();
+    return;
+  }
   if (event.data && event.data.type === "waverti:clear-caches") {
     event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))));
   }

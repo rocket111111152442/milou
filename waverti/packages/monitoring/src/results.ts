@@ -213,3 +213,28 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
     };
   });
 }
+
+/**
+ * Compaction de l'historique des pages (coût de stockage) : l'extrait de texte (jusqu'à 4 000 caractères) ne sert
+ * qu'à comparer un contrôle au précédent. Il est vidé sur les résultats de plus de 24 h qui ne sont pas le dernier
+ * résultat réussi de leur surveillance. Prix, disponibilité, empreinte du texte, statut HTTP et résumé des
+ * changements sont conservés : l'historique affiché à l'abonné est inchangé.
+ */
+export async function compactPageResults(db: Database, opts: { batch?: number; olderThanHours?: number } = {}): Promise<number> {
+  const batch = opts.batch ?? 5000;
+  const hours = opts.olderThanHours ?? 24;
+  const rows = await db.execute<{ id: string }>(sql`
+    update monitoring_results r set observation = jsonb_set(r.observation, '{excerpt}', '""'::jsonb)
+    where r.id in (
+      select c.id from monitoring_results c
+      where c.checked_at < now() - make_interval(hours => ${hours})
+        and c.observation ->> 'kind' = 'page'
+        and coalesce(c.observation ->> 'excerpt', '') <> ''
+        and c.id <> coalesce((
+          select l.id from monitoring_results l
+          where l.task_id = c.task_id and l.outcome <> 'error' and l.observation is not null
+          order by l.checked_at desc limit 1), '00000000-0000-0000-0000-000000000000'::uuid)
+      limit ${batch})
+    returning r.id`);
+  return rows.length;
+}

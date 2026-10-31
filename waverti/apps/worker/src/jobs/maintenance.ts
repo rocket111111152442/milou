@@ -1,6 +1,7 @@
 import { sql } from "@waverti/database";
 import { purgeExpiredSessions } from "@waverti/auth";
 import { recomputeEntitlements } from "@waverti/billing";
+import { compactPageResults } from "@waverti/monitoring";
 import type { WorkerContext } from "../context";
 import { logger } from "../logger";
 
@@ -37,6 +38,14 @@ export async function runMaintenance(ctx: WorkerContext): Promise<void> {
     delete from monitoring_results where id in (
       select r.id from monitoring_results r join entitlements e on e.user_id = r.user_id
       where r.checked_at < now() - make_interval(days => e.history_days) limit ${n}) returning id`);
+  // Extraits de texte des anciens résultats (seul le dernier sert aux comparaisons) : stockage maîtrisé.
+  let compacted = 0;
+  for (let i = 0; i < 20; i++) {
+    const n = await compactPageResults(ctx.db, { batch: 5000 });
+    compacted += n;
+    if (n < 5000) break;
+  }
+  if (compacted) logger.info({ compacted }, "page results compacted");
   await deleteBatched(ctx, "monitoring_jobs", (n) => sql`
     delete from monitoring_jobs where id in (
       select id from monitoring_jobs where finished_at < now() - make_interval(days => ${jobsDays}) limit ${n}) returning id`);
