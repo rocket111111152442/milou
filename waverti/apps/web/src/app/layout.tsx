@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { MotionProvider, REVEAL_BOOT_SCRIPT, ToastProvider } from "@waverti/ui";
+import { RegisterServiceWorker } from "@/components/pwa/register-sw";
 import { siteConfig } from "@/lib/site";
 import "./globals.css";
 
@@ -39,6 +40,8 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image" },
   robots: siteConfig.launchStatus === "preview" ? { index: false, follow: false } : { index: true, follow: true },
   formatDetection: { telephone: false, email: false, address: false },
+  // iPhone / iPad : ouverture plein écran depuis l'écran d'accueil.
+  appleWebApp: { capable: true, title: "Waverti", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -57,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <MotionProvider>
           <ToastProvider>{children}</ToastProvider>
         </MotionProvider>
+        <RegisterServiceWorker />
       </body>
     </html>
   );

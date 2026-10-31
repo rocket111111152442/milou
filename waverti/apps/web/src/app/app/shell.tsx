@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@waverti/ui";
 import { AppShell, type NavItem } from "@waverti/ui/app";
+import { clearServiceWorkerCaches } from "@/components/pwa/register-sw";
 
 export function DashboardShell({
   children,
@@ -98,7 +99,12 @@ export function DashboardShell({
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => logoutForm.current?.requestSubmit()}>
+              <DropdownMenuItem
+                onSelect={() => {
+                  clearServiceWorkerCaches();
+                  logoutForm.current?.requestSubmit();
+                }}
+              >
                 <LogOut /> Déconnexion
               </DropdownMenuItem>
             </DropdownMenuContent>

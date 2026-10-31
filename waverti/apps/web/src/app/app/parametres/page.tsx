@@ -5,6 +5,7 @@ import { remainingRecoveryCodes } from "@waverti/auth";
 import { requireUser } from "@/lib/auth";
 import { listDevices } from "@/lib/data/account";
 import { getDb } from "@/lib/db";
+import { InstallApp } from "@/components/pwa/install-app";
 import { DangerZone, DevicesList, MfaSettings, NotificationPrefs, PasswordForm, ProfileForm } from "./settings-forms";
 
 export const metadata: Metadata = { title: "Paramètres" };
@@ -60,6 +61,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <Callout tone="warning">Vous vous êtes connecté avec un code de récupération : il n'est plus valable. Renouvelez vos codes si nécessaire.</Callout>
           ) : null}
           <MfaSettings enabled={user.mfa.enrolled} since={user.mfa.since} remainingCodes={remaining} />
+        </CardContent>
+      </Card>
+      <Card id="application-mobile">
+        <CardHeader>
+          <CardTitle as="h2">Application sur téléphone</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <InstallApp />
         </CardContent>
       </Card>
       <Card>

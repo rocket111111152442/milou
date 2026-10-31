@@ -19,6 +19,8 @@ const csp = [
   "base-uri 'self'",
   "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
   "object-src 'none'",
+  "worker-src 'self'",
+  "manifest-src 'self'",
   ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
@@ -49,6 +51,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      {
+        // Service worker : jamais mis en cache par le navigateur (mises à jour immédiates), portée « / ».
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
       {
         // API consommée par l'application desktop (Tauri) : pas de cookies, jeton d'appareil.
         source: "/api/agent/:path*",

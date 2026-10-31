@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getCurrentUser, requireUser } from "@/lib/auth";
 import { unreadCount } from "@/lib/data/account";
+import { NetworkStatus } from "@/components/pwa/network-status";
 import { DashboardShell } from "./shell";
 
 // Espace privé : toujours rendu à la requête (session, données personnelles), jamais mis en cache statique.
@@ -14,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const current = await getCurrentUser();
   return (
     <DashboardShell email={user.email} displayName={user.displayName} isAdmin={current?.role === "admin"} unread={unread}>
+      <NetworkStatus />
       {children}
     </DashboardShell>
   );
