@@ -3,7 +3,8 @@
 # Secret GitHub requis (Settings → Secrets and variables → Actions → New repository secret) :
 #   PREVIEW_DATABASE_URL_UNPOOLED  connexion DIRECTE à la base Neon de TEST (jamais la Production :
 #                                   le garde-fou refuse toute base sans le marqueur « preview »).
-# Facultatif : PREVIEW_RESEND_API_KEY (clé Resend limitée à l'envoi) pour les e-mails d'alerte.
+# Facultatif : PREVIEW_RESEND_API_KEY (clé Resend limitée à l'envoi) pour les e-mails d'alerte ;
+#             PREVIEW_BRAVE_API_KEY (clé Brave dédiée, plafond de dépense bas) pour les recherches Internet.
 name: Waverti — worker Preview
 
 on:
@@ -76,6 +77,7 @@ jobs:
           NODE_ENV: production
           DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL_UNPOOLED }}
           RESEND_API_KEY: ${{ secrets.PREVIEW_RESEND_API_KEY }}
+          BRAVE_SEARCH_API_KEY: ${{ secrets.PREVIEW_BRAVE_API_KEY }}
           EMAIL_FROM: "Waverti (test) <noreply@waverti.com>"
           APP_URL: https://watchly-git-claude-upbeat-r-81df6d-lullinismael2-9456s-projects.vercel.app
           WORKER_ID: github-preview-${{ github.run_id }}

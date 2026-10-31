@@ -114,3 +114,19 @@ Créer une clé (offre « Data for AI » ou « Pro ») → `BRAVE_SEARCH_API_KEY
 - [ ] Double authentification des administrateurs (`ADMIN_REQUIRE_MFA=1`).
 - [ ] Sauvegardes testées, supervision du worker, alertes de budget API.
 - [ ] Installateurs signés, testés manuellement sur Windows et macOS.
+
+
+## Recette du worker sur la Preview (sans serveur payant)
+
+Aucun worker n'est hébergé pour l'instant : sans lui, les surveillances ne sont pas contrôlées, les e-mails
+d'alerte et de notification (début d'essai, rappel 24 h avant la fin de l'essai) restent en file d'attente.
+Pour la Preview, le workflow manuel **« Waverti — worker Preview »** exécute le worker sur un runner GitHub :
+
+1. Neon → projet de TEST → *Connect* → chaîne de connexion **directe** (non « pooled »).
+2. GitHub → dépôt → Settings → Secrets and variables → Actions → *New repository secret* :
+   `PREVIEW_DATABASE_URL_UNPOOLED` (obligatoire), `PREVIEW_RESEND_API_KEY` et `PREVIEW_BRAVE_API_KEY` (facultatifs).
+3. Actions → « Waverti — worker Preview » → *Run workflow* (branche de la Preview) : `scenarios` (pages et PDF
+   contrôlés dans une base temporaire), `worker` (surveillances de la Preview pendant N minutes) ou `both`.
+
+Garde-fou : la base doit porter le marqueur `app_settings.environment = "preview"`, posé uniquement par les
+déploiements Preview ; la base de Production est refusée sans aucune action.
