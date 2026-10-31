@@ -53,14 +53,32 @@ en parallèle (réservations exclusives) ; `WORKER_ROLES` permet de spécialiser
 
 ## 4. Stripe — MODE TEST [humain]
 
-1. Créer les produits et prix mensuels TTC (Plus 5,99 €, Pro 14,99 €, Business 39,99 €, site supplémentaire
-   14,99 €) **en mode test**, puis `STRIPE_PRICE_*=price_… DATABASE_URL=… pnpm db:seed`.
-2. Webhook : `https://DOMAINE/api/stripe/webhook`, événements `checkout.session.completed`,
-   `customer.subscription.created|updated|deleted|paused|resumed|trial_will_end`, `invoice.paid`,
-   `invoice.payment_failed`
-   → `STRIPE_WEBHOOK_SECRET`.
-3. Portail client : autoriser la mise à jour de carte, l'historique des factures et la résiliation.
-4. **Paiements réels** : uniquement après validation juridique (CGV, mentions légales, TVA, compte marchand
+1. Prix mensuels TTC en EUR, avec leurs clés de recherche : `waverti_plus_monthly` (5,99 €),
+   `waverti_pro_monthly` (14,99 €), `waverti_max_monthly` (29,99 €), `waverti_business_monthly` (39,99 €),
+   `waverti_business_extra_site_monthly` (14,99 €). Vérification (lecture seule, y compris avec la clé live) :
+   `STRIPE_SECRET_KEY=… pnpm stripe:prices` ; enregistrement des `price_` en base : ajouter `--write` avec `DATABASE_URL`.
+2. **Webhook** — route du code : `POST /api/stripe/webhook` (signature `Stripe-Signature` obligatoire, corps brut,
+   événements en double ignorés, ordre indifférent : l'état est relu chez Stripe). Événements à cocher :
+   `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`,
+   `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`,
+   `customer.subscription.trial_will_end`, `invoice.paid`, `invoice.payment_failed`.
+3. **Protection Vercel** : tant que la protection des déploiements reste active, Stripe (qui ne peut pas envoyer
+   d'en-tête personnalisé) serait redirigé vers la connexion Vercel. Sans désactiver la protection du site :
+   1. Vercel → projet → Settings → Deployment Protection → **Protection Bypass for Automation** → générer un
+      secret (fonction gratuite). Ne pas le copier dans un ticket ou une conversation.
+   2. URL de destination dans Stripe (mode test d'abord) :
+      `https://www.waverti.com/api/stripe/webhook?x-vercel-protection-bypass=SECRET`
+      (`www` : le domaine nu redirige en 308, et Stripe ne suit pas les redirections).
+   3. Ce secret ouvre l'accès à tout le site pour qui le connaît (risque documenté par Vercel : il peut
+      apparaître dans des journaux). Le webhook reste protégé par sa signature ; régénérer le secret en cas de
+      doute. Au lancement public, la protection sera retirée et l'URL redeviendra
+      `https://www.waverti.com/api/stripe/webhook`.
+   4. Stripe → Développeurs → Webhooks → Ajouter une destination (mode test) → copier le secret de signature
+      `whsec_…` dans la variable `STRIPE_WEBHOOK_SECRET` (environnement concerné uniquement, valeur « sensitive »).
+   5. Prérequis côté site : `DATABASE_URL`, `STRIPE_SECRET_KEY` (sk_test_), `WAVERTI_HASH_PEPPER` ; sinon la route
+      répond 503 « not_configured » (aucune donnée traitée). Envoyer un événement de test depuis Stripe : réponse 200.
+4. Portail client : autoriser la mise à jour de carte, l'historique des factures et la résiliation.
+5. **Paiements réels** : uniquement après validation juridique (CGV, mentions légales, TVA, compte marchand
    activé), puis clés live + `WAVERTI_ALLOW_LIVE_PAYMENTS=I_HAVE_LEGAL_APPROVAL`.
 
 ## 5. Resend (e-mails) [humain]

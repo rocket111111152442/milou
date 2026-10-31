@@ -52,6 +52,15 @@ Donner le rôle administrateur à un compte existant (ligne de commande uniqueme
 DATABASE_URL=… pnpm admin:grant prenom@lullin-web.com
 ```
 
+Accès bêta privé sans paiement (ligne de commande uniquement, 60 jours au plus, quotas réduits, expiration
+automatique ; un abonnement réel reste prioritaire) :
+
+```bash
+DATABASE_URL=… pnpm beta:grant testeur@exemple.fr --plan pro --days 30 --reason "Bêta privée novembre"
+DATABASE_URL=… pnpm beta:grant testeur@exemple.fr --revoke
+DATABASE_URL=… pnpm beta:grant --list
+```
+
 ## Tests
 
 `pnpm test` (unitaires + intégration), `pnpm test:e2e` (site web), `pnpm --filter @waverti/desktop test:e2e`

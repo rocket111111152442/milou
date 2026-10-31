@@ -74,3 +74,41 @@ Business au maximum de leurs quotas.
    serveurs (pages de 150 Ko). Sans conséquence sur un VPS à trafic illimité, à vérifier sinon.
 4. Le compteur technique (`provider_requests`) et la saisie des coûts réels permettent de remplacer ces
    estimations par des chiffres réels dès le premier mois d'exploitation.
+
+## Projection de 1 à 1 000 clients (tous au maximum de leurs quotas)
+
+Coût technique total mensuel (variable + serveurs) / **marge technique** (prix HT − coût technique).
+La marge technique n'est **pas** un bénéfice : elle ne déduit ni impôts, ni cotisations, ni frais généraux,
+ni Vercel Pro, ni temps de travail.
+
+| Formule (N clients identiques) | 1 | 20 | 100 | 500 | 1 000 |
+| --- | --- | --- | --- | --- | --- |
+| Plus | 17 € / −12 € | 32 € / 67 € | 112 € / 387 € | 518 € / 1 977 € | 1 037 € / 3 955 € |
+| Pro | 20 € / −7 € | 88 € / 162 € | 391 € / 858 € | 1 913 € / 4 332 € | 3 827 € / 8 665 € |
+| Max | 23 € / 2 € | 155 € / 345 € | 726 € / 1 773 € | 3 590 € / 8 906 € | 7 180 € / 17 812 € |
+| Business | 21 € / 13 € | 111 € / 555 € | 505 € / 2 827 € | 2 487 € / 14 176 € | 4 974 € / 28 351 € |
+
+Hypothèse serveurs (worker + PostgreSQL + sauvegardes hors site, **non souscrits**, à confirmer par devis) :
+≈ 16 € / mois jusqu'à 20 clients, ≈ 30 € à 100, ≈ 110 € à 500, ≈ 220 € à 1 000 (base dédiée avec ≈ 1 To de disque + 2 à 3 workers). Le poste stockage est le plus incertain : à faire chiffrer en priorité.
+Avec un seul client, les coûts fixes du serveur ne sont pas couverts (marge négative) : c'est attendu.
+Business : hypothèse prudente de 60 alertes de panne par jour (plafond technique) en plus des 150 e-mails.
+
+### Capacité nécessaire pour 1 000 clients Max dont tout passe par les serveurs
+
+| Ressource | Volume | Origine |
+| --- | --- | --- |
+| Contrôles de pages | 111,6 millions / mois ≈ 42 / s | quotas |
+| CPU de ces contrôles | ≈ 0,2 cœur en continu (5 ms / contrôle) | **mesuré** (test de charge) |
+| Bande passante | ≈ 16,7 To / mois ≈ 51 Mbit/s (pages de 150 Ko) | hypothèse de taille de page |
+| Recherches Brave | 1,24 million / mois ≈ 0,5 / s, ≈ 6 200 € | tarif configuré, à vérifier |
+| Stockage de l'historique | ≈ 1,3 million de lignes / client / an ; ≈ 0,9 To / an pour 1 000 clients après compaction des extraits (≈ 2 à 3,7 To sans compaction) | **mesuré** : observation compactée 582 octets (≈ 0,7 Ko avec l'en-tête de ligne et l'index), extrait ≈ 1,3 Ko compressé |
+| Contrôles HTTP Business (1 000 clients Business) | 134 millions / mois ≈ 51 / s, ≈ 0,1 cœur | **mesuré** (2,2 ms / contrôle) |
+| Scénarios navigateur (1 000 clients Business) | 372 000 / mois ; ≈ 0,3 cœur en moyenne ; 2 navigateurs simultanés ≈ 0,6 Go de mémoire par worker | durée mesurée, CPU de Chromium estimé |
+
+Le contrôle par l'application de bureau des abonnés et le cache partagé des pages et des recherches réduisent
+ces volumes ; ils ne sont pas pris en compte ici (cas le plus défavorable).
+
+### Essais gratuits
+
+Un essai de 72 h au maximum : 6 recherches (0,03 €), au plus 10 e-mails (0,004 €), 3 surveillances. Coût négligeable ;
+les abus (plusieurs essais) sont limités par l'empreinte de la carte bancaire et de l'adresse e-mail.
