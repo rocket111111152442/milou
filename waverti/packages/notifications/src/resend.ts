@@ -52,7 +52,17 @@ export function createResendSender(apiKey: string, base = "https://api.resend.co
       if (!res.ok) {
         // On ne journalise jamais le contenu de la requête (adresse, clé).
         const retryable = res.status === 429 || res.status >= 500;
-        throw new EmailSendError(`Resend HTTP ${res.status}`, retryable);
+        // Motif fourni par Resend (ex. « The waverti.com domain is not verified ») : sans clé ni contenu ;
+        // les adresses e-mail éventuelles sont masquées.
+        const detail = await res
+          .json()
+          .then((raw: unknown) => {
+            const b = (raw ?? {}) as { message?: unknown; name?: unknown };
+            return [b.name, b.message].filter((x) => typeof x === "string").join(": ");
+          })
+          .catch(() => "");
+        const safe = detail.replace(/[^\s@<>"']+@[^\s@<>"']+/g, "[adresse]").slice(0, 200);
+        throw new EmailSendError(`Resend HTTP ${res.status}${safe ? ` — ${safe}` : ""}`, retryable);
       }
       const body = (await res.json().catch(() => ({}))) as { id?: string };
       return { id: body.id ?? "unknown" };

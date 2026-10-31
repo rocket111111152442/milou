@@ -1,5 +1,5 @@
 import "server-only";
-import { emailOutbox, type Database } from "@waverti/database";
+import { emailOutbox, eq, type Database } from "@waverti/database";
 import { createSenderFromEnv, processEmailOutbox } from "@waverti/notifications";
 import { appUrl } from "./request";
 
@@ -32,6 +32,14 @@ export async function sendAuthEmail(
     appUrl: appUrl(),
     workerId: "web",
     ids: [row.id],
-  }).catch(() => ({ sent: 0, failed: 1 }));
+  }).catch((err: Error) => {
+    console.error(JSON.stringify({ msg: "auth email send crashed", template: input.template, error: err.message.slice(0, 300) }));
+    return { sent: 0, failed: 1 };
+  });
+  if (!r.sent) {
+    // Motif renvoyé par le fournisseur (ex. domaine d'envoi non vérifié) : jamais de clé ni d'adresse complète.
+    const [o] = await db.select({ lastError: emailOutbox.lastError, status: emailOutbox.status }).from(emailOutbox).where(eq(emailOutbox.id, row.id));
+    console.error(JSON.stringify({ msg: "auth email not sent", template: input.template, provider: transport.provider, status: o?.status, error: o?.lastError ?? null }));
+  }
   return r.sent ? "sent" : "queued";
 }
