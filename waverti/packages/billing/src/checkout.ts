@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   and,
   desc,
@@ -16,7 +17,7 @@ import { normalizeEmailForAbuse, pepperedHash } from "@waverti/auth";
 import { isPaidPlanId, TRIAL_HOURS, type PaidPlanId } from "./catalog";
 import { isLiveStatus } from "./entitlements";
 import { resolvePlanPriceId } from "./prices";
-import type { StripeClient } from "./stripe";
+import type { Stripe, StripeClient } from "./stripe";
 
 export class BillingError extends Error {
   constructor(
@@ -163,7 +164,7 @@ export async function createSubscriptionCheckout(
   const trialEndSec = trial ? Math.floor(now.getTime() / 1000) + TRIAL_HOURS * 3600 : null;
 
   const minuteBucket = Math.floor(now.getTime() / 60_000);
-  const session = await stripe.checkout.sessions.create(
+  const params: Stripe.Checkout.SessionCreateParams =
     {
       mode: "subscription",
       customer: customerId,
@@ -195,9 +196,13 @@ export async function createSubscriptionCheckout(
       },
       success_url: `${input.appUrl}/app/abonnement?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${input.appUrl}/app/abonnement?checkout=canceled`,
-    },
-    { idempotencyKey: `checkout:${input.userId}:${plan.id}:${trial ? "trial" : "paid"}:${minuteBucket}` },
-  );
+    };
+  // Idempotence : un double clic dans la même minute ne crée qu'une session ; la clé inclut une empreinte des
+  // paramètres (sinon Stripe refuse une même clé réutilisée avec des paramètres différents).
+  const paramsHash = createHash("sha256").update(JSON.stringify(params)).digest("hex").slice(0, 16);
+  const session = await stripe.checkout.sessions.create(params, {
+    idempotencyKey: `checkout:${input.userId}:${plan.id}:${trial ? "trial" : "paid"}:${minuteBucket}:${paramsHash}`,
+  });
   if (!session.url) throw new Error("Stripe n'a pas renvoyé d'URL de paiement");
   return { url: session.url, sessionId: session.id, customerId, trialEnd: trialEndSec ? new Date(trialEndSec * 1000) : null };
 }
