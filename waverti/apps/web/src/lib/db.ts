@@ -1,5 +1,8 @@
 import "server-only";
 import { createDb, type Database } from "@waverti/database";
+import { databaseUrl } from "./database-url";
+
+export { databaseUrl };
 
 declare global {
   var __wavertiDb: { db: Database; close: () => Promise<void> } | undefined;
@@ -7,7 +10,7 @@ declare global {
 
 /** Connexion partagée (une par instance serverless). Petit pool par instance (DATABASE_POOL_MAX). */
 export function getDb(): Database {
-  const url = process.env.DATABASE_URL;
+  const url = databaseUrl();
   if (!url) throw new DatabaseUnavailableError();
   if (!globalThis.__wavertiDb) {
     const handle = createDb(url, { max: Number(process.env.DATABASE_POOL_MAX ?? 3), applicationName: "waverti-web" });
@@ -17,7 +20,7 @@ export function getDb(): Database {
 }
 
 export function isDatabaseConfigured(): boolean {
-  return Boolean(process.env.DATABASE_URL);
+  return databaseUrl() !== null;
 }
 
 export class DatabaseUnavailableError extends Error {

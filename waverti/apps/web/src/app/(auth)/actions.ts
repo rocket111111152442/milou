@@ -5,6 +5,7 @@ import { checkPassword, consumeToken, createAccount, findUserByEmail, issueToken
 import { PAID_PLAN_IDS } from "@waverti/billing/catalog";
 import { eq, users } from "@waverti/database";
 import { mfaChallengePath } from "@/lib/auth";
+import { isSignupAllowed } from "@/lib/beta";
 import { sendAuthEmail } from "@/lib/auth-email";
 import { getDb } from "@/lib/db";
 import { appUrl, clientIp, ipKey, safeNext } from "@/lib/request";
@@ -54,6 +55,14 @@ export async function signUpAction(_: FormState, form: FormData): Promise<FormSt
     })
     .safeParse(Object.fromEntries(form));
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), values };
+
+  if (!isSignupAllowed(parsed.data.email)) {
+    return {
+      error:
+        "Waverti est en bêta privée : la création de compte est ouverte sur invitation uniquement. Pour demander un accès, écrivez-nous depuis la page Assistance.",
+      values,
+    };
+  }
 
   const ip = ipKey(await clientIp());
   const rl = await rateLimit(`signup:${ip}`, 5, 3600);

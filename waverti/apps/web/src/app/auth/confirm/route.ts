@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyEmailWithToken } from "@waverti/auth";
+import { applyInvitation } from "@/lib/beta-apply";
 import { getDb } from "@/lib/db";
 import { safeNext } from "@/lib/request";
 import { isAuthConfigured, startSession } from "@/lib/session";
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthConfigured()) return NextResponse.redirect(new URL("/connexion?erreur=configuration", request.url));
   const userId = token ? await verifyEmailWithToken(getDb(), token) : null;
   if (!userId) return NextResponse.redirect(new URL("/connexion?erreur=lien", request.url));
+  await applyInvitation(getDb(), userId);
   await startSession(userId, 1);
   return NextResponse.redirect(new URL(next, request.url));
 }
