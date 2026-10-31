@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { appUrl } from "@/lib/request";
 import { getStripe } from "@/lib/stripe";
+import { testBillingToolsEnabled } from "@/lib/stripe-tools";
 
 export const POST = withActor(
   async (req, actor) => {
@@ -17,6 +18,7 @@ export const POST = withActor(
       email: user!.email,
       planId: body.data.planId,
       appUrl: appUrl(),
+      testClock: testBillingToolsEnabled(),
     });
     return json({ url: res.url });
   },

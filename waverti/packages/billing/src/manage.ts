@@ -73,20 +73,40 @@ export async function createPortalSession(db: Database, stripe: StripeClient, us
 
 /**
  * TESTS UNIQUEMENT (clé Stripe de test, hors Production) : fait avancer la facturation de l'abonnement de
- * l'utilisateur sur les vrais serveurs Stripe TEST, pour vérifier fin d'essai, renouvellement et paiement refusé.
+ * l'utilisateur sur les vrais serveurs Stripe TEST.
  * - end_trial : termine l'essai maintenant → Stripe émet et tente de payer la première facture.
- * - renew_now : nouvelle période immédiatement, sans prorata → facture de renouvellement.
+ * - advance_days : avance l'horloge de test du client (créée à la recette) → renouvellements réels simulés.
+ * - failing_card : carte de test acceptée mais refusée à chaque prélèvement (pm_card_chargeCustomerFail).
  * L'appelant DOIT vérifier le mode test et l'environnement ; la clé live est de toute façon refusée par le client.
  */
-export async function advanceTestBilling(db: Database, stripe: StripeClient, userId: string, action: "end_trial" | "renew_now"): Promise<{ subscriptionId: string }> {
+export async function advanceTestBilling(
+  db: Database,
+  stripe: StripeClient,
+  userId: string,
+  action: "end_trial" | "advance_days" | "failing_card",
+  days = 31,
+): Promise<{ subscriptionId: string; frozenTime?: string }> {
   const sub = await getLiveSubscription(db, userId);
   if (!sub) throw new BillingError("no_subscription", "Aucun abonnement actif.");
   if (action === "end_trial") {
     if (sub.status !== "trialing") throw new BillingError("no_subscription", "Aucun essai en cours.");
-    await stripe.subscriptions.update(sub.stripeSubscriptionId, { trial_end: "now" as const, proration_behavior: "none" as const });
-  } else {
-    if (sub.status === "trialing") throw new BillingError("no_subscription", "Terminez d'abord l'essai.");
-    await stripe.subscriptions.update(sub.stripeSubscriptionId, { billing_cycle_anchor: { type: "now" }, proration_behavior: "none" });
+    await stripe.subscriptions.update(sub.stripeSubscriptionId, { trial_end: "now", proration_behavior: "none" });
+    return { subscriptionId: sub.stripeSubscriptionId };
   }
-  return { subscriptionId: sub.stripeSubscriptionId };
+  const stripeSub = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
+  const customerId = typeof stripeSub.customer === "string" ? stripeSub.customer : stripeSub.customer.id;
+  if (action === "failing_card") {
+    const pm = await stripe.paymentMethods.attach("pm_card_chargeCustomerFail", { customer: customerId });
+    await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: pm.id } });
+    await stripe.subscriptions.update(sub.stripeSubscriptionId, { default_payment_method: pm.id });
+    return { subscriptionId: sub.stripeSubscriptionId };
+  }
+  const customer = await stripe.customers.retrieve(customerId);
+  const clockRef = "deleted" in customer && customer.deleted ? null : customer.test_clock;
+  const clockId = typeof clockRef === "string" ? clockRef : (clockRef?.id ?? null);
+  if (!clockId) throw new BillingError("no_subscription", "Ce client n'a pas d'horloge de test (compte créé avant l'activation de la recette).");
+  const clock = await stripe.testHelpers.testClocks.retrieve(clockId);
+  const target = clock.frozen_time + Math.max(1, Math.min(62, days)) * 86_400;
+  await stripe.testHelpers.testClocks.advance(clockId, { frozen_time: target });
+  return { subscriptionId: sub.stripeSubscriptionId, frozenTime: new Date(target * 1000).toISOString() };
 }

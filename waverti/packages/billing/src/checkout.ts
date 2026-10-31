@@ -106,7 +106,16 @@ export interface CreateCheckoutResult {
 export async function createSubscriptionCheckout(
   db: Database,
   stripe: StripeClient,
-  input: { userId: string; email: string; planId: string; appUrl: string; now?: Date; pepper?: string },
+  input: {
+    userId: string;
+    email: string;
+    planId: string;
+    appUrl: string;
+    now?: Date;
+    pepper?: string;
+    /** Recette Stripe TEST uniquement : rattache le NOUVEAU client à une horloge de test (renouvellements simulés). */
+    testClock?: boolean;
+  },
 ): Promise<CreateCheckoutResult> {
   const now = input.now ?? new Date();
   if (!isPaidPlanId(input.planId)) throw new BillingError("invalid_plan", "Formule inconnue");
@@ -136,9 +145,14 @@ export async function createSubscriptionCheckout(
 
   let customerId = profile.stripeCustomerId;
   if (!customerId) {
+    let testClock: string | undefined;
+    if (input.testClock) {
+      const clock = await stripe.testHelpers.testClocks.create({ frozen_time: Math.floor(now.getTime() / 1000), name: `waverti-recette-${input.userId.slice(0, 8)}` });
+      testClock = clock.id;
+    }
     const customer = await stripe.customers.create(
-      { email: input.email, metadata: { waverti_user_id: input.userId }, preferred_locales: ["fr"] },
-      { idempotencyKey: `customer:${input.userId}` },
+      { email: input.email, metadata: { waverti_user_id: input.userId }, preferred_locales: ["fr"], ...(testClock ? { test_clock: testClock } : {}) },
+      { idempotencyKey: `customer:${input.userId}${testClock ? ":clock" : ""}` },
     );
     customerId = customer.id;
     await db.update(profiles).set({ stripeCustomerId: customerId }).where(eq(profiles.id, input.userId));

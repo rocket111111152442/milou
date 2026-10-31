@@ -13,10 +13,10 @@ import { testBillingToolsEnabled } from "@/lib/stripe-tools";
 export const POST = withActor(
   async (req, actor) => {
     if (!testBillingToolsEnabled() || !isBillingConfigured()) return apiError(404, "not_found");
-    const body = await readJson(req, z.object({ action: z.enum(["end_trial", "renew_now"]) }));
+    const body = await readJson(req, z.object({ action: z.enum(["end_trial", "advance_days", "failing_card"]), days: z.number().int().min(1).max(62).optional() }));
     if (!body.ok) return body.res;
-    const r = await advanceTestBilling(getDb(), getStripe(), actor.userId, body.data.action);
-    return json({ ok: true, action: body.data.action, subscription: r.subscriptionId.slice(0, 8) + "…" });
+    const r = await advanceTestBilling(getDb(), getStripe(), actor.userId, body.data.action, body.data.days);
+    return json({ ok: true, action: body.data.action, subscription: r.subscriptionId.slice(0, 8) + "…", frozenTime: r.frozenTime ?? null });
   },
   { rate: { name: "billing-test", limit: 20, windowSec: 3600 } },
 );
