@@ -4,7 +4,7 @@
  * Lancer : docker run -p 12111:12111 stripe/stripe-mock  puis  STRIPE_MOCK_URL=http://localhost:12111
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { eq, planAddons, plans } from "@waverti/database";
+import { eq, plans } from "@waverti/database";
 import { createTestDatabase, createTestUser, type TestDatabase } from "@waverti/database/testing";
 import { createSubscriptionCheckout } from "../src/checkout";
 import { createStripeClient } from "../src/stripe";
@@ -17,7 +17,6 @@ describe.skipIf(!MOCK)("stripe-mock contract", () => {
   beforeAll(async () => {
     t = await createTestDatabase();
     await t.db.update(plans).set({ stripePriceId: "price_1PlusTest" }).where(eq(plans.id, "plus"));
-    await t.db.update(planAddons).set({ stripePriceId: "price_1ExtraTest" }).where(eq(planAddons.id, "business_extra_site"));
   });
   afterAll(async () => {
     await t?.drop();
@@ -25,13 +24,22 @@ describe.skipIf(!MOCK)("stripe-mock contract", () => {
 
   it("creates customer and trial Checkout session with parameters accepted by the Stripe API schema", async () => {
     const stripe = createStripeClient("sk_test_123", MOCK);
+    // La recherche par clé de recherche est un vrai appel (paramètres validés par stripe-mock) ; stripe-mock
+    // renvoie un prix générique, remplacé ici par un prix conforme au catalogue pour poursuivre le parcours.
+    const listed = await stripe.prices.list({ lookup_keys: ["waverti_plus_monthly"], active: true, limit: 1 });
+    expect(listed.object).toBe("list");
+    const realList = stripe.prices.list.bind(stripe.prices);
+    stripe.prices.list = (async (params: unknown) => {
+      const r = await realList(params as never);
+      return { ...r, data: [{ ...r.data[0]!, id: "price_1PlusTest", active: true, currency: "eur", type: "recurring", unit_amount: 599, tax_behavior: "inclusive", recurring: { interval: "month", interval_count: 1, usage_type: "licensed" }, lookup_key: "waverti_plus_monthly" }] };
+    }) as typeof stripe.prices.list;
     const u = await createTestUser(t, "contract@example.test");
     const res = await createSubscriptionCheckout(t.db, stripe, { userId: u.id, email: u.email, planId: "plus", appUrl: "https://app.test", pepper: PEPPER });
     expect(res.sessionId).toMatch(/^cs_/);
     expect(res.url).toMatch(/^https:\/\//);
   });
 
-  it("accepts the cancellation, plan change and add-on parameters", async () => {
+  it("accepts the cancellation, plan change and portal parameters", async () => {
     const stripe = createStripeClient("sk_test_123", MOCK);
     await expect(stripe.subscriptions.update("sub_123", { cancel_at_period_end: true })).resolves.toBeTruthy();
     await expect(
@@ -41,9 +49,6 @@ describe.skipIf(!MOCK)("stripe-mock contract", () => {
         cancel_at_period_end: false,
         metadata: { plan_id: "pro" },
       }),
-    ).resolves.toBeTruthy();
-    await expect(
-      stripe.subscriptionItems.create({ subscription: "sub_123", price: "price_1ExtraTest", quantity: 2, proration_behavior: "create_prorations" }),
     ).resolves.toBeTruthy();
     await expect(stripe.subscriptions.cancel("sub_123", { invoice_now: false, prorate: false })).resolves.toBeTruthy();
     await expect(stripe.billingPortal.sessions.create({ customer: "cus_123", return_url: "https://app.test/app/abonnement", locale: "fr" })).resolves.toBeTruthy();

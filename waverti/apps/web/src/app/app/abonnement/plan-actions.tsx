@@ -1,6 +1,5 @@
 "use client";
-import { useState } from "react";
-import { Button, Dialog, DialogClose, DialogContent, DialogTrigger, Input, Label } from "@waverti/ui";
+import { Button, Dialog, DialogClose, DialogContent, DialogTrigger } from "@waverti/ui";
 import { useApiAction } from "@/components/app/use-api";
 
 export function PlanActions({ mode, planId, planName }: { mode: "change" | "resume"; planId?: string; planName?: string }) {
@@ -45,21 +44,5 @@ export function PortalButton() {
     >
       Factures et moyen de paiement
     </Button>
-  );
-}
-
-export function ExtraSitesControl({ current }: { current: number }) {
-  const [qty, setQty] = useState(current);
-  const { run, pending } = useApiAction();
-  return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="extra-sites">Sites supplémentaires</Label>
-        <Input id="extra-sites" type="number" min={0} max={20} value={qty} onChange={(e) => setQty(Number(e.target.value))} className="w-28" />
-      </div>
-      <Button variant="secondary" loading={pending} disabled={qty === current} onClick={() => run("/api/billing/extra-sites", { quantity: qty }, { success: "Mise à jour demandée" })}>
-        Mettre à jour
-      </Button>
-    </div>
   );
 }

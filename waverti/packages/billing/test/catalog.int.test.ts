@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestDatabase, type TestDatabase } from "@waverti/database/testing";
-import { EXTRA_SITE_ADDON, PLAN_CATALOG } from "../src/catalog";
+import { PAID_PLAN_IDS, PLAN_CATALOG, RETIRED_STRIPE_LOOKUP_KEYS } from "../src/catalog";
 
 let t: TestDatabase;
 beforeAll(async () => {
@@ -25,9 +25,11 @@ describe("catalogue affiché = formules en base", () => {
     }
   });
 
-  it("site supplémentaire Business à 14,99 €", async () => {
-    const [a] = await t.client<{ price_cents: number; requires_plan_id: string; stripe_lookup_key: string }[]>`
-      select price_cents, requires_plan_id, stripe_lookup_key from plan_addons where id = ${EXTRA_SITE_ADDON.id}`;
-    expect(a).toEqual({ price_cents: 1499, requires_plan_id: "business", stripe_lookup_key: EXTRA_SITE_ADDON.stripeLookupKey });
+  it("quatre formules uniquement ; l'ancienne option site supplémentaire n'est plus proposée (données conservées)", async () => {
+    expect(PAID_PLAN_IDS).toEqual(["plus", "pro", "max", "business"]);
+    const [a] = await t.client<{ is_public: boolean }[]>`select is_public from plan_addons where id = 'business_extra_site'`;
+    expect(a).toEqual({ is_public: false });
+    expect(RETIRED_STRIPE_LOOKUP_KEYS).toEqual(["waverti_business_extra_site_monthly"]);
+    expect(Object.values(PLAN_CATALOG).map((p) => p.stripeLookupKey)).not.toContain("waverti_business_extra_site_monthly");
   });
 });

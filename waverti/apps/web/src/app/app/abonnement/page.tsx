@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarClock, CreditCard } from "lucide-react";
 import { Badge, Button, Callout, Card, CardContent, CardHeader, CardTitle, PageHeader, Progress } from "@waverti/ui";
-import { EXTRA_SITE_ADDON, PAID_PLAN_IDS, PLAN_CATALOG } from "@waverti/billing/catalog";
+import { PAID_PLAN_IDS, PLAN_CATALOG } from "@waverti/billing/catalog";
 import { formatCents, formatDateTime } from "@waverti/types";
 import { requireUser } from "@/lib/auth";
 import { getQuotaViews, getSubscriptionView, loadEntitlements } from "@/lib/data/account";
 import { isBillingConfigured } from "@/lib/stripe";
-import { PlanActions, PortalButton, ExtraSitesControl } from "./plan-actions";
+import { PlanActions, PortalButton } from "./plan-actions";
 
 export const metadata: Metadata = { title: "Abonnement" };
 
@@ -137,20 +137,6 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         </Card>
       </div>
 
-      {sub.planId === "business" && !sub.isTrial && billing ? (
-        <Card>
-          <CardHeader>
-            <CardTitle as="h2">Sites professionnels supplémentaires</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <p className="text-sm text-muted-fg">
-              {formatCents(EXTRA_SITE_ADDON.priceCents)} / mois par site, avec ses propres quotas : 3 points de contrôle chaque minute et le certificat HTTPS (sans scénario navigateur). Le
-              changement est proratisé.
-            </p>
-            <ExtraSitesControl current={Math.max(0, ent.businessSites - 1)} />
-          </CardContent>
-        </Card>
-      ) : null}
 
       <section id="formules" aria-labelledby="change-title" className="flex scroll-mt-24 flex-col gap-4">
         <h2 id="change-title" className="font-display text-lg font-semibold">

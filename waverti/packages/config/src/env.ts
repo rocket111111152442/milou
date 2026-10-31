@@ -57,10 +57,29 @@ export function integrationStatus(env: Partial<ServerEnv>): IntegrationStatus {
   return {
     auth: Boolean(env.DATABASE_URL && env.WAVERTI_HASH_PEPPER),
     email: Boolean(env.RESEND_API_KEY || env.SMTP_URL),
-    stripe: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET),
+    stripe: Boolean(env.STRIPE_WEBHOOK_SECRET) && ["test", "live"].includes(billingMode(env as Record<string, string | undefined>)),
     resend: Boolean(env.RESEND_API_KEY),
     braveSearch: Boolean(braveApiKey(env)),
   };
+}
+
+export type BillingMode = "absent" | "test" | "live_blocked" | "live";
+
+/**
+ * Mode de facturation déduit de la clé secrète (jamais affichée) :
+ * - absent : aucune clé ;
+ * - test : clé sk_test_/rk_test_ (paiements fictifs uniquement) ;
+ * - live_blocked : clé live présente mais paiements réels non autorisés (WAVERTI_ALLOW_LIVE_PAYMENTS absent) ;
+ * - live : paiements réels explicitement autorisés.
+ */
+export function billingMode(env: Record<string, string | undefined> = process.env): BillingMode {
+  const key = env.STRIPE_SECRET_KEY;
+  if (!key) return "absent";
+  if (key.startsWith("sk_test_") || key.startsWith("rk_test_")) return "test";
+  if (key.startsWith("sk_live_") || key.startsWith("rk_live_")) {
+    return env.WAVERTI_ALLOW_LIVE_PAYMENTS === "I_HAVE_LEGAL_APPROVAL" ? "live" : "live_blocked";
+  }
+  return "absent";
 }
 
 /** Refuse les clés Stripe live tant que le lancement commercial n'est pas validé. */

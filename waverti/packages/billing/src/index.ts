@@ -7,3 +7,5 @@ export * from "./checkout";
 export * from "./webhooks";
 export * from "./manage";
 export * from "./search-quota";
+export * from "./prices";
+export * from "./stripe-mock";

@@ -88,11 +88,10 @@ describe("computeEntitlements", () => {
     expect(active("business")).toMatchObject({ maxMonitors: 100, maxWebTopics: 10, monthlyEmailAlerts: 150, businessSites: 1, businessScenarios: 1 });
   });
 
-  it("sites supplémentaires : disponibilité et HTTPS, sans scénario navigateur", () => {
+  it("option site supplémentaire abandonnée : une ancienne quantité éventuelle n'ouvre aucun droit", () => {
     const biz = active("business", 2);
-    expect(biz.businessSites).toBe(3);
+    expect(biz.businessSites).toBe(1);
     expect(biz.businessScenarios).toBe(1);
-    // Les sites supplémentaires ne s'appliquent qu'à Business.
     expect(active("max", 5).businessSites).toBe(0);
   });
 
@@ -152,13 +151,13 @@ describe("quotas", () => {
   it("le site professionnel exige Business", () => {
     expect(() => checkNewSite(active("max"), 0)).toThrow(/Business/);
     expect(() => checkNewSite(active("business"), 1)).toThrow(/1 site/);
-    expect(() => checkNewSite(active("business", 1), 1)).not.toThrow();
+    expect(() => checkNewSite(active("business", 1), 1)).toThrow(/1 site/);
   });
 
-  it("un seul scénario navigateur au total, même avec des sites supplémentaires", () => {
-    const biz = active("business", 2);
+  it("un seul scénario navigateur au total", () => {
+    const biz = active("business");
     expect(() => checkNewScenario(biz, 0, 0)).not.toThrow();
-    expect(() => checkNewScenario(biz, 0, 1)).toThrow(/sites supplémentaires n'en incluent pas/);
+    expect(() => checkNewScenario(biz, 0, 1)).toThrow(/1 scénario/);
     expect(() => checkNewScenario(biz, 1, 1)).toThrow(/par site/);
   });
 

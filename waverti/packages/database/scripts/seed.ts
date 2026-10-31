@@ -15,7 +15,7 @@ const mapping: Array<[table: "plans" | "plan_addons", id: string, env: string]> 
   ["plans", "pro", "STRIPE_PRICE_PRO"],
   ["plans", "max", "STRIPE_PRICE_MAX"],
   ["plans", "business", "STRIPE_PRICE_BUSINESS"],
-  ["plan_addons", "business_extra_site", "STRIPE_PRICE_BUSINESS_EXTRA_SITE"],
+  // L'ancienne option « site supplémentaire » est abandonnée : aucun prix ne lui est plus associé.
 ];
 const sql = postgres(url, { max: 1, onnotice: () => undefined });
 try {

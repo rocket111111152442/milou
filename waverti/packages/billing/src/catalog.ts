@@ -180,15 +180,12 @@ export const PLAN_CATALOG: Record<PlanId, PlanDefinition> = {
   },
 };
 
-/** Site supplémentaire : disponibilité (3 points de contrôle, chaque minute) et HTTPS ; aucun scénario navigateur inclus. */
-export const EXTRA_SITE_ADDON = {
-  id: "business_extra_site",
-  name: "Site professionnel supplémentaire",
-  priceCents: 1499,
-  stripeLookupKey: "waverti_business_extra_site_monthly",
-  requiresPlanId: "business" as PlanId,
-  grantsBusinessSites: 1,
-};
+/**
+ * L'ancienne option « site professionnel supplémentaire » (14,99 €/mois, clé waverti_business_extra_site_monthly)
+ * est abandonnée : elle n'est ni affichée, ni vendue, ni prise en compte dans les droits. Business comprend
+ * un site professionnel surveillé. Le produit éventuellement créé dans Stripe reste inutilisé (cf. docs/STRIPE.md).
+ */
+export const RETIRED_STRIPE_LOOKUP_KEYS = ["waverti_business_extra_site_monthly"] as const;
 
 export const PAID_PLAN_IDS = ["plus", "pro", "max", "business"] as const;
 export type PaidPlanId = (typeof PAID_PLAN_IDS)[number];

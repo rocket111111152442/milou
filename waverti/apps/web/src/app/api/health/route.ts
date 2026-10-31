@@ -3,6 +3,7 @@ import { integrationStatus } from "@waverti/config/env";
 import { databaseUrl, getDb, isDatabaseConfigured } from "@/lib/db";
 import { signupMode } from "@/lib/beta";
 import { EXPECTED_MIGRATIONS } from "@/lib/schema-version";
+import { currentBillingMode, isBillingConfigured } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,8 @@ export async function GET() {
       integrations,
       launchStatus: process.env.NEXT_PUBLIC_LAUNCH_STATUS ?? "preview",
       signup: signupMode(),
+      // Mode de facturation uniquement (jamais la clé) : absent, test, live_blocked ou live.
+      billing: { mode: currentBillingMode(), available: isBillingConfigured() },
     },
     { headers: { "cache-control": "no-store" } },
   );

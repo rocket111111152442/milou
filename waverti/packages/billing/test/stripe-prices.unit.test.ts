@@ -1,23 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { EXPECTED_PRICES, priceProblems } from "../scripts/stripe-prices";
+import { checkPrice } from "../src/prices";
+import { PAID_PLAN_IDS, PLAN_CATALOG } from "../src/catalog";
 
-const base = { unit_amount: 2999, currency: "eur", recurring: { interval: "month", interval_count: 1 }, active: true, tax_behavior: "inclusive" } as const;
+const price = (over: Record<string, unknown> = {}) =>
+  ({ id: "price_max", active: true, currency: "eur", type: "recurring", unit_amount: 2999, tax_behavior: "inclusive", recurring: { interval: "month", interval_count: 1, usage_type: "licensed" }, ...over }) as never;
 
-describe("vérification des prix Stripe", () => {
-  it("attend un prix par formule et pour le site supplémentaire, avec des clés de recherche stables", () => {
-    expect(EXPECTED_PRICES.map((e) => [e.env, e.lookupKey, e.amount])).toEqual([
-      ["STRIPE_PRICE_PLUS", "waverti_plus_monthly", 599],
-      ["STRIPE_PRICE_PRO", "waverti_pro_monthly", 1499],
-      ["STRIPE_PRICE_MAX", "waverti_max_monthly", 2999],
-      ["STRIPE_PRICE_BUSINESS", "waverti_business_monthly", 3999],
-      ["STRIPE_PRICE_BUSINESS_EXTRA_SITE", "waverti_business_extra_site_monthly", 1499],
+describe("contrôle des prix Stripe avant paiement", () => {
+  it("quatre formules, clés de recherche et montants du catalogue", () => {
+    expect(PAID_PLAN_IDS.map((id) => [PLAN_CATALOG[id].stripeLookupKey, PLAN_CATALOG[id].priceCents])).toEqual([
+      ["waverti_plus_monthly", 599],
+      ["waverti_pro_monthly", 1499],
+      ["waverti_max_monthly", 2999],
+      ["waverti_business_monthly", 3999],
     ]);
   });
+  it("accepte un prix conforme (EUR, mensuel, montant exact, TTC ou non précisé)", () => {
+    expect(checkPrice("max", price())).toMatchObject({ ok: true, priceId: "price_max", issues: [] });
+    expect(checkPrice("max", price({ tax_behavior: "unspecified" })).ok).toBe(true);
+  });
+  it("refuse tout écart : montant, devise, périodicité, archivage, hors taxes, absent", () => {
+    const bad = checkPrice("max", price({ unit_amount: 2900, currency: "usd", active: false, tax_behavior: "exclusive", recurring: { interval: "year", interval_count: 1 } }));
+    expect(bad.ok).toBe(false);
+    expect(bad.issues).toHaveLength(5);
+    expect(checkPrice("max", price({ type: "one_time", recurring: null })).ok).toBe(false);
+    expect(checkPrice("plus", undefined)).toMatchObject({ ok: false, priceId: null });
+  });
+});
 
-  it("signale tout écart avec le catalogue (montant, devise, périodicité, TTC, archivage)", () => {
-    const max = EXPECTED_PRICES.find((e) => e.lookupKey === "waverti_max_monthly")!;
-    expect(priceProblems(base as never, max)).toEqual([]);
-    const wrong = { ...base, unit_amount: 2900, currency: "usd", recurring: { interval: "year", interval_count: 1 }, active: false, tax_behavior: "exclusive" };
-    expect(priceProblems(wrong as never, max)).toHaveLength(5);
+describe("adaptateur stripe-mock", () => {
+  it("ne s'active que pour un hôte local, jamais en production", async () => {
+    const { isLocalStripeMock } = await import("../src/stripe-mock");
+    expect(isLocalStripeMock("http://localhost:12111", {})).toBe(true);
+    expect(isLocalStripeMock("http://127.0.0.1:12111", {})).toBe(true);
+    expect(isLocalStripeMock(undefined, {})).toBe(false);
+    expect(isLocalStripeMock("https://api.stripe.com", {})).toBe(false);
+    expect(isLocalStripeMock("http://localhost:12111", { VERCEL_ENV: "production" })).toBe(false);
   });
 });

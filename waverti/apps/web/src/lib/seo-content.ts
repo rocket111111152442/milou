@@ -206,8 +206,8 @@ export const seoPages: Record<string, SeoContent & { title: string; description:
         ],
       },
       {
-        title: "Plusieurs sites",
-        body: ["La formule inclut un site ; chaque site supplémentaire coûte 14,99 € par mois et dispose de ses propres quotas de contrôle."],
+        title: "Un site professionnel inclus",
+        body: ["La formule Business couvre un site professionnel, avec ses trois points de contrôle, son scénario navigateur et la surveillance HTTPS."],
       },
     ],
     steps: [
@@ -219,7 +219,7 @@ export const seoPages: Record<string, SeoContent & { title: string; description:
     faqs: [
       {
         q: "Combien de points de contrôle sont inclus ?",
-        a: "Trois points de contrôle (des adresses de votre site : accueil, page produit…) vérifiés chaque minute, et un scénario navigateur toutes les deux heures pour le site inclus dans la formule. Un site supplémentaire comprend ses trois points de contrôle et la surveillance HTTPS, sans scénario navigateur.",
+        a: "Trois points de contrôle (des adresses de votre site : accueil, page produit…) vérifiés chaque minute, et un scénario navigateur toutes les deux heures pour le site inclus dans la formule.",
       },
       {
         q: "Les contrôles sont-ils faits depuis plusieurs pays ?",

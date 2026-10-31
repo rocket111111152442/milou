@@ -90,5 +90,5 @@ contrôles par heure ; voir `docs/LOAD-TEST-RESULTS.md`).
 
 Stripe Checkout (page hébergée par Stripe : aucune donnée de carte chez Waverti), essai de 72 h avec carte
 obligatoire, anti-abus (hachages de l'e-mail normalisé et de l'empreinte de carte), webhooks signés et
-idempotents, portail client, changement de formule proratisé, sites Business supplémentaires.
+idempotents, portail client, changement de formule proratisé (quatre formules ; l'option « site supplémentaire » est abandonnée).
 **Clés live refusées** tant que `WAVERTI_ALLOW_LIVE_PAYMENTS` n'est pas défini (après validation juridique).

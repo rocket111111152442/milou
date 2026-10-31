@@ -49,9 +49,9 @@ export default async function BusinessPage() {
       />
       {!canAdd && sites.length > 0 ? (
         <Callout tone="neutral">
-          Tous les sites inclus sont utilisés. Un site supplémentaire coûte 14,99 € par mois :{" "}
+          La formule Business inclut un site professionnel, déjà utilisé :{" "}
           <Link className="font-medium text-blue hover:underline" href="/app/abonnement">
-            gérer l'abonnement
+            voir l'abonnement
           </Link>
           .
         </Callout>

@@ -35,7 +35,8 @@ export interface PlanRow {
 export interface SubscriptionSnapshot {
   planId: string;
   status: SubscriptionStatus;
-  extraSites: number;
+  /** Ancienne option abandonnée : conservée en base, jamais prise en compte dans les droits. */
+  extraSites?: number;
   trialEnd: Date | null;
   currentPeriodEnd: Date | null;
 }
@@ -62,7 +63,7 @@ export interface Entitlements {
   businessEndpointsPerSite: number;
   businessHttpIntervalSeconds: number;
   businessScenariosPerSite: number;
-  /** Scénarios navigateur pour tout le compte : ceux des sites inclus (les sites supplémentaires n'en apportent pas). */
+  /** Scénarios navigateur pour tout le compte (ceux du site inclus dans la formule). */
   businessScenarios: number;
   businessScenarioIntervalMinutes: number;
   businessTlsChecks: boolean;
@@ -221,7 +222,7 @@ export function computeEntitlements(
         planId: plan.id,
         source: "subscription",
         subscriptionStatus: "active",
-        businessSites: plan.businessSitesIncluded + (plan.businessSitesIncluded > 0 ? subscription.extraSites : 0),
+        businessSites: plan.businessSitesIncluded,
         validUntil: subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd.getTime() + WEBHOOK_LAG_MS) : null,
       };
     case "past_due": {
@@ -234,7 +235,7 @@ export function computeEntitlements(
           planId: plan.id,
           source: "grace",
           subscriptionStatus: "past_due",
-          businessSites: plan.businessSitesIncluded + (plan.businessSitesIncluded > 0 ? subscription.extraSites : 0),
+          businessSites: plan.businessSitesIncluded,
           validUntil: graceEnd,
         };
       }

@@ -63,9 +63,8 @@ export async function getAdminKpis(db: Executor = getDb()): Promise<AdminKpis> {
     from trial_usage`);
   const [cancel] = await db.execute(sql`select count(*) as n from subscriptions where canceled_at > now() - interval '30 days'`);
   const [mrr] = await db.execute(sql`
-    select coalesce(sum(p.price_cents), 0) + coalesce(sum(s.extra_sites * a.price_cents), 0) as cents
+    select coalesce(sum(p.price_cents), 0) as cents
     from subscriptions s join plans p on p.id = s.plan_id
-    left join plan_addons a on a.id = 'business_extra_site'
     where s.status in ('active', 'past_due') and not s.cancel_at_period_end`);
   const [collected] = await db.execute(sql`
     select coalesce(sum((summary->>'amount_paid')::bigint), 0) as cents, count(*) as invoices,

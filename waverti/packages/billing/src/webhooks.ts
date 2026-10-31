@@ -22,6 +22,7 @@ import {
 import { isUuid } from "@waverti/database";
 import { normalizeEmailForAbuse, pepperedHash } from "@waverti/auth";
 import { notify } from "@waverti/notifications";
+import { PLAN_CATALOG } from "./catalog";
 import { loadPriceMap } from "./checkout";
 import { recomputeEntitlements } from "./store";
 import { idOf, normalizeStatus, toDate, type Stripe, type StripeClient } from "./stripe";
@@ -168,6 +169,7 @@ async function processEvent(tx: Transaction, deps: WebhookDeps, event: Stripe.Ev
       }
       await recomputeEntitlements(tx, userId, deps.now?.());
       await notifyTransition(tx, userId, before, sub);
+      if (event.type === "customer.subscription.trial_will_end") await notifyTrialEnding(tx, userId, sub);
       return userId;
     }
     case "invoice.paid":
@@ -216,7 +218,6 @@ interface StoredSub {
 async function upsertSubscription(tx: Transaction, userId: string, sub: Stripe.Subscription): Promise<StoredSub | null> {
   const priceMap = await loadPriceMap(tx);
   let planId: string | null = null;
-  let extraSites = 0;
   let periodStart: number | null = null;
   let periodEnd: number | null = null;
   for (const item of sub.items.data) {
@@ -226,9 +227,8 @@ async function upsertSubscription(tx: Transaction, userId: string, sub: Stripe.S
       planId = p;
       periodStart = item.current_period_start;
       periodEnd = item.current_period_end;
-    } else if (priceMap.addons.get(priceId) === "business_extra_site") {
-      extraSites += item.quantity ?? 0;
     }
+    // Tout autre élément (ex. ancienne option « site supplémentaire ») est ignoré : il n'ouvre aucun droit.
   }
   planId ??= sub.metadata?.plan_id ?? null;
   if (!planId) throw new Error(`subscription ${sub.id}: formule inconnue`);
@@ -245,7 +245,7 @@ async function upsertSubscription(tx: Transaction, userId: string, sub: Stripe.S
     stripeSubscriptionId: sub.id,
     stripeCustomerId: idOf(sub.customer)!,
     status: normalizeStatus(sub.status),
-    extraSites,
+    extraSites: 0,
     trialStart: toDate(sub.trial_start),
     trialEnd: toDate(sub.trial_end),
     currentPeriodStart: toDate(periodStart),
@@ -328,7 +328,27 @@ async function registerTrial(
   return "started";
 }
 
-const PLAN_NAMES: Record<string, string> = { plus: "Plus", pro: "Pro", business: "Business" };
+const PLAN_NAMES: Record<string, string> = Object.fromEntries(Object.values(PLAN_CATALOG).map((p) => [p.id, p.name]));
+
+/** Rappel envoyé par Stripe environ 3 jours avant la fin de l'essai (donc dès le début d'un essai de 72 h). */
+async function notifyTrialEnding(tx: Transaction, userId: string, sub: Stripe.Subscription): Promise<void> {
+  if (sub.status !== "trialing" || sub.cancel_at_period_end) return;
+  const planId = sub.metadata?.plan_id ?? "";
+  const plan = PLAN_NAMES[planId] ?? "payante";
+  const price = PLAN_CATALOG[planId as keyof typeof PLAN_CATALOG]?.priceCents;
+  const trialEnd = toDate(sub.trial_end);
+  const when = trialEnd ? trialEnd.toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "long", timeStyle: "short" }) : "la fin de l'essai";
+  const amount = price ? `${(price / 100).toFixed(2).replace(".", ",")} € TTC` : "le prix de la formule";
+  await notify(tx, {
+    userId,
+    type: "trial",
+    title: `Fin de votre essai ${plan} le ${when}`,
+    body: `Sans résiliation avant cette date, ${amount} seront prélevés le ${when}, puis chaque mois. Pour ne rien payer, résiliez depuis la page Abonnement avant la fin de l'essai.`,
+    linkPath: "/app/abonnement",
+    dedupKey: `trial_will_end:${sub.id}:${sub.trial_end ?? "x"}`,
+    emailPolicy: "transactional",
+  });
+}
 
 async function notifyTransition(tx: Transaction, userId: string, before: StoredSub | null, sub: Stripe.Subscription): Promise<void> {
   const now = sub.status;
@@ -362,7 +382,7 @@ async function notifyTransition(tx: Transaction, userId: string, before: StoredS
       userId,
       type: "subscription",
       title: "Votre abonnement est terminé",
-      body: "Votre compte est repassé en formule Découverte. Vos surveillances au-delà des limites gratuites ont été mises en pause, rien n'a été supprimé.",
+      body: "Vos surveillances ont été mises en pause ; rien n'a été supprimé et votre historique reste consultable. Vous pouvez souscrire à nouveau à tout moment depuis la page Abonnement.",
       linkPath: "/app/abonnement",
       dedupKey: `canceled:${sub.id}`,
       emailPolicy: "transactional",

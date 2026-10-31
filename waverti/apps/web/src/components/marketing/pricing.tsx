@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Check, Minus } from "lucide-react";
 import { Badge, Button, Container, SectionHeading, cn } from "@waverti/ui";
-import { EXTRA_SITE_ADDON, PLAN_FEATURES, type PlanDefinition, type PlanId } from "@waverti/billing/catalog";
+import { PLAN_FEATURES, type PlanDefinition, type PlanId } from "@waverti/billing/catalog";
 import { formatCents, formatInterval } from "@waverti/types";
 
 export function PricingCards({ plans }: { plans: PlanDefinition[] }) {
@@ -48,12 +48,6 @@ export function PricingCards({ plans }: { plans: PlanDefinition[] }) {
                 </li>
               ))}
             </ul>
-            {p.id === "business" ? (
-              <p className="mt-6 rounded-xl bg-surface p-3 text-xs text-muted-fg">
-                {EXTRA_SITE_ADDON.name} : {formatCents(EXTRA_SITE_ADDON.priceCents)} / mois, avec ses propres quotas de
-                contrôle.
-              </p>
-            ) : null}
           </article>
         );
       })}

@@ -104,7 +104,7 @@ export function checkNewEndpoint(e: Entitlements, endpointCountForSite: number):
 
 /**
  * Scénarios navigateur : au plus `businessScenariosPerSite` par site, et au plus `businessScenarios` pour tout le
- * compte (les sites supplémentaires à 14,99 € n'incluent pas de scénario).
+ * compte.
  */
 export function checkNewScenario(e: Entitlements, scenarioCountForSite: number, scenarioCountForAccount = scenarioCountForSite): void {
   if (e.businessSites === 0) throw new QuotaError("business_not_included", "Formule Business requise.");
@@ -114,7 +114,7 @@ export function checkNewScenario(e: Entitlements, scenarioCountForSite: number, 
   if (scenarioCountForAccount >= e.businessScenarios) {
     throw new QuotaError(
       "scenario_limit",
-      `Votre abonnement inclut ${e.businessScenarios} scénario(s) navigateur au total : les sites supplémentaires n'en incluent pas.`,
+      `Votre abonnement inclut ${e.businessScenarios} scénario(s) navigateur au total.`,
     );
   }
 }

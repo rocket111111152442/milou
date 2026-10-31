@@ -54,15 +54,19 @@ en parallèle (réservations exclusives) ; `WORKER_ROLES` permet de spécialiser
 ## 4. Stripe — MODE TEST [humain]
 
 1. Prix mensuels TTC en EUR, avec leurs clés de recherche : `waverti_plus_monthly` (5,99 €),
-   `waverti_pro_monthly` (14,99 €), `waverti_max_monthly` (29,99 €), `waverti_business_monthly` (39,99 €),
-   `waverti_business_extra_site_monthly` (14,99 €). Vérification (lecture seule, y compris avec la clé live) :
+   `waverti_pro_monthly` (14,99 €), `waverti_max_monthly` (29,99 €), `waverti_business_monthly` (39,99 €).
+   Quatre formules uniquement : l'ancienne option `waverti_business_extra_site_monthly` est abandonnée (voir
+   `docs/STRIPE.md` pour l'archiver). Vérification (lecture seule, de préférence avec une clé restreinte `rk_` en lecture des prix) :
    `STRIPE_SECRET_KEY=… pnpm stripe:prices` ; enregistrement des `price_` en base : ajouter `--write` avec `DATABASE_URL`.
 2. **Webhook** — route du code : `POST /api/stripe/webhook` (signature `Stripe-Signature` obligatoire, corps brut,
    événements en double ignorés, ordre indifférent : l'état est relu chez Stripe). Événements à cocher :
    `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`,
    `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`,
    `customer.subscription.trial_will_end`, `invoice.paid`, `invoice.payment_failed`.
-3. **Protection Vercel** : tant que la protection des déploiements reste active, Stripe (qui ne peut pas envoyer
+3. **Protection Vercel** : la production `www.waverti.com` est publique (protection limitée aux prévisualisations,
+   `all_except_custom_domains`) : l'URL du webhook est directement `https://www.waverti.com/api/stripe/webhook`,
+   sans contournement. Les étapes ci-dessous ne concernent qu'un webhook pointé vers une prévisualisation protégée.
+   Tant que la protection des déploiements reste active sur l'URL visée, Stripe (qui ne peut pas envoyer
    d'en-tête personnalisé) serait redirigé vers la connexion Vercel. Sans désactiver la protection du site :
    1. Vercel → projet → Settings → Deployment Protection → **Protection Bypass for Automation** → générer un
       secret (fonction gratuite). Ne pas le copier dans un ticket ou une conversation.

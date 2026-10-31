@@ -3,6 +3,7 @@
  * signature authentique via stripe.webhooks) dont les appels réseau sont remplacés.
  */
 import Stripe from "stripe";
+import { PLAN_CATALOG } from "../src/catalog";
 
 export const WEBHOOK_SECRET = "whsec_test_" + "a".repeat(32);
 
@@ -10,6 +11,8 @@ export interface FakeState {
   subscriptions: Map<string, Stripe.Subscription>;
   paymentMethods: Map<string, Stripe.PaymentMethod>;
   calls: Array<{ method: string; args: unknown[] }>;
+  /** Prix actifs par clé de recherche (mode test). */
+  prices: Map<string, Stripe.Price>;
 }
 
 let counter = 0;
@@ -24,8 +27,9 @@ export function makeSubscription(input: {
   trialEnd?: number | null;
   periodEnd?: number;
   paymentMethod?: string | null;
-  extraSitePrice?: string;
-  extraSites?: number;
+  /** Ancien élément d'abonnement (option abandonnée) : doit être ignoré par la synchronisation. */
+  legacyItemPrice?: string;
+  legacyItemQuantity?: number;
 }): Stripe.Subscription {
   const now = Math.floor(Date.now() / 1000);
   const items: unknown[] = [
@@ -38,12 +42,12 @@ export function makeSubscription(input: {
       current_period_end: input.periodEnd ?? now + 30 * 86400,
     },
   ];
-  if (input.extraSitePrice && input.extraSites) {
+  if (input.legacyItemPrice && input.legacyItemQuantity) {
     items.push({
       id: nextId("si"),
       object: "subscription_item",
-      price: { id: input.extraSitePrice, object: "price" },
-      quantity: input.extraSites,
+      price: { id: input.legacyItemPrice, object: "price" },
+      quantity: input.legacyItemQuantity,
       current_period_start: now,
       current_period_end: input.periodEnd ?? now + 30 * 86400,
     });
@@ -67,7 +71,7 @@ export function makeSubscription(input: {
 
 export function createFakeStripe(): { stripe: Stripe; state: FakeState } {
   const stripe = new Stripe("sk_test_fake_key_for_tests");
-  const state: FakeState = { subscriptions: new Map(), paymentMethods: new Map(), calls: [] };
+  const state: FakeState = { subscriptions: new Map(), paymentMethods: new Map(), calls: [], prices: new Map() };
   const rec = (method: string, args: unknown[]) => state.calls.push({ method, args });
 
   Object.assign(stripe.subscriptions, {
@@ -100,6 +104,20 @@ export function createFakeStripe(): { stripe: Stripe; state: FakeState } {
     retrieve: async (id: string) => {
       rec("paymentMethods.retrieve", [id]);
       return state.paymentMethods.get(id);
+    },
+  });
+  // Catalogue de prix du mode test : identifiants price_<formule>_test (ceux des tests), modifiables par test.
+  state.prices = new Map(
+    (["plus", "pro", "max", "business"] as const).map((id) => [
+      PLAN_CATALOG[id].stripeLookupKey,
+      { id: `price_${id}_test`, object: "price", active: true, currency: "eur", type: "recurring", unit_amount: PLAN_CATALOG[id].priceCents, tax_behavior: "inclusive", lookup_key: PLAN_CATALOG[id].stripeLookupKey, recurring: { interval: "month", interval_count: 1, usage_type: "licensed" } } as unknown as Stripe.Price,
+    ]),
+  );
+  Object.assign(stripe.prices, {
+    list: async (params: { lookup_keys?: string[] }) => {
+      rec("prices.list", [params]);
+      const data = (params.lookup_keys ?? []).map((k) => state.prices.get(k)).filter((p): p is Stripe.Price => Boolean(p && p.active));
+      return { object: "list", data, has_more: false };
     },
   });
   Object.assign(stripe.customers, {

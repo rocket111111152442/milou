@@ -29,7 +29,6 @@ recherches identiques entre abonnés ne sont payées qu'une fois par 6 h).
 | Pro (100 pages / 2 h, 10 sujets) | 37 200 | 620 | 80 | — | — |
 | Max (150 pages / 1 h, 20 sujets) | 111 600 | 1 240 | 150 | — | — |
 | Business (Pro + 1 site, 3 points / min, 1 scénario / 2 h) | 37 200 | 620 | 150 + alertes Business (plafond technique 60 / 24 h, soit ≤ 1 860) | 133 920 | 372 |
-| Site supplémentaire Business | — | — | inclus dans le plafond du compte | 133 920 | — |
 
 Les contrôles de pages peuvent être faits par l'ordinateur de l'abonné (application desktop) : le coût serveur
 ci-dessous est le cas où tout est fait par les serveurs.
@@ -42,7 +41,6 @@ ci-dessous est le cas où tout est fait par les serveurs.
 | Pro | 14,99 € | 3,10 € | 0,03 € | ≈ 0,01 € | 0,47 € | **≈ 3,61 €** | ≈ 8,88 € |
 | Max | 29,99 € | 6,20 € | 0,06 € | ≈ 0,02 € | 0,70 € | **≈ 6,98 €** | ≈ 18,01 € |
 | Business | 39,99 € | 3,10 € | ≤ 0,80 € | ≈ 0,04 € | 0,85 € | **≈ 4,79 €** | ≈ 28,54 € |
-| Site supplémentaire | 14,99 € | — | (plafond du compte) | ≈ 0,01 € | 0,22 € | **≈ 0,23 €** | ≈ 12,26 € |
 
 Marge brute = prix HT (TTC / 1,2) − coût variable maximal, avant coûts fixes. **Aucune formule n'est
 déficitaire au maximum de ses quotas** avec ces hypothèses. La formule la plus sensible est Pro : si le prix

@@ -6,7 +6,6 @@ import {
   eq,
   monitoringTasks,
   notifications,
-  planAddons,
   plans,
   profiles,
   subscriptions,
@@ -23,7 +22,7 @@ import { searchQuotaWindow } from "../src/search-quota";
 import { addCard, createFakeStripe, makeSubscription, signedEvent, WEBHOOK_SECRET } from "./fake-stripe";
 
 const PEPPER = "p".repeat(48);
-const PRICES = { plus: "price_plus_test", pro: "price_pro_test", max: "price_max_test", business: "price_business_test", extra: "price_extra_test" };
+const PRICES = { plus: "price_plus_test", pro: "price_pro_test", max: "price_max_test", business: "price_business_test" };
 
 let t: TestDatabase;
 let fake: ReturnType<typeof createFakeStripe>;
@@ -35,7 +34,6 @@ beforeAll(async () => {
   await t.db.update(plans).set({ stripePriceId: PRICES.pro }).where(eq(plans.id, "pro"));
   await t.db.update(plans).set({ stripePriceId: PRICES.business }).where(eq(plans.id, "business"));
   await t.db.update(plans).set({ stripePriceId: PRICES.max }).where(eq(plans.id, "max"));
-  await t.db.update(planAddons).set({ stripePriceId: PRICES.extra }).where(eq(planAddons.id, "business_extra_site"));
 });
 afterAll(async () => {
   await t?.drop();
@@ -318,6 +316,57 @@ describe("stripe webhooks", () => {
     const w2 = searchQuotaWindow(after, await loadCurrentSubscription(t.db, u.id), new Date((start + 3600) * 1000));
     expect(w2.period).not.toBe(w1.period);
     expect(w2).toMatchObject({ days: 31, limit: 93 });
+  });
+
+  it("trial_will_end: reminds the first charge date and amount, never when cancellation is scheduled", async () => {
+    const u = await newCustomer();
+    const pm = addCard(fake.state, "fp_trial_end");
+    const sub = makeSubscription({ customer: u.customer, priceId: PRICES.max, status: "trialing", userId: u.id, planId: "max", trialEnd: Math.floor(Date.now() / 1000) + 72 * 3600, paymentMethod: pm });
+    fake.state.subscriptions.set(sub.id, sub);
+    let ev = signedEvent(fake.stripe, "customer.subscription.trial_will_end", sub);
+    expect((await handleStripeWebhook(deps, ev.payload, ev.signature)).status).toBe(200);
+    // Rejouer le même événement ne crée pas de doublon.
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    let n = await t.db.select().from(notifications).where(eq(notifications.userId, u.id));
+    const reminders = n.filter((x) => x.title.startsWith("Fin de votre essai Max"));
+    expect(reminders).toHaveLength(1);
+    expect(reminders[0]!.body).toContain("29,99 € TTC");
+    expect(n.some((x) => x.title === "Votre essai Waverti Max a commencé")).toBe(true);
+    expect(await getEntitlements(t.db, u.id)).toMatchObject({ planId: "max", source: "trial", maxMonitors: 3 });
+
+    const u2 = await newCustomer();
+    const pm2 = addCard(fake.state, "fp_trial_end_2");
+    const sub2 = { ...makeSubscription({ customer: u2.customer, priceId: PRICES.plus, status: "trialing", userId: u2.id, planId: "plus", trialEnd: Math.floor(Date.now() / 1000) + 72 * 3600, paymentMethod: pm2 }), cancel_at_period_end: true } as ReturnType<typeof makeSubscription>;
+    fake.state.subscriptions.set(sub2.id, sub2);
+    ev = signedEvent(fake.stripe, "customer.subscription.trial_will_end", sub2);
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    n = await t.db.select().from(notifications).where(eq(notifications.userId, u2.id));
+    expect(n.some((x) => x.title.startsWith("Fin de votre essai"))).toBe(false);
+  });
+
+  it("an old subscription item (retired extra-site option) grants nothing and is not counted", async () => {
+    const u = await newCustomer();
+    const sub = makeSubscription({ customer: u.customer, priceId: PRICES.business, status: "active", userId: u.id, planId: "business", legacyItemPrice: "price_old_extra_site", legacyItemQuantity: 3 });
+    fake.state.subscriptions.set(sub.id, sub);
+    const ev = signedEvent(fake.stripe, "customer.subscription.created", sub);
+    expect((await handleStripeWebhook(deps, ev.payload, ev.signature)).status).toBe(200);
+    expect(await getEntitlements(t.db, u.id)).toMatchObject({ planId: "business", businessSites: 1, businessScenarios: 1 });
+    const [row] = await t.db.select({ extra: subscriptions.extraSites }).from(subscriptions).where(eq(subscriptions.userId, u.id));
+    expect(row!.extra).toBe(0);
+  });
+
+  it("an ended subscription notice no longer mentions a free plan", async () => {
+    const u = await newCustomer();
+    const sub = makeSubscription({ customer: u.customer, priceId: PRICES.pro, status: "active", userId: u.id, planId: "pro" });
+    fake.state.subscriptions.set(sub.id, sub);
+    let ev = signedEvent(fake.stripe, "customer.subscription.created", sub);
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    fake.state.subscriptions.set(sub.id, { ...sub, status: "canceled" });
+    ev = signedEvent(fake.stripe, "customer.subscription.deleted", sub);
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    const n = await t.db.select().from(notifications).where(eq(notifications.userId, u.id));
+    const ended = n.find((x) => x.title === "Votre abonnement est terminé");
+    expect(ended?.body).not.toMatch(/Découverte|gratuit/i);
   });
 
   it("ignores unrelated event types but records them", async () => {

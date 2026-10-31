@@ -5,7 +5,6 @@ import {
   isNotNull,
   ne,
   or,
-  planAddons,
   plans,
   profiles,
   subscriptions,
@@ -16,6 +15,7 @@ import {
 import { normalizeEmailForAbuse, pepperedHash } from "@waverti/auth";
 import { isPaidPlanId, TRIAL_HOURS, type PaidPlanId } from "./catalog";
 import { isLiveStatus } from "./entitlements";
+import { resolvePlanPriceId } from "./prices";
 import type { StripeClient } from "./stripe";
 
 export class BillingError extends Error {
@@ -112,7 +112,6 @@ export async function createSubscriptionCheckout(
   if (!isPaidPlanId(input.planId)) throw new BillingError("invalid_plan", "Formule inconnue");
   const [plan] = await db.select().from(plans).where(eq(plans.id, input.planId)).limit(1);
   if (!plan) throw new BillingError("invalid_plan", "Formule inconnue");
-  if (!plan.stripePriceId) throw new BillingError("price_missing", "Cette formule n'est pas encore disponible au paiement.");
 
   const [profile] = await db
     .select({ stripeCustomerId: profiles.stripeCustomerId, suspendedAt: profiles.suspendedAt })
@@ -131,6 +130,9 @@ export async function createSubscriptionCheckout(
   if (current && isLiveStatus(current.status)) {
     throw new BillingError("already_subscribed", "Vous avez déjà un abonnement : modifiez-le depuis la page Abonnement.");
   }
+
+  // Prix contrôlé chez Stripe (clé de recherche, EUR, mensuel, montant) avant toute création de client ou de paiement.
+  const priceId = await resolvePlanPriceId(db, stripe, input.planId);
 
   let customerId = profile.stripeCustomerId;
   if (!customerId) {
@@ -152,7 +154,7 @@ export async function createSubscriptionCheckout(
       mode: "subscription",
       customer: customerId,
       client_reference_id: input.userId,
-      line_items: [{ price: plan.stripePriceId, quantity: 1 }],
+      line_items: [{ price: priceId, quantity: 1 }],
       payment_method_collection: "always",
       locale: "fr",
       allow_promotion_codes: false,
@@ -182,12 +184,8 @@ export async function createSubscriptionCheckout(
   return { url: session.url, sessionId: session.id, customerId, trialEnd: trialEndSec ? new Date(trialEndSec * 1000) : null };
 }
 
-/** Identifiants de prix Stripe -> formule / option. */
-export async function loadPriceMap(db: Database | Transaction): Promise<{ plans: Map<string, string>; addons: Map<string, string> }> {
+/** Identifiants de prix Stripe -> formule (les quatre formules uniquement). */
+export async function loadPriceMap(db: Database | Transaction): Promise<{ plans: Map<string, string> }> {
   const p = await db.select({ id: plans.id, price: plans.stripePriceId }).from(plans);
-  const a = await db.select({ id: planAddons.id, price: planAddons.stripePriceId }).from(planAddons);
-  return {
-    plans: new Map(p.filter((r) => r.price).map((r) => [r.price!, r.id])),
-    addons: new Map(a.filter((r) => r.price).map((r) => [r.price!, r.id])),
-  };
+  return { plans: new Map(p.filter((r) => r.price && isPaidPlanId(r.id)).map((r) => [r.price!, r.id])) };
 }
