@@ -1,12 +1,14 @@
 /**
- * Test de bout en bout de la VRAIE application desktop (binaire Tauri, WebKitGTK) pilotée par
- * WebDriver (tauri-driver), contre le vrai serveur web local et sa base PostgreSQL.
+ * Test de bout en bout de la VRAIE application desktop (binaire Tauri) pilotée par WebDriver
+ * (tauri-driver), contre le vrai serveur web local et sa base PostgreSQL.
+ * Linux : WebKitGTK + WebKitWebDriver sous Xvfb. Windows : WebView2 + msedgedriver
+ * (chemin dans MSEDGEDRIVER, version identique au runtime WebView2).
  *
  * Parcours : liaison par code (validé dans un navigateur connecté) -> accord explicite ->
  * contrôle d'une page exécuté par l'ordinateur -> alerte -> pause -> déliaison.
  *
  * Prérequis (voir TESTING.md) : PostgreSQL et Mailpit locaux, application web sur http://localhost:3000,
- * binaire construit avec `pnpm tauri build --debug --no-bundle`, `tauri-driver`, Xvfb.
+ * binaire construit avec `pnpm tauri build --debug --no-bundle`, `tauri-driver`, Xvfb (Linux) ou msedgedriver (Windows).
  * Lancement : DESKTOP_E2E=1 pnpm --filter @waverti/desktop test:e2e
  */
 import { spawn, type ChildProcess } from "node:child_process";
@@ -25,7 +27,8 @@ import { createMonitor, scheduleDueTasks } from "@waverti/monitoring";
 const RUN = process.env.DESKTOP_E2E === "1";
 const WEB = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 const DB_URL = process.env.E2E_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:55432/waverti";
-const APP = join(import.meta.dirname, "../src-tauri/target/debug/waverti-desktop");
+const IS_WINDOWS = process.platform === "win32";
+const APP = join(import.meta.dirname, `../src-tauri/target/debug/waverti-desktop${IS_WINDOWS ? ".exe" : ""}`);
 const PASSWORD = "MotDePasse-E2E-2026";
 
 let shopPrice = "129,99";
@@ -55,7 +58,7 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
   const { db, close: closeDb } = createDb(DB_URL, { max: 2 });
   let shop: http.Server;
   let shopPort = 0;
-  let xvfb: ChildProcess;
+  let xvfb: ChildProcess | undefined;
   let driver: ChildProcess;
   let home: string;
   let browser: Browser;
@@ -82,9 +85,13 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
 
     home = mkdtempSync(join(tmpdir(), "waverti-desktop-e2e-"));
     const display = ":97";
-    xvfb = spawn("Xvfb", [display, "-screen", "0", "1280x900x24"], { stdio: "ignore" });
-    await new Promise((r) => setTimeout(r, 800));
-    driver = spawn("tauri-driver", ["--port", "4444"], {
+    if (!IS_WINDOWS) {
+      xvfb = spawn("Xvfb", [display, "-screen", "0", "1280x900x24"], { stdio: "ignore" });
+      await new Promise((r) => setTimeout(r, 800));
+    }
+    const driverArgs = ["--port", "4444"];
+    if (IS_WINDOWS && process.env.MSEDGEDRIVER) driverArgs.push("--native-driver", process.env.MSEDGEDRIVER);
+    driver = spawn("tauri-driver", driverArgs, {
       stdio: ["ignore", "inherit", "inherit"],
       env: {
         ...process.env,
@@ -102,7 +109,7 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
       hostname: "127.0.0.1",
       port: 4444,
       logLevel: "warn",
-      // WebKitWebDriver ne gère que le protocole WebDriver « classique » (pas BiDi).
+      // WebKitWebDriver ne gère que le protocole WebDriver « classique » (pas BiDi) ; même choix sous Windows.
       capabilities: { "wdio:enforceWebDriverClassic": true, "tauri:options": { application: APP } } as WebdriverIO.Capabilities,
     });
     browser = await chromium.launch();

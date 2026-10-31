@@ -1,0 +1,260 @@
+# Vérification de l'application desktop sur Windows, macOS et Linux (sans publication).
+#
+# - Windows : tests Rust, E2E du binaire réel (WebView2 + msedgedriver) contre le site et PostgreSQL
+#   lancés sur le runner, puis installateurs NSIS (.exe) et MSI construits, installés, lancés et
+#   désinstallés silencieusement.
+# - macOS : application construite pour Apple Silicon et Intel, lancée sur le runner (Apple Silicon).
+#   Pas d'E2E WebDriver : tauri-driver ne prend pas en charge macOS.
+# - Linux : paquets .deb / .rpm / AppImage construits ; le .deb est installé, lancé et désinstallé.
+#
+# Les installateurs produits ici sont des ARTEFACTS DE TEST, NON SIGNÉS : ils ne sont ni publiés ni
+# proposés au téléchargement sur le site. La publication passe par waverti-desktop-release.yml (brouillon).
+name: Waverti Desktop — plateformes
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "waverti/apps/desktop/**"
+      - "waverti/packages/**"
+      - "waverti/apps/web/src/app/api/agent/**"
+      - ".github/workflows/waverti-desktop-platforms.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: waverti-desktop-platforms-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Adresse intégrée aux binaires « release » de test (exigée par build.rs). Aucun appel n'est fait
+  # vers ce serveur pendant les tests, hormis la page d'accueil de l'application non reliée.
+  WAVERTI_API_URL: https://www.waverti.com
+
+defaults:
+  run:
+    working-directory: waverti
+
+jobs:
+  windows:
+    name: Windows — E2E du binaire réel et installateurs (.exe, .msi)
+    runs-on: windows-2025
+    timeout-minutes: 90
+    env:
+      E2E_DATABASE_URL: postgresql://postgres:root@127.0.0.1:5432/waverti
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: waverti/apps/desktop/src-tauri
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: waverti/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: waverti/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @waverti/desktop build
+      - name: Tests et lint Rust (Windows)
+        working-directory: waverti/apps/desktop/src-tauri
+        run: |
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+      - name: PostgreSQL préinstallé sur le runner
+        shell: pwsh
+        run: |
+          $svc = Get-Service -Name "postgresql*" | Select-Object -First 1
+          if (-not $svc) { throw "PostgreSQL absent de l'image du runner" }
+          Set-Service -Name $svc.Name -StartupType Manual
+          Start-Service -Name $svc.Name
+          "$env:PGBIN" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $v = & "$env:PGBIN\psql.exe" -tAc "show server_version_num" "postgresql://postgres:root@127.0.0.1:5432/postgres"
+          Write-Host "PostgreSQL $v"
+          if ([int]$v -lt 150000) { throw "PostgreSQL 15 ou plus requis (NULLS NOT DISTINCT)" }
+      - name: Configuration de test (migrations, données, .env.local)
+        shell: bash
+        run: bash infra/ci/e2e-env.sh
+      - name: Site web (construction)
+        run: pnpm --filter @waverti/web build
+      - name: msedgedriver de la même version que WebView2
+        shell: pwsh
+        run: |
+          $key = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+          $ver = (Get-ItemProperty -Path $key).pv
+          Write-Host "WebView2 $ver"
+          $dir = Join-Path $env:RUNNER_TEMP "edgedriver"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$ver/edgedriver_win64.zip" -OutFile "$dir\d.zip"
+          Expand-Archive -Path "$dir\d.zip" -DestinationPath $dir -Force
+          "MSEDGEDRIVER=$dir\msedgedriver.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & "$dir\msedgedriver.exe" --version
+      - name: tauri-driver et Chromium (validation du code de liaison)
+        run: |
+          cargo install tauri-driver --version 2.1.0 --locked
+          pnpm --filter @waverti/desktop exec playwright install chromium
+      - name: Binaire desktop (debug)
+        run: pnpm --filter @waverti/desktop tauri build --debug --no-bundle
+      - name: E2E desktop (Windows, WebView2)
+        shell: bash
+        run: |
+          pnpm --filter @waverti/web start > "$RUNNER_TEMP/web.log" 2>&1 &
+          for i in $(seq 1 90); do curl -fsS http://localhost:3000/api/health > /dev/null && break; sleep 1; done
+          curl -fsS http://localhost:3000/api/health > /dev/null || { cat "$RUNNER_TEMP/web.log"; exit 1; }
+          DESKTOP_E2E=1 E2E_SCREENSHOTS="$RUNNER_TEMP/screens" pnpm --filter @waverti/desktop test:e2e
+      - name: Captures d'écran E2E
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-e2e-captures
+          path: ${{ runner.temp }}/screens
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Installateurs NSIS et MSI (release, non signés)
+        run: pnpm --filter @waverti/desktop tauri build --bundles nsis,msi
+      - name: Installation, lancement et désinstallation (NSIS puis MSI)
+        shell: pwsh
+        working-directory: waverti/apps/desktop/src-tauri/target/release/bundle
+        run: |
+          function Wait-Until([scriptblock]$cond, [int]$seconds) {
+            for ($i = 0; $i -lt $seconds; $i++) { if (& $cond) { return $true }; Start-Sleep -Seconds 1 }
+            return $false
+          }
+          function Test-Launch([string]$exe) {
+            $p = Start-Process -FilePath $exe -PassThru
+            Start-Sleep -Seconds 10
+            if ($p.HasExited) { throw "L'application s'est arrêtée au lancement (code $($p.ExitCode))" }
+            Stop-Process -Id $p.Id -Force
+            Write-Host "Lancement OK : $exe"
+          }
+
+          # NSIS (installation par utilisateur, sans droits administrateur)
+          $setup = Get-ChildItem nsis\*-setup.exe | Select-Object -First 1
+          Write-Host "NSIS : $($setup.Name) ($([math]::Round($setup.Length / 1MB, 1)) Mo)"
+          Start-Process -FilePath $setup.FullName -ArgumentList "/S" -Wait
+          $installed = Get-ChildItem -Path $env:LOCALAPPDATA -Filter waverti-desktop.exe -Recurse -Depth 2 -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $installed) { throw "waverti-desktop.exe introuvable après l'installation NSIS" }
+          Write-Host "Installé dans $($installed.DirectoryName)"
+          Test-Launch $installed.FullName
+          $uninstaller = Join-Path $installed.DirectoryName "uninstall.exe"
+          Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait
+          if (-not (Wait-Until { -not (Test-Path $installed.FullName) } 60)) { throw "Désinstallation NSIS incomplète" }
+          Write-Host "Désinstallation NSIS OK"
+
+          # MSI (installation machine)
+          $msi = Get-ChildItem msi\*.msi | Select-Object -First 1
+          Write-Host "MSI : $($msi.Name) ($([math]::Round($msi.Length / 1MB, 1)) Mo)"
+          $r = Start-Process msiexec.exe -ArgumentList "/i `"$($msi.FullName)`" /qn /l*v `"$env:RUNNER_TEMP\msi-install.log`"" -Wait -PassThru
+          if ($r.ExitCode -ne 0) { Get-Content "$env:RUNNER_TEMP\msi-install.log" -Tail 50; throw "msiexec /i : code $($r.ExitCode)" }
+          $exe = Get-ChildItem -Path "$env:ProgramFiles\Waverti" -Filter waverti-desktop.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "waverti-desktop.exe introuvable après l'installation MSI" }
+          Test-Launch $exe.FullName
+          $r = Start-Process msiexec.exe -ArgumentList "/x `"$($msi.FullName)`" /qn" -Wait -PassThru
+          if ($r.ExitCode -ne 0) { throw "msiexec /x : code $($r.ExitCode)" }
+          if (Test-Path $exe.FullName) { throw "Désinstallation MSI incomplète" }
+          Write-Host "Désinstallation MSI OK"
+      - name: Empreintes SHA-256
+        shell: pwsh
+        working-directory: waverti/apps/desktop/src-tauri/target/release/bundle
+        run: Get-ChildItem nsis\*.exe, msi\*.msi | Get-FileHash -Algorithm SHA256 | Format-Table -AutoSize | Out-String -Width 200
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waverti-windows-NON-SIGNE-test-uniquement
+          path: |
+            waverti/apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+            waverti/apps/desktop/src-tauri/target/release/bundle/msi/*.msi
+          retention-days: 7
+
+  macos:
+    name: macOS — Apple Silicon et Intel (construction et lancement)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: waverti/apps/desktop/src-tauri
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: waverti/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: waverti/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Tests Rust (macOS)
+        working-directory: waverti/apps/desktop/src-tauri
+        run: cargo test
+      - name: Apple Silicon (.app, .dmg)
+        run: pnpm --filter @waverti/desktop tauri build --target aarch64-apple-darwin --bundles app,dmg
+      - name: Intel (.app, .dmg)
+        run: pnpm --filter @waverti/desktop tauri build --target x86_64-apple-darwin --bundles app,dmg
+      - name: Architectures et lancement (Apple Silicon)
+        working-directory: waverti/apps/desktop/src-tauri/target
+        run: |
+          lipo -archs aarch64-apple-darwin/release/bundle/macos/Waverti.app/Contents/MacOS/waverti-desktop
+          lipo -archs x86_64-apple-darwin/release/bundle/macos/Waverti.app/Contents/MacOS/waverti-desktop
+          ./aarch64-apple-darwin/release/bundle/macos/Waverti.app/Contents/MacOS/waverti-desktop &
+          PID=$!
+          sleep 10
+          kill -0 "$PID" || { echo "L'application s'est arrêtée au lancement"; exit 1; }
+          kill "$PID"
+          echo "Lancement OK (Apple Silicon)"
+          shasum -a 256 */release/bundle/dmg/*.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waverti-macos-NON-SIGNE-test-uniquement
+          path: waverti/apps/desktop/src-tauri/target/*/release/bundle/dmg/*.dmg
+          retention-days: 7
+
+  linux:
+    name: Linux — paquets .deb, .rpm, AppImage (installation et lancement)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev xvfb rpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: waverti/apps/desktop/src-tauri
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: waverti/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: waverti/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @waverti/desktop tauri build --bundles deb,rpm,appimage
+      - name: Installation, lancement et désinstallation du .deb
+        working-directory: waverti/apps/desktop/src-tauri/target/release/bundle
+        run: |
+          sudo apt-get install -y ./deb/*.deb
+          test -x /usr/bin/waverti-desktop
+          xvfb-run -a /usr/bin/waverti-desktop &
+          sleep 10
+          pgrep -x waverti-desktop || { echo "L'application s'est arrêtée au lancement"; exit 1; }
+          pkill -x waverti-desktop
+          sudo apt-get remove -y waverti
+          test ! -e /usr/bin/waverti-desktop
+          sha256sum deb/*.deb rpm/*.rpm appimage/*.AppImage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waverti-linux-NON-SIGNE-test-uniquement
+          path: |
+            waverti/apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+            waverti/apps/desktop/src-tauri/target/release/bundle/rpm/*.rpm
+            waverti/apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: 7
