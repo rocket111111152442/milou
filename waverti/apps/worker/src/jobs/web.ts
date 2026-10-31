@@ -1,5 +1,5 @@
 import { count, eq, monitoringResults, monitoringTargets, monitoringTasks, sql } from "@waverti/database";
-import { getEntitlements } from "@waverti/billing";
+import { getEntitlements, loadCurrentSubscription, searchQuotaWindow } from "@waverti/billing";
 import { claimCloudJobs, StaleClaimError, submitResult } from "@waverti/monitoring";
 import { BudgetExceededError, runWebTopic, SearchProviderError } from "@waverti/monitoring/search";
 import { webTopicConditionSchema } from "@waverti/types";
@@ -21,12 +21,14 @@ export async function processWebJobs(ctx: WorkerContext): Promise<number> {
       await submitResult(ctx.db, { jobId: claim.jobId, claimToken: claim.claimToken, executor: "cloud", durationMs: 0, error: { code: "subscription_required", message: "Aucun abonnement actif." } }).catch(() => undefined);
       return;
     }
+    // Plafond de la période facturée en cours (28 à 31 jours), cf. @waverti/billing/search-quota.
+    const quota = searchQuotaWindow(ent, await loadCurrentSubscription(ctx.db, claim.userId));
     const [runs] = await ctx.db.select({ n: count() }).from(monitoringResults).where(eq(monitoringResults.taskId, task.id));
     const submitError = (code: string, message: string) =>
       submitResult(ctx.db, { jobId: claim.jobId, claimToken: claim.claimToken, executor: "cloud", durationMs: Date.now() - started, error: { code, message } });
     try {
       const { observation, evaluation } = await runWebTopic(
-        { db: ctx.db, provider: ctx.search, planId: ent.planId, monthlyCallLimit: ent.monthlySearchCalls, dailyCallLimit: ent.dailySearchCalls },
+        { db: ctx.db, provider: ctx.search, planId: ent.planId, monthlyCallLimit: quota.limit, dailyCallLimit: quota.dailyLimit, quotaPeriod: quota.period, attempt: claim.attempts },
         {
           id: task.id,
           userId: task.userId,

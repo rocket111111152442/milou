@@ -9,6 +9,7 @@ import { createResendSender, EmailSendError, type EmailSender } from "./resend";
 export function createSmtpSender(url: string): EmailSender {
   const transport = nodemailer.createTransport(url);
   return {
+    provider: "smtp",
     async send(msg) {
       try {
         const info = await transport.sendMail({

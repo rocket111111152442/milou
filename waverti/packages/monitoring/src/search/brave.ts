@@ -11,9 +11,30 @@ export interface SearchResultItem {
   hostname: string;
 }
 
+/** Informations techniques de la réponse (compteur des appels, quota annoncé par le fournisseur). */
+export interface SearchResponseMeta {
+  status: number;
+  quotaRemaining: number | null;
+  quotaLimit: number | null;
+}
+
+export interface SearchOptions {
+  count?: number;
+  freshness?: "pd" | "pw" | "pm" | "py";
+  onResponse?: (meta: SearchResponseMeta) => void;
+}
+
 export interface SearchProvider {
   readonly name: string;
-  search(query: string, opts?: { count?: number; freshness?: "pd" | "pw" | "pm" | "py" }): Promise<SearchResultItem[]>;
+  search(query: string, opts?: SearchOptions): Promise<SearchResultItem[]>;
+}
+
+/** « 1, 15000 » (par seconde, par mois) : la dernière valeur est le quota mensuel. */
+export function lastRateLimitValue(header: string | null): number | null {
+  if (!header) return null;
+  const parts = header.split(",").map((s) => Number(s.trim()));
+  const v = parts[parts.length - 1];
+  return v !== undefined && Number.isFinite(v) ? v : null;
 }
 
 export class SearchProviderError extends Error {
@@ -43,6 +64,11 @@ export function createBraveProvider(apiKey: string, base = "https://api.search.b
       const res = await fetchImpl(u, {
         headers: { accept: "application/json", "x-subscription-token": apiKey },
         signal: AbortSignal.timeout(15_000),
+      });
+      opts.onResponse?.({
+        status: res.status,
+        quotaRemaining: lastRateLimitValue(res.headers.get("x-ratelimit-remaining")),
+        quotaLimit: lastRateLimitValue(res.headers.get("x-ratelimit-limit")),
       });
       if (!res.ok) throw new SearchProviderError(`Brave HTTP ${res.status}`, res.status === 429 || res.status >= 500, res.status);
       const body = (await res.json()) as {

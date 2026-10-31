@@ -13,6 +13,8 @@ export interface EmailMessage {
 }
 
 export interface EmailSender {
+  /** Fournisseur, pour le compteur technique des envois (provider_requests). */
+  readonly provider?: "resend" | "smtp";
   send(msg: EmailMessage): Promise<{ id: string }>;
 }
 
@@ -28,6 +30,7 @@ export class EmailSendError extends Error {
 
 export function createResendSender(apiKey: string, base = "https://api.resend.com", fetchImpl: typeof fetch = fetch): EmailSender {
   return {
+    provider: "resend",
     async send(msg) {
       const res = await fetchImpl(`${base.replace(/\/$/, "")}/emails`, {
         method: "POST",

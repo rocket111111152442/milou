@@ -7,6 +7,7 @@ import {
   monitoringTasks,
   notifications,
   profiles,
+  sql,
   usagePeriod,
   type Executor,
   type NotificationType,
@@ -36,6 +37,9 @@ export interface NotifyInput {
   emailPolicy?: "transactional" | "alert" | "none";
   emailTemplate?: string;
   emailPayload?: Record<string, unknown>;
+  /** Interne : notification de synthèse déjà issue de la protection anti-répétition. */
+  bypassBusinessGuard?: boolean;
+  now?: Date;
 }
 
 export interface NotifyResult {
@@ -44,6 +48,46 @@ export interface NotifyResult {
   desktop: "pending" | "none";
   /** true : e-mail non envoyé car le quota mensuel d'alertes e-mail de la formule est atteint. */
   emailQuotaReached?: boolean;
+  /** E-mail Business non envoyé par la protection anti-répétition (l'alerte reste dans l'application). */
+  emailSuppressed?: BusinessEmailGuard;
+}
+
+/**
+ * Protection des e-mails de panne / rétablissement Business (non décomptés du quota de la formule) :
+ *  - « grouped » : un e-mail du même type a déjà été envoyé pour ce site il y a moins de 10 minutes
+ *    (plusieurs points de contrôle tombés en même temps) ;
+ *  - « flapping » : le site a déjà déclenché N e-mails de panne dans l'heure (site instable) : un seul
+ *    e-mail « site instable » est envoyé, les suivants restent dans l'application ;
+ *  - « daily_cap » : plafond technique anti-abus par compte et par 24 h.
+ * L'incident est toujours confirmé avant toute alerte (second contrôle, cf. business/uptime.ts).
+ */
+export type BusinessEmailGuard = "grouped" | "flapping" | "daily_cap";
+const GROUP_WINDOW_MINUTES = 10;
+
+async function settingInt(db: Executor, key: string, fallback: number): Promise<number> {
+  const r = await db.execute<{ value: unknown }>(sql`select value from app_settings where key = ${key}`);
+  const v = Number(r[0]?.value);
+  return Number.isInteger(v) && v > 0 ? v : fallback;
+}
+
+async function businessEmailGuard(db: Executor, userId: string, siteId: string, type: NotificationType, now: Date): Promise<BusinessEmailGuard | null> {
+  const dailyCap = await settingInt(db, "limit.business_alert_emails_per_day", 60);
+  const flapLimit = await settingInt(db, "limit.business_flapping_per_hour", 4);
+  const [r] = await db.execute<{ day: string; site_hour_down: string; site_recent_same: string }>(sql`
+    select
+      (select count(*) from notifications
+        where user_id = ${userId} and type in ('business_down', 'business_recovered') and email_status in ('pending', 'sent')
+          and created_at > ${now.toISOString()}::timestamptz - interval '24 hours')::text as day,
+      (select count(*) from notifications
+        where site_id = ${siteId} and type = 'business_down' and email_status in ('pending', 'sent')
+          and created_at > ${now.toISOString()}::timestamptz - interval '1 hour')::text as site_hour_down,
+      (select count(*) from notifications
+        where site_id = ${siteId} and type = ${type} and email_status in ('pending', 'sent')
+          and created_at > ${now.toISOString()}::timestamptz - make_interval(mins => ${GROUP_WINDOW_MINUTES}))::text as site_recent_same`);
+  if (Number(r?.day ?? 0) >= dailyCap) return "daily_cap";
+  if (Number(r?.site_hour_down ?? 0) >= flapLimit) return "flapping";
+  if (Number(r?.site_recent_same ?? 0) > 0) return "grouped";
+  return null;
 }
 
 /**
@@ -96,6 +140,12 @@ export async function notify(db: Executor, input: NotifyInput): Promise<NotifyRe
     if (!EMAIL_QUOTA_EXEMPT.has(input.type)) emailQuota = ent?.monthlyEmailAlerts ?? 0;
   }
   if (profile.suspendedAt && policy !== "transactional") wantsEmail = false;
+  const now = input.now ?? new Date();
+  let suppressed: BusinessEmailGuard | null = null;
+  if (wantsEmail && EMAIL_QUOTA_EXEMPT.has(input.type) && input.siteId && !input.bypassBusinessGuard) {
+    suppressed = await businessEmailGuard(db, input.userId, input.siteId, input.type, now);
+    if (suppressed) wantsEmail = false;
+  }
   const wantsDesktop = profile.notifyDesktop && taskPrefs.desktop && policy !== "transactional";
 
   const inserted = await db
@@ -121,6 +171,38 @@ export async function notify(db: Executor, input: NotifyInput): Promise<NotifyRe
     .returning({ id: notifications.id });
   const notificationId = inserted[0]?.id;
   if (!notificationId) return null;
+
+  if (suppressed === "flapping" && input.siteId) {
+    // Une seule synthèse « site instable » par site et par heure, envoyée par e-mail.
+    await notify(db, {
+      userId: input.userId,
+      type: "business_down",
+      priority: input.priority ?? "high",
+      title: "Site instable : pannes répétées",
+      body: "Ce site a subi plusieurs pannes et rétablissements en moins d'une heure. Pour éviter de vous submerger d'e-mails, les alertes suivantes de l'heure restent visibles dans l'application et sur la page de l'incident.",
+      siteId: input.siteId,
+      linkPath: `/app/business/sites/${input.siteId}`,
+      dedupKey: `business_flapping:${input.siteId}:${now.toISOString().slice(0, 13)}`,
+      emailPolicy: "alert",
+      bypassBusinessGuard: true,
+      now,
+    });
+  } else if (suppressed === "daily_cap") {
+    await db
+      .insert(notifications)
+      .values({
+        userId: input.userId,
+        type: "system",
+        priority: "normal",
+        title: "Limite technique d'e-mails Business atteinte",
+        body: "Un nombre inhabituel d'alertes Business a été envoyé par e-mail en 24 heures. Les alertes suivantes restent visibles dans l'application et sur le bureau ; les e-mails reprendront automatiquement.",
+        linkPath: "/app/business",
+        dedupKey: `business_email_cap:${now.toISOString().slice(0, 10)}`,
+        emailStatus: "none",
+        desktopStatus: "none",
+      })
+      .onConflictDoNothing();
+  }
 
   // Quota mensuel d'alertes e-mail : réservé atomiquement, uniquement pour une notification nouvelle.
   let emailQuotaReached = false;
@@ -177,6 +259,7 @@ export async function notify(db: Executor, input: NotifyInput): Promise<NotifyRe
     email: policy === "none" ? "none" : wantsEmail ? "pending" : "skipped",
     desktop: wantsDesktop ? "pending" : "none",
     ...(emailQuotaReached ? { emailQuotaReached } : {}),
+    ...(suppressed ? { emailSuppressed: suppressed } : {}),
   };
 }
 

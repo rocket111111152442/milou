@@ -1,4 +1,4 @@
-import { emailOutbox, eq, notifications, sql, type Database } from "@waverti/database";
+import { emailOutbox, eq, notifications, recordProviderRequest, sql, type Database } from "@waverti/database";
 import { EmailSendError, type EmailSender } from "./resend";
 import { renderEmail } from "./templates";
 
@@ -48,7 +48,15 @@ export async function processEmailOutbox(db: Database, sender: EmailSender, opts
 
   let sent = 0;
   let failed = 0;
+  let costMicros = 400;
+  if (claimed.length) {
+    const [c] = await db.execute<{ value: unknown }>(sql`select value from app_settings where key = 'cost.email_micros'`);
+    const v = Number(c?.value);
+    if (Number.isFinite(v) && v >= 0) costMicros = v;
+  }
+  const provider = sender.provider ?? "resend";
   for (const row of claimed) {
+    const started = Date.now();
     try {
       const rendered = renderEmail(row.template, row.subject, row.payload ?? {}, opts.appUrl);
       const res = await sender.send({
@@ -59,6 +67,7 @@ export async function processEmailOutbox(db: Database, sender: EmailSender, opts
         text: rendered.text,
         idempotencyKey: row.idempotency_key ?? row.id,
       });
+      await recordProviderRequest(db, { provider, userId: row.user_id, outcome: "success", attempt: row.attempts, latencyMs: Date.now() - started, estimatedCostMicros: costMicros });
       await db
         .update(emailOutbox)
         .set({
@@ -77,6 +86,14 @@ export async function processEmailOutbox(db: Database, sender: EmailSender, opts
       await opts.onSent?.({ id: row.id, userId: row.user_id });
     } catch (err) {
       failed++;
+      await recordProviderRequest(db, {
+        provider,
+        userId: row.user_id,
+        outcome: (err as Error).name === "TimeoutError" ? "timeout" : "failure",
+        attempt: row.attempts,
+        latencyMs: Date.now() - started,
+        error: (err as Error).message,
+      });
       const retryable = !(err instanceof EmailSendError) || err.retryable;
       const final = !retryable || row.attempts >= MAX_ATTEMPTS;
       const delaySec = Math.min(3600, 30 * 2 ** (row.attempts - 1));

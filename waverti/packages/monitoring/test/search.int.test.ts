@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { apiUsage, eq, sql } from "@waverti/database";
 import { createTestDatabase, createTestUser, type TestDatabase } from "@waverti/database/testing";
-import type { SearchProvider, SearchResultItem } from "../src/search/brave";
+import { createBraveProvider, SearchProviderError, type SearchProvider, type SearchResultItem } from "../src/search/brave";
 import { BudgetExceededError, runWebTopic, type WebRunDeps } from "../src/search/engine";
 
 let t: TestDatabase;
@@ -106,6 +106,39 @@ describe("web topic engine", () => {
     await expect(runWebTopic({ ...deps, provider: failing }, await task(v.id, { queries: ["failing q"] }))).rejects.toThrow(/réseau/);
     const [d] = await t.client<{ value: string }[]>`select value from usage_counters where user_id = ${v.id} and metric = 'brave_search' and length(period) = 7`;
     expect(Number(d?.value ?? 0)).toBe(0);
+  });
+
+  it("technical counter: every request sent to Brave is logged (success, failure, retry, rate limit, provider quota)", async () => {
+    const u = await createTestUser(t);
+    let mode: "ok" | "429" | "500" = "ok";
+    const fakeFetch = (async () => {
+      const headers = { "content-type": "application/json", "x-ratelimit-limit": "1, 2000", "x-ratelimit-remaining": "0, 1987" };
+      if (mode === "429") return new Response("{}", { status: 429, headers });
+      if (mode === "500") return new Response("{}", { status: 500, headers });
+      return new Response(JSON.stringify({ web: { results: [{ url: "https://numerama.com/a", title: "A", description: "" }] } }), { status: 200, headers });
+    }) as typeof fetch;
+    const provider = createBraveProvider("test-key", "https://brave.invalid", fakeFetch);
+    const deps: WebRunDeps = { db: t.db, provider, planId: "pro", monthlyCallLimit: 100, dailyCallLimit: null, quotaPeriod: "bp:2026-10-15" };
+    await runWebTopic(deps, await task(u.id, { queries: ["compteur ok"] }));
+    mode = "429";
+    await expect(runWebTopic({ ...deps, attempt: 1 }, await task(u.id, { queries: ["compteur 429"] }))).rejects.toBeInstanceOf(SearchProviderError);
+    mode = "500";
+    await expect(runWebTopic({ ...deps, attempt: 2 }, await task(u.id, { queries: ["compteur 500"] }))).rejects.toBeInstanceOf(SearchProviderError);
+    const rows = await t.client<{ outcome: string; http_status: number; is_retry: boolean; estimated_cost_micros: string; provider_quota_remaining: number; provider_quota_limit: number }[]>`
+      select outcome, http_status, is_retry, estimated_cost_micros::text, provider_quota_remaining, provider_quota_limit
+      from provider_requests where user_id = ${u.id} and provider = 'brave_search' order by id`;
+    expect(rows.map((r) => [r.outcome, r.http_status, r.is_retry])).toEqual([["success", 200, false], ["rate_limited", 429, false], ["failure", 500, true]]);
+    expect(Number(rows[0]!.estimated_cost_micros)).toBeGreaterThan(0);
+    expect(rows.slice(1).map((r) => Number(r.estimated_cost_micros))).toEqual([0, 0]);
+    expect(rows[0]).toMatchObject({ provider_quota_remaining: 1987, provider_quota_limit: 2000 });
+    // Le quota de l'abonné est compté sur la période facturée transmise, et seuls les succès sont décomptés.
+    const [c] = await t.client<{ value: string }[]>`select value from usage_counters where user_id = ${u.id} and metric = 'brave_search' and period = 'bp:2026-10-15'`;
+    expect(Number(c!.value)).toBe(1);
+    const { providerMonthSummary } = await import("@waverti/database");
+    const month = new Date().toISOString().slice(0, 7);
+    const summary = (await providerMonthSummary(t.db, month)).find((s) => s.provider === "brave_search");
+    expect(summary).toMatchObject({ successes: expect.any(Number), rateLimited: expect.any(Number), retries: expect.any(Number) });
+    expect(summary!.requests).toBeGreaterThanOrEqual(3);
   });
 
   it("fails clearly when no search provider is configured", async () => {

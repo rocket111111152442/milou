@@ -6,3 +6,4 @@ export * from "./stripe";
 export * from "./checkout";
 export * from "./webhooks";
 export * from "./manage";
+export * from "./search-quota";

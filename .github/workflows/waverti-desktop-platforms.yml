@@ -101,6 +101,22 @@ jobs:
           pnpm --filter @waverti/desktop exec playwright install chromium
       - name: Binaire desktop (debug)
         run: pnpm --filter @waverti/desktop tauri build --debug --no-bundle
+      - name: Diagnostic WebView2 (lancement direct, port de débogage)
+        continue-on-error: true
+        shell: pwsh
+        working-directory: waverti/apps/desktop/src-tauri
+        run: |
+          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9222"
+          $env:WAVERTI_API_URL = "http://localhost:3000"
+          $env:RUST_BACKTRACE = "1"
+          $p = Start-Process -FilePath target\debug\waverti-desktop.exe -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\app-out.txt" -RedirectStandardError "$env:RUNNER_TEMP\app-err.txt"
+          Start-Sleep -Seconds 15
+          Write-Host "Application toujours lancée : $(-not $p.HasExited)"
+          if ($p.HasExited) { Write-Host "Code de sortie : $($p.ExitCode)" }
+          try { (Invoke-WebRequest -Uri http://127.0.0.1:9222/json/version -UseBasicParsing).Content } catch { Write-Host "Port de débogage fermé : $_" }
+          Get-ChildItem -Path "$env:LOCALAPPDATA\com.lullinweb.waverti" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 30 FullName
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          Get-Content "$env:RUNNER_TEMP\app-out.txt", "$env:RUNNER_TEMP\app-err.txt" -ErrorAction SilentlyContinue | Select-Object -Last 60
       - name: E2E desktop (Windows, WebView2)
         shell: bash
         run: |

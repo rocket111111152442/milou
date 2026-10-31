@@ -12,6 +12,7 @@ import {
   consumeUsage,
   eq,
   monitoringSeenItems,
+  recordProviderRequest,
   releaseUsage,
   sql,
   usagePeriod,
@@ -20,7 +21,7 @@ import {
 import type { Evaluation } from "../compare/evaluate";
 import type { WebFinding, WebTopicCondition, WebTopicObservation } from "@waverti/types";
 import { STATUS_LABELS } from "@waverti/types";
-import type { SearchProvider, SearchResultItem } from "./brave";
+import type { SearchProvider, SearchResponseMeta, SearchResultItem } from "./brave";
 import { SearchProviderError } from "./brave";
 import { classifyResult, meetsThreshold, topicStatus } from "./classify";
 
@@ -50,8 +51,13 @@ export interface WebRunDeps {
   db: Database;
   provider: SearchProvider | null;
   planId: string;
+  /** Plafond de la période de quota (proportionnel aux jours de la période facturée, cf. billing/search-quota). */
   monthlyCallLimit: number;
   dailyCallLimit: number | null;
+  /** Clé de la période de quota (« bp:AAAA-MM-JJ » ou « AAAA-MM ») ; par défaut le mois civil UTC. */
+  quotaPeriod?: string;
+  /** Numéro de tentative du travail (> 1 : nouvelle tentative après une erreur temporaire). */
+  attempt?: number;
   now?: Date;
 }
 
@@ -81,9 +87,9 @@ async function reserveSearch(deps: WebRunDeps, userId: string, costMicros: numbe
   if (Number(g?.spent ?? 0) + costMicros > budgetEur * 1_000_000) {
     throw new BudgetExceededError("global", "Budget mensuel des recherches atteint");
   }
-  const month = usagePeriod("month", now);
+  const month = deps.quotaPeriod ?? usagePeriod("month", now);
   const monthOk = await consumeUsage(db, { userId, metric: "brave_search", period: month, limit: deps.monthlyCallLimit });
-  if (monthOk === null) throw new BudgetExceededError("user_month", "Quota mensuel de recherches atteint pour votre formule");
+  if (monthOk === null) throw new BudgetExceededError("user_month", "Quota de recherches de la période atteint pour votre formule");
   const releases = [() => releaseUsage(db, { userId, metric: "brave_search", period: month })];
   if (deps.dailyCallLimit !== null) {
     const day = usagePeriod("day", now);
@@ -114,13 +120,38 @@ export async function cachedSearch(deps: WebRunDeps, userId: string, query: stri
   const cost = await settingNumber(deps.db, "cost.brave_search_call_micros", 5000);
   const release = await reserveSearch(deps, userId, cost);
   let items: SearchResultItem[];
+  let meta: SearchResponseMeta | null = null;
+  const started = Date.now();
+  const track = { provider: "brave_search" as const, userId, attempt: deps.attempt ?? 1 };
   try {
-    items = await deps.provider.search(query, { count: 10 });
+    items = await deps.provider.search(query, { count: 10, onResponse: (m) => (meta = m) });
   } catch (err) {
-    // Appel non abouti : la réservation est rendue (ni facturé par Brave, ni décompté à l'utilisateur).
+    // Appel non abouti : la réservation est rendue (non décompté à l'utilisateur). Coût estimé 0 : Brave ne
+    // facture pas les requêtes refusées (429) ; pour les erreurs serveur, à vérifier sur la facture.
     await release();
+    const m = meta as SearchResponseMeta | null;
+    const name = (err as Error).name;
+    await recordProviderRequest(deps.db, {
+      ...track,
+      outcome: m?.status === 429 ? "rate_limited" : name === "TimeoutError" || name === "AbortError" ? "timeout" : "failure",
+      httpStatus: m?.status ?? null,
+      latencyMs: Date.now() - started,
+      providerQuotaRemaining: m?.quotaRemaining ?? null,
+      providerQuotaLimit: m?.quotaLimit ?? null,
+      error: (err as Error).message,
+    });
     throw err;
   }
+  const okMeta = meta as SearchResponseMeta | null;
+  await recordProviderRequest(deps.db, {
+    ...track,
+    outcome: "success",
+    httpStatus: okMeta?.status ?? 200,
+    latencyMs: Date.now() - started,
+    estimatedCostMicros: cost,
+    providerQuotaRemaining: okMeta?.quotaRemaining ?? null,
+    providerQuotaLimit: okMeta?.quotaLimit ?? null,
+  });
   await deps.db.execute(sql`
     insert into search_cache (query_hash, provider, query, results, fetched_at, expires_at)
     values (${hash}, ${deps.provider.name}, ${query.slice(0, 400)}, ${JSON.stringify(items)}::jsonb, now(), now() + make_interval(secs => ${SEARCH_CACHE_TTL_SECONDS}))

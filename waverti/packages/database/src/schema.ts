@@ -660,6 +660,36 @@ export const apiUsage = pgTable("api_usage", {
   meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
 });
 
+export type ProviderName = "brave_search" | "resend" | "smtp";
+export type ProviderOutcome = "success" | "failure" | "rate_limited" | "timeout";
+
+/** Compteur technique : chaque requête réellement émise vers un fournisseur externe. */
+export const providerRequests = pgTable("provider_requests", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  occurredAt: ts("occurred_at").notNull().defaultNow(),
+  provider: text("provider").$type<ProviderName>().notNull(),
+  userId: uuid("user_id"),
+  outcome: text("outcome").$type<ProviderOutcome>().notNull(),
+  httpStatus: smallint("http_status"),
+  attempt: smallint("attempt").notNull().default(1),
+  isRetry: boolean("is_retry").notNull().default(false),
+  latencyMs: integer("latency_ms"),
+  estimatedCostMicros: bigint("estimated_cost_micros", { mode: "number" }).notNull().default(0),
+  providerQuotaRemaining: integer("provider_quota_remaining"),
+  providerQuotaLimit: integer("provider_quota_limit"),
+  error: text("error"),
+});
+
+/** Coût réel mensuel saisi d'après la facture du fournisseur. */
+export const providerMonthlyCosts = pgTable("provider_monthly_costs", {
+  provider: text("provider").notNull(),
+  month: text("month").notNull(),
+  actualCostMicros: bigint("actual_cost_micros", { mode: "number" }).notNull(),
+  note: text("note"),
+  recordedBy: uuid("recorded_by"),
+  recordedAt: ts("recorded_at").notNull().defaultNow(),
+});
+
 export const workerHeartbeats = pgTable("worker_heartbeats", {
   workerId: text("worker_id").primaryKey(),
   hostname: text("hostname").notNull(),
