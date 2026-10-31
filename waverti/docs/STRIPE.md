@@ -83,7 +83,17 @@ définitif, expiré : surveillances mises en pause (rien n'est supprimé), repri
 - `STRIPE_SECRET_KEY=… pnpm stripe:prices` : contrôle local en lecture seule ; `--create-test-catalog`
   (clé de test uniquement) crée les quatre prix de test s'ils manquent, sans jamais recréer un prix existant.
 
-## 8. Actions humaines restantes avant tout test réel sur www.waverti.com
+## 8. Environnement de test (Preview)
+
+- Base : projet Neon **distinct** (aucune donnée de production), relié au projet Vercel pour **Preview seulement**
+  avec le préfixe `PREVIEW` (`PREVIEW_DATABASE_URL`, `PREVIEW_DATABASE_URL_UNPOOLED`). En Preview, le code
+  n'utilise jamais `DATABASE_URL` (base de production) et refuse une adresse de test pointant vers le même
+  serveur. Les migrations y sont appliquées au déploiement.
+- Au build d'une Preview avec une clé `sk_test_`, les quatre prix sont contrôlés et listés dans le journal
+  (`[stripe-test] …`), sans secret.
+- URL stable de la branche : `https://watchly-git-claude-upbeat-r-81df6d-lullinismael2-9456s-projects.vercel.app`.
+
+## 9. Actions humaines restantes avant tout test réel sur www.waverti.com
 
 1. Stripe **mode test** : vérifier/créer les 4 prix avec leurs clés de recherche (ou `--create-test-catalog`).
 2. Vercel (Production) : `STRIPE_SECRET_KEY` = clé `sk_test_…` (sensible) à la place de la clé live actuelle,
@@ -91,7 +101,7 @@ définitif, expiré : surveillances mises en pause (rien n'est supprimé), repri
 3. Stripe (mode test) : destination webhook vers l'URL ci-dessus avec les événements listés ; régler le portail.
 4. Tester avec la carte `4242 4242 4242 4242`, puis `4000 0000 0000 0341` (refus au premier prélèvement).
 
-## 9. Conditions avant les paiements réels
+## 10. Conditions avant les paiements réels
 
 CGV / mentions légales / confidentialité complétées et validées, statut TVA tranché (prix TTC affichés),
 compte Stripe live activé, prix live créés avec les mêmes clés de recherche et vérifiés par

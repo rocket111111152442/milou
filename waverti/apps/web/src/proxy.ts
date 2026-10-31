@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { databaseUrl } from "./lib/database-url";
 
 /**
  * Première barrière des espaces privés : sans cookie de session, redirection vers la connexion.
@@ -11,7 +12,7 @@ export function proxy(request: NextRequest) {
   // /admin n'est pas redirigé vers la connexion : requireAdmin() répond 404 à tout non-administrateur,
   // pour ne pas révéler l'existence de l'administration.
   const isPrivate = request.nextUrl.pathname.startsWith("/app");
-  if (!process.env.DATABASE_URL) {
+  if (!databaseUrl()) {
     if (isPrivate) return NextResponse.redirect(new URL("/connexion?erreur=configuration", request.url));
     return NextResponse.next();
   }

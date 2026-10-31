@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { autoBetaGrant, isBootstrapAdmin, isSignupAllowed, signupMode } from "../src/lib/beta";
-import { databaseUrl } from "../src/lib/database-url";
+import { databaseUrl, directDatabaseUrl, sameServer } from "../src/lib/database-url";
 import { EXPECTED_MIGRATIONS } from "../src/lib/schema-version";
 
 describe("base de données selon l'environnement Vercel", () => {
@@ -11,11 +11,23 @@ describe("base de données selon l'environnement Vercel", () => {
     expect(databaseUrl({ DATABASE_URL: url, VERCEL_ENV: "production" })).toBe(url);
     expect(databaseUrl({ DATABASE_URL: url })).toBe(url);
   });
-  it("une prévisualisation n'écrit jamais dans la base partagée, sauf autorisation explicite", () => {
-    expect(databaseUrl({ DATABASE_URL: url, VERCEL_ENV: "preview" })).toBeNull();
-    expect(databaseUrl({ DATABASE_URL: url, VERCEL_ENV: "development" })).toBeNull();
-    expect(databaseUrl({ DATABASE_URL: url, VERCEL_ENV: "preview", WAVERTI_PREVIEW_DATABASE: "1" })).toBe(url);
+  it("une prévisualisation n'utilise jamais la base de production, seulement PREVIEW_DATABASE_URL", () => {
+    const prod = "postgresql://u:p@ep-prod-123-pooler.eu-central-1.aws.neon.tech/neondb";
+    const test = "postgresql://u:p@ep-test-456-pooler.eu-central-1.aws.neon.tech/neondb";
+    expect(databaseUrl({ DATABASE_URL: prod, VERCEL_ENV: "preview" })).toBeNull();
+    expect(databaseUrl({ DATABASE_URL: prod, VERCEL_ENV: "development" })).toBeNull();
+    expect(databaseUrl({ DATABASE_URL: prod, VERCEL_ENV: "preview", WAVERTI_PREVIEW_DATABASE: "1" })).toBeNull();
+    expect(databaseUrl({ DATABASE_URL: prod, PREVIEW_DATABASE_URL: test, VERCEL_ENV: "preview" })).toBe(test);
+    expect(databaseUrl({ DATABASE_URL: prod, PREVIEW_DATABASE_URL: test, VERCEL_ENV: "production" })).toBe(prod);
     expect(databaseUrl({ VERCEL_ENV: "production" })).toBeNull();
+  });
+  it("refuse une base de test qui pointe vers le serveur de production", () => {
+    const prod = "postgresql://u:p@ep-prod-123-pooler.eu-central-1.aws.neon.tech/neondb";
+    const sameDirect = "postgresql://u:p@ep-prod-123.eu-central-1.aws.neon.tech/autre";
+    expect(sameServer(prod, sameDirect)).toBe(true);
+    expect(databaseUrl({ DATABASE_URL: prod, PREVIEW_DATABASE_URL: sameDirect, VERCEL_ENV: "preview" })).toBeNull();
+    expect(directDatabaseUrl({ DATABASE_URL: prod, DATABASE_URL_UNPOOLED: sameDirect.replace("/autre", "/neondb"), PREVIEW_DATABASE_URL: "postgresql://u:p@ep-test-1-pooler.x.neon.tech/db", PREVIEW_DATABASE_URL_UNPOOLED: sameDirect, VERCEL_ENV: "preview" })).toBeNull();
+    expect(directDatabaseUrl({ DATABASE_URL: prod, PREVIEW_DATABASE_URL: "postgresql://u:p@ep-test-1-pooler.x.neon.tech/db", PREVIEW_DATABASE_URL_UNPOOLED: "postgresql://u:p@ep-test-1.x.neon.tech/db", VERCEL_ENV: "preview" })).toBe("postgresql://u:p@ep-test-1.x.neon.tech/db");
   });
   it("le nombre de migrations attendu correspond aux fichiers de db/migrations", () => {
     const files = readdirSync(join(import.meta.dirname, "../../../db/migrations")).filter((f) => f.endsWith(".sql"));
