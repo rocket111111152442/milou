@@ -23,6 +23,8 @@ const schema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
   STRIPE_SECRET_KEY: z.string().optional(),
   WAVERTI_ALLOW_PRIVATE_TARGETS: z.enum(["0", "1"]).default("0"),
+  /** Exécution bornée (recette Preview via GitHub Actions) : arrêt propre après ce nombre de secondes. */
+  WORKER_RUN_FOR_SECONDS: z.coerce.number().int().min(30).max(5400).optional(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
 });
 

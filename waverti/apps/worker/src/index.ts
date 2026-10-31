@@ -85,8 +85,18 @@ export async function startWorker(env: Record<string, string | undefined> = proc
 const isMain = import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("dist/index.js");
 if (isMain) {
   startWorker()
-    .then(({ stop }) => {
+    .then(({ stop, ctx }) => {
       for (const sig of ["SIGTERM", "SIGINT"] as const) process.once(sig, () => void stop().then(() => process.exit(0)));
+      const limit = ctx.config.WORKER_RUN_FOR_SECONDS;
+      if (limit) {
+        logger.info({ seconds: limit }, "exécution bornée : arrêt programmé");
+        setTimeout(() => {
+          // Un contrôle en échec (site injoignable, clé de recherche absente) est un résultat normal, pas une panne :
+          // seul un plantage du worker produit un code de sortie non nul.
+          logger.info({ succeeded: ctx.counters.succeeded, failed: ctx.counters.failed }, "exécution bornée terminée");
+          void stop().then(() => process.exit(0));
+        }, limit * 1000).unref();
+      }
     })
     .catch((err) => {
       logger.fatal({ err: { message: (err as Error).message } }, "worker failed to start");

@@ -1,0 +1,85 @@
+# Recette du worker sur l'environnement Preview (base Neon de TEST), sans serveur payant.
+# Lancement MANUEL uniquement (Actions → « Waverti — worker Preview » → Run workflow).
+# Secret GitHub requis (Settings → Secrets and variables → Actions → New repository secret) :
+#   PREVIEW_DATABASE_URL_UNPOOLED  connexion DIRECTE à la base Neon de TEST (jamais la Production :
+#                                   le garde-fou refuse toute base sans le marqueur « preview »).
+# Facultatif : PREVIEW_RESEND_API_KEY (clé Resend limitée à l'envoi) pour les e-mails d'alerte.
+name: Waverti — worker Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "scenarios = pages contrôlées (base temporaire) ; worker = traiter les surveillances de la Preview ; both = les deux"
+        type: choice
+        options: [both, scenarios, worker]
+        default: both
+      minutes:
+        description: "Durée d'exécution du worker (minutes, 1 à 60)"
+        type: number
+        default: 10
+
+permissions:
+  contents: read
+
+concurrency:
+  group: waverti-preview-worker
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: waverti
+
+jobs:
+  preview-worker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    env:
+      HAS_DB: ${{ secrets.PREVIEW_DATABASE_URL_UNPOOLED != '' }}
+    steps:
+      - name: Secret présent ?
+        working-directory: .
+        run: |
+          if [ "$HAS_DB" != "true" ]; then
+            echo "::error::Ajoutez le secret PREVIEW_DATABASE_URL_UNPOOLED (base Neon de TEST) dans Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: waverti/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: waverti/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      - name: Garde-fou — base de TEST de la Preview uniquement
+        env:
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL_UNPOOLED }}
+        run: pnpm exec tsx packages/database/scripts/assert-preview-db.ts
+
+      - name: Scénarios sur pages contrôlées (base temporaire sur le serveur de TEST, supprimée ensuite)
+        if: inputs.mode != 'worker'
+        env:
+          TEST_DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL_UNPOOLED }}
+        run: >
+          pnpm exec vitest run --project integration
+          packages/monitoring/test/rules.int.test.ts
+          packages/monitoring/test/scenarios.int.test.ts
+          apps/worker/test/worker.int.test.ts
+
+      - name: Worker sur les surveillances de la Preview (durée bornée)
+        if: inputs.mode != 'scenarios'
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL_UNPOOLED }}
+          RESEND_API_KEY: ${{ secrets.PREVIEW_RESEND_API_KEY }}
+          EMAIL_FROM: "Waverti (test) <noreply@waverti.com>"
+          APP_URL: https://watchly-git-claude-upbeat-r-81df6d-lullinismael2-9456s-projects.vercel.app
+          WORKER_ID: github-preview-${{ github.run_id }}
+          WORKER_ROLES: scheduler,pages,web,email,maintenance
+          WORKER_BROWSER_CONCURRENCY: "0"
+          WORKER_RUN_FOR_SECONDS: ${{ inputs.minutes * 60 }}
+        run: pnpm --filter @waverti/worker exec tsx src/index.ts

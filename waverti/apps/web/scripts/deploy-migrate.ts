@@ -33,6 +33,21 @@ function migrate(): number {
   return r.status ?? 1;
 }
 
+/** Marqueur d'environnement de la base de TEST : les outils de recette (worker Preview) refusent toute autre base. */
+async function markPreviewDatabase(): Promise<void> {
+  if (target !== "preview") return;
+  const direct = directDatabaseUrl(process.env);
+  if (!direct) return;
+  const { createDb, sql } = await import("@waverti/database");
+  const h = createDb(direct, { max: 1, applicationName: "waverti-deploy" });
+  try {
+    await h.db.execute(sql`insert into app_settings (key, value) values ('environment', '"preview"'::jsonb) on conflict (key) do nothing`);
+    console.info("[migrations] marqueur d'environnement : preview");
+  } finally {
+    await h.close();
+  }
+}
+
 async function checkStripeTestPrices(): Promise<void> {
   const key = process.env.STRIPE_SECRET_KEY ?? "";
   if (target !== "preview" || !/^(sk|rk)_test_/.test(key)) return;
@@ -51,5 +66,6 @@ async function checkStripeTestPrices(): Promise<void> {
 void (async () => {
   const status = migrate();
   if (status !== 0) process.exit(status);
+  await markPreviewDatabase();
   await checkStripeTestPrices();
 })();
