@@ -86,7 +86,7 @@ export async function advanceTestBilling(db: Database, stripe: StripeClient, use
     await stripe.subscriptions.update(sub.stripeSubscriptionId, { trial_end: "now" as const, proration_behavior: "none" as const });
   } else {
     if (sub.status === "trialing") throw new BillingError("no_subscription", "Terminez d'abord l'essai.");
-    await stripe.subscriptions.update(sub.stripeSubscriptionId, { billing_cycle_anchor: "now" as const, proration_behavior: "none" as const });
+    await stripe.subscriptions.update(sub.stripeSubscriptionId, { billing_cycle_anchor: { type: "now" }, proration_behavior: "none" });
   }
   return { subscriptionId: sub.stripeSubscriptionId };
 }
