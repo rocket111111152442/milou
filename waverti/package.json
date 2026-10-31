@@ -22,7 +22,8 @@
     "format:check": "prettier --check .",
     "admin:grant": "tsx packages/database/scripts/grant-admin.ts",
     "test:load": "WAVERTI_LOAD_TESTS=1 vitest run --project load",
-    "stripe:prices": "tsx packages/billing/scripts/stripe-prices.ts"
+    "stripe:prices": "tsx packages/billing/scripts/stripe-prices.ts",
+    "beta:grant": "tsx packages/billing/scripts/beta-grant.ts"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

@@ -1,5 +1,6 @@
 import {
   and,
+  betaGrants,
   desc,
   entitlements as entitlementsTable,
   eq,
@@ -13,6 +14,7 @@ import {
   type Transaction,
 } from "@waverti/database";
 import {
+  betaEntitlements,
   computeEntitlements,
   roleForEntitlements,
   type Entitlements,
@@ -121,7 +123,12 @@ export async function recomputeEntitlements(
           currentPeriodEnd: sub.currentPeriodEnd,
         }
       : null;
-    const e = computeEntitlements(plans, snapshot, now);
+    let e = computeEntitlements(plans, snapshot, now);
+    if (e.source === "none") {
+      // Accès bêta privé : seulement en l'absence d'abonnement valide (un abonnement est toujours prioritaire).
+      const [grant] = await tx.select().from(betaGrants).where(eq(betaGrants.userId, userId)).limit(1);
+      e = betaEntitlements(plans, grant ?? null, now) ?? e;
+    }
     const row = toRow(userId, e);
     await tx.insert(entitlementsTable).values(row).onConflictDoUpdate({ target: entitlementsTable.userId, set: row });
 

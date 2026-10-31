@@ -13,7 +13,7 @@
  * montée en gamme débloque aussitôt des recherches ; une baisse ne supprime pas les recherches déjà faites,
  * mais aucune nouvelle recherche n'est faite au-delà du nouveau plafond). Une nouvelle période (renouvellement
  * ou fin d'essai) ouvre un nouveau compteur.
- * Essai : plafond propre à l'essai (2 recherches par jour), sans proratisation.
+ * Essai et accès bêta privé : plafonds propres (2 recherches par jour), sans proratisation.
  */
 import type { Entitlements } from "./entitlements";
 
@@ -60,7 +60,8 @@ export function searchQuotaWindow(ent: Pick<Entitlements, "source" | "monthlySea
     const e = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
     window = { period: now.toISOString().slice(0, 7), start: s, end: e, days: daysInUtcMonth(now) };
   }
-  if (ent.source === "trial") {
+  // Essai et accès bêta : plafonds propres (2 recherches par jour), sans proratisation.
+  if (ent.source === "trial" || ent.source === "admin_grant") {
     return { ...window, limit: ent.monthlySearchCalls, dailyLimit: ent.dailySearchCalls };
   }
   if (ent.source === "none") return { ...window, limit: 0, dailyLimit: 0 };

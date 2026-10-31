@@ -68,6 +68,8 @@ export interface SubscriptionView {
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
+  /** Accès bêta privé (sans paiement) : date de fin, sinon null. */
+  betaEndsAt?: string | null;
 }
 
 export interface OverviewData {

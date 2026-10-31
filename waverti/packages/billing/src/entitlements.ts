@@ -73,6 +73,51 @@ export interface Entitlements {
 /** Pendant l'essai : recherche sur Internet au plus une fois par jour et par sujet. */
 export const TRIAL_MIN_WEB_INTERVAL_MINUTES = 1440;
 
+/**
+ * Plafonds de l'accès bêta privé (sans paiement) : toujours inférieurs ou égaux à la formule de référence.
+ * Recherches : 2 par jour comme pendant l'essai, pour limiter le coût Brave.
+ */
+export const BETA_CAPS = {
+  maxMonitors: 10,
+  maxWebTopics: 2,
+  dailySearchCalls: 2,
+  monthlySearchCalls: 60,
+  monthlyEmailAlerts: 30,
+  businessSites: 1,
+} as const;
+export const BETA_MAX_DAYS = 60;
+
+export interface BetaGrantSnapshot {
+  planId: string;
+  startsAt: Date;
+  expiresAt: Date;
+  revokedAt: Date | null;
+}
+
+/** Droits de l'accès bêta, ou null si l'accès n'est pas (ou plus) valable. */
+export function betaEntitlements(plans: ReadonlyMap<string, PlanRow>, grant: BetaGrantSnapshot | null, now: Date = new Date()): Entitlements | null {
+  if (!grant || grant.revokedAt) return null;
+  if (grant.startsAt.getTime() > now.getTime() || grant.expiresAt.getTime() <= now.getTime()) return null;
+  const plan = plans.get(grant.planId);
+  if (!plan) return null;
+  const base = fromPlan(plan);
+  const sites = Math.min(plan.businessSitesIncluded, BETA_CAPS.businessSites);
+  return {
+    ...base,
+    planId: plan.id,
+    source: "admin_grant",
+    subscriptionStatus: null,
+    maxMonitors: Math.min(plan.maxMonitors, BETA_CAPS.maxMonitors),
+    maxWebTopics: Math.min(plan.maxWebTopics, BETA_CAPS.maxWebTopics),
+    dailySearchCalls: BETA_CAPS.dailySearchCalls,
+    monthlySearchCalls: Math.min(plan.monthlySearchCalls, BETA_CAPS.monthlySearchCalls),
+    monthlyEmailAlerts: Math.min(plan.monthlyEmailAlerts, BETA_CAPS.monthlyEmailAlerts),
+    businessSites: sites,
+    businessScenarios: Math.min(base.businessScenarios, sites * plan.businessScenariosPerSite),
+    validUntil: grant.expiresAt,
+  };
+}
+
 /** Délai de grâce après un échec de paiement (past_due) avant la suspension des surveillances. */
 export const PAST_DUE_GRACE_DAYS = 7;
 /** Marge laissée aux webhooks Stripe pour confirmer une conversion d'essai ou un renouvellement. */

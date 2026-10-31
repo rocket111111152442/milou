@@ -56,14 +56,31 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
             <div className="flex flex-col gap-1">
               <CardTitle as="h2">{sub.planName ? `Formule ${sub.planName}` : "Aucun abonnement en cours"}</CardTitle>
               <p className="text-sm text-muted-fg">
-                {sub.planId
+                {sub.betaEndsAt
+                  ? "Accès bêta privé sans paiement, avec des quotas réduits. Aucun moyen de paiement n'est enregistré."
+                  : sub.planId
                   ? `${formatCents(PLAN_CATALOG[sub.planId as keyof typeof PLAN_CATALOG]?.priceCents ?? 0)} / mois TTC, renouvelé chaque mois jusqu'à résiliation`
                   : "Vos surveillances sont en pause. Choisissez une formule pour démarrer un essai gratuit de 3 jours."}
               </p>
             </div>
-            {status ? <Badge tone={status.tone}>{status.label}</Badge> : <Badge tone="neutral">Inactif</Badge>}
+            {sub.betaEndsAt ? (
+              <Badge tone="info">Bêta privée</Badge>
+            ) : status ? (
+              <Badge tone={status.tone}>{status.label}</Badge>
+            ) : (
+              <Badge tone="neutral">Inactif</Badge>
+            )}
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
+            {sub.betaEndsAt ? (
+              <p className="flex items-start gap-2 text-sm" data-testid="beta-access">
+                <CalendarClock className="mt-0.5 size-4 shrink-0 text-blue" aria-hidden="true" />
+                <span>
+                  Accès bêta jusqu'au <strong>{formatDateTime(sub.betaEndsAt)}</strong>. Il s'arrête automatiquement à cette date ;
+                  vos surveillances seront alors mises en pause, sauf si vous choisissez une formule.
+                </span>
+              </p>
+            ) : null}
             {sub.isTrial && sub.trialEndsAt ? (
               <p className="flex items-start gap-2 text-sm">
                 <CalendarClock className="mt-0.5 size-4 shrink-0 text-blue" aria-hidden="true" />

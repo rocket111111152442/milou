@@ -39,6 +39,7 @@ export async function getSubscriptionView(userId: string): Promise<SubscriptionV
       trialEndsAt: live && sub.trialEnd ? sub.trialEnd.toISOString() : null,
       currentPeriodEnd: live && sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null,
       cancelAtPeriodEnd: Boolean(live && sub.cancelAtPeriodEnd),
+      betaEndsAt: ent.source === "admin_grant" && ent.validUntil ? ent.validUntil.toISOString() : null,
     };
   });
 }

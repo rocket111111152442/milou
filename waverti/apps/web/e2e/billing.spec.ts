@@ -65,4 +65,23 @@ test.describe("abonnements (Stripe en mode test)", () => {
     await expect(page.getByText("Résiliation enregistrée").first()).toBeVisible();
     await page.waitForURL(/\/app\/abonnement$/);
   });
+
+  test("accès bêta privé : sans carte, quotas réduits, date de fin affichée, aucune activation possible depuis le site", async ({ page }) => {
+    const u = await createConfirmedUser(uniqueEmail("beta"), { plan: null });
+    await sql`insert into beta_grants (user_id, plan_id, reason, expires_at) values (${u.id}, 'pro', 'Bêta privée E2E', now() + interval '14 days')`;
+    await login(page, u.email);
+    await page.waitForURL(/\/app/);
+    await page.goto("/app/abonnement");
+    await expect(page.getByText("Bêta privée", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("beta-access")).toContainText("Accès bêta jusqu'au");
+    await expect(page.getByText(/Aucun moyen de paiement n'est enregistré/)).toBeVisible();
+    // Surveillances possibles, dans la limite des quotas bêta.
+    const created = await page.request.post("/api/monitors", {
+      data: { kind: "page", name: "Bêta", url: "https://example.com/produit", renderMode: "http", condition: { type: "page_changed", sensitivity: "significant" }, executionMode: "auto", notify: { inapp: true, email: false, desktop: false } },
+      headers: { origin: "http://localhost:3000" },
+    });
+    expect(created.status()).toBe(201);
+    const [e] = await sql<{ source: string; max_monitors: number }[]>`select source, max_monitors from entitlements where user_id = ${u.id}`;
+    expect(e).toEqual({ source: "admin_grant", max_monitors: 10 });
+  });
 });

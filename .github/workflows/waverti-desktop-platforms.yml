@@ -168,8 +168,15 @@ jobs:
           Write-Host "MSI : $($msi.Name) ($([math]::Round($msi.Length / 1MB, 1)) Mo)"
           $r = Start-Process msiexec.exe -ArgumentList "/i `"$($msi.FullName)`" /qn /l*v `"$env:RUNNER_TEMP\msi-install.log`"" -Wait -PassThru
           if ($r.ExitCode -ne 0) { Get-Content "$env:RUNNER_TEMP\msi-install.log" -Tail 50; throw "msiexec /i : code $($r.ExitCode)" }
-          $exe = Get-ChildItem -Path "$env:ProgramFiles\Waverti" -Filter waverti-desktop.exe -Recurse | Select-Object -First 1
-          if (-not $exe) { throw "waverti-desktop.exe introuvable après l'installation MSI" }
+          # Emplacement déclaré par l'installateur (registre de désinstallation), sinon emplacement par défaut.
+          $entry = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*", "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq "Waverti" } | Select-Object -First 1
+          Write-Host "Entrée de désinstallation : $($entry.DisplayName) $($entry.DisplayVersion) — $($entry.InstallLocation)"
+          $candidates = @()
+          if ($entry.InstallLocation) { $candidates += (Join-Path $entry.InstallLocation "waverti-desktop.exe") }
+          $candidates += "$env:ProgramFiles\Waverti\waverti-desktop.exe", "${env:ProgramFiles(x86)}\Waverti\waverti-desktop.exe"
+          $exe = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1 | ForEach-Object { Get-Item $_ }
+          if (-not $exe) { throw "waverti-desktop.exe introuvable après l'installation MSI (cherché : $($candidates -join ', '))" }
+          Write-Host "Installé dans $($exe.DirectoryName)"
           Test-Launch $exe.FullName
           $r = Start-Process msiexec.exe -ArgumentList "/x `"$($msi.FullName)`" /qn" -Wait -PassThru
           if ($r.ExitCode -ne 0) { throw "msiexec /x : code $($r.ExitCode)" }

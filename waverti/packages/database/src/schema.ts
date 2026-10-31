@@ -690,6 +690,18 @@ export const providerMonthlyCosts = pgTable("provider_monthly_costs", {
   recordedAt: ts("recorded_at").notNull().defaultNow(),
 });
 
+/** Accès bêta privé sans paiement, accordé en ligne de commande (durée et quotas limités). */
+export const betaGrants = pgTable("beta_grants", {
+  userId: uuid("user_id").primaryKey(),
+  planId: text("plan_id").notNull(),
+  reason: text("reason").notNull(),
+  startsAt: ts("starts_at").notNull().defaultNow(),
+  expiresAt: ts("expires_at").notNull(),
+  revokedAt: ts("revoked_at"),
+  grantedBy: text("granted_by").notNull().default("ligne de commande"),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
 export const workerHeartbeats = pgTable("worker_heartbeats", {
   workerId: text("worker_id").primaryKey(),
   hostname: text("hostname").notNull(),
