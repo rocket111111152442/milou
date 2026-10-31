@@ -4,7 +4,7 @@ import { siteConfig } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteConfig.url;
-  const staticPaths = ["", "/tarifs", "/entreprises", "/telecharger", "/assistance", "/robot"];
+  const staticPaths = ["", "/tarifs", "/entreprises", "/telecharger", "/assistance", "/robot", "/fonctionnement"];
   const legal = ["/legal/conditions-generales", "/legal/confidentialite", "/legal/cookies", "/legal/mentions-legales"];
   return [
     ...staticPaths.map((p) => ({ url: `${base}${p}`, changeFrequency: "weekly" as const, priority: p === "" ? 1 : 0.8 })),

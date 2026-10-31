@@ -15,7 +15,6 @@ test.describe("site public", () => {
       "Votre site tombe en panne ? Vous le savez avant vos clients.",
       "Voyez Waverti décider à votre place",
       "Simple à utiliser, même quand c'est technique",
-      "Votre ordinateur d'abord, nos serveurs en relais",
       "Waverti sur votre ordinateur",
       "Une formule pour chaque besoin",
       "Tout ce que vous voulez savoir",
@@ -58,7 +57,7 @@ test.describe("site public", () => {
   });
 
   test("pages SEO et juridiques accessibles, robots et sitemap présents", async ({ page, request }) => {
-    for (const path of ["/surveiller-prix-produit", "/alerte-retour-en-stock", "/surveiller-changements-site", "/detecter-panne-site-internet", "/surveillance-site-entreprise", "/legal/mentions-legales", "/legal/confidentialite", "/legal/cookies", "/legal/conditions-generales", "/entreprises", "/assistance", "/robot", "/tarifs", "/telecharger"]) {
+    for (const path of ["/surveiller-prix-produit", "/alerte-retour-en-stock", "/surveiller-changements-site", "/detecter-panne-site-internet", "/surveillance-site-entreprise", "/legal/mentions-legales", "/legal/confidentialite", "/legal/cookies", "/legal/conditions-generales", "/entreprises", "/assistance", "/robot", "/fonctionnement", "/tarifs", "/telecharger"]) {
       const res = await page.goto(path);
       expect(res?.status(), path).toBe(200);
       await expect(page.getByRole("heading", { level: 1 }), path).toHaveCount(1);
@@ -80,7 +79,7 @@ test.describe("site public", () => {
 
   test("accessibilité : aucune violation critique ou grave (axe)", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    for (const path of ["/", "/tarifs", "/connexion", "/inscription", "/entreprises", "/telecharger"]) {
+    for (const path of ["/", "/tarifs", "/connexion", "/inscription", "/entreprises", "/telecharger", "/fonctionnement"]) {
       await page.goto(path);
       // Fait défiler la page pour révéler toutes les sections avant l'audit.
       await page.evaluate(async () => {
@@ -95,4 +94,14 @@ test.describe("site public", () => {
       expect(serious.map((v) => `${path}: ${v.id} (${v.nodes.length})`)).toEqual([]);
     }
   });
+});
+
+test("page « Fonctionnement de Waverti » : local expliqué hors de l'accueil, lien dans le pied de page", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Votre ordinateur d'abord, nos serveurs en relais" })).toHaveCount(0);
+  await page.getByRole("contentinfo").getByRole("link", { name: "Fonctionnement de Waverti" }).click();
+  await expect(page).toHaveURL(/\/fonctionnement$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fonctionnement de Waverti");
+  await expect(page.getByText("Aucun contrôle n'est exécuté sur le téléphone.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Votre ordinateur d'abord, nos serveurs en relais" })).toBeVisible();
 });

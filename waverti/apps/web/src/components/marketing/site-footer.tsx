@@ -27,6 +27,7 @@ const columns = [
     links: [
       { href: "/assistance", label: "Assistance" },
       { href: "/#faq", label: "Questions fréquentes" },
+      { href: "/fonctionnement", label: "Fonctionnement de Waverti" },
       { href: "/robot", label: "Notre robot d'exploration" },
     ],
   },

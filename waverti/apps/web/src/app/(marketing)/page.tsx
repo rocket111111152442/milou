@@ -8,7 +8,6 @@ import {
   BusinessSection,
   FinalCta,
   HowItWorks,
-  HybridSection,
   PageMonitoring,
   WebSearchSection,
 } from "@/components/marketing/sections";
@@ -56,7 +55,6 @@ export default async function HomePage() {
       <BusinessSection />
       <InteractiveDemo />
       <AppShowcase />
-      <HybridSection />
       <DownloadSection releases={releases} />
       <PricingSection plans={planOrder(plans)} />
       <FaqSection />
