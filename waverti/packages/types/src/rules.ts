@@ -11,6 +11,10 @@
  */
 import { z } from "zod";
 
+/** Catégories de surveillance proposées à la création (affichage et préréglages). */
+export const RULE_CATEGORIES = ["price", "product", "page", "keyword", "event", "company", "news", "uptime", "document", "custom"] as const;
+export type RuleCategory = (typeof RULE_CATEGORIES)[number];
+
 const term = z.string().trim().min(1).max(120);
 const terms = z.array(term).min(1).max(10);
 const optionalContains = z.string().trim().max(120).optional();
@@ -94,9 +98,7 @@ export const ruleConditionSchema = z
     type: z.literal("rule"),
     version: z.literal(1).default(1),
     /** Catégorie choisie à la création (affichage uniquement). */
-    category: z
-      .enum(["price", "product", "page", "keyword", "event", "company", "news", "uptime", "document", "custom"])
-      .default("custom"),
+    category: z.enum(RULE_CATEGORIES).default("custom"),
     match: z.enum(["all", "any"]).default("all"),
     conditions: z.array(ruleAtomSchema).max(8).default([]),
     groups: z.array(ruleGroupSchema).max(3).default([]),

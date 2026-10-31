@@ -2,7 +2,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, Checkbox, Field, Input, Label, Select, Switch } from "@waverti/ui";
-import { formatInterval } from "@waverti/types";
+import { formatInterval, type RuleConditionInput } from "@waverti/types";
+import { normalizeRule, RuleBuilder, ruleProblem } from "@waverti/ui/app";
 import { useApiAction } from "@/components/app/use-api";
 
 interface Initial {
@@ -28,12 +29,21 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
   const [threshold, setThreshold] = useState(initial.condition.type === "price_below" ? String(initial.condition.threshold) : "");
   const [requireOfficial, setRequireOfficial] = useState(Boolean(initial.condition.requireOfficial));
   const [domains, setDomains] = useState(initial.officialDomains.join(", "));
+  const isRule = initial.condition.type === "rule";
+  const [rule, setRule] = useState(() => normalizeRule((isRule ? initial.condition : { type: "rule", conditions: [{ type: "page_changed" }] }) as RuleConditionInput));
+  const [ruleError, setRuleError] = useState<string | null>(null);
   const options = [...new Set([minInterval, 120, 240, 360, 720, 1440, 2880, 10080].filter((m) => m >= minInterval))].sort((a, b) => a - b);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    const condition =
-      initial.condition.type === "price_below"
+    if (isRule) {
+      const problem = ruleProblem(rule);
+      setRuleError(problem);
+      if (problem) return;
+    }
+    const condition = isRule
+      ? { type: "rule", ...rule }
+      : initial.condition.type === "price_below"
         ? { ...initial.condition, threshold: Number(threshold.replace(",", ".")) }
         : initial.condition.type === "web_topic"
           ? { ...initial.condition, requireOfficial }
@@ -43,7 +53,7 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
       intervalMinutes: interval,
       notify: { email, desktop },
       ...(condition ? { condition } : {}),
-      ...(kind === "page" ? { cssSelector: selector || null, executionMode: cloudRelay ? exec : "local_only" } : {}),
+      ...(kind === "page" ? { cssSelector: selector || null, ...(isRule ? {} : { executionMode: cloudRelay ? exec : "local_only" }) } : {}),
       ...(kind === "web_topic" ? { officialDomains: domains.split(/[,\s]+/).map((d) => d.trim().toLowerCase()).filter(Boolean).slice(0, 5) } : {}),
     };
     const r = await run(`/api/monitors/${id}`, body, { method: "PATCH", success: "Modifications enregistrées", refresh: false });
@@ -55,6 +65,17 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
       <Field id="e-name" label="Nom" required>
         {(p) => <Input {...p} value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />}
       </Field>
+      {isRule ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium">Conditions</p>
+          <RuleBuilder value={rule} onChange={setRule} id="e-rb" />
+          {ruleError ? (
+            <p role="alert" className="text-sm font-medium text-danger">
+              {ruleError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {initial.condition.type === "price_below" ? (
         <Field id="e-threshold" label="Seuil de prix (€)">
           {(p) => <Input {...p} inputMode="decimal" value={threshold} onChange={(e) => setThreshold(e.target.value)} className="max-w-48" />}
@@ -86,7 +107,8 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
           </Select>
         )}
       </Field>
-      {kind === "page" && cloudRelay ? (
+      {kind === "page" && isRule ? <p className="text-sm text-muted-fg">Les règles personnalisées sont contrôlées par les serveurs Waverti.</p> : null}
+      {kind === "page" && cloudRelay && !isRule ? (
         <Field id="e-exec" label="Exécution">
           {(p) => (
             <Select {...p} value={exec} onChange={(e) => setExec(e.target.value as Initial["executionMode"])}>

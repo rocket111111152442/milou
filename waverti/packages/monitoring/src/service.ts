@@ -126,10 +126,13 @@ export async function createMonitor(
     const [counts] = await tx.execute<{ total: number; topics: number }>(sql`
       select count(*)::int as total, count(*) filter (where kind = 'web_topic')::int as topics
       from monitoring_tasks where user_id = ${userId}`);
+    // Les règles personnalisées utilisent des données (liens, documents, temps de réponse, PDF…) que seules les
+    // versions récentes de l'extracteur produisent : elles sont toujours contrôlées par les serveurs Waverti.
+    const isRule = input.kind === "page" && (condition as { type?: string }).type === "rule";
     const settings = checkNewMonitor(ent, { total: counts?.total ?? 0, webTopics: counts?.topics ?? 0 }, {
       kind: input.kind,
       intervalMinutes: input.intervalMinutes,
-      executionMode: input.kind === "page" ? input.executionMode : "cloud_only",
+      executionMode: input.kind === "page" && !isRule ? input.executionMode : "cloud_only",
     });
 
     const [task] = await tx
@@ -201,6 +204,7 @@ export async function updateMonitor(db: Database, userId: string, taskId: string
       const [t] = await db.select({ css: monitoringTargets.cssSelector }).from(monitoringTargets).where(eq(monitoringTargets.taskId, taskId));
       assertFeasible(parsed.data, input.cssSelector === undefined ? t?.css : input.cssSelector);
       patch.condition = parsed.data;
+      if (parsed.data.type === "rule") patch.executionMode = "cloud_only";
     }
     else patch.condition = webTopicConditionSchema.parse(input.condition);
   }
@@ -209,7 +213,8 @@ export async function updateMonitor(db: Database, userId: string, taskId: string
   if (input.notify?.desktop !== undefined) patch.notifyDesktop = input.notify.desktop;
   let settings: ReturnType<typeof resolveSettings> | null = null;
   if (input.intervalMinutes !== undefined || input.executionMode !== undefined) {
-    settings = resolveSettings(ent, { kind: task.kind, intervalMinutes: input.intervalMinutes, executionMode: input.executionMode ?? task.executionMode });
+    const ruleBased = (patch.condition ?? task.condition)?.type === "rule";
+    settings = resolveSettings(ent, { kind: task.kind, intervalMinutes: input.intervalMinutes, executionMode: ruleBased ? "cloud_only" : (input.executionMode ?? task.executionMode) });
     patch.executionMode = settings.executionMode;
   }
   await db.transaction(async (tx) => {

@@ -14,19 +14,19 @@ const target = process.env.VERCEL_ENV;
 
 function migrate(): number {
   if (target !== "production" && target !== "preview") {
-    console.log(`[migrations] ignorées (environnement : ${target ?? "local"})`);
+    console.info(`[migrations] ignorées (environnement : ${target ?? "local"})`);
     return 0;
   }
   const direct = directDatabaseUrl(process.env);
   if (!direct) {
-    console.log(
+    console.info(
       target === "preview"
         ? "[migrations] ignorées : aucune base de test (PREVIEW_DATABASE_URL absent ou identique à la production)"
         : "[migrations] ignorées : DATABASE_URL absent",
     );
     return 0;
   }
-  console.log(`[migrations] base ${target === "preview" ? "de TEST (Preview)" : "de production"}`);
+  console.info(`[migrations] base ${target === "preview" ? "de TEST (Preview)" : "de production"}`);
   const script = fileURLToPath(new URL("../../../packages/database/scripts/migrate.ts", import.meta.url));
   const env = { ...process.env, DATABASE_URL_DIRECT: direct, DATABASE_URL: direct };
   const r = spawnSync("tsx", [script], { stdio: "inherit", env, shell: process.platform === "win32" });
@@ -40,11 +40,11 @@ async function checkStripeTestPrices(): Promise<void> {
     const { createStripeClient, verifyPlanPrices } = await import("@waverti/billing");
     const { plans, retiredActive } = await verifyPlanPrices(createStripeClient(key));
     for (const p of plans) {
-      console.log(`[stripe-test] ${p.lookupKey} → ${p.priceId ?? "absent"} : ${p.ok ? "conforme" : p.issues.join(", ")}`);
+      console.info(`[stripe-test] ${p.lookupKey} → ${p.priceId ?? "absent"} : ${p.ok ? "conforme" : p.issues.join(", ")}`);
     }
-    if (retiredActive.length) console.log(`[stripe-test] ancienne option encore active : ${retiredActive.join(", ")}`);
+    if (retiredActive.length) console.info(`[stripe-test] ancienne option encore active : ${retiredActive.join(", ")}`);
   } catch (e) {
-    console.log(`[stripe-test] vérification impossible : ${e instanceof Error ? e.message.slice(0, 160) : "erreur"}`);
+    console.info(`[stripe-test] vérification impossible : ${e instanceof Error ? e.message.slice(0, 160) : "erreur"}`);
   }
 }
 

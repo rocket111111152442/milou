@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { PLAN_CATALOG } from "@waverti/billing/catalog";
 import { requireUser } from "@/lib/auth";
 import { listDevices, loadEntitlements } from "@/lib/data/account";
 import { Onboarding } from "./onboarding";
@@ -21,6 +22,9 @@ export default async function WelcomePage() {
         maxWebTopics: ent.maxWebTopics,
         cloudRelay: ent.cloudRelay,
         emailAlerts: ent.emailAlerts,
+        planName: PLAN_CATALOG[ent.planId as keyof typeof PLAN_CATALOG]?.name ?? null,
+        maxMonitors: ent.maxMonitors,
+        businessSites: ent.businessSites,
       }}
     />
   );

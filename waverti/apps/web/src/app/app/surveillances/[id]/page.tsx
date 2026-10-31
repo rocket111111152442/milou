@@ -5,7 +5,7 @@ import { ExternalLink, Pencil } from "lucide-react";
 import { Badge, Button, Callout, Card, CardContent, CardHeader, CardTitle, LineChart, PageHeader } from "@waverti/ui";
 import { MonitorStatusBadge, ResultTimeline } from "@waverti/ui/app";
 import { isUuid } from "@waverti/database";
-import { formatDateTime, formatInterval, formatRelative, STATUS_LABELS, type WebFinding } from "@waverti/types";
+import { describeRule, formatDateTime, formatInterval, formatRelative, ruleConditionSchema, STATUS_LABELS, type WebFinding } from "@waverti/types";
 import { requireUser } from "@/lib/auth";
 import { loadEntitlements } from "@/lib/data/account";
 import { conditionLabel, getMonitorDetail, toResultView } from "@/lib/data/monitors";
@@ -30,6 +30,9 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
   const latestWeb = d.results.find((r) => (r.observation as { kind?: string } | null)?.kind === "web_topic")?.observation as
     | { status: keyof typeof STATUS_LABELS; findings: WebFinding[] }
     | undefined;
+
+  const ruleParsed = ruleConditionSchema.safeParse(task.condition);
+  const ruleLines = ruleParsed.success ? describeRule(ruleParsed.data) : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -71,6 +74,21 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="flex flex-col gap-6">
+          {ruleLines.length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle as="h2">Règle d'alerte</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="flex flex-col gap-1.5 text-sm" aria-label="Conditions de la règle">
+                  {ruleLines.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+                {target?.cssSelector ? <p className="mt-3 text-xs text-muted-fg">Zone surveillée : {target.cssSelector}</p> : null}
+              </CardContent>
+            </Card>
+          ) : null}
           {task.kind === "page" && prices.length > 1 ? (
             <Card>
               <CardHeader>

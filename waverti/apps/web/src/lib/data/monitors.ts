@@ -18,7 +18,10 @@ import {
 } from "@waverti/database";
 import {
   CONDITION_LABELS,
+  describeAtom,
   formatPrice,
+  ruleAtoms,
+  ruleConditionSchema,
   STATUS_LABELS,
   type Condition,
   type MonitorSummary,
@@ -50,6 +53,13 @@ export function conditionLabel(c: Condition | Record<string, unknown>): string {
       return `Disparition de « ${cond.text} »`;
     case "page_changed":
       return cond.sensitivity === "any" ? "Toute modification" : "Modification significative";
+    case "rule": {
+      const parsed = ruleConditionSchema.safeParse(cond);
+      if (!parsed.success) return "Règle personnalisée";
+      const atoms = ruleAtoms(parsed.data);
+      const first = describeAtom(atoms[0]!);
+      return atoms.length > 1 ? `${first} ${parsed.data.match === "all" ? "et" : "ou"} ${atoms.length - 1} autre(s) condition(s)` : first;
+    }
     case "web_topic":
       return `${INTENT_LABELS[cond.intent] ?? "Recherche"}${cond.requireOfficial ? " (officielle)" : ""}`;
     default:

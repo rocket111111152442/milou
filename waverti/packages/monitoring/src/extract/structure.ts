@@ -9,7 +9,7 @@
  */
 import { sha256 as sha256Bytes } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import type * as cheerio from "cheerio/slim";
+import * as cheerio from "cheerio/slim";
 import type { LinkRef } from "@waverti/types";
 import { findPricesInText, parsePrice } from "./price";
 import { collapseWhitespace, normalizeForMatch, stripVolatile } from "./text";
@@ -341,16 +341,43 @@ const IDENT = /^-?[_a-zA-Z][_a-zA-Z0-9-]{0,60}$/;
  * Zones sélectionnables d'une page (« sélection visuelle » sans exécuter la page) : chaque zone est proposée avec
  * un sélecteur CSS UNIQUE dans la page et un extrait de son contenu. L'utilisateur choisit la zone à surveiller.
  */
-export function listBlocks($: cheerio.CheerioAPI, max = 25): PageBlock[] {
-  $("script, style, noscript, svg, iframe, template, head, link, meta").remove();
-  $(NOISE_SELECTOR).remove();
+/** Chemin positionnel (au plus 4 niveaux) jusqu'à l'ancêtre identifié le plus proche, vérifié unique. */
+function positionalSelector($: cheerio.CheerioAPI, el: cheerio.Cheerio<never>): string | null {
+  const parts: string[] = [];
+  let cur = el;
+  for (let depth = 0; depth < 4 && cur.length; depth++) {
+    const node = cur.get(0) as { tagName?: string } | undefined;
+    if (!node?.tagName || node.tagName === "body" || node.tagName === "html") break;
+    const id = cur.attr("id");
+    if (id && IDENT.test(id)) {
+      parts.unshift(`#${id}`);
+      break;
+    }
+    const sameTag = cur.parent().children(node.tagName);
+    parts.unshift(sameTag.length > 1 ? `${node.tagName}:nth-of-type(${sameTag.index(cur) + 1})` : node.tagName);
+    cur = cur.parent() as cheerio.Cheerio<never>;
+  }
+  const sel = parts.join(" > ");
+  try {
+    return sel && $(sel).length === 1 ? sel : null;
+  } catch {
+    return null;
+  }
+}
+
+export function listBlocks(html: string, max = 25): PageBlock[] {
+  const $ = cheerio.load(html.slice(0, 2_000_000));
+  // Les zones annexes ne sont PAS retirées (les positions des sélecteurs doivent correspondre à la vraie page) :
+  // elles sont seulement exclues des propositions.
   const out: PageBlock[] = [];
   const used = new Set<string>();
   const consider = (el: cheerio.Cheerio<never>, kind: PageBlock["kind"]) => {
     if (out.length >= max) return;
     const node = el.get(0) as { tagName?: string } | undefined;
-    if (!node?.tagName) return;
-    const text = label(el.text(), 400);
+    if (!node?.tagName || el.closest(NOISE_SELECTOR).length) return;
+    const clone = el.clone();
+    clone.find("script, style, noscript, svg, template").remove();
+    const text = label(clone.text(), 400);
     if (text.length < 15) return;
     let selector: string | null = null;
     const id = el.attr("id");
@@ -366,6 +393,7 @@ export function listBlocks($: cheerio.CheerioAPI, max = 25): PageBlock[] {
         }
       }
     }
+    if (!selector) selector = positionalSelector($, el);
     if (!selector || used.has(selector)) return;
     used.add(selector);
     const heading = label(el.find("h1, h2, h3, h4, caption, legend").first().text(), 80);
@@ -377,6 +405,10 @@ export function listBlocks($: cheerio.CheerioAPI, max = 25): PageBlock[] {
   });
   $("table").slice(0, 5).each((_, e) => consider($(e) as cheerio.Cheerio<never>, "table"));
   $("main, section, article, [id]").each((_, e) => consider($(e) as cheerio.Cheerio<never>, "section"));
+  $("div[class]").each((_, e) => {
+    const el = $(e) as cheerio.Cheerio<never>;
+    if (el.children("h2, h3, h4").length) consider(el, "block");
+  });
   $("ul, ol").slice(0, 20).each((_, e) => {
     const el = $(e) as cheerio.Cheerio<never>;
     if (el.children("li").length >= 3) consider(el, "list");

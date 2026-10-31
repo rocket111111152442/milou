@@ -374,3 +374,42 @@ describe("assistant en langage naturel (déterministe)", () => {
 });
 
 void day;
+
+describe("analyse de page : zones sélectionnables et suggestions", () => {
+  it("propose des zones avec un sélecteur unique, sans les zones annexes", async () => {
+    const { listBlocks } = await import("../src/extract/structure");
+    const blocks = listBlocks(`<html><body><nav id="menu">Menu principal du site web</nav>
+      <main><section id="tarifs"><h2>Nos tarifs</h2><p>Abonnement mensuel à partir de 9 €.</p></section>
+      <div class="planning box"><h3>Planning</h3><p>Séances du lundi au vendredi.</p></div>
+      <table><caption>Horaires</caption><tr><td>Lundi</td><td>9 h - 18 h</td></tr></table></main>
+      <div class="cookie-banner" id="cookies">Nous utilisons des cookies sur ce site</div></body></html>`);
+    const sels = blocks.map((b) => b.selector);
+    expect(sels).toContain("#tarifs");
+    expect(sels).toContain("div.planning.box");
+    expect(blocks.find((b) => b.kind === "table")?.label).toBe("Horaires");
+    expect(sels).not.toContain("#menu");
+    expect(sels).not.toContain("#cookies");
+    expect(blocks.find((b) => b.selector === "#tarifs")!.label).toBe("Nos tarifs");
+  });
+
+  it("ne suggère que ce qui a été réellement détecté", async () => {
+    const { suggestRules } = await import("@waverti/types");
+    const none = suggestRules({ title: "T", contentKind: "html", price: null, currency: null, regularPrice: null, availability: "unknown", items: [], documents: [], futureDates: [], headings: [], linksCount: 0, tablesCount: 0, signupForm: false, textSample: "Bonjour" });
+    expect(none.map((s) => s.id)).toEqual(["change"]);
+    const shop = suggestRules({ title: "T", contentKind: "html", price: 249, currency: "EUR", regularPrice: 299, availability: "out_of_stock", items: [], documents: [{ t: "Notice", u: "/n.pdf" }], futureDates: ["2027-01-10"], headings: [], linksCount: 1, tablesCount: 0, signupForm: false, textSample: "" });
+    expect(shop.map((s) => s.id)).toEqual(expect.arrayContaining(["price-below", "price-15", "promo", "back-in-stock", "price-and-stock", "new-doc", "new-date"]));
+    for (const s of shop) expect(ruleConditionSchema.safeParse(s.rule).success, s.id).toBe(true);
+  });
+});
+
+describe("sélecteur proposé = zone réellement surveillée", () => {
+  it("le sélecteur positionnel désigne la même zone à l'extraction", async () => {
+    const { listBlocks } = await import("../src/extract/structure");
+    const html = `<html><body><nav>Menu</nav><div><p>Annexe sans intérêt particulier</p></div><div><table><tr><td>Tarif réduit</td><td>12 €</td></tr></table></div></body></html>`;
+    const table = listBlocks(html).find((b) => b.kind === "table")!;
+    const obs = extractPage({ html, url: URL_, finalUrl: URL_, httpStatus: 200, method: "http", cssSelector: table.selector });
+    expect(obs.selectorFound).toBe(true);
+    expect(obs.excerpt).toContain("Tarif réduit");
+    expect(obs.excerpt).not.toContain("Annexe");
+  });
+});

@@ -5,14 +5,14 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Cloud, Download, Globe, Laptop, PartyPopper, Search, ShieldCheck } from "lucide-react";
 import { Button, Callout, Logo, Spinner, cn } from "@waverti/ui";
 import { LOCAL_CONSENT_TEXT } from "@waverti/config/constants";
-import { ResultTimeline, type FormEntitlements } from "@waverti/ui/app";
+import { ResultTimeline, type WizardEntitlements } from "@waverti/ui/app";
 import type { ResultView } from "@waverti/types";
 import { apiCall } from "@/components/app/use-api";
 import { NewMonitor } from "../surveillances/nouvelle/new-monitor";
 
 const STEPS = ["Bienvenue", "Présentation", "Application", "Fonctionnement local", "Première surveillance", "Résultat initial", "C'est parti"];
 
-export function Onboarding({ displayName, hasDevice, entitlements }: { displayName: string | null; hasDevice: boolean; entitlements: FormEntitlements }) {
+export function Onboarding({ displayName, hasDevice, entitlements }: { displayName: string | null; hasDevice: boolean; entitlements: WizardEntitlements }) {
   const [step, setStep] = useState(0);
   const [monitorId, setMonitorId] = useState<string | null>(null);
   const router = useRouter();

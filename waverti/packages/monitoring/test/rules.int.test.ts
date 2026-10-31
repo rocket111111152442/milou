@@ -198,3 +198,15 @@ describe("validation, quotas et compatibilité", () => {
     expect(task!.c).toMatchObject({ type: "price_below" });
   });
 });
+
+describe("coût de stockage", () => {
+  it("les listes détaillées ne sont conservées que sur le dernier résultat réussi", async () => {
+    const u = await subscriber();
+    const m = await monitor(u.id, "/catalogue", { type: "rule", conditions: [{ type: "item_added" }] });
+    await check(m.id, u.id);
+    await check(m.id, u.id);
+    await check(m.id, u.id);
+    const rows = await t.db.execute<{ heavy: boolean }>(sql`select (observation ? 'items') as heavy from monitoring_results where task_id = ${m.id} order by checked_at`);
+    expect(rows.map((r) => r.heavy)).toEqual([false, false, true]);
+  });
+});

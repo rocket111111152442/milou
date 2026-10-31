@@ -60,6 +60,22 @@ réel de Brave était de 15 € / 1 000 requêtes, le coût Brave de Pro passera
 Seuil de rentabilité indicatif : ≈ 40 € / mois de coûts fixes, couverts par ≈ 10 abonnés Plus ou 2 abonnés
 Business au maximum de leurs quotas.
 
+## Règles personnalisées (mesure du 01/11/2026)
+
+- **Aucun appel payant supplémentaire** : les règles réutilisent le même téléchargement de page que l'ancien système
+  (une règle = un contrôle à la fréquence de la formule, quel que soit le nombre de conditions). L'assistant en
+  langage naturel est déterministe (aucune IA). Les PDF sont téléchargés uniquement quand l'adresse surveillée est un
+  PDF (8 Mo max), jamais en masse.
+- **Stockage mesuré** (pire cas : page catalogue de 80 produits et 150 liens) : observation enrichie 28 Ko contre
+  4,4 Ko auparavant ; 0,6 Ko une fois compactée. Les listes détaillées ne sont conservées que sur le **dernier**
+  résultat réussi de chaque surveillance (supprimées des précédents dès le contrôle suivant) et l'extrait de texte est
+  compacté après 24 h. Coût par surveillance : ≤ 28 Ko pour le dernier résultat + 0,6 à 4,4 Ko par contrôle conservé.
+- Mémoire de déduplication : empreintes de 16 caractères, 800 au plus par type de liste (≈ 70 Ko maximum par
+  surveillance dans le pire cas, quelques Ko en pratique).
+- CPU (mesuré, pire cas ci-dessus) : 23 ms par extraction enrichie contre 2,4 ms pour l'extraction historique, soit
+  ≈ 1 vCPU pour 150 000 contrôles par heure (1 000 abonnés Max au maximum). Aucun navigateur supplémentaire. Piste
+  d'optimisation si nécessaire : n'extraire que les listes utilisées par la règle de la surveillance.
+
 ## Points de vigilance
 
 1. **Brave** : seul coût variable significatif. Plafond global de la plateforme (`budget.monthly_api_eur`, 50 € par

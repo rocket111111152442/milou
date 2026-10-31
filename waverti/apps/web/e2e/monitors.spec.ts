@@ -10,20 +10,25 @@ test.describe("surveillances (moteurs A et B)", () => {
     const u = await createConfirmedUser(uniqueEmail("mon"), { plan: "plus" });
     await login(page, u.email, undefined, "/app/surveillances/nouvelle");
     await page.waitForURL(/surveillances\/nouvelle/);
-    await expect(page.getByRole("radio", { name: /Un sujet sur Internet/ })).toBeEnabled();
-    await page.getByLabel(/^Adresse de la page/).fill("https://boutique.example.com/casque");
-    await page.getByLabel(/^Seuil de prix/).fill("99");
+    // Étape 1 : catégorie ; étape 2 : objectif, adresse et seuil ; étape 3 : résumé.
+    await page.getByRole("listitem").filter({ hasText: "Prix" }).first().click();
+    await expect(page.getByRole("radio", { name: /Prix inférieur à une valeur/ })).toHaveAttribute("aria-checked", "true");
+    await page.getByLabel(/^Adresse/).fill("https://boutique.example.com/casque");
+    await page.getByLabel("Montant en euros").fill("99");
+    await page.getByRole("button", { name: /Continuer/ }).click();
+    await expect(page.getByRole("heading", { name: "Résumé avant création" })).toBeVisible();
+    await expect(page.getByText("Le prix est inférieur à 99 €")).toBeVisible();
     await page.getByLabel(/^Nom de la surveillance/).fill("Casque <script>alert(1)</script>");
     await page.getByRole("button", { name: "Créer la surveillance" }).click();
     await page.waitForURL(/\/app\/surveillances\/[0-9a-f-]{36}$/);
     // Le nom est affiché comme du texte (aucune injection HTML).
     await expect(page.getByRole("heading", { name: "Casque <script>alert(1)</script>" })).toBeVisible();
-    await expect(page.getByText("Prix sous 99,00 €")).toBeVisible();
+    await expect(page.getByText("Le prix est inférieur à 99 €").first()).toBeVisible();
 
     const id = page.url().split("/").pop()!;
-    const [task] = await sql<{ status: string; execution_mode: string }[]>`select status, execution_mode from monitoring_tasks where id = ${id}`;
-    // Fonctionnement hybride par défaut : ordinateur en priorité, serveurs en relais.
-    expect(task).toEqual({ status: "active", execution_mode: "auto" });
+    const [task] = await sql<{ status: string; execution_mode: string; type: string }[]>`select status, execution_mode, condition->>'type' as type from monitoring_tasks where id = ${id}`;
+    // Les règles sont contrôlées par les serveurs Waverti.
+    expect(task).toEqual({ status: "active", execution_mode: "cloud_only", type: "rule" });
 
     await page.getByRole("button", { name: "Autres actions" }).click();
     await page.getByRole("menuitem", { name: "Mettre en pause" }).click();

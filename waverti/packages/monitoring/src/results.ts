@@ -167,6 +167,14 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
       })
       .returning({ id: monitoringResults.id });
 
+    // Coût de stockage : les listes détaillées (liens, éléments, documents, rubriques) ne servent qu'à comparer avec
+    // le contrôle suivant. Elles ne sont conservées que sur le dernier résultat réussi (celui qui vient d'être écrit).
+    if (evaluation.outcome !== "error" && observation && job.kind === "page") {
+      await tx.execute(sql`
+        update monitoring_results set observation = observation - 'links' - 'items' - 'documents' - 'headings'
+        where task_id = ${task.id} and id <> ${result!.id} and observation ?| array['links', 'items', 'documents', 'headings']`);
+    }
+
     await tx.execute(sql`
       update monitoring_jobs set status = 'succeeded', finished_at = ${tsParam(now)}, lease_expires_at = null,
              last_error = ${evaluation.outcome === "error" ? evaluation.errorCode : null}

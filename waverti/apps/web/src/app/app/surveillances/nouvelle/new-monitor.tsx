@@ -1,19 +1,21 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useToast } from "@waverti/ui";
-import { MonitorForm, type FormEntitlements, type PreviewResult, type TopicPlan } from "@waverti/ui/app";
+import { MonitorWizard, type AnalysisResult, type TopicPlan, type WizardEntitlements } from "@waverti/ui/app";
+import type { RuleCategory } from "@waverti/types";
 import { apiCall } from "@/components/app/use-api";
 
-export function NewMonitor({ entitlements, defaultKind, onCreated }: { entitlements: FormEntitlements; defaultKind?: "page" | "web_topic"; onCreated?: (id: string) => void }) {
+export function NewMonitor({ entitlements, initialCategory, onCreated }: { entitlements: WizardEntitlements; initialCategory?: RuleCategory; onCreated?: (id: string) => void }) {
   const router = useRouter();
   const { push } = useToast();
   return (
-    <MonitorForm
+    <MonitorWizard
       entitlements={entitlements}
-      defaultKind={defaultKind}
+      initialCategory={initialCategory}
       upgradeHref="/app/abonnement"
+      businessHref="/app/business"
       onPreview={async (url, cssSelector) => {
-        const r = await apiCall<PreviewResult>("/api/monitors/preview", { body: { url, cssSelector } });
+        const r = await apiCall<AnalysisResult>("/api/monitors/preview", { body: { url, cssSelector } });
         return r.ok ? r.data : { ok: false, error: { code: r.error.error ?? "error", message: r.error.message ?? "Analyse impossible." } };
       }}
       onPlanTopic={async (request, officialDomains) => {
