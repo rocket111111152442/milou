@@ -21,6 +21,37 @@ const HIDDEN_ARG: &str = "--hidden";
 /// Cadence à laquelle l'interface est réveillée pour faire avancer l'agent (même fenêtre masquée).
 const TICK: Duration = Duration::from_secs(20);
 
+/// Crée la fenêtre principale à partir de tauri.conf.json (`create: false`).
+///
+/// Compilation de développement sous Windows uniquement : WebView2 ignore la variable
+/// `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` lorsque l'application fixe ses propres arguments (ce que fait
+/// wry). Les tests WebDriver (msedgedriver) ont besoin du port de débogage qu'ils transmettent par cette
+/// variable : elle est donc relayée ici, avec le dossier de données qu'ils imposent. Jamais en version publiée.
+fn create_main_window(app: &tauri::App) -> tauri::Result<()> {
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .cloned()
+        .expect("fenêtre « main » absente de tauri.conf.json");
+    #[allow(unused_mut)]
+    let mut builder = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
+    if cfg!(all(windows, debug_assertions)) {
+        if let Ok(extra) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+            builder = builder.additional_browser_args(&format!(
+                "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection {extra}"
+            ));
+        }
+        if let Ok(dir) = std::env::var("WEBVIEW2_USER_DATA_FOLDER") {
+            builder = builder.data_directory(dir.into());
+        }
+    }
+    builder.build()?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
@@ -40,6 +71,7 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             let config_dir = app.path().app_config_dir()?;
             app.manage(AppState::new(data_dir, config_dir));
+            create_main_window(app)?;
             tray::create(app.handle())?;
 
             if !std::env::args().any(|a| a == HIDDEN_ARG) {
