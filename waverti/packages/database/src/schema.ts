@@ -305,6 +305,8 @@ export const monitoringTasks = pgTable("monitoring_tasks", {
   lastTriggeredAt: ts("last_triggered_at"),
   lastError: text("last_error"),
   consecutiveErrors: integer("consecutive_errors").notNull().default(0),
+  /** Mémoire du moteur de règles (voir @waverti/monitoring compare/rules). */
+  ruleState: jsonb("rule_state").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: ts("created_at").notNull().defaultNow(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });

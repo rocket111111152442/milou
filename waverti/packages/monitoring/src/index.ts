@@ -2,6 +2,8 @@ export * from "./net";
 export * from "./extract";
 export * from "./compare/evaluate";
 export * from "./compare/similarity";
+export * from "./compare/rules";
+export * from "./extract/pdf";
 export * from "./schedule/next-run";
 export * from "./queue";
 export * from "./results";

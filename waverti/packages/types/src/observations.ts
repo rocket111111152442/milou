@@ -3,6 +3,10 @@ import { z } from "zod";
 export const availabilitySchema = z.enum(["in_stock", "out_of_stock", "preorder", "unknown"]);
 export type Availability = z.infer<typeof availabilitySchema>;
 
+/** Lien ou élément repéré sur une page : adresse absolue et libellé. */
+export const linkRefSchema = z.object({ u: z.string().max(500), t: z.string().max(160) });
+export type LinkRef = z.infer<typeof linkRefSchema>;
+
 /** Résultat d'extraction d'une page (produit par le worker cloud ou l'application desktop). */
 export const pageObservationSchema = z.object({
   kind: z.literal("page"),
@@ -22,6 +26,24 @@ export const pageObservationSchema = z.object({
   selectorFound: z.boolean().nullable(),
   method: z.enum(["http", "browser"]),
   fetchedAt: z.string().datetime(),
+  // ——— Données enrichies (facultatives : absentes des observations antérieures et des anciennes versions desktop) ———
+  /** Nature du contenu : page HTML ou document (PDF…). */
+  contentKind: z.enum(["html", "pdf", "document"]).optional(),
+  /** Empreinte du contenu nettoyé (navigation, publicités, cookies, horloges retirées) : détection de changements. */
+  contentHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  /** Temps de réponse mesuré par le serveur (ms). */
+  responseMs: z.number().int().nonnegative().max(600_000).optional(),
+  /** Prix barré affiché par le site (prix de référence), seulement s'il est supérieur au prix actuel. */
+  regularPrice: z.number().nonnegative().max(100_000_000).nullable().optional(),
+  headings: z.array(z.string().max(160)).max(40).optional(),
+  links: z.array(linkRefSchema).max(100).optional(),
+  documents: z.array(linkRefSchema).max(30).optional(),
+  /** Éléments d'une liste ou d'un catalogue (produits, offres, événements, articles). */
+  items: z.array(linkRefSchema.extend({ p: z.number().nonnegative().nullable().optional() })).max(60).optional(),
+  /** Dates trouvées dans le contenu (AAAA-MM-JJ). */
+  dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(40).optional(),
+  tableHashes: z.array(z.string().max(16)).max(10).optional(),
+  forms: z.object({ count: z.number().int().nonnegative(), signup: z.boolean() }).optional(),
 });
 export type PageObservation = z.infer<typeof pageObservationSchema>;
 

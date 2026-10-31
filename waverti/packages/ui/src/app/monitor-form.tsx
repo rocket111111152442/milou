@@ -6,7 +6,7 @@
  */
 import * as React from "react";
 import { Globe, Search, ScanSearch, Sparkles, Lock } from "lucide-react";
-import { formatInterval, formatPrice, type CreateMonitorInput, type PageCondition, type WebTopicCondition } from "@waverti/types";
+import { formatInterval, formatPrice, type CreateMonitorInput, type LegacyPageCondition as PageCondition, type WebTopicCondition } from "@waverti/types";
 import { cn } from "../lib/cn";
 import { Badge } from "../components/badge";
 import { Button } from "../components/button";

@@ -3,7 +3,7 @@
  * Règle anti-répétition : une alerte n'est émise que lors d'une TRANSITION vers l'état
  * recherché (ex. passage sous le seuil), pas à chaque contrôle où la condition reste vraie.
  */
-import type { PageCondition, PageObservation } from "@waverti/types";
+import type { LegacyPageCondition, PageObservation } from "@waverti/types";
 import { formatPrice } from "@waverti/types";
 import { normalizeForMatch } from "../extract/text";
 import { changeRatio, diffSentences } from "./similarity";
@@ -34,7 +34,7 @@ function priceChange(prev: PageObservation | null, curr: PageObservation) {
   return { from: prev.price, to: curr.price, delta: Math.round((curr.price - prev.price) * 100) / 100 };
 }
 
-export function evaluatePage(condition: PageCondition, prev: PageObservation | null, curr: PageObservation, taskName: string): Evaluation {
+export function evaluatePage(condition: LegacyPageCondition, prev: PageObservation | null, curr: PageObservation, taskName: string): Evaluation {
   const value =
     condition.type === "price_below" || condition.type === "price_drop"
       ? curr.price !== null

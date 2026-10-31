@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { ruleConditionSchema } from "./rules";
 
 /** Conditions d'alerte du moteur A (surveillance d'une URL). */
-export const pageConditionSchema = z.discriminatedUnion("type", [
+/** Conditions historiques (une seule condition par surveillance) : toujours prises en charge. */
+export const legacyPageConditionSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("price_below"),
     threshold: z.number().positive().max(10_000_000),
@@ -21,6 +23,10 @@ export const pageConditionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("text_appears"), text: z.string().trim().min(2).max(200) }),
   z.object({ type: z.literal("text_disappears"), text: z.string().trim().min(2).max(200) }),
 ]);
+export type LegacyPageCondition = z.infer<typeof legacyPageConditionSchema>;
+
+/** Condition d'une surveillance de page : historique ou règle personnalisée. */
+export const pageConditionSchema = z.union([legacyPageConditionSchema, ruleConditionSchema]);
 export type PageCondition = z.infer<typeof pageConditionSchema>;
 
 export const webTopicIntentSchema = z.enum([
@@ -53,5 +59,6 @@ export const CONDITION_LABELS: Record<PageCondition["type"] | "web_topic", strin
   page_changed: "Modification de la page",
   text_appears: "Apparition d'un texte",
   text_disappears: "Disparition d'un texte",
+  rule: "Règle personnalisée",
   web_topic: "Recherche sur Internet",
 };

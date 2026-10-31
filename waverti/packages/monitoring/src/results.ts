@@ -25,6 +25,7 @@ import {
   type WebTopicObservation,
 } from "@waverti/types";
 import { evaluatePage, type Evaluation } from "./compare/evaluate";
+import { evaluateRule, parseMemory, type RuleMemory } from "./compare/rules";
 
 export class StaleClaimError extends Error {
   readonly code = "stale_claim";
@@ -104,7 +105,26 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
 
     let evaluation: Evaluation;
     let observation: Record<string, unknown> | null = null;
-    if (input.error || !input.observation) {
+    let memory: RuleMemory | null = null;
+    const pageCond = job.kind === "page" ? pageConditionSchema.safeParse(task.condition) : null;
+    const rule = pageCond?.success && pageCond.data.type === "rule" ? pageCond.data : null;
+    if (rule) {
+      // Règle personnalisée : évaluée aussi en cas d'échec (détection de panne confirmée sur 2 contrôles).
+      const obs = !input.error && input.observation ? pageObservationSchema.parse(input.observation) : null;
+      const prev = await previousPageObservation(tx, task.id);
+      const r = evaluateRule({
+        rule,
+        prev,
+        curr: obs,
+        failure: obs ? null : { code: input.error?.code?.slice(0, 60) ?? "unknown_error", message: input.error?.message?.slice(0, 300) || "Le contrôle a échoué." },
+        memory: parseMemory(task.ruleState),
+        taskName: task.name,
+        now,
+      });
+      evaluation = r.evaluation;
+      memory = r.memory;
+      observation = obs as unknown as Record<string, unknown> | null;
+    } else if (input.error || !input.observation) {
       evaluation = {
         outcome: "error",
         triggered: false,
@@ -117,6 +137,7 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
     } else if (job.kind === "page") {
       const obs = pageObservationSchema.parse(input.observation);
       const cond = pageConditionSchema.parse(task.condition);
+      if (cond.type === "rule") throw new Error("règle traitée ci-dessus");
       const prev = await previousPageObservation(tx, task.id);
       evaluation = evaluatePage(cond, prev, obs, task.name);
       observation = obs as unknown as Record<string, unknown>;
@@ -151,7 +172,9 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
              last_error = ${evaluation.outcome === "error" ? evaluation.errorCode : null}
       where id = ${job.id}`);
 
-    const errors = evaluation.outcome === "error" ? task.consecutiveErrors + 1 : 0;
+    // Une panne suivie par une règle « site inaccessible » n'est pas une erreur de configuration de la surveillance.
+    const tracksDowntime = !!rule && [...rule.conditions, ...rule.groups.flatMap((g) => g.conditions)].some((a) => a.type === "site_down");
+    const errors = evaluation.outcome === "error" && !tracksDowntime ? task.consecutiveErrors + 1 : 0;
     await tx
       .update(monitoringTasks)
       .set({
@@ -162,6 +185,7 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
         ...(evaluation.triggered ? { lastTriggeredAt: now } : {}),
         ...(task.status === "active" && errors >= MAX_CONSECUTIVE_ERRORS_BEFORE_ERROR_STATE ? { status: "error" as const } : {}),
         ...(task.status === "error" && errors === 0 ? { status: "active" as const } : {}),
+        ...(memory ? { ruleState: memory as unknown as Record<string, unknown> } : {}),
       })
       .where(eq(monitoringTasks.id, task.id));
 
@@ -224,7 +248,7 @@ export async function compactPageResults(db: Database, opts: { batch?: number; o
   const batch = opts.batch ?? 5000;
   const hours = opts.olderThanHours ?? 24;
   const rows = await db.execute<{ id: string }>(sql`
-    update monitoring_results r set observation = jsonb_set(r.observation, '{excerpt}', '""'::jsonb)
+    update monitoring_results r set observation = jsonb_set(r.observation - 'links' - 'items' - 'documents' - 'headings', '{excerpt}', '""'::jsonb)
     where r.id in (
       select c.id from monitoring_results c
       where c.checked_at < now() - make_interval(hours => ${hours})

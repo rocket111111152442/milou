@@ -18,7 +18,9 @@ import {
 import { checkNewMonitor, getEntitlements, QuotaError, resolveSettings } from "@waverti/billing";
 import {
   pageConditionSchema,
+  ruleAtoms,
   webTopicConditionSchema,
+  type PageCondition,
   type CreateMonitorInput,
   type UpdateMonitorInput,
 } from "@waverti/types";
@@ -35,6 +37,18 @@ export class MonitorError extends Error {
   ) {
     super(message);
     this.name = "MonitorError";
+  }
+}
+
+/**
+ * Refuse les combinaisons impossibles à vérifier avec les données collectées (au lieu de créer une surveillance
+ * qui ne pourrait jamais alerter). Les limites de fréquence et de nombre restent celles de la formule.
+ */
+export function assertFeasible(cond: PageCondition, cssSelector: string | null | undefined): void {
+  if (cond.type !== "rule") return;
+  const atoms = ruleAtoms(cond);
+  if (atoms.some((a) => a.type === "element_present") && !cssSelector) {
+    throw new MonitorError("invalid_condition", "« Élément présent » nécessite de choisir la zone ou l'élément à surveiller.");
   }
 }
 
@@ -70,7 +84,10 @@ export async function createMonitor(
       throw err;
     }
     const canonical = canonicalUrl(url);
-    condition = pageConditionSchema.parse(input.condition);
+    const parsed = pageConditionSchema.safeParse(input.condition);
+    if (!parsed.success) throw new MonitorError("invalid_condition", parsed.error.issues[0]?.message ?? "Condition invalide");
+    assertFeasible(parsed.data, input.cssSelector);
+    condition = parsed.data;
     target = {
       taskId: "",
       userId,
@@ -178,7 +195,13 @@ export async function updateMonitor(db: Database, userId: string, taskId: string
   const patch: Partial<typeof monitoringTasks.$inferInsert> = {};
   if (input.name) patch.name = input.name;
   if (input.condition) {
-    if (task.kind === "page") patch.condition = pageConditionSchema.parse(input.condition);
+    if (task.kind === "page") {
+      const parsed = pageConditionSchema.safeParse(input.condition);
+      if (!parsed.success) throw new MonitorError("invalid_condition", parsed.error.issues[0]?.message ?? "Condition invalide");
+      const [t] = await db.select({ css: monitoringTargets.cssSelector }).from(monitoringTargets).where(eq(monitoringTargets.taskId, taskId));
+      assertFeasible(parsed.data, input.cssSelector === undefined ? t?.css : input.cssSelector);
+      patch.condition = parsed.data;
+    }
     else patch.condition = webTopicConditionSchema.parse(input.condition);
   }
   if (input.notify?.inapp !== undefined) patch.notifyInapp = input.notify.inapp;

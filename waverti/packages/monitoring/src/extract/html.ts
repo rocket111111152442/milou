@@ -5,6 +5,7 @@ import * as cheerio from "cheerio/slim";
 import type { Availability, PageObservation } from "@waverti/types";
 import { detectCurrency, findPricesInText, parsePrice } from "./price";
 import { collapseWhitespace, normalizeForMatch } from "./text";
+import { extractStructure, jsonLdItems, jsonLdRegularPrice, strikethroughPrice } from "./structure";
 
 const OUT_OF_STOCK = [
   "rupture de stock",
@@ -108,6 +109,10 @@ export interface ExtractInput {
   cssSelector?: string | null;
   method: "http" | "browser";
   fetchedAt?: Date;
+  /** Temps de réponse mesuré (ms). */
+  responseMs?: number;
+  /** false : extraction historique seule (tests de compatibilité). */
+  enrich?: boolean;
 }
 
 /** Transforme une page HTML en observation structurée (prix, disponibilité, texte normalisé). */
@@ -130,6 +135,8 @@ export function extractPage(input: ExtractInput): PageObservation {
 
   // Données structurées lues AVANT de retirer les scripts du document.
   const ld = extractJsonLdOffer($);
+  const ldItems = input.enrich === false ? [] : jsonLdItems($, input.finalUrl);
+  const ldRegular = input.enrich === false ? null : jsonLdRegularPrice($);
   const mdPriceEl = $('[itemprop="price"]').first();
   const mdPriceRaw = mdPriceEl.attr("content") ?? mdPriceEl.text();
   const mdCurrency = $('[itemprop="priceCurrency"]').first().attr("content");
@@ -217,7 +224,28 @@ export function extractPage(input: ExtractInput): PageObservation {
     if (availability !== "unknown") availabilitySource = "text";
   }
 
+  // Données enrichies (règles personnalisées). Le texte et l'empreinte historiques ci-dessus sont inchangés.
+  let enriched: Partial<PageObservation> = {};
+  if (input.enrich !== false) {
+    const regular = ldRegular !== null && price !== null && ldRegular > price ? ldRegular : strikethroughPrice($, scope, price);
+    const st = extractStructure($, scope, input.finalUrl, ldItems);
+    enriched = {
+      contentKind: "html",
+      contentHash: st.contentHash,
+      regularPrice: regular,
+      headings: st.headings,
+      links: st.links,
+      documents: st.documents,
+      items: st.items,
+      dates: st.dates,
+      tableHashes: st.tableHashes,
+      forms: st.forms,
+      ...(input.responseMs !== undefined ? { responseMs: Math.round(input.responseMs) } : {}),
+    };
+  }
+
   return {
+    ...enriched,
     kind: "page",
     url: input.url,
     finalUrl: input.finalUrl,

@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { sql, type Database } from "@waverti/database";
 import { pageObservationSchema, type PageObservation } from "@waverti/types";
 import { extractPage, looksJsRendered } from "./extract/html";
+import { extractPdfObservation, isPdf, PDF_MAX_BYTES } from "./extract/pdf";
 import type { HostPoliteness } from "./net/politeness";
 import { RobotsCache } from "./net/robots";
 import { decodeBody, FetchError, safeFetch, type SafeFetchOptions } from "./net/safe-fetch";
@@ -34,12 +35,25 @@ export interface PageRunnerDeps {
 
 export interface PageRunResult {
   observation?: PageObservation;
+  /** Aperçu uniquement : HTML reçu (pour proposer les zones sélectionnables). */
+  html?: string | null;
   error?: { code: string; message: string };
   fromCache: boolean;
   durationMs: number;
 }
 
-const HTML_TYPES = /^(text\/html|application\/xhtml\+xml|text\/plain|application\/json|application\/ld\+json)/;
+/** Pages et documents PDF (aucun autre type de fichier n'est téléchargé). */
+const PAGE_OR_PDF_TYPES = /^(text\/html|application\/xhtml\+xml|text\/plain|application\/json|application\/ld\+json|application\/pdf)/;
+const HTML_MAX_BYTES = 2 * 1024 * 1024;
+
+function observe(res: Awaited<ReturnType<typeof safeFetch>>, target: PageTarget): PageObservation {
+  if (isPdf(res.contentType, res.body)) {
+    return extractPdfObservation({ body: res.body, url: target.url, finalUrl: res.finalUrl, httpStatus: res.status, responseMs: res.durationMs });
+  }
+  if (res.body.length > HTML_MAX_BYTES) throw new FetchError("too_large", "Page trop volumineuse (plus de 2 Mo).");
+  const html = decodeBody(res.body, res.contentType);
+  return extractPage({ html, url: target.url, finalUrl: res.finalUrl, httpStatus: res.status, cssSelector: target.cssSelector, method: "http", responseMs: res.durationMs });
+}
 
 export function pageCacheKey(t: PageTarget): string {
   return createHash("sha256").update(`${t.url}\n${t.cssSelector ?? ""}\n${t.renderMode}`).digest("hex");
@@ -72,11 +86,10 @@ export async function runPageCheck(deps: PageRunnerDeps, target: PageTarget): Pr
     if (target.renderMode === "browser" && deps.browser) {
       observation = await renderWithBrowser(deps.browser, target);
     } else {
-      const res = await safeFetch(target.url, { ...deps.fetchOptions, allowedContentTypes: HTML_TYPES, maxBytes: 2 * 1024 * 1024, timeoutMs: 20_000 });
+      const res = await safeFetch(target.url, { ...deps.fetchOptions, allowedContentTypes: PAGE_OR_PDF_TYPES, maxBytes: PDF_MAX_BYTES, timeoutMs: deps.fetchOptions?.timeoutMs ?? 20_000 });
       await deps.recordUsage?.({ provider: "http_fetch", cacheHit: false });
-      const html = decodeBody(res.body, res.contentType);
-      observation = extractPage({ html, url: target.url, finalUrl: res.finalUrl, httpStatus: res.status, cssSelector: target.cssSelector, method: "http" });
-      if (target.renderMode === "auto" && deps.browser && res.status < 400 && looksJsRendered(html, observation)) {
+      observation = observe(res, target);
+      if (target.renderMode === "auto" && deps.browser && res.status < 400 && observation.contentKind !== "pdf" && looksJsRendered(decodeBody(res.body, res.contentType), observation)) {
         observation = await renderWithBrowser(deps.browser, target);
         await deps.recordUsage?.({ provider: "playwright", cacheHit: false });
       }
@@ -113,10 +126,10 @@ export async function previewPage(target: PageTarget, fetchOptions: SafeFetchOpt
     if (!(await robots.isAllowed(url))) {
       return { error: { code: "robots_disallowed", message: "Le site interdit l'accès automatisé à cette page (robots.txt)." }, fromCache: false, durationMs: Date.now() - started };
     }
-    const res = await safeFetch(target.url, { ...fetchOptions, allowedContentTypes: HTML_TYPES, maxBytes: 2 * 1024 * 1024, timeoutMs: 15_000 });
-    const html = decodeBody(res.body, res.contentType);
-    const observation = extractPage({ html, url: target.url, finalUrl: res.finalUrl, httpStatus: res.status, cssSelector: target.cssSelector, method: "http" });
-    return { observation, fromCache: false, durationMs: Date.now() - started };
+    const res = await safeFetch(target.url, { ...fetchOptions, allowedContentTypes: PAGE_OR_PDF_TYPES, maxBytes: PDF_MAX_BYTES, timeoutMs: 15_000 });
+    const observation = observe(res, target);
+    const html = observation.contentKind === "pdf" ? null : decodeBody(res.body, res.contentType);
+    return { observation, html, fromCache: false, durationMs: Date.now() - started };
   } catch (err) {
     const fe = err instanceof FetchError ? err : null;
     return { error: { code: fe?.code ?? "check_failed", message: fe?.message ?? "Page inaccessible." }, fromCache: false, durationMs: Date.now() - started };
