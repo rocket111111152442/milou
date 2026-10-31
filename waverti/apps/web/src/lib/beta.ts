@@ -1,5 +1,7 @@
 /**
  * Bêta privée sur invitation (production), sans paiement :
+ * - WAVERTI_SIGNUP_MODE=open : inscription ouverte à tous, même si une liste d'invitation existe (la liste sert
+ *   alors seulement à l'accès bêta automatique et à l'administrateur d'amorçage).
  * - WAVERTI_SIGNUP_ALLOWLIST : adresses autorisées à créer un compte, séparées par des virgules. Si la variable
  *   est définie, l'inscription est fermée à toute autre adresse. Absente : inscription ouverte (développement, tests).
  * - WAVERTI_BETA_AUTO_GRANT : « formule:jours » (ex. « pro:30 »). À la confirmation de l'adresse d'un compte invité,
@@ -24,6 +26,7 @@ function list(value: string | undefined): string[] {
 }
 
 export function signupMode(env: Env = process.env): "open" | "invite" {
+  if (env.WAVERTI_SIGNUP_MODE?.trim().toLowerCase() === "open") return "open";
   return env.WAVERTI_SIGNUP_ALLOWLIST !== undefined && env.WAVERTI_SIGNUP_ALLOWLIST.trim() !== "" ? "invite" : "open";
 }
 

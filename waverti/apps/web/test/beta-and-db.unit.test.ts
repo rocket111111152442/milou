@@ -33,6 +33,14 @@ describe("bêta privée sur invitation", () => {
     expect(isSignupAllowed("ami@exemple.fr", env)).toBe(true);
     expect(isSignupAllowed("inconnu@exemple.fr", env)).toBe(false);
   });
+  it("WAVERTI_SIGNUP_MODE=open : inscription ouverte à tous, la liste garde son rôle d'invitation", async () => {
+    const open = { ...env, WAVERTI_SIGNUP_MODE: "open" };
+    expect(signupMode(open)).toBe("open");
+    expect(isSignupAllowed("inconnu@exemple.fr", open)).toBe(true);
+    const { isInvited } = await import("../src/lib/beta");
+    expect(isInvited("ami@exemple.fr", open)).toBe(true);
+    expect(isInvited("inconnu@exemple.fr", open)).toBe(false);
+  });
   it("accès bêta automatique borné à 60 jours ; formule invalide ignorée", () => {
     expect(autoBetaGrant(env)).toEqual({ planId: "pro", days: 30 });
     expect(autoBetaGrant({ WAVERTI_BETA_AUTO_GRANT: "max:365" })).toEqual({ planId: "max", days: 60 });
