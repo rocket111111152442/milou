@@ -318,25 +318,36 @@ describe("stripe webhooks", () => {
     expect(w2).toMatchObject({ days: 31, limit: 93 });
   });
 
-  it("trial_will_end: reminds the first charge date and amount, never when cancellation is scheduled", async () => {
+  it("trial_will_end: no duplicate reminder at the start of a 72h trial; one reminder when the end is near, shared with the worker", async () => {
     const u = await newCustomer();
     const pm = addCard(fake.state, "fp_trial_end");
     const sub = makeSubscription({ customer: u.customer, priceId: PRICES.max, status: "trialing", userId: u.id, planId: "max", trialEnd: Math.floor(Date.now() / 1000) + 72 * 3600, paymentMethod: pm });
     fake.state.subscriptions.set(sub.id, sub);
+    // Stripe l'envoie dès le début d'un essai de 72 h : pas de rappel immédiat (le worker s'en charge ~24 h avant).
     let ev = signedEvent(fake.stripe, "customer.subscription.trial_will_end", sub);
     expect((await handleStripeWebhook(deps, ev.payload, ev.signature)).status).toBe(200);
-    // Rejouer le même événement ne crée pas de doublon.
-    await handleStripeWebhook(deps, ev.payload, ev.signature);
     let n = await t.db.select().from(notifications).where(eq(notifications.userId, u.id));
-    const reminders = n.filter((x) => x.title.startsWith("Fin de votre essai Max"));
-    expect(reminders).toHaveLength(1);
-    expect(reminders[0]!.body).toContain("29,99 € TTC");
+    expect(n.some((x) => x.title.startsWith("Fin de votre essai"))).toBe(false);
     expect(n.some((x) => x.title === "Votre essai Waverti Max a commencé")).toBe(true);
     expect(await getEntitlements(t.db, u.id)).toMatchObject({ planId: "max", source: "trial", maxMonitors: 3 });
 
+    // Fin proche (ex. essai raccourci par une horloge de test) : un seul rappel, avec date et montant.
+    const soon = { ...sub, trial_end: Math.floor(Date.now() / 1000) + 20 * 3600 } as typeof sub;
+    fake.state.subscriptions.set(sub.id, soon);
+    ev = signedEvent(fake.stripe, "customer.subscription.trial_will_end", soon);
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    const ev2 = signedEvent(fake.stripe, "customer.subscription.trial_will_end", soon);
+    await handleStripeWebhook(deps, ev2.payload, ev2.signature);
+    n = await t.db.select().from(notifications).where(eq(notifications.userId, u.id));
+    const reminders = n.filter((x) => x.title.startsWith("Fin de votre essai Max"));
+    expect(reminders).toHaveLength(1);
+    expect(reminders[0]!.body).toContain("29,99 € TTC");
+    const [row] = await t.db.select({ r: subscriptions.trialReminderSentAt }).from(subscriptions).where(eq(subscriptions.userId, u.id));
+    expect(row!.r).not.toBeNull();
+
     const u2 = await newCustomer();
     const pm2 = addCard(fake.state, "fp_trial_end_2");
-    const sub2 = { ...makeSubscription({ customer: u2.customer, priceId: PRICES.plus, status: "trialing", userId: u2.id, planId: "plus", trialEnd: Math.floor(Date.now() / 1000) + 72 * 3600, paymentMethod: pm2 }), cancel_at_period_end: true } as ReturnType<typeof makeSubscription>;
+    const sub2 = { ...makeSubscription({ customer: u2.customer, priceId: PRICES.plus, status: "trialing", userId: u2.id, planId: "plus", trialEnd: Math.floor(Date.now() / 1000) + 20 * 3600, paymentMethod: pm2 }), cancel_at_period_end: true } as ReturnType<typeof makeSubscription>;
     fake.state.subscriptions.set(sub2.id, sub2);
     ev = signedEvent(fake.stripe, "customer.subscription.trial_will_end", sub2);
     await handleStripeWebhook(deps, ev.payload, ev.signature);
@@ -407,7 +418,10 @@ describe("checkout", () => {
       client_reference_id: u.id,
       line_items: [{ price: PRICES.pro, quantity: 1 }],
     });
-    expect(params.subscription_data.trial_end).toBe(Math.floor(now.getTime() / 1000) + 72 * 3600);
+    // Essai de 3 jours compté à partir de la validation (affiché « 3 jours » par Stripe), prix en euros sans conversion.
+    expect(params.subscription_data.trial_period_days).toBe(3);
+    expect(params.subscription_data.trial_end).toBeUndefined();
+    expect(params.adaptive_pricing).toEqual({ enabled: false });
     expect(params.subscription_data.trial_settings.end_behavior.missing_payment_method).toBe("cancel");
     const [p] = await t.db.select({ c: profiles.stripeCustomerId }).from(profiles).where(eq(profiles.id, u.id));
     expect(p!.c).toMatch(/^cus_/);

@@ -169,7 +169,7 @@ async function processEvent(tx: Transaction, deps: WebhookDeps, event: Stripe.Ev
       }
       await recomputeEntitlements(tx, userId, deps.now?.());
       await notifyTransition(tx, userId, before, sub);
-      if (event.type === "customer.subscription.trial_will_end") await notifyTrialEnding(tx, userId, sub);
+      if (event.type === "customer.subscription.trial_will_end") await notifyTrialEnding(tx, userId, sub, deps.now?.());
       return userId;
     }
     case "invoice.paid":
@@ -331,8 +331,16 @@ async function registerTrial(
 const PLAN_NAMES: Record<string, string> = Object.fromEntries(Object.values(PLAN_CATALOG).map((p) => [p.id, p.name]));
 
 /** Rappel envoyé par Stripe environ 3 jours avant la fin de l'essai (donc dès le début d'un essai de 72 h). */
-async function notifyTrialEnding(tx: Transaction, userId: string, sub: Stripe.Subscription): Promise<void> {
+async function notifyTrialEnding(tx: Transaction, userId: string, sub: Stripe.Subscription, now: Date = new Date()): Promise<void> {
   if (sub.status !== "trialing" || sub.cancel_at_period_end) return;
+  // Stripe envoie cet événement 3 jours avant la fin de l'essai, soit DÈS LE DÉBUT d'un essai de 72 h : le rappel
+  // est alors laissé à la tâche du worker (environ 24 h avant). Il n'est envoyé ici que si la fin est proche, et
+  // une seule fois pour les deux mécanismes (trial_reminder_sent_at).
+  if (!sub.trial_end || sub.trial_end * 1000 - now.getTime() > 26 * 3_600_000) return;
+  const marked = await tx.execute(sql`
+    update subscriptions set trial_reminder_sent_at = now()
+    where stripe_subscription_id = ${sub.id} and trial_reminder_sent_at is null returning id`);
+  if (!marked.length) return;
   const planId = sub.metadata?.plan_id ?? "";
   const plan = PLAN_NAMES[planId] ?? "payante";
   const price = PLAN_CATALOG[planId as keyof typeof PLAN_CATALOG]?.priceCents;

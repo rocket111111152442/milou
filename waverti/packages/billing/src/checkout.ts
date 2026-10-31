@@ -161,17 +161,21 @@ export async function createSubscriptionCheckout(
       metadata: { waverti_user_id: input.userId, plan_id: plan.id },
       subscription_data: {
         metadata: { waverti_user_id: input.userId, plan_id: plan.id },
+        // Essai exprimé en jours (3 jours = 72 h) : il démarre à la validation du paiement et Stripe l'affiche
+        // correctement (une date de fin figée à la création de la session était arrondie à « 2 jours »).
         ...(trialEndSec
           ? {
-              trial_end: trialEndSec,
+              trial_period_days: TRIAL_HOURS / 24,
               trial_settings: { end_behavior: { missing_payment_method: "cancel" as const } },
             }
           : {}),
       },
+      // Prix facturés en euros TTC uniquement : pas de conversion automatique de devise (avec frais) par Stripe.
+      adaptive_pricing: { enabled: false },
       custom_text: {
         submit: {
           message: trialEndSec
-            ? `Essai gratuit de 72 heures. Premier prélèvement le ${new Date(trialEndSec * 1000).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "long", timeStyle: "short" })} sauf résiliation avant cette date.`
+            ? `Essai gratuit de 3 jours (72 heures) à partir de maintenant : aucun prélèvement pendant l'essai. Premier prélèvement de ${formatEuros(plan.priceCents)} TTC à la fin de l'essai (vers le ${new Date(trialEndSec * 1000).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "long" })}), sauf résiliation avant.`
             : "Abonnement mensuel sans engagement, résiliable à tout moment depuis votre espace Waverti.",
         },
       },
@@ -182,6 +186,10 @@ export async function createSubscriptionCheckout(
   );
   if (!session.url) throw new Error("Stripe n'a pas renvoyé d'URL de paiement");
   return { url: session.url, sessionId: session.id, customerId, trialEnd: trialEndSec ? new Date(trialEndSec * 1000) : null };
+}
+
+function formatEuros(cents: number): string {
+  return `${(cents / 100).toFixed(2).replace(".", ",")} €`;
 }
 
 /** Identifiants de prix Stripe -> formule (les quatre formules uniquement). */
