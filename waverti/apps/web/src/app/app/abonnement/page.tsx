@@ -60,7 +60,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
                   ? "Accès bêta privé sans paiement, avec des quotas réduits. Aucun moyen de paiement n'est enregistré."
                   : sub.planId
                   ? `${formatCents(PLAN_CATALOG[sub.planId as keyof typeof PLAN_CATALOG]?.priceCents ?? 0)} / mois TTC, renouvelé chaque mois jusqu'à résiliation`
-                  : "Vos surveillances sont en pause. Choisissez une formule pour démarrer un essai gratuit de 3 jours."}
+                  : "Vos surveillances sont en pause. Choisissez une formule (essai gratuit de 3 jours si vous n'en avez pas encore bénéficié)."}
               </p>
             </div>
             {sub.betaEndsAt ? (
@@ -101,10 +101,12 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
             {sub.status === "past_due" ? (
               <Callout tone="warning">Le dernier paiement a échoué. Mettez à jour votre carte pour conserver vos fonctionnalités.</Callout>
             ) : null}
-            <p className="text-xs text-muted-fg">
-              Désinstaller l'application ou supprimer vos surveillances ne résilie pas l'abonnement : utilisez le bouton
-              « Résilier » ci-dessous.
-            </p>
+            {sub.subscriptionId ? (
+              <p className="text-xs text-muted-fg">
+                Désinstaller l'application ou supprimer vos surveillances ne résilie pas l'abonnement : utilisez le bouton
+                « Résilier » ci-dessous.
+              </p>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               {sub.subscriptionId ? (
                 <>
@@ -130,7 +132,9 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
               <Progress key={q.key} label={q.label} value={q.used} max={q.limit} />
             ))}
             <p className="text-xs text-muted-fg">
-              Fréquence minimale : pages toutes les {ent.pageIntervalMinutes >= 60 ? `${ent.pageIntervalMinutes / 60} h` : `${ent.pageIntervalMinutes} min`}.
+              {ent.pageIntervalMinutes > 0
+                ? `Fréquence minimale : pages toutes les ${ent.pageIntervalMinutes >= 60 ? `${ent.pageIntervalMinutes / 60} h` : `${ent.pageIntervalMinutes} min`}.`
+                : "Aucune vérification sans abonnement ni essai."}
               {ent.cloudRelay ? " Surveillance continue par nos serveurs incluse." : ""}
             </p>
           </CardContent>

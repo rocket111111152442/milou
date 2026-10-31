@@ -120,6 +120,7 @@ export async function recomputeEntitlements(
           status: sub.status,
           extraSites: sub.extraSites,
           trialEnd: sub.trialEnd,
+          currentPeriodStart: sub.currentPeriodStart,
           currentPeriodEnd: sub.currentPeriodEnd,
         }
       : null;

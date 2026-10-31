@@ -38,6 +38,8 @@ export interface SubscriptionSnapshot {
   /** Ancienne option abandonnée : conservée en base, jamais prise en compte dans les droits. */
   extraSites?: number;
   trialEnd: Date | null;
+  /** Début de la période en cours : lors d'un renouvellement impayé, Stripe a déjà ouvert la nouvelle période. */
+  currentPeriodStart?: Date | null;
   currentPeriodEnd: Date | null;
 }
 
@@ -226,9 +228,11 @@ export function computeEntitlements(
         validUntil: subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd.getTime() + WEBHOOK_LAG_MS) : null,
       };
     case "past_due": {
-      const graceEnd = subscription.currentPeriodEnd
-        ? new Date(subscription.currentPeriodEnd.getTime() + PAST_DUE_GRACE_DAYS * 86_400_000)
-        : null;
+      // Délai de grâce compté à partir de l'échéance impayée. Quand un renouvellement échoue, Stripe a déjà
+      // ouvert la nouvelle période : l'échéance est le DÉBUT de la période en cours (et non sa fin, ce qui
+      // aurait laissé ~37 jours d'accès au lieu de 7). Repli sur la fin de période pour les données anciennes.
+      const due = subscription.currentPeriodStart ?? subscription.currentPeriodEnd;
+      const graceEnd = due ? new Date(due.getTime() + PAST_DUE_GRACE_DAYS * 86_400_000) : null;
       if (graceEnd && graceEnd.getTime() > now.getTime()) {
         return {
           ...fromPlan(plan),

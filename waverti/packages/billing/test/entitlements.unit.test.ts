@@ -102,6 +102,15 @@ describe("computeEntitlements", () => {
     expect(computeEntitlements(plans, { planId: "plus", status: "past_due", extraSites: 0, trialEnd: null, currentPeriodEnd: old }, now).planId).toBeNull();
   });
 
+  it("impayé au renouvellement : 7 jours de grâce à partir de l'échéance, même si Stripe a ouvert la nouvelle période", () => {
+    // Renouvellement échoué il y a 2 jours : la nouvelle période (de J-2 à J+28) est déjà ouverte chez Stripe.
+    const start = new Date(now.getTime() - 2 * day);
+    const end = new Date(now.getTime() + 28 * day);
+    expect(computeEntitlements(plans, { planId: "plus", status: "past_due", trialEnd: null, currentPeriodStart: start, currentPeriodEnd: end }, now)).toMatchObject({ source: "grace", planId: "plus" });
+    const later = new Date(now.getTime() + 6 * day);
+    expect(computeEntitlements(plans, { planId: "plus", status: "past_due", trialEnd: null, currentPeriodStart: start, currentPeriodEnd: end }, later).planId).toBeNull();
+  });
+
   it.each(["canceled", "unpaid", "incomplete", "incomplete_expired", "paused"] as const)("aucun droit quand %s", (status) => {
     const e = computeEntitlements(plans, { planId: "pro", status, extraSites: 0, trialEnd: null, currentPeriodEnd: new Date(now.getTime() + day) }, now);
     expect(e).toMatchObject({ planId: null, source: "none", maxMonitors: 0 });
