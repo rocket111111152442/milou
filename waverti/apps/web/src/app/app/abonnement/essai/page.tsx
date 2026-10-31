@@ -30,11 +30,16 @@ export default async function EssaiPage({ searchParams }: { searchParams: Promis
   const preview = await previewCheckout(getDb(), user, formule, new Date(), process.env.WAVERTI_HASH_PEPPER);
   const rows: Array<[string, string]> = [
     ["Formule", `${preview.planName}`],
-    ["Prix après l'essai", `${formatCents(preview.priceCents)} TTC par mois`],
+    [preview.trial ? "Prix après l'essai" : "Prix", `${formatCents(preview.priceCents)} TTC par mois`],
     ["Durée de l'essai", preview.trial ? "3 jours (72 heures), gratuit" : "Pas d'essai (déjà utilisé)"],
     ["Premier prélèvement", preview.trial ? formatDateTime(preview.firstChargeAt, user.timezone) : "Immédiatement, à la validation"],
     ["Renouvellement", "Chaque mois à la même date, sans engagement"],
-    ["Résiliation", "En ligne depuis la page Abonnement, à tout moment (avant la fin de l'essai : aucun prélèvement)"],
+    [
+      "Résiliation",
+      preview.trial
+        ? "En ligne depuis la page Abonnement, à tout moment (avant la fin de l'essai : aucun prélèvement)"
+        : "En ligne depuis la page Abonnement, à tout moment ; l'abonnement reste actif jusqu'à la fin du mois payé",
+    ],
   ];
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
