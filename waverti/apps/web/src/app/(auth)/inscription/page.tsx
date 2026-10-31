@@ -38,7 +38,7 @@ export default async function InscriptionPage({ searchParams }: { searchParams: 
         </>
       }
     >
-      <SignUpForm formule={plan?.id} googleEnabled={process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "1"} />
+      <SignUpForm formule={plan?.id} />
     </AuthCard>
   );
 }

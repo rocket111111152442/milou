@@ -19,10 +19,23 @@ test.describe("sécurité", () => {
     const u = await createConfirmedUser(uniqueEmail("cookie"));
     await login(page, u.email);
     await page.waitForURL(/\/app/);
-    const session = (await context.cookies()).filter((c) => c.name.startsWith("sb-") && c.name.includes("auth-token"));
-    expect(session.length).toBeGreaterThan(0);
-    for (const c of session) expect(c).toMatchObject({ httpOnly: true, sameSite: "Lax" });
-    expect(await page.evaluate(() => document.cookie)).not.toContain("auth-token");
+    // En production : préfixe __Host- (Secure, Path=/, sans Domain) ; localhost est un contexte sécurisé.
+    const session = (await context.cookies()).filter((c) => c.name.endsWith("waverti_session"));
+    expect(session).toHaveLength(1);
+    expect(session[0]).toMatchObject({ httpOnly: true, sameSite: "Lax", path: "/" });
+    if (session[0]!.name.startsWith("__Host-")) expect(session[0]!.secure).toBe(true);
+    // Jeton opaque de 256 bits ; seule son empreinte est stockée en base.
+    expect(session[0]!.value).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const [s] = await sql<{ n: number }[]>`select count(*)::int as n from user_sessions where id = ${session[0]!.value}`;
+    expect(s!.n).toBe(0);
+    expect(await page.evaluate(() => document.cookie)).not.toContain("waverti_session");
+    // Déconnexion : la session est supprimée côté serveur (le jeton volé ne sert plus).
+    const token = session[0]!.value;
+    await page.request.post("/auth/deconnexion", { headers: { origin: "http://localhost:3000" }, maxRedirects: 0 });
+    const ctx2 = await page.context().browser()!.newContext();
+    await ctx2.addCookies([{ name: session[0]!.name, value: token, domain: "localhost", path: "/", secure: session[0]!.secure }]);
+    expect((await ctx2.request.get("http://localhost:3000/api/monitors")).status()).toBe(401);
+    await ctx2.close();
   });
 
   test("protection CSRF : écriture refusée depuis une autre origine", async ({ page }) => {

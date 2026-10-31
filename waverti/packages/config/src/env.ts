@@ -13,16 +13,19 @@ export const serverEnvSchema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
   DATABASE_URL: z.string().min(1),
   DATABASE_URL_DIRECT: optional,
-  NEXT_PUBLIC_SUPABASE_URL: optionalUrl,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: optional,
-  SUPABASE_SERVICE_ROLE_KEY: optional,
+  /** Clé de chiffrement des secrets de double authentification (32 octets, base64 ou hexadécimal). */
+  WAVERTI_ENCRYPTION_KEY: optional,
   STRIPE_SECRET_KEY: optional,
   STRIPE_WEBHOOK_SECRET: optional,
   STRIPE_API_BASE: optionalUrl,
   RESEND_API_KEY: optional,
   RESEND_API_BASE: optionalUrl,
+  /** Alternative gratuite à Resend : serveur SMTP (smtp://… ou smtps://…). */
+  SMTP_URL: optional,
   EMAIL_FROM: z.string().default("Waverti <alertes@waverti.invalid>"),
   BRAVE_SEARCH_API_KEY: optional,
+  /** Ancien nom accepté (variable créée sous ce nom sur Vercel) ; BRAVE_SEARCH_API_KEY est prioritaire. */
+  BRAVE_API_KEY: optional,
   BRAVE_SEARCH_API_BASE: optionalUrl,
   WAVERTI_HASH_PEPPER: z.string().min(32).optional(),
   WAVERTI_ALLOW_PRIVATE_TARGETS: z.enum(["0", "1"]).default("0"),
@@ -43,7 +46,8 @@ export function readServerEnv(source: Record<string, string | undefined> = proce
 }
 
 export interface IntegrationStatus {
-  supabaseAuth: boolean;
+  auth: boolean;
+  email: boolean;
   stripe: boolean;
   resend: boolean;
   braveSearch: boolean;
@@ -51,10 +55,11 @@ export interface IntegrationStatus {
 
 export function integrationStatus(env: Partial<ServerEnv>): IntegrationStatus {
   return {
-    supabaseAuth: Boolean(env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    auth: Boolean(env.DATABASE_URL && env.WAVERTI_HASH_PEPPER),
+    email: Boolean(env.RESEND_API_KEY || env.SMTP_URL),
     stripe: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET),
     resend: Boolean(env.RESEND_API_KEY),
-    braveSearch: Boolean(env.BRAVE_SEARCH_API_KEY),
+    braveSearch: Boolean(braveApiKey(env)),
   };
 }
 
@@ -68,4 +73,9 @@ export function assertStripeTestMode(secretKey: string | undefined): void {
       );
     }
   }
+}
+
+/** Clé Brave Search : BRAVE_SEARCH_API_KEY, ou BRAVE_API_KEY (ancien nom) à défaut. */
+export function braveApiKey(env: Partial<Record<"BRAVE_SEARCH_API_KEY" | "BRAVE_API_KEY", string | undefined>>): string | undefined {
+  return env.BRAVE_SEARCH_API_KEY || env.BRAVE_API_KEY || undefined;
 }

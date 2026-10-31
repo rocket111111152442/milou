@@ -31,7 +31,7 @@ export default function ConfidentialitePage() {
       </ul>
       <h2>Destinataires et sous-traitants</h2>
       <p>
-        Supabase (authentification, base de données), Vercel (hébergement web), OVHcloud (serveurs de surveillance), Stripe
+        <Todo>Hébergeur du serveur de base de données</Todo> (base de données et comptes, exploités par LULLIN WEB), Vercel (hébergement web), OVHcloud (serveurs de surveillance), Stripe
         (paiement), Resend (e-mails), Brave Search (moteur de recherche : seules les requêtes de recherche sont transmises, sans
         donnée d'identification). <Todo>Vérifier les régions d'hébergement et les garanties de transfert hors UE (clauses
         contractuelles types / DPF) pour chaque sous-traitant.</Todo>

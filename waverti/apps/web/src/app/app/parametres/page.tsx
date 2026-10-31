@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Callout, Card, CardContent, CardHeader, CardTitle, PageHeader } from "@waverti/ui";
 import { eq, profiles, withUser } from "@waverti/database";
+import { remainingRecoveryCodes } from "@waverti/auth";
 import { requireUser } from "@/lib/auth";
 import { listDevices } from "@/lib/data/account";
 import { getDb } from "@/lib/db";
@@ -8,9 +9,12 @@ import { DangerZone, DevicesList, MfaSettings, NotificationPrefs, PasswordForm, 
 
 export const metadata: Metadata = { title: "Paramètres" };
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ "double-authentification"?: string }> }) {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ "double-authentification"?: string; "code-recuperation"?: string }> }) {
   const user = await requireUser("/app/parametres");
-  const mfaRequired = (await searchParams)["double-authentification"] === "requise" && !user.mfa.enrolled;
+  const sp = await searchParams;
+  const mfaRequired = sp["double-authentification"] === "requise" && !user.mfa.enrolled;
+  const recoveryUsed = sp["code-recuperation"] === "utilise";
+  const remaining = user.mfa.enrolled ? await remainingRecoveryCodes(getDb(), user.id) : 0;
   const [prefs] = await withUser(getDb(), user.id, (tx) =>
     tx
       .select({ notifyEmail: profiles.notifyEmail, notifyInapp: profiles.notifyInapp, notifyDesktop: profiles.notifyDesktop, marketingOptIn: profiles.marketingOptIn })
@@ -52,7 +56,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {mfaRequired ? <Callout tone="warning">La double authentification est obligatoire pour accéder à l'administration. Activez-la ci-dessous.</Callout> : null}
-          <MfaSettings factorId={user.mfa.factorId} since={user.mfa.since} />
+          {recoveryUsed ? (
+            <Callout tone="warning">Vous vous êtes connecté avec un code de récupération : il n'est plus valable. Renouvelez vos codes si nécessaire.</Callout>
+          ) : null}
+          <MfaSettings enabled={user.mfa.enrolled} since={user.mfa.since} remainingCodes={remaining} />
         </CardContent>
       </Card>
       <Card>

@@ -100,26 +100,71 @@ export function PasswordForm() {
   );
 }
 
-export function MfaSettings({ factorId, since }: { factorId: string | null; since: string | null }) {
-  const [setup, setSetup] = useState<{ factorId: string; qrCode: string; secret: string } | null>(null);
+function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4" role="region" aria-label="Codes de récupération">
+      <p className="text-sm font-semibold">Vos codes de récupération</p>
+      <p className="text-sm text-muted-fg">
+        Conservez-les en lieu sûr (gestionnaire de mots de passe, papier). Chaque code ne sert qu'une fois si vous perdez votre
+        téléphone. Ils ne seront plus affichés.
+      </p>
+      <ul data-testid="recovery-codes" className="grid grid-cols-2 gap-2 font-mono text-sm">
+        {codes.map((c) => (
+          <li key={c} className="rounded-md bg-white px-2 py-1 text-center">
+            {c}
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={async () => {
+            await navigator.clipboard?.writeText(codes.join("\n")).catch(() => undefined);
+            setCopied(true);
+          }}
+        >
+          {copied ? "Copiés" : "Copier les codes"}
+        </Button>
+        <Button type="button" size="sm" onClick={onDone}>
+          J'ai conservé mes codes
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export function MfaSettings({ enabled, since, remainingCodes }: { enabled: boolean; since: string | null; remainingCodes: number }) {
+  const [setup, setSetup] = useState<{ qrCode: string; secret: string } | null>(null);
+  const [codes, setCodes] = useState<string[] | null>(null);
   const [code, setCode] = useState("");
   const { run, pending } = useApiAction();
+  const router = useRouter();
   const cleanCode = code.replace(/\s/g, "");
-  const codeField = (id: string) => (
-    <Field id={id} label="Code à 6 chiffres" required hint="Affiché par votre application d'authentification.">
-      {(p) => <Input {...p} inputMode="numeric" autoComplete="one-time-code" maxLength={7} value={code} onChange={(e) => setCode(e.target.value)} className="max-w-40" />}
+  const validCode = /^\d{6}$/.test(cleanCode) || /^[A-Za-z2-7]{5}-?[A-Za-z2-7]{5}$/.test(cleanCode);
+  const codeField = (id: string, hint = "Affiché par votre application d'authentification (ou un code de récupération).") => (
+    <Field id={id} label="Code à 6 chiffres" required hint={hint}>
+      {(p) => <Input {...p} autoComplete="one-time-code" maxLength={12} value={code} onChange={(e) => setCode(e.target.value)} className="max-w-48" />}
     </Field>
   );
 
-  if (factorId) {
+  if (codes) {
     return (
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (await run(`/api/account/mfa/${factorId}`, { code: cleanCode }, { method: "DELETE", success: "Double authentification désactivée" })) setCode("");
+      <RecoveryCodes
+        codes={codes}
+        onDone={() => {
+          setCodes(null);
+          router.refresh();
         }}
-      >
+      />
+    );
+  }
+
+  if (enabled) {
+    return (
+      <div className="flex flex-col gap-5">
         <p className="flex items-center gap-2 text-sm">
           <ShieldCheck className="size-4 text-success" aria-hidden="true" />
           <span>
@@ -127,11 +172,40 @@ export function MfaSettings({ factorId, since }: { factorId: string | null; sinc
             {since ? ` depuis le ${formatDateTime(since)}` : ""}. Un code est demandé à chaque connexion.
           </span>
         </p>
-        {codeField("mfa-disable-code")}
-        <Button type="submit" variant="secondary" loading={pending} className="self-start" disabled={!/^\d{6}$/.test(cleanCode)}>
-          Désactiver la double authentification
-        </Button>
-      </form>
+        <p className="text-sm text-muted-fg">
+          Codes de récupération restants : <strong className="text-ink">{remainingCodes}</strong> sur 10.
+          {remainingCodes <= 3 ? " Pensez à les renouveler." : ""}
+        </p>
+        {codeField("mfa-manage-code")}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            loading={pending}
+            disabled={!validCode}
+            onClick={async () => {
+              const r = await run<{ recoveryCodes: string[] }>("/api/account/mfa/recovery-codes", { code: cleanCode }, { success: "Nouveaux codes générés", refresh: false });
+              if (r) {
+                setCode("");
+                setCodes(r.recoveryCodes);
+              }
+            }}
+          >
+            Renouveler les codes de récupération
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            loading={pending}
+            disabled={!validCode}
+            onClick={async () => {
+              if (await run("/api/account/mfa", { code: cleanCode }, { method: "DELETE", success: "Double authentification désactivée" })) setCode("");
+            }}
+          >
+            Désactiver la double authentification
+          </Button>
+        </div>
+      </div>
     );
   }
 
@@ -140,13 +214,13 @@ export function MfaSettings({ factorId, since }: { factorId: string | null; sinc
       <div className="flex flex-col gap-4">
         <p className="text-sm text-muted-fg">
           En plus du mot de passe, un code temporaire généré par une application d'authentification (Google Authenticator, Microsoft
-          Authenticator, 1Password, Aegis…) sera demandé à chaque connexion.
+          Authenticator, 1Password, Aegis…) sera demandé à chaque connexion. Des codes de récupération vous seront fournis.
         </p>
         <Button
           className="self-start"
           loading={pending}
           onClick={async () => {
-            const r = await run<{ factorId: string; qrCode: string; secret: string }>("/api/account/mfa", {}, { refresh: false });
+            const r = await run<{ qrCode: string; secret: string }>("/api/account/mfa", {}, { refresh: false });
             if (r) setSetup(r);
           }}
         >
@@ -161,9 +235,11 @@ export function MfaSettings({ factorId, since }: { factorId: string | null; sinc
       className="flex flex-col gap-4"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (await run("/api/account/mfa/verify", { factorId: setup.factorId, code: cleanCode }, { success: "Double authentification activée" })) {
+        const r = await run<{ recoveryCodes: string[] }>("/api/account/mfa/verify", { code: cleanCode }, { success: "Double authentification activée", refresh: false });
+        if (r) {
           setSetup(null);
           setCode("");
+          setCodes(r.recoveryCodes);
         }
       }}
     >
@@ -172,7 +248,6 @@ export function MfaSettings({ factorId, since }: { factorId: string | null; sinc
         <li>Saisissez le code à 6 chiffres affiché par l'application pour confirmer.</li>
       </ol>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        {/* QR code SVG fourni par le serveur d'authentification (data URI, aucune ressource externe). */}
         <img src={setup.qrCode} alt="QR code de configuration de la double authentification" width={176} height={176} className="rounded-lg border border-line bg-white p-2" />
         <div className="flex min-w-0 flex-col gap-1">
           <span className="text-xs text-muted-fg">Clé de configuration</span>
@@ -181,7 +256,7 @@ export function MfaSettings({ factorId, since }: { factorId: string | null; sinc
           </code>
         </div>
       </div>
-      {codeField("mfa-enroll-code")}
+      {codeField("mfa-enroll-code", "Affiché par votre application d'authentification.")}
       <div className="flex gap-2">
         <Button type="submit" loading={pending} disabled={!/^\d{6}$/.test(cleanCode)}>
           Confirmer l'activation

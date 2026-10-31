@@ -30,7 +30,7 @@ export default async function ConnexionPage({ searchParams }: { searchParams: Pr
       <div className="flex flex-col gap-5">
         {erreur && ERRORS[erreur] ? <Callout tone="warning">{ERRORS[erreur]}</Callout> : null}
         {verifie ? <Callout tone="success">Adresse e-mail vérifiée. Vous pouvez vous connecter.</Callout> : null}
-        <SignInForm suivant={suivant} googleEnabled={process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "1"} />
+        <SignInForm suivant={suivant} />
       </div>
     </AuthCard>
   );

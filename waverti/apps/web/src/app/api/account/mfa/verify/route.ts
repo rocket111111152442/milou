@@ -1,16 +1,22 @@
 import { z } from "zod";
+import { confirmTotpEnrollment } from "@waverti/auth";
 import { apiError, json, readJson, withActor } from "@/lib/api";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
+import { elevateCurrentSession, encryptionKey, getActiveSession, hashPepper } from "@/lib/session";
 
-/** Confirmation de l'activation : le premier code valide active le facteur et passe la session en aal2. */
+/**
+ * Confirmation de l'activation : le premier code valide active la double authentification, renvoie
+ * les 10 codes de récupération (affichés une seule fois) et passe la session au niveau 2.
+ */
 export const POST = withActor(
-  async (req) => {
-    const body = await readJson(req, z.object({ factorId: z.string().uuid(), code: z.string().regex(/^\d{6}$/, "6 chiffres") }));
+  async (req, actor) => {
+    const body = await readJson(req, z.object({ code: z.string().regex(/^\d{6}$/, "6 chiffres") }));
     if (!body.ok) return body.res;
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.auth.mfa.challengeAndVerify(body.data);
-    if (error) return apiError(422, "invalid_code", "Code incorrect ou expiré. Saisissez le code affiché actuellement.");
-    return json({ ok: true });
+    const codes = await confirmTotpEnrollment(getDb(), actor.userId, body.data.code, encryptionKey(), hashPepper());
+    if (!codes) return apiError(422, "invalid_code", "Code incorrect ou expiré. Saisissez le code affiché actuellement.");
+    const session = await getActiveSession();
+    if (session) await elevateCurrentSession(session);
+    return json({ ok: true, recoveryCodes: codes }, { headers: { "cache-control": "no-store" } });
   },
   { rate: { name: "mfa-verify", limit: 10, windowSec: 900 } },
 );

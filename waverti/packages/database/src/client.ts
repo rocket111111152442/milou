@@ -8,7 +8,7 @@ export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 export type Executor = Database | Transaction;
 
 export interface CreateDbOptions {
-  /** Taille du pool. Sur Vercel (serverless) garder une petite valeur et utiliser le pooler Supabase. */
+  /** Taille du pool. Sur Vercel (serverless) garder une petite valeur (ou un pooler PgBouncer en mode transaction). */
   max?: number;
   /** Nom applicatif visible dans pg_stat_activity. */
   applicationName?: string;
@@ -25,7 +25,7 @@ export function createDb(url: string, options: CreateDbOptions = {}): DbHandle {
     max: options.max ?? 5,
     idle_timeout: 20,
     connect_timeout: 10,
-    // Requis avec le pooler Supabase en mode transaction (pas de requêtes préparées nommées).
+    // Requis avec un pooler en mode transaction (pas de requêtes préparées nommées).
     prepare: false,
     onnotice: () => undefined,
     connection: { application_name: options.applicationName ?? "waverti" },
@@ -53,9 +53,8 @@ export function isUuid(value: unknown): value is string {
 export async function withUser<T>(db: Database, userId: string, fn: (tx: Transaction) => Promise<T>): Promise<T> {
   assertUuid(userId, "user id");
   return db.transaction(async (tx) => {
-    const claims = JSON.stringify({ sub: userId, role: "authenticated" });
-    await tx.execute(sql`select set_config('request.jwt.claims', ${claims}, true)`);
-    await tx.execute(sql`set local role authenticated`);
+    await tx.execute(sql`select set_config('app.user_id', ${userId}, true)`);
+    await tx.execute(sql`set local role app_user`);
     return fn(tx);
   });
 }

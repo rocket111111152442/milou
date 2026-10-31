@@ -1,8 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Tests end-to-end contre un environnement LOCAL complet : pile Supabase (auth réelle + Mailpit),
- * PostgreSQL migré, stripe-mock. Prérequis décrits dans TESTING.md.
+ * Tests end-to-end contre un environnement LOCAL complet : PostgreSQL migré (authentification Waverti réelle),
+ * Mailpit, stripe-mock. Prérequis décrits dans TESTING.md.
  */
 export default defineConfig({
   testDir: "./e2e",

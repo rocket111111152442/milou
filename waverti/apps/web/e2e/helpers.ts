@@ -1,11 +1,10 @@
 import { createHmac } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { expect, type Page } from "@playwright/test";
 import postgres from "postgres";
+import { hashPassword } from "@waverti/auth";
 
-export const MAILPIT = process.env.E2E_MAILPIT_URL ?? "http://127.0.0.1:54324";
-export const DB_URL = process.env.E2E_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+export const MAILPIT = process.env.E2E_MAILPIT_URL ?? "http://127.0.0.1:8025";
+export const DB_URL = process.env.E2E_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:55432/waverti";
 export const sql = postgres(DB_URL, { max: 2, onnotice: () => undefined });
 
 export const PASSWORD = "MotDePasse-E2E-2026";
@@ -20,7 +19,7 @@ interface MailSummary {
   To: Array<{ Address: string }>;
 }
 
-/** Attend l'e-mail envoyé par l'authentification Supabase (Mailpit) et renvoie le premier lien d'action. */
+/** Attend l'e-mail d'authentification (reçu par Mailpit via SMTP) et renvoie son lien d'action. */
 export async function waitForEmailLink(to: string, subjectIncludes: string, timeoutMs = 20_000): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -29,7 +28,7 @@ export async function waitForEmailLink(to: string, subjectIncludes: string, time
     const msg = list.messages?.find((m) => m.Subject.includes(subjectIncludes));
     if (msg) {
       const full = (await (await fetch(`${MAILPIT}/api/v1/message/${msg.ID}`)).json()) as { HTML: string };
-      const href = /href="([^"]+token_hash[^"]+)"/.exec(full.HTML)?.[1];
+      const href = /href="([^"]+token=[^"]+)"/.exec(full.HTML)?.[1];
       if (href) return href.replace(/&amp;/g, "&");
     }
     await new Promise((r) => setTimeout(r, 500));
@@ -73,15 +72,6 @@ export async function skipOnboarding(email: string) {
   await sql`update profiles set onboarding_completed_at = now() where email = ${email}`;
 }
 
-const SUPABASE_URL = process.env.E2E_SUPABASE_URL ?? "http://127.0.0.1:54321";
-
-function serviceRoleKey(): string {
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) return process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const env = readFileSync(join(import.meta.dirname, "../.env.local"), "utf8");
-  return /^SUPABASE_SERVICE_ROLE_KEY=(.+)$/m.exec(env)?.[1]?.trim() ?? "";
-}
-
-/** Compte confirmé créé via l'API d'administration de Supabase locale (plus rapide que l'inscription). */
 /**
  * Compte confirmé. Par défaut abonné Plus actif (il n'existe pas de formule gratuite) ;
  * `plan: null` pour un compte sans abonnement, `status: "trialing"` pour un essai en cours.
@@ -91,14 +81,11 @@ export async function createConfirmedUser(
   opts: { plan?: "plus" | "pro" | "max" | "business" | null; status?: "active" | "trialing" } = {},
 ): Promise<{ id: string; email: string }> {
   const plan = opts.plan === undefined ? "plus" : opts.plan;
-  const key = serviceRoleKey();
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-    method: "POST",
-    headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" },
-    body: JSON.stringify({ email, password: PASSWORD, email_confirm: true, user_metadata: { display_name: "Test" } }),
-  });
-  if (!res.ok) throw new Error(`création du compte impossible : ${res.status} ${await res.text()}`);
-  const { id } = (await res.json()) as { id: string };
+  // Compte vérifié créé directement en base (mot de passe haché comme à l'inscription).
+  const [{ id } = { id: "" }] = await sql<{ id: string }[]>`
+    insert into users (email, email_verified_at, password_hash, password_changed_at)
+    values (${email.toLowerCase()}, now(), ${await hashPassword(PASSWORD)}, now()) returning id`;
+  await sql`update profiles set display_name = 'Test' where id = ${id}`;
   await sql`update profiles set onboarding_completed_at = now() where id = ${id}`;
   if (plan) {
     // Équivaut au résultat d'un webhook Stripe « abonnement actif » ou « essai démarré » (mode test).
@@ -126,14 +113,18 @@ export function totp(secret: string, at = Date.now()): string {
   return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
 
-/** Active la double authentification depuis la page Paramètres ; renvoie la clé TOTP. */
-export async function enableMfa(page: Page): Promise<string> {
+/** Active la double authentification depuis la page Paramètres ; renvoie la clé TOTP et les codes de récupération. */
+export async function enableMfa(page: Page): Promise<{ secret: string; codes: string[] }> {
   if (!page.url().includes("/app/parametres")) await page.goto("/app/parametres");
   await page.getByRole("button", { name: "Activer la double authentification" }).click();
   await expect(page.getByRole("img", { name: /QR code de configuration/ })).toBeVisible();
   const secret = (await page.getByTestId("mfa-secret").innerText()).trim();
   await page.getByLabel(/^Code à 6 chiffres/).fill(totp(secret));
   await page.getByRole("button", { name: "Confirmer l'activation" }).click();
+  const list = page.getByTestId("recovery-codes");
+  await expect(list).toBeVisible();
+  const codes = (await list.locator("li").allInnerTexts()).map((c) => c.trim());
+  await page.getByRole("button", { name: "J'ai conservé mes codes" }).click();
   await expect(page.getByText("Double authentification activée", { exact: true })).toBeVisible();
-  return secret;
+  return { secret, codes };
 }

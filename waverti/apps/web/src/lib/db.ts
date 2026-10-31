@@ -5,7 +5,7 @@ declare global {
   var __wavertiDb: { db: Database; close: () => Promise<void> } | undefined;
 }
 
-/** Connexion partagée (une par instance serverless). Le pooler Supabase gère la mutualisation. */
+/** Connexion partagée (une par instance serverless). Petit pool par instance (DATABASE_POOL_MAX). */
 export function getDb(): Database {
   const url = process.env.DATABASE_URL;
   if (!url) throw new DatabaseUnavailableError();

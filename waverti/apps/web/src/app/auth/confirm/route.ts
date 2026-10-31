@@ -1,25 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
-import type { EmailOtpType } from "@supabase/supabase-js";
+import { verifyEmailWithToken } from "@waverti/auth";
+import { getDb } from "@/lib/db";
 import { safeNext } from "@/lib/request";
-import { createSupabaseServerClient, isAuthConfigured } from "@/lib/supabase/server";
+import { isAuthConfigured, startSession } from "@/lib/session";
 
-const TYPES: EmailOtpType[] = ["signup", "email", "recovery", "email_change", "invite", "magiclink"];
-
-/** Lien reçu par e-mail (confirmation, réinitialisation) : flux « token_hash », fonctionne d'un appareil à l'autre. */
+/**
+ * Lien de vérification d'adresse reçu par e-mail (jeton à usage unique, 24 h) : active le compte,
+ * ouvre une session et redirige vers la suite du parcours (choix de la formule ou essai).
+ */
 export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const tokenHash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
-  const next = safeNext(searchParams.get("next"), "/app");
-  const code = searchParams.get("code");
+  const token = request.nextUrl.searchParams.get("token");
+  const next = safeNext(request.nextUrl.searchParams.get("next"), "/app/abonnement?bienvenue=1");
   if (!isAuthConfigured()) return NextResponse.redirect(new URL("/connexion?erreur=configuration", request.url));
-  const supabase = await createSupabaseServerClient();
-  if (tokenHash && type && TYPES.includes(type)) {
-    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-    if (!error) return NextResponse.redirect(new URL(type === "recovery" ? "/reinitialiser-mot-de-passe" : next, request.url));
-  } else if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL(next, request.url));
-  }
-  return NextResponse.redirect(new URL("/connexion?erreur=lien", request.url));
+  const userId = token ? await verifyEmailWithToken(getDb(), token) : null;
+  if (!userId) return NextResponse.redirect(new URL("/connexion?erreur=lien", request.url));
+  await startSession(userId, 1);
+  return NextResponse.redirect(new URL(next, request.url));
 }

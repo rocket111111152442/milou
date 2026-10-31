@@ -12,7 +12,7 @@ export default function CookiesPage() {
         la loi Informatique et Libertés, lignes directrices de la CNIL) :
       </p>
       <ul>
-        <li>Cookies de session d'authentification (Supabase) : maintien de votre connexion, durée de la session.</li>
+        <li>Cookie de session d'authentification (waverti_session, strictement nécessaire) : maintien de votre connexion, 30 jours glissants au maximum, supprimé à la déconnexion.</li>
         <li>Préférences d'interface éventuellement stockées localement dans votre navigateur.</li>
       </ul>
       <p>

@@ -5,11 +5,11 @@
 ```
                  ┌──────────────────────────── Vercel ─────────────────────────────┐
  Navigateur ───▶ │ apps/web (Next.js) : site public, espace client, API, admin       │
-                 │  - Auth Supabase (cookies httpOnly), API JSON, webhooks Stripe    │
+                 │  - Comptes et sessions internes (cookie httpOnly), API, Stripe   │
                  └──────────────┬───────────────────────────────┬────────────────────┘
                                 │ SQL (RLS)                     │ HTTPS
                  ┌──────────────▼──────────────┐      ┌─────────▼─────────┐
-                 │ Supabase : PostgreSQL + Auth │      │ Stripe (mode test) │
+                 │ PostgreSQL 17 auto-hébergé   │      │ Stripe (mode test) │
                  └──────────────▲──────────────┘      └───────────────────┘
                                 │ SQL (file de travaux, résultats, notifications)
       ┌─────────────────────────┴───────────────────────┐
@@ -73,7 +73,7 @@ contrôles par heure ; voir `docs/LOAD-TEST-RESULTS.md`).
 
 ## Données et droits
 
-- Schéma : `supabase/migrations/*` (≈ 35 tables), miroir Drizzle `packages/database/src/schema.ts`
+- Schéma : `db/migrations/*` (≈ 35 tables), miroir Drizzle `packages/database/src/schema.ts`
   (un test vérifie leur concordance).
 - **RLS** : les rôles `anon`/`authenticated` n'ont que des lectures de leurs propres lignes ; toutes les
   écritures passent par le serveur (API Next.js ou worker) après validation Zod, quotas et contrôle d'accès.

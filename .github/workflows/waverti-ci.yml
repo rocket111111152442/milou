@@ -1,5 +1,5 @@
 # Intégration continue de Waverti (dossier waverti/ uniquement).
-# Aucun secret de production n'est utilisé : base PostgreSQL éphémère, Supabase local,
+# Aucun secret de production n'est utilisé : PostgreSQL éphémère, Mailpit (e-mails de test),
 # stripe-mock (mode test Stripe simulé) et serveurs de test locaux.
 name: Waverti CI
 
@@ -57,11 +57,21 @@ jobs:
       - run: pnpm test
 
   web-e2e:
-    name: Site web — E2E (Supabase local, stripe-mock)
+    name: Site web — E2E (PostgreSQL, Mailpit, stripe-mock)
     runs-on: ubuntu-24.04
     needs: tests
     timeout-minutes: 40
     services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      mailpit:
+        image: axllent/mailpit:latest
+        ports: ["1025:1025", "8025:8025"]
       stripe-mock:
         image: stripe/stripe-mock:latest
         ports: ["12111:12111"]
@@ -75,12 +85,7 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: waverti/pnpm-lock.yaml
-      - uses: supabase/setup-cli@v1
-        with:
-          version: 2.122.0
       - run: pnpm install --frozen-lockfile
-      - name: Supabase local (Auth, Postgres, Mailpit)
-        run: supabase start -x studio,imgproxy,vector,logflare,edge-runtime,realtime,storage-api,postgres-meta,supavisor
       - name: Configuration de test
         run: bash infra/ci/e2e-env.sh
       - run: pnpm --filter @waverti/web exec playwright install --with-deps chromium
@@ -99,6 +104,16 @@ jobs:
     needs: tests
     timeout-minutes: 60
     services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      mailpit:
+        image: axllent/mailpit:latest
+        ports: ["1025:1025", "8025:8025"]
       stripe-mock:
         image: stripe/stripe-mock:latest
         ports: ["12111:12111"]
@@ -129,12 +144,7 @@ jobs:
         run: |
           cargo clippy --all-targets -- -D warnings
           cargo test
-      # E2E : binaire Tauri réel piloté par WebDriver contre le site et la pile Supabase locaux.
-      - uses: supabase/setup-cli@v1
-        with:
-          version: 2.122.0
-      - name: Supabase local (Auth, Postgres)
-        run: supabase start -x studio,imgproxy,vector,logflare,edge-runtime,realtime,storage-api,postgres-meta,supavisor
+      # E2E : binaire Tauri réel piloté par WebDriver contre le site, PostgreSQL et Mailpit locaux.
       - name: Configuration de test
         run: bash infra/ci/e2e-env.sh
       - name: Site web local

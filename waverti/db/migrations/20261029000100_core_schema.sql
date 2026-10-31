@@ -1,12 +1,11 @@
 -- WAVERTI — schéma principal
--- Compatible Supabase (schéma auth existant) et PostgreSQL 15+ (avec le shim local pour les tests).
+-- PostgreSQL 15+ auto-hébergé (identités : public.users, cf. 20261029000000_platform.sql).
 -- Conventions :
 --   * statuts en text + CHECK (plus simples à faire évoluer que les ENUM) ;
 --   * toutes les tables utilisateur portent user_id pour la RLS et les requêtes de quota ;
 --   * suppression d'un compte => ON DELETE CASCADE sur les données personnelles,
 --     ON DELETE SET NULL sur les journaux nécessaires à la comptabilité / sécurité.
 
-create extension if not exists pgcrypto with schema extensions;
 
 create schema if not exists private;
 revoke all on schema private from public;
@@ -70,6 +69,8 @@ create table public.plans (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+create trigger users_touch before update on public.users
+  for each row execute function private.touch_updated_at();
 create trigger plans_touch before update on public.plans
   for each row execute function private.touch_updated_at();
 
@@ -87,10 +88,10 @@ create table public.plan_addons (
 );
 
 -- ---------------------------------------------------------------------------
--- Profils (1-1 avec auth.users)
+-- Profils (1-1 avec public.users)
 -- ---------------------------------------------------------------------------
 create table public.profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
+  id uuid primary key references public.users (id) on delete cascade,
   email text not null,
   display_name text check (display_name is null or char_length(display_name) <= 80),
   role text not null default 'user' check (role in ('user', 'business', 'admin')),
@@ -787,7 +788,7 @@ create table public.account_deletions (
 );
 
 -- ---------------------------------------------------------------------------
--- Synchronisation auth.users -> profiles
+-- Synchronisation public.users -> profiles (le nom affiché est renseigné par l'inscription)
 -- ---------------------------------------------------------------------------
 create or replace function private.handle_new_user()
 returns trigger
@@ -796,19 +797,15 @@ security definer
 set search_path = ''
 as $$
 begin
-  insert into public.profiles (id, email, display_name)
-  values (
-    new.id,
-    coalesce(new.email, ''),
-    nullif(left(coalesce(new.raw_user_meta_data ->> 'display_name', ''), 80), '')
-  )
+  insert into public.profiles (id, email)
+  values (new.id, new.email)
   on conflict (id) do nothing;
   return new;
 end;
 $$;
 
-create trigger on_auth_user_created
-  after insert on auth.users
+create trigger on_user_created
+  after insert on public.users
   for each row execute function private.handle_new_user();
 
 create or replace function private.handle_user_email_change()
@@ -819,12 +816,12 @@ set search_path = ''
 as $$
 begin
   if new.email is distinct from old.email then
-    update public.profiles set email = coalesce(new.email, '') where id = new.id;
+    update public.profiles set email = new.email where id = new.id;
   end if;
   return new;
 end;
 $$;
 
-create trigger on_auth_user_email_changed
-  after update of email on auth.users
+create trigger on_user_email_changed
+  after update of email on public.users
   for each row execute function private.handle_user_email_change();

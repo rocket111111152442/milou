@@ -15,23 +15,22 @@ afterAll(async () => {
 });
 
 describe("migrations", () => {
-  it("are all applied and tracked like the Supabase CLI", async () => {
-    const rows = await t.client<{ version: string }[]>`select version from supabase_migrations.schema_migrations order by version`;
+  it("are all applied and tracked (no Supabase object required)", async () => {
+    const rows = await t.client<{ version: string }[]>`select version from waverti_migrations.schema_migrations order by version`;
     expect(rows.map((r) => r.version)).toEqual(listMigrations().map((m) => m.version));
   });
 
   it("drizzle schema matches the database (every table and column exists)", async () => {
     const cols = await t.client<{ table_schema: string; table_name: string; column_name: string }[]>`
       select table_schema, table_name, column_name from information_schema.columns
-      where table_schema in ('public', 'auth')`;
+      where table_schema = 'public'`;
     const existing = new Set(cols.map((c) => `${c.table_schema}.${c.table_name}.${c.column_name}`));
     const missing: string[] = [];
     for (const value of Object.values(schema)) {
       if (!is(value, PgTable)) continue;
       const name = getTableName(value);
-      const schemaName = name === "users" ? "auth" : "public";
       for (const col of Object.values(getTableColumns(value))) {
-        const key = `${schemaName}.${name}.${col.name}`;
+        const key = `public.${name}.${col.name}`;
         if (!existing.has(key)) missing.push(key);
       }
     }
@@ -65,6 +64,17 @@ describe("migrations", () => {
   it("creates a profile when an auth user is created", async () => {
     const u = await createTestUser(t, "Hello@Example.test");
     const [p] = await t.client`select email, role from profiles where id = ${u.id}`;
-    expect(p).toMatchObject({ email: "Hello@Example.test", role: "user" });
+    expect(p).toMatchObject({ email: "hello@example.test", role: "user" });
+    // L'e-mail est stocké en minuscules (contrainte), sans doublon possible.
+    await expect(t.client`insert into users (email) values ('hello@example.test')`).rejects.toThrow(/duplicate/);
+    await expect(t.client`insert into users (email) values ('Mixed@Case.test')`).rejects.toThrow(/check/);
+  });
+
+  it("removes every Supabase dependency (no auth schema, no anon/authenticated roles needed)", async () => {
+    const [auth] = await t.client`select count(*)::int as n from pg_namespace where nspname = 'auth'`;
+    expect(auth!.n).toBe(0);
+    const deps = await t.client`
+      select p.polname from pg_policy p where pg_get_expr(p.polqual, p.polrelid) ilike '%auth.%'`;
+    expect(deps).toEqual([]);
   });
 });

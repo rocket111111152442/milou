@@ -1,4 +1,5 @@
 import { sql } from "@waverti/database";
+import { purgeExpiredSessions } from "@waverti/auth";
 import { recomputeEntitlements } from "@waverti/billing";
 import type { WorkerContext } from "../context";
 import { logger } from "../logger";
@@ -55,6 +56,7 @@ export async function runMaintenance(ctx: WorkerContext): Promise<void> {
   await ctx.db.execute(sql`update agent_link_requests set status = 'expired' where status = 'pending' and expires_at < now()`);
   await ctx.db.execute(sql`delete from agent_link_requests where created_at < now() - interval '7 days'`);
   await ctx.db.execute(sql`delete from email_outbox where status in ('sent', 'canceled') and created_at < now() - interval '30 days'`);
+  await purgeExpiredSessions(ctx.db);
 }
 
 /**

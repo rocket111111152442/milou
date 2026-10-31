@@ -13,9 +13,12 @@ const schema = z.object({
   WORKER_BUSINESS_CONCURRENCY: z.coerce.number().int().min(1).max(128).default(16),
   PLAYWRIGHT_CHROMIUM_EXECUTABLE: z.string().optional(),
   BRAVE_SEARCH_API_KEY: z.string().optional(),
+  /** Ancien nom accepté ; BRAVE_SEARCH_API_KEY est prioritaire. */
+  BRAVE_API_KEY: z.string().optional(),
   BRAVE_SEARCH_API_BASE: z.string().url().optional(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_API_BASE: z.string().url().optional(),
+  SMTP_URL: z.string().optional(),
   EMAIL_FROM: z.string().default("Waverti <alertes@waverti.invalid>"),
   APP_URL: z.string().url().default("http://localhost:3000"),
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -31,5 +34,5 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const c = parsed.data;
   if (c.NODE_ENV === "production" && c.WAVERTI_ALLOW_PRIVATE_TARGETS === "1") throw new Error("WAVERTI_ALLOW_PRIVATE_TARGETS interdit en production");
   assertStripeTestMode(c.STRIPE_SECRET_KEY);
-  return { ...c, roles: new Set(c.WORKER_ROLES.split(",").map((r) => r.trim())), allowPrivate: c.WAVERTI_ALLOW_PRIVATE_TARGETS === "1" };
+  return { ...c, BRAVE_SEARCH_API_KEY: c.BRAVE_SEARCH_API_KEY || c.BRAVE_API_KEY || undefined, roles: new Set(c.WORKER_ROLES.split(",").map((r) => r.trim())), allowPrivate: c.WAVERTI_ALLOW_PRIVATE_TARGETS === "1" };
 }

@@ -5,8 +5,8 @@ import { getLiveSubscription } from "@waverti/billing";
 import { apiError, json, readJson, withActor } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { getStripe, isBillingConfigured } from "@/lib/stripe";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { deleteAccount } from "@waverti/auth";
+import { endSession } from "@/lib/session";
 
 /**
  * Suppression du compte (droit à l'effacement) : abonnement Stripe annulé immédiatement,
@@ -30,11 +30,9 @@ export const POST = withActor(
     const ref = createHash("sha256").update(`${process.env.WAVERTI_HASH_PEPPER ?? ""}:${actor.userId}`).digest("hex").slice(0, 32);
     await db.insert(accountDeletions).values({ userRef: ref, requestedAt: new Date(), stripeCancellation });
     await db.insert(adminAuditLogs).values({ adminId: null, action: "account.self_delete", targetType: "user", targetId: ref, metadata: {} });
-    const admin = createSupabaseAdminClient();
-    const { error } = await admin.auth.admin.deleteUser(actor.userId);
-    if (error) return apiError(500, "delete_failed", "La suppression n'a pas pu aboutir. Contactez l'assistance.");
-    const supabase = await createSupabaseServerClient();
-    await supabase.auth.signOut().catch(() => undefined);
+    // Suppression de l'identité : cascade sur le profil, les sessions, les surveillances et toutes les données.
+    await deleteAccount(db, actor.userId);
+    await endSession().catch(() => undefined);
     return json({ ok: true });
   },
   { rate: { name: "delete", limit: 3, windowSec: 3600 } },

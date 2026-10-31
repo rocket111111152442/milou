@@ -5,7 +5,7 @@ const isDev = process.env.NODE_ENV !== "production";
 /**
  * CSP : les scripts inline restent autorisés ('unsafe-inline') car Next.js en injecte pour
  * l'hydratation ; une CSP à nonce imposerait le rendu dynamique de toutes les pages (cf. SECURITY.md).
- * Aucune ressource tierce n'est chargée côté navigateur : l'authentification Supabase et Stripe
+ * Aucune ressource tierce n'est chargée côté navigateur : l'authentification et Stripe
  * passent par le serveur, Stripe Checkout est une redirection.
  */
 const csp = [

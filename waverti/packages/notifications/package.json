@@ -11,7 +11,10 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@waverti/database": "workspace:*"
+    "@waverti/database": "workspace:*",
+    "nodemailer": "^7.0.13"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.2"
+  }
 }

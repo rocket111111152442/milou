@@ -8,7 +8,12 @@ export interface OutboxOptions {
   batchSize?: number;
   workerId: string;
   onSent?: (row: { id: string; userId: string | null }) => Promise<void> | void;
+  /** Envoi immédiat de messages précis (e-mails d'authentification envoyés par le site). */
+  ids?: string[];
 }
+
+/** Gabarits contenant un lien à usage unique : le contenu est effacé de la file dès l'envoi. */
+const ONE_TIME_LINK_TEMPLATES = new Set(["verify_email", "reset_password"]);
 
 const MAX_ATTEMPTS = 5;
 
@@ -32,8 +37,9 @@ export async function processEmailOutbox(db: Database, sender: EmailSender, opts
     update email_outbox set status = 'sending', attempts = attempts + 1, lease_expires_at = now() + interval '2 minutes'
     where id in (
       select id from email_outbox
-      where (status = 'pending' and next_attempt_at <= now())
-         or (status = 'sending' and lease_expires_at < now())
+      where ((status = 'pending' and next_attempt_at <= now())
+         or (status = 'sending' and lease_expires_at < now()))
+        ${opts.ids?.length ? sql`and id in ${opts.ids}` : sql``}
       order by case priority when 'critical' then 0 when 'high' then 1 else 2 end, next_attempt_at
       limit ${batch}
       for update skip locked
@@ -55,7 +61,14 @@ export async function processEmailOutbox(db: Database, sender: EmailSender, opts
       });
       await db
         .update(emailOutbox)
-        .set({ status: "sent", sentAt: new Date(), providerMessageId: res.id, lastError: null, leaseExpiresAt: null })
+        .set({
+          status: "sent",
+          sentAt: new Date(),
+          providerMessageId: res.id,
+          lastError: null,
+          leaseExpiresAt: null,
+          ...(ONE_TIME_LINK_TEMPLATES.has(row.template) ? { payload: {} } : {}),
+        })
         .where(eq(emailOutbox.id, row.id));
       if (row.notification_id) {
         await db.update(notifications).set({ emailStatus: "sent" }).where(eq(notifications.id, row.notification_id));

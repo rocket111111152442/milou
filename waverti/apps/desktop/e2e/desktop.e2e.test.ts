@@ -1,11 +1,11 @@
 /**
  * Test de bout en bout de la VRAIE application desktop (binaire Tauri, WebKitGTK) pilotée par
- * WebDriver (tauri-driver), contre le vrai serveur web local et la base Supabase locale.
+ * WebDriver (tauri-driver), contre le vrai serveur web local et sa base PostgreSQL.
  *
  * Parcours : liaison par code (validé dans un navigateur connecté) -> accord explicite ->
  * contrôle d'une page exécuté par l'ordinateur -> alerte -> pause -> déliaison.
  *
- * Prérequis (voir TESTING.md) : `supabase start`, application web sur http://localhost:3000,
+ * Prérequis (voir TESTING.md) : PostgreSQL et Mailpit locaux, application web sur http://localhost:3000,
  * binaire construit avec `pnpm tauri build --debug --no-bundle`, `tauri-driver`, Xvfb.
  * Lancement : DESKTOP_E2E=1 pnpm --filter @waverti/desktop test:e2e
  */
@@ -18,14 +18,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { remote } from "webdriverio";
 import { chromium, type Browser } from "playwright";
 import postgres from "postgres";
+import { hashPassword } from "@waverti/auth";
 import { createDb } from "@waverti/database";
 import { createMonitor, scheduleDueTasks } from "@waverti/monitoring";
 
 const RUN = process.env.DESKTOP_E2E === "1";
 const WEB = process.env.E2E_BASE_URL ?? "http://localhost:3000";
-const DB_URL = process.env.E2E_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-const SUPABASE_URL = process.env.E2E_SUPABASE_URL ?? "http://127.0.0.1:54321";
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const DB_URL = process.env.E2E_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:55432/waverti";
 const APP = join(import.meta.dirname, "../src-tauri/target/debug/waverti-desktop");
 const PASSWORD = "MotDePasse-E2E-2026";
 
@@ -69,14 +68,12 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
     await new Promise<void>((r) => shop.listen(0, "127.0.0.1", r));
     shopPort = (shop.address() as { port: number }).port;
 
-    // Compte de test confirmé, créé via l'API d'administration de Supabase (locale).
-    const created = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-      method: "POST",
-      headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}`, "content-type": "application/json" },
-      body: JSON.stringify({ email, password: PASSWORD, email_confirm: true, user_metadata: { display_name: "Desk" } }),
-    });
-    expect(created.status, await created.clone().text()).toBe(200);
-    userId = ((await created.json()) as { id: string }).id;
+    // Compte de test vérifié, créé directement en base (mot de passe haché comme à l'inscription).
+    const [created] = await sql<{ id: string }[]>`
+      insert into users (email, email_verified_at, password_hash, password_changed_at)
+      values (${email}, now(), ${await hashPassword(PASSWORD)}, now()) returning id`;
+    userId = created!.id;
+    await sql`update profiles set display_name = 'Desk' where id = ${userId}`;
     await sql`update profiles set onboarding_completed_at = now() where id = ${userId}`;
     // Abonné Plus actif (état équivalent à un webhook Stripe) : il n'existe plus de formule gratuite.
     await sql`insert into subscriptions (user_id, plan_id, stripe_subscription_id, stripe_customer_id, status, current_period_end)
@@ -117,12 +114,7 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
     await Promise.all([driver, xvfb].map((p) => stopProcess(p)));
     await browser?.close();
     shop?.close();
-    if (userId) {
-      await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
-        method: "DELETE",
-        headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}` },
-      });
-    }
+    if (userId) await sql`delete from users where id = ${userId}`;
     await sql.end();
     await closeDb();
     if (home) rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

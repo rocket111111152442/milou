@@ -6,7 +6,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import postgres from "postgres";
 import { createDb, type DbHandle } from "./client";
-import { listMigrations, runMigrations, SHIM_FILE } from "./migrations";
+import { listMigrations, runMigrations } from "./migrations";
 
 /**
  * Nom de la base modèle dérivé du contenu des migrations : toute modification du schéma produit
@@ -14,7 +14,7 @@ import { listMigrations, runMigrations, SHIM_FILE } from "./migrations";
  */
 function templateName(): string {
   const h = createHash("sha256");
-  for (const f of [...listMigrations().map((m) => m.path), SHIM_FILE]) h.update(readFileSync(f));
+  for (const f of listMigrations().map((m) => m.path)) h.update(readFileSync(f));
   return `waverti_test_tpl_${h.digest("hex").slice(0, 12)}`;
 }
 const TEMPLATE = templateName();
@@ -42,7 +42,7 @@ async function ensureTemplate(adminUrl: string): Promise<void> {
       await admin.unsafe(`create database ${TEMPLATE}`);
       const t = postgres(withDatabase(adminUrl, TEMPLATE), { max: 1, onnotice: () => undefined });
       try {
-        await runMigrations(t, { withLocalShim: true });
+        await runMigrations(t);
       } finally {
         await t.end();
       }
@@ -94,6 +94,6 @@ export async function createTestUser(
   email = `user-${randomBytes(4).toString("hex")}@example.test`,
 ): Promise<{ id: string; email: string }> {
   const [row] = await handle.client<{ id: string }[]>`
-    insert into auth.users (email, email_confirmed_at) values (${email}, now()) returning id`;
+    insert into users (email, email_verified_at) values (${email.toLowerCase()}, now()) returning id`;
   return { id: row!.id, email };
 }

@@ -4,8 +4,7 @@ import { fileURLToPath } from "node:url";
 import type postgres from "postgres";
 
 const here = dirname(fileURLToPath(import.meta.url));
-export const MIGRATIONS_DIR = resolve(here, "../../../supabase/migrations");
-export const SHIM_FILE = resolve(here, "../sql/local-supabase-shim.sql");
+export const MIGRATIONS_DIR = resolve(here, "../../../db/migrations");
 
 export interface MigrationFile {
   version: string;
@@ -24,41 +23,36 @@ export function listMigrations(dir = MIGRATIONS_DIR): MigrationFile[] {
 }
 
 /**
- * Applique les migrations non encore appliquées. Utilise la même table de suivi que la CLI
- * Supabase (supabase_migrations.schema_migrations) pour rester compatible avec `supabase db push`.
+ * Applique, dans l'ordre et chacune dans sa transaction, les migrations non encore appliquées
+ * (suivi dans waverti_migrations.schema_migrations). Verrou consultatif : deux déploiements
+ * simultanés ne peuvent pas appliquer la même migration.
  */
-export async function runMigrations(
-  sql: postgres.Sql,
-  options: { withLocalShim?: boolean; log?: (msg: string) => void } = {},
-): Promise<string[]> {
+export async function runMigrations(sql: postgres.Sql, options: { log?: (msg: string) => void } = {}): Promise<string[]> {
   const log = options.log ?? (() => undefined);
-  if (options.withLocalShim) {
-    await sql.unsafe(readFileSync(SHIM_FILE, "utf8"));
-    log("local supabase shim applied");
-  }
   await sql.unsafe(`
-    create schema if not exists supabase_migrations;
-    create table if not exists supabase_migrations.schema_migrations (
+    create schema if not exists waverti_migrations;
+    create table if not exists waverti_migrations.schema_migrations (
       version text primary key,
-      statements text[],
-      name text
+      name text not null,
+      applied_at timestamptz not null default now()
     );
   `);
-  const applied = new Set(
-    (await sql<{ version: string }[]>`select version from supabase_migrations.schema_migrations`).map(
-      (r) => r.version,
-    ),
-  );
   const done: string[] = [];
-  for (const m of listMigrations()) {
-    if (applied.has(m.version)) continue;
-    const content = readFileSync(m.path, "utf8");
-    await sql.begin(async (tx) => {
-      await tx.unsafe(content);
-      await tx`insert into supabase_migrations.schema_migrations (version, name) values (${m.version}, ${m.name})`;
-    });
-    log(`applied ${m.version}_${m.name}`);
-    done.push(m.version);
-  }
+  await sql.begin(async (lock) => {
+    await lock`select pg_advisory_xact_lock(7461001)`;
+    const applied = new Set(
+      (await lock<{ version: string }[]>`select version from waverti_migrations.schema_migrations`).map((r) => r.version),
+    );
+    for (const m of listMigrations()) {
+      if (applied.has(m.version)) continue;
+      const content = readFileSync(m.path, "utf8");
+      await lock.savepoint(async (tx) => {
+        await tx.unsafe(content);
+        await tx`insert into waverti_migrations.schema_migrations (version, name) values (${m.version}, ${m.name})`;
+      });
+      log(`applied ${m.version}_${m.name}`);
+      done.push(m.version);
+    }
+  });
   return done;
 }

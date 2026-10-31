@@ -87,6 +87,34 @@ export function renderEmail(template: string, subject: string, payload: Record<s
   if (typeof p.detectedAt === "string") meta.push(["Détecté le", p.detectedAt]);
 
   switch (template) {
+    case "verify_email": {
+      const url = safeHttpUrl(p.url) ?? `${appUrl}/connexion`;
+      const r = layout({
+        appUrl,
+        preheader: "Confirmez votre adresse pour activer votre compte",
+        heading: "Confirmez votre adresse e-mail",
+        paragraphs: [
+          "Cliquez sur le bouton ci-dessous pour activer votre compte Waverti. Ce lien est valable 24 heures et ne peut servir qu'une fois.",
+          "Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet e-mail.",
+        ],
+        cta: { label: "Confirmer mon adresse", url },
+      });
+      return { subject, ...r };
+    }
+    case "reset_password": {
+      const url = safeHttpUrl(p.url) ?? `${appUrl}/mot-de-passe-oublie`;
+      const r = layout({
+        appUrl,
+        preheader: "Choisissez un nouveau mot de passe",
+        heading: "Réinitialisation de votre mot de passe",
+        paragraphs: [
+          "Une réinitialisation du mot de passe de votre compte Waverti a été demandée. Ce lien est valable 1 heure et ne peut servir qu'une fois.",
+          "Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail : votre mot de passe reste inchangé.",
+        ],
+        cta: { label: "Choisir un nouveau mot de passe", url },
+      });
+      return { subject, ...r };
+    }
     case "support_ack": {
       const r = layout({
         appUrl,

@@ -22,25 +22,25 @@ waverti/
 │   ├── monitoring/ Moteurs A (pages), B (sujets Internet), C (Business), file hybride, protections SSRF
 │   ├── billing/    Formules, droits, quotas, Stripe (Checkout, webhooks, gestion)
 │   ├── notifications/ Notifications in-app / bureau / e-mail (Resend), modèles d'e-mails
-│   ├── auth/       Jetons d'appareil, hachages, codes de liaison
+│   ├── auth/       Comptes, mots de passe (scrypt), sessions, TOTP + codes de récupération, jetons d'appareil
 │   ├── types/      Schémas Zod et types partagés, formatage français
 │   ├── ui/         Design system (Tailwind v4, Radix) + écrans partagés web/desktop
 │   └── config/     Constantes de marque, texte d'accord local, lecture de l'environnement
-├── supabase/       Migrations SQL (schéma, RLS, données de référence), config locale, modèles d'e-mails Auth
-├── infra/          Docker / systemd du worker
+├── db/migrations/  Migrations SQL PostgreSQL (plateforme et identités, schéma, RLS, données de référence)
+├── infra/          Docker (PostgreSQL, worker), systemd, sauvegardes
 └── docs/           Architecture, déploiement, environnement, sécurité, tests, feuille de route
 ```
 
 ## Démarrage local
 
-Prérequis : Node 22.12+, pnpm 10, Docker (Supabase local), Rust stable (application desktop).
+Prérequis : Node 22.12+, pnpm 10, Docker (PostgreSQL 17, Mailpit, stripe-mock), Rust stable (application desktop).
 
 ```bash
 pnpm install
-npx supabase@2.122.0 start -x studio,imgproxy,vector,logflare,edge-runtime,realtime,storage-api,postgres-meta,supavisor
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres pnpm db:migrate
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres STRIPE_PRICE_PLUS=price_… pnpm db:seed
-cp .env.example apps/web/.env.local   # puis compléter (clés Supabase locales : `npx supabase status`)
+docker compose -f infra/docker/docker-compose.dev.yml up -d   # PostgreSQL :55432, Mailpit :8025, stripe-mock :12111
+export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/waverti
+pnpm db:migrate && pnpm db:seed
+cp .env.example apps/web/.env.local   # puis compléter (WAVERTI_ENCRYPTION_KEY, WAVERTI_HASH_PEPPER, SMTP_URL=smtp://127.0.0.1:1025)
 pnpm --filter @waverti/web dev        # http://localhost:3000
 pnpm --filter @waverti/worker dev     # traitements serveur
 pnpm --filter @waverti/desktop tauri dev
@@ -62,8 +62,8 @@ DATABASE_URL=… pnpm admin:grant prenom@lullin-web.com
 | Domaine | État |
 | --- | --- |
 | Site public, SEO, accessibilité (axe), responsive | Fonctionnel et vérifié (E2E) |
-| Inscription, e-mail de confirmation, connexion, réinitialisation, déconnexion | Fonctionnel et vérifié (E2E, Supabase local) |
-| Double authentification (TOTP), obligatoire pour l'administration avec `ADMIN_REQUIRE_MFA=1` | Fonctionnel et vérifié (E2E, Supabase local) — pas de codes de secours |
+| Inscription, e-mail de confirmation, connexion, réinitialisation, déconnexion | Fonctionnel et vérifié (E2E, PostgreSQL auto-hébergé + Mailpit) |
+| Double authentification (TOTP), obligatoire pour l'administration avec `ADMIN_REQUIRE_MFA=1` | Fonctionnel et vérifié (E2E) — 10 codes de récupération à usage unique, anti-rejeu des codes TOTP |
 | Surveillance de pages (moteur A), file hybride ordinateur / serveurs | Fonctionnel et vérifié (intégration, E2E, desktop réel) |
 | Recherche sur Internet (moteur B, Brave Search) | Fonctionnel en environnement de test (API simulée) — clé Brave requise |
 | Business : vérification de propriété, disponibilité, HTTPS, scénarios, rapports | Fonctionnel et vérifié (intégration avec serveurs locaux et Chromium, E2E) |

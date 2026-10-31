@@ -4,7 +4,7 @@
 
 1. Informations légales réelles et validation juridique des documents (modèles fournis avec des zones `[À COMPLÉTER]`).
 2. Compte Stripe activé + passage en paiements réels (après validation) ; TVA et facturation.
-3. Supabase de production, Vercel Pro, domaine, serveur du worker, Resend, Brave Search (coûts à valider).
+3. Serveur PostgreSQL de production (sauvegardes hors site), Vercel Pro, domaine, serveur du worker, Resend, Brave Search (coûts à valider).
 4. Certificats de signature Windows / Apple et tests manuels des installateurs sur ces systèmes.
 5. Audit de sécurité externe recommandé.
 

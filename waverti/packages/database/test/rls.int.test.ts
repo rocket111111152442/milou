@@ -59,7 +59,7 @@ describe("row level security", () => {
     expect(p.map((r) => r.id)).toEqual([bob.id]);
   });
 
-  it("the authenticated role cannot write tasks directly (quotas are enforced server-side)", async () => {
+  it("app_user cannot write tasks directly (quotas are enforced server-side)", async () => {
     await expectDenied(() =>
       withUser(t.db, alice.id, (tx) =>
         tx.insert(monitoringTasks).values({ userId: alice.id, kind: "page", name: "bypass", condition: {} }),
@@ -67,13 +67,13 @@ describe("row level security", () => {
     );
   });
 
-  it("the authenticated role cannot escalate its role", async () => {
+  it("app_user cannot escalate its role", async () => {
     await expectDenied(() =>
       withUser(t.db, alice.id, (tx) => tx.execute(sql`update profiles set role = 'admin' where id = ${alice.id}`)),
     );
   });
 
-  it("the authenticated role cannot read device token hashes", async () => {
+  it("app_user cannot read device token hashes", async () => {
     await expectDenied(() =>
       withUser(t.db, alice.id, (tx) => tx.select({ h: agentDevices.tokenHash }).from(agentDevices)),
     );
@@ -83,21 +83,26 @@ describe("row level security", () => {
     expect(ok).toHaveLength(1);
   });
 
-  it("anonymous role sees public plans only and no private tables", async () => {
+  it("app_user without a current user sees public plans only, and no one else's rows", async () => {
     const plans = await t.db.transaction(async (tx) => {
-      await tx.execute(sql`set local role anon`);
+      await tx.execute(sql`set local role app_user`);
       return tx.execute(sql`select id from plans`);
     });
     expect(plans.length).toBe(4);
-    await expectDenied(() =>
-      t.db.transaction(async (tx) => {
-        await tx.execute(sql`set local role anon`);
-        return tx.execute(sql`select id from monitoring_tasks`);
-      }),
-    );
+    const tasks = await t.db.transaction(async (tx) => {
+      await tx.execute(sql`set local role app_user`);
+      return tx.execute(sql`select id from monitoring_tasks`);
+    });
+    expect(tasks.length).toBe(0);
   });
 
-  it("operational tables are not readable by authenticated users", async () => {
+  it("identity tables (password hashes, sessions, tokens, recovery codes) are never readable by app_user", async () => {
+    for (const table of ["users", "user_sessions", "auth_tokens", "mfa_recovery_codes"]) {
+      await expectDenied(() => withUser(t.db, alice.id, (tx) => tx.execute(sql.raw(`select * from ${table} limit 1`))));
+    }
+  });
+
+  it("operational tables are not readable by app_user", async () => {
     for (const table of [
       "billing_events",
       "api_usage",

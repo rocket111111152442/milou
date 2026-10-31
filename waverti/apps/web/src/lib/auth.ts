@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { authenticateDevice, bearerFrom, type Role } from "@waverti/auth";
 import { eq, profiles } from "@waverti/database";
 import { getDb, isDatabaseConfigured } from "./db";
-import { createSupabaseServerClient, isAuthConfigured } from "./supabase/server";
+import { getActiveSession, isAuthConfigured } from "./session";
 
 export interface CurrentUser {
   id: string;
@@ -16,7 +16,9 @@ export interface CurrentUser {
   onboardingCompletedAt: Date | null;
   timezone: string;
   /** Double authentification (TOTP) : activée sur le compte, et validée pour la session en cours (aal2). */
-  mfa: { enrolled: boolean; verified: boolean; factorId: string | null; since: string | null };
+  mfa: { enrolled: boolean; verified: boolean; since: string | null };
+  /** Identifiant de la session courante (empreinte), pour fermer les autres sessions. */
+  sessionId: string;
 }
 
 /** Page de saisie du code de double authentification, avec retour vers `next` après validation. */
@@ -25,16 +27,15 @@ export function mfaChallengePath(next: string): string {
 }
 
 /**
- * Utilisateur courant, validé auprès du serveur d'authentification (getUser) puis enrichi
- * par le profil en base (rôle, suspension). Mis en cache pour la durée de la requête.
+ * Utilisateur courant : session valide (cookie → empreinte en base) enrichie par le profil
+ * (rôle, suspension). Mis en cache pour la durée de la requête.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   // Lecture des cookies en premier : marque la route comme dynamique même sans configuration.
   await cookies();
   if (!isAuthConfigured() || !isDatabaseConfigured()) return null;
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
+  const session = await getActiveSession();
+  if (!session) return null;
   const [p] = await getDb()
     .select({
       role: profiles.role,
@@ -45,25 +46,20 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       timezone: profiles.timezone,
     })
     .from(profiles)
-    .where(eq(profiles.id, data.user.id))
+    .where(eq(profiles.id, session.userId))
     .limit(1);
   if (!p) return null;
-  // Facteurs lus sur l'utilisateur renvoyé par le serveur d'authentification (pas sur le cookie).
-  const factor = data.user.factors?.find((f) => f.status === "verified" && f.factor_type === "totp") ?? null;
-  let verified = false;
-  if (factor) {
-    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    verified = aal?.currentLevel === "aal2";
-  }
+  const enrolled = Boolean(session.user.totpEnabledAt && session.user.totpSecretEnc);
   return {
-    id: data.user.id,
-    email: p.email || data.user.email || "",
+    id: session.userId,
+    email: p.email || session.user.email,
     role: p.role,
     suspended: Boolean(p.suspendedAt),
     displayName: p.displayName,
     onboardingCompletedAt: p.onboardingCompletedAt,
     timezone: p.timezone,
-    mfa: { enrolled: Boolean(factor), verified, factorId: factor?.id ?? null, since: factor?.created_at ?? null },
+    mfa: { enrolled, verified: enrolled && session.aal === 2, since: session.user.totpEnabledAt?.toISOString() ?? null },
+    sessionId: session.id,
   };
 });
 

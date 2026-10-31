@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { login, PASSWORD, resetRateLimits, signUpAndConfirm, uniqueEmail, waitForEmailLink } from "./helpers";
 
-test.describe("authentification (Supabase réel)", () => {
+test.describe("authentification (comptes Waverti réels)", () => {
   test.beforeEach(resetRateLimits);
 
   test("inscription, vérification de l'e-mail puis onboarding", async ({ page }) => {

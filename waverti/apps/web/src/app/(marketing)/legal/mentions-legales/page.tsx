@@ -22,7 +22,7 @@ export default function MentionsLegalesPage() {
       <h2>Hébergement</h2>
       <p>
         Site et tableau de bord : Vercel Inc., <Todo>adresse de l'hébergeur à vérifier sur le contrat</Todo>. Base de données et
-        authentification : Supabase, <Todo>région d'hébergement retenue (UE recommandée) et adresse</Todo>. Serveurs de
+        authentification : serveur PostgreSQL exploité par LULLIN WEB, <Todo>hébergeur, région (UE) et adresse du serveur de base de données</Todo>. Serveurs de
         surveillance : OVHcloud, <Todo>adresse et localisation du serveur</Todo>.
       </p>
       <h2>Propriété intellectuelle</h2>

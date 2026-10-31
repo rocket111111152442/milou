@@ -1,6 +1,6 @@
 /**
- * Usage : DATABASE_URL=postgres://... pnpm db:migrate [--local-shim]
- * --local-shim : à utiliser UNIQUEMENT sur un PostgreSQL local sans Supabase.
+ * Usage : DATABASE_URL=postgres://... pnpm db:migrate
+ * Applique les migrations de db/migrations sur un PostgreSQL 15+ (auto-hébergé ou local).
  */
 import postgres from "postgres";
 import { runMigrations } from "../src/migrations";
@@ -12,11 +12,8 @@ if (!url) {
 }
 const sql = postgres(url, { max: 1, onnotice: () => undefined });
 try {
-  const applied = await runMigrations(sql, {
-    withLocalShim: process.argv.includes("--local-shim"),
-    log: (m) => console.log(m),
-  });
-  console.log(applied.length ? `${applied.length} migration(s) appliquée(s)` : "Base à jour");
+  const applied = await runMigrations(sql, { log: (m) => console.info(m) });
+  console.info(applied.length ? `${applied.length} migration(s) appliquée(s)` : "Base à jour");
 } finally {
   await sql.end();
 }

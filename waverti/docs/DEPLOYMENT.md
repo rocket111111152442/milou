@@ -1,23 +1,31 @@
 # Déploiement
 
-Ordre recommandé : Supabase → Vercel (Preview) → worker → Stripe (test) → Resend → Brave → desktop.
+Ordre recommandé : PostgreSQL → Vercel (Preview) → worker → Stripe (test) → Resend → Brave → desktop.
 Chaque étape marquée **[humain]** nécessite un compte, un paiement ou une décision de LULLIN WEB.
 
-## 1. Supabase (base de données + authentification) [humain]
+## 1. PostgreSQL auto-hébergé (base de données + comptes) [humain]
 
-1. Créer un projet (région UE, ex. Paris `eu-west-3`) ; noter l'URL, la clé `anon` et la clé `service_role`.
+Supabase n'est plus utilisé : comptes, sessions et double authentification sont gérés par l'application.
+
+1. Serveur (ex. le VPS du worker) : `infra/docker/docker-compose.postgres.yml` (PostgreSQL 17, TLS,
+   `scram-sha-256`, volume persistant). Placer `server.crt`/`server.key` dans `infra/docker/pg-tls/`,
+   définir `POSTGRES_PASSWORD` (fichier `.env` non versionné), puis `docker compose -f … up -d`.
+   N'ouvrir le port 5432 qu'aux adresses nécessaires (pare-feu) — le site Vercel s'y connecte en TLS.
 2. Appliquer le schéma depuis un poste de confiance :
    ```bash
-   DATABASE_URL="postgresql://postgres:MOT_DE_PASSE@db.REF.supabase.co:5432/postgres" pnpm db:migrate
+   DATABASE_URL="postgresql://waverti:MOT_DE_PASSE@HOTE:5432/waverti?sslmode=require" pnpm db:migrate
+   DATABASE_URL=… pnpm db:seed
    ```
-3. Authentification → URL Configuration : *Site URL* = URL publique ; *Redirect URLs* = `https://DOMAINE/**`
-   (et l'URL de Preview Vercel si utilisée). E-mails : confirmation obligatoire, mot de passe ≥ 10 caractères.
-   Authentification multifacteur : laisser « TOTP (App Authenticator) » activé (inscription et vérification).
-4. Modèles d'e-mails (Confirm signup, Reset password) : reprendre `supabase/templates/*.html`
-   (liens `{{ .RedirectTo }}&token_hash=…`, indispensables au flux `/auth/confirm`).
-5. SMTP personnalisé (Resend) pour ne pas dépendre du service d'envoi limité de Supabase.
-6. Sauvegardes : activer les sauvegardes quotidiennes / PITR (formule payante Supabase) et tester une
-   restauration sur un projet de test avant le lancement.
+   Les migrations sont suivies dans `waverti_migrations.schema_migrations` (verrou consultatif : deux
+   exécutions simultanées ne se chevauchent pas).
+3. Variables du site : `DATABASE_URL`, `WAVERTI_ENCRYPTION_KEY`, `WAVERTI_HASH_PEPPER`, `RESEND_API_KEY`
+   (ou `SMTP_URL`), `EMAIL_FROM`, `NEXT_PUBLIC_APP_URL` (voir `docs/ENVIRONMENT.md`).
+4. Sauvegardes : `infra/backup/pg-backup.sh` (format personnalisé `pg_dump -Fc`, rotation) via cron ou
+   minuteur systemd, copie hors du serveur ; vérifier chaque semaine avec `infra/backup/pg-restore-check.sh`
+   (restauration dans une base temporaire, contrôle des tables et de la RLS). Ce test de restauration est
+   aussi automatisé (`packages/database/test/backup.int.test.ts`).
+5. Ne jamais exposer le rôle propriétaire de la base à l'application si un rôle dédié est créé ; l'isolation
+   par utilisateur repose sur la RLS (`app_user`).
 
 ## 2. Vercel — projet distinct « waverti » [humain pour la production]
 
@@ -79,7 +87,7 @@ Créer une clé (offre « Data for AI » ou « Pro ») → `BRAVE_SEARCH_API_KEY
 
 - [ ] Mentions légales, CGU/CGV, confidentialité, cookies complétées avec les informations réelles de LULLIN WEB
       (SIRET, adresse, hébergeurs, DPO/contact) et validées juridiquement.
-- [ ] Registre des traitements RGPD, contrats de sous-traitance (Supabase, Vercel, Stripe, Resend, OVH, Brave).
+- [ ] Registre des traitements RGPD, contrats de sous-traitance (hébergeur de la base, Vercel, Stripe, Resend, OVH, Brave).
 - [ ] Vercel Pro, domaine, HTTPS, `NEXT_PUBLIC_LAUNCH_STATUS=live`.
 - [ ] Double authentification des administrateurs (`ADMIN_REQUIRE_MFA=1`).
 - [ ] Sauvegardes testées, supervision du worker, alertes de budget API.

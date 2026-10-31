@@ -1,0 +1,19 @@
+# Environnement de développement et de test (aucun service payant) :
+#   docker compose -f infra/docker/docker-compose.dev.yml up -d
+# PostgreSQL 17 (port 55432), Mailpit (SMTP 1025, interface http://localhost:8025), stripe-mock (12111).
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: waverti
+    ports: ["55432:5432"]
+    volumes: [waverti-dev-db:/var/lib/postgresql/data]
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["1025:1025", "8025:8025"]
+  stripe-mock:
+    image: stripe/stripe-mock:latest
+    ports: ["12111:12111"]
+volumes:
+  waverti-dev-db:

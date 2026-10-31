@@ -8,7 +8,7 @@ import { createDb, sql } from "@waverti/database";
 import { recoverJobs, scheduleDueTasks, HostPoliteness, RobotsCache } from "@waverti/monitoring";
 import { BrowserPool } from "@waverti/monitoring/browser";
 import { createBraveProvider } from "@waverti/monitoring/search";
-import { createResendSender } from "@waverti/notifications";
+import { createSenderFromEnv } from "@waverti/notifications";
 import { loadConfig } from "./config";
 import { makeFetchOptions, type WorkerContext } from "./context";
 import { logger } from "./logger";
@@ -40,11 +40,11 @@ export async function startWorker(env: Record<string, string | undefined> = proc
           })
         : null,
     search: config.BRAVE_SEARCH_API_KEY ? createBraveProvider(config.BRAVE_SEARCH_API_KEY, config.BRAVE_SEARCH_API_BASE) : null,
-    email: config.RESEND_API_KEY ? createResendSender(config.RESEND_API_KEY, config.RESEND_API_BASE) : null,
+    email: createSenderFromEnv({ RESEND_API_KEY: config.RESEND_API_KEY, RESEND_API_BASE: config.RESEND_API_BASE, SMTP_URL: config.SMTP_URL })?.sender ?? null,
     counters: { succeeded: 0, failed: 0 },
   };
   if (!ctx.search) logger.warn("BRAVE_SEARCH_API_KEY absente : les recherches Web échoueront avec un message explicite");
-  if (!ctx.email) logger.warn("RESEND_API_KEY absente : les e-mails restent en file d'attente (non envoyés)");
+  if (!ctx.email) logger.warn("Aucun transport d'e-mail (RESEND_API_KEY ou SMTP_URL) : les e-mails restent en file d'attente (non envoyés)");
 
   const startedAt = new Date();
   const loops: LoopHandle[] = [];

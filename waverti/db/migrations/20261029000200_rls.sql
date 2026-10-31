@@ -2,10 +2,10 @@
 --
 -- Modèle :
 --   * Toutes les tables ont la RLS activée.
---   * Les rôles exposés par Supabase (anon, authenticated) n'ont AUCUN droit d'écriture :
+--   * Le rôle app_user (lectures pour le compte d'un utilisateur) n'a AUCUN droit d'écriture :
 --     toutes les écritures passent par l'API serveur, qui valide les quotas, les URL (SSRF)
 --     et les droits d'abonnement avant d'écrire avec le rôle propriétaire.
---   * Le rôle authenticated peut seulement LIRE ses propres lignes (défense en profondeur :
+--   * Le rôle app_user peut seulement LIRE ses propres lignes (défense en profondeur :
 --     l'application exécute aussi ses lectures utilisateur sous ce rôle, cf. withUser()).
 --   * Les tables d'exploitation (billing_events, api_usage, admin_audit_logs, caches,
 --     worker_heartbeats, rate_limits, app_settings...) ne sont accessibles qu'au serveur.
@@ -21,32 +21,23 @@ begin
 end;
 $$;
 
--- 2. Retirer tous les droits par défaut accordés par Supabase à anon/authenticated
-revoke all on all tables in schema public from anon, authenticated;
-revoke all on all sequences in schema public from anon, authenticated;
-revoke all on all functions in schema public from anon, authenticated;
-alter default privileges in schema public revoke all on tables from anon, authenticated;
-alter default privileges in schema public revoke all on sequences from anon, authenticated;
-alter default privileges in schema public revoke all on functions from anon, authenticated;
-revoke all on schema private from anon, authenticated;
+-- 2. Le rôle app_user n'a aucun droit par défaut ; seuls les droits de LECTURE ci-dessous lui sont accordés.
+revoke all on all tables in schema public from app_user;
+revoke all on all sequences in schema public from app_user;
+revoke all on all functions in schema public from app_user;
+revoke all on schema private from app_user;
+grant usage on schema public to app_user;
 
-grant usage on schema public to anon, authenticated;
+-- 3. Données publiques (formules, versions desktop publiées)
+grant select on public.plans, public.plan_addons to app_user;
+create policy plans_public_read on public.plans for select to app_user using (is_public);
+create policy plan_addons_public_read on public.plan_addons for select to app_user using (is_public);
+grant select on public.desktop_releases to app_user;
+create policy desktop_releases_public_read on public.desktop_releases for select to app_user using (is_published);
 
--- 3. Catalogue public des formules
-grant select on public.plans, public.plan_addons to anon, authenticated;
-create policy plans_public_read on public.plans
-  for select to anon, authenticated using (is_public);
-create policy plan_addons_public_read on public.plan_addons
-  for select to anon, authenticated using (is_public);
-
-grant select on public.desktop_releases to anon, authenticated;
-create policy desktop_releases_public_read on public.desktop_releases
-  for select to anon, authenticated using (is_published);
-
--- 4. Lecture de ses propres données
-grant select on public.profiles to authenticated;
+grant select on public.profiles to app_user;
 create policy profiles_self_read on public.profiles
-  for select to authenticated using (id = (select auth.uid()));
+  for select to app_user using (id = (select app.current_user_id()));
 
 do $$
 declare
@@ -62,9 +53,9 @@ begin
     'incidents', 'incident_events', 'artifacts',
     'support_tickets'
   ] loop
-    execute format('grant select on public.%I to authenticated', t);
+    execute format('grant select on public.%I to app_user', t);
     execute format(
-      'create policy %I on public.%I for select to authenticated using (user_id = (select auth.uid()))',
+      'create policy %I on public.%I for select to app_user using (user_id = (select app.current_user_id()))',
       t || '_owner_read', t
     );
   end loop;
@@ -72,12 +63,12 @@ end;
 $$;
 
 -- Messages de support : visibles si le ticket appartient à l'utilisateur
-grant select on public.support_messages to authenticated;
+grant select on public.support_messages to app_user;
 create policy support_messages_owner_read on public.support_messages
-  for select to authenticated using (
+  for select to app_user using (
     exists (
       select 1 from public.support_tickets st
-      where st.id = support_messages.ticket_id and st.user_id = (select auth.uid())
+      where st.id = support_messages.ticket_id and st.user_id = (select app.current_user_id())
     )
   );
 
@@ -85,9 +76,9 @@ create policy support_messages_owner_read on public.support_messages
 grant select (
   id, user_id, name, platform, app_version, status, consent_local_at, consent_version,
   monitoring_enabled, last_seen_at, last_state, created_at, revoked_at
-) on public.agent_devices to authenticated;
+) on public.agent_devices to app_user;
 create policy agent_devices_owner_read on public.agent_devices
-  for select to authenticated using (user_id = (select auth.uid()));
+  for select to app_user using (user_id = (select app.current_user_id()));
 
 -- 5. Garde-fou supplémentaire : un rôle client ne peut jamais modifier un rôle ou une suspension,
 --    même si un droit d'écriture était accordé par erreur dans une migration future.
@@ -97,7 +88,7 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if current_user in ('anon', 'authenticated') then
+  if current_user = 'app_user' then
     if new.role is distinct from old.role
        or new.suspended_at is distinct from old.suspended_at
        or new.stripe_customer_id is distinct from old.stripe_customer_id then

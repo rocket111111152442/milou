@@ -1,0 +1,35 @@
+# PostgreSQL de PRODUCTION auto-hébergé (même serveur que le worker).
+#   docker compose -f infra/docker/docker-compose.postgres.yml --env-file infra/docker/postgres.env up -d
+# - Données persistantes dans le volume « waverti-db » ; sauvegardes : infra/backup/pg-backup.sh (+ copie hors serveur).
+# - Le site (Vercel) se connecte par Internet : TLS obligatoire (certificat dans ./postgres-tls), mot de passe fort
+#   (scram-sha-256), port exposé uniquement si nécessaire et filtré par le pare-feu.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-waverti}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD est requis}
+      POSTGRES_DB: waverti
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/tls/server.crt
+      - -c
+      - ssl_key_file=/tls/server.key
+      - -c
+      - max_connections=100
+      - -c
+      - password_encryption=scram-sha-256
+    ports: ["${POSTGRES_PUBLIC_PORT:-5432}:5432"]
+    volumes:
+      - waverti-db:/var/lib/postgresql/data
+      - ./postgres-tls:/tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-waverti} -d waverti"]
+      interval: 10s
+volumes:
+  waverti-db:

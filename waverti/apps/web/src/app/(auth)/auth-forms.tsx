@@ -47,7 +47,7 @@ function FormMessages({ state }: { state: FormState }) {
   );
 }
 
-export function SignUpForm({ formule, googleEnabled }: { formule?: string; googleEnabled: boolean }) {
+export function SignUpForm({ formule }: { formule?: string }) {
   const [state, action, pending] = useActionState(signUpAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -86,23 +86,11 @@ export function SignUpForm({ formule, googleEnabled }: { formule?: string; googl
       <Button type="submit" size="lg" loading={pending}>
         Créer mon compte
       </Button>
-      {googleEnabled ? <GoogleButton /> : null}
     </form>
   );
 }
 
-function GoogleButton() {
-  return (
-    <a
-      href="/auth/google"
-      className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-line bg-white text-[15px] font-medium hover:bg-surface"
-    >
-      Continuer avec Google
-    </a>
-  );
-}
-
-export function SignInForm({ suivant, googleEnabled }: { suivant?: string; googleEnabled: boolean }) {
+export function SignInForm({ suivant }: { suivant?: string }) {
   const [state, action, pending] = useActionState(signInAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -122,7 +110,6 @@ export function SignInForm({ suivant, googleEnabled }: { suivant?: string; googl
       <Button type="submit" size="lg" loading={pending}>
         Se connecter
       </Button>
-      {googleEnabled ? <GoogleButton /> : null}
     </form>
   );
 }
@@ -132,8 +119,14 @@ export function MfaChallengeForm({ suivant }: { suivant: string }) {
   return (
     <form action={action} className="flex flex-col gap-5">
       <input type="hidden" name="suivant" value={suivant} />
-      <Field id="code" label="Code à 6 chiffres" required error={state.fieldErrors?.code} hint="Affiché par votre application d'authentification (Google Authenticator, 1Password, Aegis…).">
-        {(p) => <Input {...p} name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} required autoFocus />}
+      <Field
+        id="code"
+        label="Code de vérification"
+        required
+        error={state.fieldErrors?.code}
+        hint="Les 6 chiffres affichés par votre application d'authentification, ou l'un de vos codes de récupération (XXXXX-XXXXX)."
+      >
+        {(p) => <Input {...p} name="code" autoComplete="one-time-code" autoCapitalize="characters" maxLength={12} required autoFocus />}
       </Field>
       <FormMessages state={state} />
       <Button type="submit" size="lg" loading={pending}>
@@ -158,10 +151,11 @@ export function ForgotPasswordForm() {
   );
 }
 
-export function ResetPasswordForm() {
+export function ResetPasswordForm({ token }: { token: string }) {
   const [state, action, pending] = useActionState(resetPasswordAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
+      <input type="hidden" name="token" value={token} />
       <Field id="password" label="Nouveau mot de passe" required error={state.fieldErrors?.password} hint="10 caractères minimum.">
         {(p) => <PasswordInput {...p} name="password" autoComplete="new-password" required minLength={10} />}
       </Field>

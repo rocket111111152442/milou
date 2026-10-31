@@ -1,5 +1,5 @@
 /**
- * Schéma Drizzle — miroir typé des migrations SQL de `supabase/migrations`.
+ * Schéma Drizzle — miroir typé des migrations SQL de `db/migrations`.
  * Les migrations SQL restent la source de vérité ; le test d'intégration
  * `schema-sync.test.ts` vérifie que chaque table/colonne déclarée ici existe en base.
  */
@@ -11,9 +11,9 @@ import {
   date,
   integer,
   jsonb,
-  pgSchema,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uuid,
@@ -25,15 +25,6 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType() {
     return "bytea";
   },
-});
-
-// Table auth.users de Supabase (lecture seule côté application)
-const authSchema = pgSchema("auth");
-export const authUsers = authSchema.table("users", {
-  id: uuid("id").primaryKey(),
-  email: text("email"),
-  emailConfirmedAt: ts("email_confirmed_at"),
-  createdAt: ts("created_at"),
 });
 
 export const plans = pgTable("plans", {
@@ -86,6 +77,49 @@ export const planAddons = pgTable("plan_addons", {
   grantsBusinessSites: integer("grants_business_sites").notNull(),
   isPublic: boolean("is_public").notNull(),
   createdAt: ts("created_at").notNull(),
+});
+
+/** Identités (auto-hébergées) : e-mail, empreinte du mot de passe, double authentification. */
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull(),
+  emailVerifiedAt: ts("email_verified_at"),
+  passwordHash: text("password_hash"),
+  passwordChangedAt: ts("password_changed_at"),
+  totpSecretEnc: text("totp_secret_enc"),
+  totpPendingEnc: text("totp_pending_enc"),
+  totpEnabledAt: ts("totp_enabled_at"),
+  totpLastStep: bigint("totp_last_step", { mode: "number" }),
+  createdAt: ts("created_at").notNull().defaultNow(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+
+export const userSessions = pgTable("user_sessions", {
+  id: text("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
+  aal: smallint("aal").notNull(),
+  createdAt: ts("created_at").notNull().defaultNow(),
+  lastSeenAt: ts("last_seen_at").notNull().defaultNow(),
+  expiresAt: ts("expires_at").notNull(),
+  ipHash: text("ip_hash"),
+  userAgent: text("user_agent"),
+});
+
+export const authTokens = pgTable("auth_tokens", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: uuid("user_id").notNull(),
+  purpose: text("purpose").$type<"verify_email" | "reset_password">().notNull(),
+  createdAt: ts("created_at").notNull().defaultNow(),
+  expiresAt: ts("expires_at").notNull(),
+  usedAt: ts("used_at"),
+});
+
+export const mfaRecoveryCodes = pgTable("mfa_recovery_codes", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  userId: uuid("user_id").notNull(),
+  codeHash: text("code_hash").notNull(),
+  createdAt: ts("created_at").notNull().defaultNow(),
+  usedAt: ts("used_at"),
 });
 
 export const profiles = pgTable("profiles", {
