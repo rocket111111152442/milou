@@ -35,7 +35,7 @@ export function PricingCards({ plans }: { plans: PlanDefinition[] }) {
               <span className="text-sm text-muted-fg">/ mois TTC</span>
             </p>
             <p className="mt-1 text-xs text-muted-fg">Essai gratuit de 3 jours · carte bancaire requise · sans engagement</p>
-            <Button asChild className="mt-6" variant={highlighted ? "primary" : "secondary"}>
+            <Button asChild className="mt-6 h-auto min-h-10 whitespace-normal px-4 py-2.5 text-center leading-snug" variant={highlighted ? "primary" : "secondary"}>
               <Link href={`/inscription?formule=${p.id}`} aria-label={`Essayer ${p.name} gratuitement pendant 3 jours`}>
                 Essayer gratuitement pendant 3 jours
               </Link>

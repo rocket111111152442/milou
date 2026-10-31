@@ -26,8 +26,8 @@ export default function CgPage() {
       </p>
       <h2>4. Formules, prix et essai</h2>
       <p>
-        Les formules et quotas sont décrits sur la page Tarifs. Les prix sont indiqués TTC. Les formules Plus, Pro et Business
-        ouvrent droit à un essai unique de 72 heures, avec enregistrement d'un moyen de paiement via Stripe ; le premier
+        Les formules et quotas sont décrits sur la page Tarifs. Les prix sont indiqués TTC. Les formules Plus, Pro, Max et
+        Business ouvrent droit à un essai unique de 72 heures, avec enregistrement d'un moyen de paiement via Stripe ; le premier
         prélèvement intervient à la fin de l'essai sauf résiliation préalable. Un rappel est adressé avant ce prélèvement.
       </p>
       <h2>5. Droit de rétractation</h2>

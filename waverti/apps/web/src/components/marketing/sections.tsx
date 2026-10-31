@@ -414,7 +414,7 @@ export function FinalCta() {
             </Button>
           </div>
           <p className="text-[13px] text-muted-fg">
-            3 jours d'essai gratuit sur Plus, Pro et Business. Carte bancaire requise pour l'essai, aucun prélèvement si vous
+            3 jours d'essai gratuit sur Plus, Pro, Max et Business. Carte bancaire requise pour l'essai, aucun prélèvement si vous
             résiliez avant la fin.
           </p>
         </div>

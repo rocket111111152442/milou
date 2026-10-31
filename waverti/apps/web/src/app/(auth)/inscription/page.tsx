@@ -26,7 +26,7 @@ export default async function InscriptionPage({ searchParams }: { searchParams: 
             </Badge>
           </span>
         ) : (
-          "Créez votre compte, puis choisissez Plus, Pro ou Business pour démarrer votre essai gratuit de 3 jours."
+          "Créez votre compte, puis choisissez Plus, Pro, Max ou Business pour démarrer votre essai gratuit de 3 jours."
         )
       }
       footer={
