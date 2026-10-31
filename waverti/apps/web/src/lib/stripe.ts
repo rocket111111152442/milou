@@ -26,3 +26,4 @@ export function getStripe(): StripeClient {
   }
   return client;
 }
+

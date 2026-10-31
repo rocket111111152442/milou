@@ -70,3 +70,23 @@ export async function createPortalSession(db: Database, stripe: StripeClient, us
   const session = await stripe.billingPortal.sessions.create({ customer: p.customer, return_url: returnUrl, locale: "fr" });
   return session.url;
 }
+
+/**
+ * TESTS UNIQUEMENT (clé Stripe de test, hors Production) : fait avancer la facturation de l'abonnement de
+ * l'utilisateur sur les vrais serveurs Stripe TEST, pour vérifier fin d'essai, renouvellement et paiement refusé.
+ * - end_trial : termine l'essai maintenant → Stripe émet et tente de payer la première facture.
+ * - renew_now : nouvelle période immédiatement, sans prorata → facture de renouvellement.
+ * L'appelant DOIT vérifier le mode test et l'environnement ; la clé live est de toute façon refusée par le client.
+ */
+export async function advanceTestBilling(db: Database, stripe: StripeClient, userId: string, action: "end_trial" | "renew_now"): Promise<{ subscriptionId: string }> {
+  const sub = await getLiveSubscription(db, userId);
+  if (!sub) throw new BillingError("no_subscription", "Aucun abonnement actif.");
+  if (action === "end_trial") {
+    if (sub.status !== "trialing") throw new BillingError("no_subscription", "Aucun essai en cours.");
+    await stripe.subscriptions.update(sub.stripeSubscriptionId, { trial_end: "now" as const, proration_behavior: "none" as const });
+  } else {
+    if (sub.status === "trialing") throw new BillingError("no_subscription", "Terminez d'abord l'essai.");
+    await stripe.subscriptions.update(sub.stripeSubscriptionId, { billing_cycle_anchor: "now" as const, proration_behavior: "none" as const });
+  }
+  return { subscriptionId: sub.stripeSubscriptionId };
+}

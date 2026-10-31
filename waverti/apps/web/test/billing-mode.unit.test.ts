@@ -17,3 +17,14 @@ describe("mode de facturation", () => {
     expect(integrationStatus({ STRIPE_SECRET_KEY: "sk_test_abc" }).stripe).toBe(false);
   });
 });
+
+describe("outils de recette Stripe", () => {
+  it("jamais en Production ni avec une clé live, et seulement sur activation explicite", async () => {
+    const { testBillingToolsEnabled } = await import("../src/lib/stripe-tools");
+    const test = { STRIPE_SECRET_KEY: "sk_test_x", WAVERTI_BILLING_TEST_TOOLS: "1" };
+    expect(testBillingToolsEnabled({ ...test, VERCEL_ENV: "preview" })).toBe(true);
+    expect(testBillingToolsEnabled({ ...test, VERCEL_ENV: "production" })).toBe(false);
+    expect(testBillingToolsEnabled({ ...test, STRIPE_SECRET_KEY: "sk_live_x", VERCEL_ENV: "preview" })).toBe(false);
+    expect(testBillingToolsEnabled({ STRIPE_SECRET_KEY: "sk_test_x", VERCEL_ENV: "preview" })).toBe(false);
+  });
+});
