@@ -56,6 +56,13 @@ test.describe("site public", () => {
     await expect(page.getByRole("table", { name: /Comparatif/ })).toBeVisible();
   });
 
+  test("l'option abandonnée « site supplémentaire » n'apparaît sur aucune page commerciale", async ({ request }) => {
+    for (const path of ["/", "/tarifs", "/entreprises", "/surveillance-site-entreprise", "/detecter-panne-site-internet"]) {
+      const html = await (await request.get(path)).text();
+      expect(html, path).not.toMatch(/sites? (professionnels? )?supplémentaires?/i);
+    }
+  });
+
   test("pages SEO et juridiques accessibles, robots et sitemap présents", async ({ page, request }) => {
     for (const path of ["/surveiller-prix-produit", "/alerte-retour-en-stock", "/surveiller-changements-site", "/detecter-panne-site-internet", "/surveillance-site-entreprise", "/legal/mentions-legales", "/legal/confidentialite", "/legal/cookies", "/legal/conditions-generales", "/entreprises", "/assistance", "/robot", "/fonctionnement", "/tarifs", "/telecharger"]) {
       const res = await page.goto(path);

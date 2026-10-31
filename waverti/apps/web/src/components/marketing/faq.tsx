@@ -27,7 +27,7 @@ export const faqItems: Array<{ q: string; a: string }> = [
   },
   {
     q: "Combien coûte Waverti ?",
-    a: "Plus coûte 5,99 € par mois, Pro 14,99 € par mois et Business 39,99 € par mois (14,99 € par site professionnel supplémentaire). Les prix sont indiqués TTC, sans engagement. Chaque formule s'essaie gratuitement pendant 3 jours.",
+    a: "Plus coûte 5,99 € par mois, Pro 14,99 € par mois, Max 29,99 € par mois et Business 39,99 € par mois (un site professionnel inclus). Les prix sont indiqués TTC, sans engagement. Chaque formule s'essaie gratuitement pendant 3 jours.",
   },
   {
     q: "Comment se passent les paiements ?",
