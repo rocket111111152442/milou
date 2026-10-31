@@ -65,15 +65,17 @@ DATABASE_URL=… pnpm admin:grant prenom@lullin-web.com
 | Inscription, e-mail de confirmation, connexion, réinitialisation, déconnexion | Fonctionnel et vérifié (E2E, PostgreSQL auto-hébergé + Mailpit) |
 | Double authentification (TOTP), obligatoire pour l'administration avec `ADMIN_REQUIRE_MFA=1` | Fonctionnel et vérifié (E2E) — 10 codes de récupération à usage unique, anti-rejeu des codes TOTP |
 | Surveillance de pages (moteur A), file hybride ordinateur / serveurs | Fonctionnel et vérifié (intégration, E2E, desktop réel) |
-| Recherche sur Internet (moteur B, Brave Search) | Fonctionnel en environnement de test (API simulée) — clé Brave requise |
+| Recherche sur Internet (moteur B, Brave Search) | Fonctionnel en environnement de test (API simulée) — clé Brave requise ; quota proportionnel aux jours de la période facturée ; compteur technique des requêtes |
 | Business : vérification de propriété, disponibilité, HTTPS, scénarios, rapports | Fonctionnel et vérifié (intégration avec serveurs locaux et Chromium, E2E) |
 | Abonnements, essai 72 h, résiliation, portail | Fonctionnel en environnement de test (Stripe mode test simulé par stripe-mock) |
 | E-mails (Resend) | Fonctionnel en environnement de test (API simulée) — domaine d'envoi à configurer |
-| Application desktop Linux | Fonctionnel et vérifié (E2E sur le binaire réel, paquets .deb / AppImage construits) |
-| Application desktop Windows / macOS | Développé mais non vérifié (workflow de construction prêt, non exécuté) |
+| Application desktop Linux | Fonctionnel et vérifié en CI (E2E sur le binaire réel ; .deb installé, lancé, désinstallé ; .rpm et AppImage construits) |
+| Application desktop Windows | Voir `docs/RAPPORT-2026-10-31.md` § 5 (E2E WebView2 et installateurs NSIS/MSI en CI) — non signée |
+| Application desktop macOS (Apple Silicon, Intel) | Construite en CI, lancement vérifié sur Apple Silicon ; pas d'E2E fonctionnel (non pris en charge par tauri-driver) ; non signée |
+| Application sur téléphone (PWA) | Vérifiée dans Chromium (manifeste, service worker, hors ligne, aucune donnée privée en cache) ; non essayée sur un vrai iPhone / Android ; notifications push préparées, envoi non développé |
 | Mises à jour automatiques signées du desktop | Développé mais non vérifié (activé seulement avec une clé de signature) |
 | Administration LULLIN WEB | Fonctionnel et vérifié (E2E) |
 | Mentions légales, CGV/CGU, politique de confidentialité | Modèles à compléter et à faire valider (aucune information inventée) |
 
 Documentation : `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`, `docs/SECURITY.md`,
-`docs/TESTING.md`, `docs/ROADMAP.md`, `docs/LOAD-TEST-RESULTS.md`, `docs/RAPPORT-FINAL.md` (état détaillé).
+`docs/TESTING.md`, `docs/ROADMAP.md`, `docs/LOAD-TEST-RESULTS.md`, `docs/COUTS.md`, `docs/RAPPORT-2026-10-31.md` (état détaillé).

@@ -258,7 +258,7 @@ describe("stripe webhooks", () => {
     const w1 = searchQuotaWindow(before, await loadCurrentSubscription(t.db, u.id));
 
     for (const [planId, price, topics] of [["max", PRICES.max, 20], ["pro", PRICES.pro, 10]] as const) {
-      const changed = { ...sub, metadata: { ...sub.metadata, plan_id: planId }, items: { ...sub.items, data: [{ ...sub.items.data[0]!, price: { id: price, object: "price" } }] } } as typeof sub;
+      const changed = { ...sub, metadata: { ...sub.metadata, plan_id: planId }, items: { ...sub.items, data: [{ ...sub.items.data[0]!, price: { id: price, object: "price" } }] } } as unknown as typeof sub;
       fake.state.subscriptions.set(sub.id, changed);
       ev = signedEvent(fake.stripe, "customer.subscription.updated", changed);
       expect((await handleStripeWebhook(deps, ev.payload, ev.signature)).status).toBe(200);
