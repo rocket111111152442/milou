@@ -50,3 +50,26 @@ service n'est pas configuré. Sans Stripe, les formules payantes sont présenté
 
 `TEST_DATABASE_URL` (PostgreSQL de test, défaut `postgres://postgres:postgres@127.0.0.1:5432/postgres`),
 `STRIPE_MOCK_URL` (stripe-mock), `E2E_BASE_URL`, `E2E_DATABASE_URL`, `MAILPIT_URL`, `DESKTOP_E2E=1`, `WAVERTI_LOAD_TESTS=1`.
+
+## Audit du 31 octobre 2026 (projet Vercel existant et code)
+
+Valeurs non lues (variables sensibles) : seuls les **noms** et environnements ont été comparés au code.
+
+| Variable sur Vercel (Production) | Lue par le code ? | Constat | Action recommandée |
+| --- | --- | --- | --- |
+| `BRAVE_API_KEY` | oui (alias) | Le nom canonique est `BRAVE_SEARCH_API_KEY` ; `BRAVE_API_KEY` est accepté en repli (si les deux existent, `BRAVE_SEARCH_API_KEY` l'emporte). **Les recherches sont faites par le worker, pas par le site** : sur Vercel, la clé ne sert qu'à l'indicateur de santé. | Placer la clé sur le serveur du worker (`worker.env`) ; la retirer de Vercel réduit son exposition. |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | **non** | Inutile : le paiement est une redirection vers Stripe Checkout créée côté serveur. Variable publique (pas un secret), mais si c'est une clé `pk_live_`, elle ne correspond pas au mode test. | Supprimer ou ignorer. |
+| `STRIPE_SECRET_KEY` | oui | Si c'est une clé `sk_live_`, le site **refuse de l'utiliser** tant que `WAVERTI_ALLOW_LIVE_PAYMENTS` n'est pas défini (garde-fou vérifié) : les paiements restent indisponibles. | Pour tester le parcours de paiement : une clé `sk_test_` dans l'environnement **Preview** (jamais la clé live), avec `STRIPE_WEBHOOK_SECRET` de l'endpoint de test. |
+| `RESEND_API_KEY` | oui | Correct. Sans `EMAIL_FROM`, l'expéditeur par défaut est utilisé. | Ajouter `EMAIL_FROM=Waverti <alertes@waverti.com>` après vérification du domaine chez Resend. |
+| `NEXT_PUBLIC_LAUNCH_STATUS=preview` | oui | Correct (bandeau + `noindex`). | Conserver. |
+
+Variables **absentes** nécessaires au fonctionnement du site : `DATABASE_URL` (PostgreSQL auto-hébergé, TLS),
+`WAVERTI_ENCRYPTION_KEY`, `WAVERTI_HASH_PEPPER`, `NEXT_PUBLIC_APP_URL=https://www.waverti.com`,
+`STRIPE_WEBHOOK_SECRET` (mode test), `ADMIN_REQUIRE_MFA=1`. Sans `DATABASE_URL`, l'espace client indique que le
+service n'est pas configuré (aucune donnée envoyée).
+
+### Configuration du worker (serveur)
+
+Modèle : `infra/docker/worker.env.example`. Minimum : `DATABASE_URL`, `APP_URL`, `EMAIL_FROM`,
+`RESEND_API_KEY` (ou `SMTP_URL`), `BRAVE_SEARCH_API_KEY`, `WORKER_ID`. `STRIPE_SECRET_KEY` facultative et en mode
+test uniquement. Le worker n'a besoin ni de `WAVERTI_ENCRYPTION_KEY` ni de `STRIPE_WEBHOOK_SECRET`.

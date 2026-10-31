@@ -18,10 +18,12 @@ import { createSubscriptionCheckout, checkTrialEligibility, previewCheckout } fr
 import { getEntitlements } from "../src/store";
 import { handleStripeWebhook, type WebhookDeps } from "../src/webhooks";
 import { PLAN_CATALOG } from "../src/catalog";
+import { loadCurrentSubscription } from "../src/store";
+import { searchQuotaWindow } from "../src/search-quota";
 import { addCard, createFakeStripe, makeSubscription, signedEvent, WEBHOOK_SECRET } from "./fake-stripe";
 
 const PEPPER = "p".repeat(48);
-const PRICES = { plus: "price_plus_test", pro: "price_pro_test", business: "price_business_test", extra: "price_extra_test" };
+const PRICES = { plus: "price_plus_test", pro: "price_pro_test", max: "price_max_test", business: "price_business_test", extra: "price_extra_test" };
 
 let t: TestDatabase;
 let fake: ReturnType<typeof createFakeStripe>;
@@ -32,6 +34,7 @@ beforeAll(async () => {
   await t.db.update(plans).set({ stripePriceId: PRICES.plus }).where(eq(plans.id, "plus"));
   await t.db.update(plans).set({ stripePriceId: PRICES.pro }).where(eq(plans.id, "pro"));
   await t.db.update(plans).set({ stripePriceId: PRICES.business }).where(eq(plans.id, "business"));
+  await t.db.update(plans).set({ stripePriceId: PRICES.max }).where(eq(plans.id, "max"));
   await t.db.update(planAddons).set({ stripePriceId: PRICES.extra }).where(eq(planAddons.id, "business_extra_site"));
 });
 afterAll(async () => {
@@ -242,6 +245,79 @@ describe("stripe webhooks", () => {
     expect((await getEntitlements(t.db, u.id)).source).toBe("grace");
     const n = await t.db.select().from(notifications).where(eq(notifications.userId, u.id));
     expect(n.some((x) => x.title.includes("Échec du paiement") && x.priority === "high")).toBe(true);
+  });
+
+  it("plan change mid-period (Plus → Max → Pro): quotas follow immediately, search counter period unchanged", async () => {
+    const u = await newCustomer();
+    const sub = makeSubscription({ customer: u.customer, priceId: PRICES.plus, status: "active", userId: u.id, planId: "plus" });
+    fake.state.subscriptions.set(sub.id, sub);
+    let ev = signedEvent(fake.stripe, "customer.subscription.created", sub);
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    const before = await getEntitlements(t.db, u.id);
+    expect(before).toMatchObject({ planId: "plus", maxWebTopics: 3 });
+    const w1 = searchQuotaWindow(before, await loadCurrentSubscription(t.db, u.id));
+
+    for (const [planId, price, topics] of [["max", PRICES.max, 20], ["pro", PRICES.pro, 10]] as const) {
+      const changed = { ...sub, metadata: { ...sub.metadata, plan_id: planId }, items: { ...sub.items, data: [{ ...sub.items.data[0]!, price: { id: price, object: "price" } }] } } as typeof sub;
+      fake.state.subscriptions.set(sub.id, changed);
+      ev = signedEvent(fake.stripe, "customer.subscription.updated", changed);
+      expect((await handleStripeWebhook(deps, ev.payload, ev.signature)).status).toBe(200);
+      const e = await getEntitlements(t.db, u.id);
+      expect(e).toMatchObject({ planId, maxWebTopics: topics });
+      const w = searchQuotaWindow(e, await loadCurrentSubscription(t.db, u.id));
+      expect(w.period).toBe(w1.period);
+      expect(w.limit).toBe(Math.round((PLAN_CATALOG[planId].monthlySearchCalls * w.days) / 30));
+    }
+  });
+
+  it("scheduled cancellation keeps access until the period end, then removes it", async () => {
+    const u = await newCustomer();
+    const sub = makeSubscription({ customer: u.customer, priceId: PRICES.pro, status: "active", userId: u.id, planId: "pro" });
+    fake.state.subscriptions.set(sub.id, sub);
+    let ev = signedEvent(fake.stripe, "customer.subscription.created", sub);
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    const scheduled = { ...sub, cancel_at_period_end: true } as typeof sub;
+    fake.state.subscriptions.set(sub.id, scheduled);
+    ev = signedEvent(fake.stripe, "customer.subscription.updated", scheduled);
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    expect(await getEntitlements(t.db, u.id)).toMatchObject({ planId: "pro", source: "subscription" });
+    const [row] = await t.db.select({ c: subscriptions.cancelAtPeriodEnd }).from(subscriptions).where(eq(subscriptions.userId, u.id));
+    expect(row!.c).toBe(true);
+    fake.state.subscriptions.set(sub.id, { ...scheduled, status: "canceled" });
+    ev = signedEvent(fake.stripe, "customer.subscription.deleted", scheduled);
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    expect((await getEntitlements(t.db, u.id)).planId).toBeNull();
+  });
+
+  it("renewal: a paid invoice for the next period extends access and opens a new search quota period", async () => {
+    const u = await newCustomer();
+    const now = Math.floor(Date.now() / 1000);
+    const sub = makeSubscription({ customer: u.customer, priceId: PRICES.plus, status: "active", userId: u.id, planId: "plus", periodEnd: now + 3600 });
+    fake.state.subscriptions.set(sub.id, sub);
+    let ev = signedEvent(fake.stripe, "customer.subscription.created", sub);
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    const first = await getEntitlements(t.db, u.id);
+    const w1 = searchQuotaWindow(first, await loadCurrentSubscription(t.db, u.id));
+    // Stripe renouvelle : nouvelle période de 31 jours qui commence maintenant (démarrée 1 jour plus tard que la première).
+    const start = now + 86400;
+    const renewed = {
+      ...sub,
+      items: { ...sub.items, data: [{ ...sub.items.data[0]!, current_period_start: start, current_period_end: start + 31 * 86400 }] },
+    } as typeof sub;
+    fake.state.subscriptions.set(sub.id, renewed);
+    ev = signedEvent(fake.stripe, "invoice.paid", {
+      id: "in_renew_1",
+      object: "invoice",
+      customer: u.customer,
+      amount_paid: 599,
+      parent: { subscription_details: { subscription: sub.id, metadata: { waverti_user_id: u.id } } },
+    });
+    expect((await handleStripeWebhook(deps, ev.payload, ev.signature)).status).toBe(200);
+    const after = await getEntitlements(t.db, u.id);
+    expect(after.validUntil!.getTime()).toBeGreaterThan(first.validUntil!.getTime());
+    const w2 = searchQuotaWindow(after, await loadCurrentSubscription(t.db, u.id), new Date((start + 3600) * 1000));
+    expect(w2.period).not.toBe(w1.period);
+    expect(w2).toMatchObject({ days: 31, limit: 93 });
   });
 
   it("ignores unrelated event types but records them", async () => {

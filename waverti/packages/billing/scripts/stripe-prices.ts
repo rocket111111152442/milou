@@ -51,7 +51,17 @@ async function main() {
   const live = /^(sk|rk)_live_/.test(key);
   const args = new Set(process.argv.slice(2));
   if (args.has("--create-test-catalog") && live) throw new Error("--create-test-catalog est refusé avec une clé live : créez le catalogue de production dans le tableau de bord Stripe.");
-  const stripe = new Stripe(key, { maxNetworkRetries: 2, timeout: 20_000, appInfo: { name: "Waverti price check" } });
+  // Lecture seule autorisée avec une clé live (aucune écriture n'est faite dans ce cas) ; STRIPE_API_BASE cible stripe-mock.
+  const opts: Stripe.StripeConfig = { maxNetworkRetries: 2, timeout: 20_000, appInfo: { name: "Waverti price check" } };
+  const base = process.env.STRIPE_API_BASE;
+  if (base) {
+    if (live) throw new Error("STRIPE_API_BASE est réservé aux tests (stripe-mock) : ne pas l'utiliser avec une clé live.");
+    const u = new URL(base);
+    opts.host = u.hostname;
+    opts.port = Number(u.port || (u.protocol === "https:" ? 443 : 80));
+    opts.protocol = u.protocol.replace(":", "") as "http" | "https";
+  }
+  const stripe = new Stripe(key, opts);
   console.info(`Mode Stripe : ${live ? "PRODUCTION (lecture seule)" : "test"}`);
 
   const found = new Map<string, Stripe.Price>();

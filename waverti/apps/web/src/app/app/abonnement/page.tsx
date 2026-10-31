@@ -127,7 +127,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <p className="text-sm text-muted-fg">
-              {formatCents(EXTRA_SITE_ADDON.priceCents)} / mois par site, avec ses propres quotas (3 points de contrôle, 1 scénario). Le
+              {formatCents(EXTRA_SITE_ADDON.priceCents)} / mois par site, avec ses propres quotas : 3 points de contrôle chaque minute et le certificat HTTPS (sans scénario navigateur). Le
               changement est proratisé.
             </p>
             <ExtraSitesControl current={Math.max(0, ent.businessSites - 1)} />

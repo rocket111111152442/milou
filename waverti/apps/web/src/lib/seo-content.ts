@@ -219,7 +219,11 @@ export const seoPages: Record<string, SeoContent & { title: string; description:
     faqs: [
       {
         q: "Combien de points de contrôle sont inclus ?",
-        a: "Trois points de contrôle vérifiés chaque minute et un scénario navigateur toutes les deux heures, par site.",
+        a: "Trois points de contrôle (des adresses de votre site : accueil, page produit…) vérifiés chaque minute, et un scénario navigateur toutes les deux heures pour le site inclus dans la formule. Un site supplémentaire comprend ses trois points de contrôle et la surveillance HTTPS, sans scénario navigateur.",
+      },
+      {
+        q: "Les contrôles sont-ils faits depuis plusieurs pays ?",
+        a: "Non. Les contrôles sont effectués depuis les serveurs de Waverti, situés à un seul emplacement. Un « point de contrôle » est une adresse de votre site, pas un lieu géographique. Pour éviter les fausses alertes, chaque échec est revérifié avant l'ouverture d'un incident.",
       },
       {
         q: "Le certificat HTTPS est-il surveillé ?",
