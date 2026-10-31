@@ -110,7 +110,12 @@ describe.skipIf(!RUN)("application desktop réelle (Tauri + WebDriver)", () => {
       port: 4444,
       logLevel: "warn",
       // WebKitWebDriver ne gère que le protocole WebDriver « classique » (pas BiDi) ; même choix sous Windows.
-      capabilities: { "wdio:enforceWebDriverClassic": true, "tauri:options": { application: APP } } as WebdriverIO.Capabilities,
+      // Windows : sans « webviewOptions », msedgedriver traite l'exécutable comme le navigateur Edge et attend
+      // un port de débogage qui n'est jamais ouvert ; avec, il pilote le WebView2 de l'application.
+      capabilities: {
+        "wdio:enforceWebDriverClassic": true,
+        "tauri:options": IS_WINDOWS ? { application: APP, webviewOptions: {} } : { application: APP },
+      } as WebdriverIO.Capabilities,
     });
     browser = await chromium.launch();
   }, 120_000);
