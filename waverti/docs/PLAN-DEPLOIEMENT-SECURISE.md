@@ -48,7 +48,7 @@ Après :
 * À vérifier dans le tableau de bord (non lisible ici) : que la *Build Command* du projet n'est pas surchargée par une commande
   appelant des migrations. Aucun `vercel.json` ne existe dans `waverti/`.
 * **Conséquence** : un déploiement Preview ne met plus la base de test à jour tout seul ; lancer `db:migrate:env` avant de tester une
-  migration. Aucune migration n'est actuellement en attente (le catalogue produits reste dans `db/migrations-pending/`).
+  migration. Une migration est en attente : `20261102010000_update_plan_prices` (voir `docs/PLAN-PUBLICATION-PRIX.md`, qui détaille l'ordre migration → déploiement). Le catalogue produits reste dans `db/migrations-pending/`.
 
 ## 4. Lot 4 rendu non destructif (corrigé dans ce commit)
 
@@ -71,6 +71,6 @@ Après :
 | 0 | Sauvegarde/point de restauration Neon de la base de production (à faire par LULLIN WEB) | — |
 | 1 | Fusionner la branche de correctifs dans `release/waverti` (PR) ; la CI doit être verte | `git revert` de la fusion |
 | 2 | Régler la Production Branch (section 2) — aucun déploiement immédiat | remettre l'ancien réglage |
-| 3 | Déploiement Production du commit validé (le build ne touche plus la base) | Vercel → *Instant Rollback* vers `c429092` (le schéma n'a pas changé : aucune migration en attente) |
+| 3 | Déploiement Production du commit validé (le build ne touche plus la base) | Vercel → *Instant Rollback* vers `c429092` (compatible avec une base migrée : `/api/health` n'est « degraded » que si `applied < expected`) |
 | 4 | Contrôle : `/api/health`, connexion d'un compte test, comptage des lignes (3 comptes, 4 e-mails) identique à l'avant | — |
 | 5 | Migrations de production : **séparément**, `db:migrate:env` en simulation puis, sur accord, `--execute --confirm=…` | restauration Neon (les migrations sont additives) |
