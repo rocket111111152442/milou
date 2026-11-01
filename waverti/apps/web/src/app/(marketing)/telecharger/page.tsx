@@ -18,7 +18,7 @@ const steps = [
   },
   {
     title: "2. Installez et ouvrez Waverti",
-    text: "Windows : exécutez le fichier .exe (ou .msi). macOS : ouvrez le .dmg et glissez Waverti dans Applications. Linux : installez le paquet .deb (sudo apt install ./Waverti_….deb).",
+    text: "Windows : exécutez le fichier .exe. macOS : ouvrez le .dmg et glissez Waverti dans Applications. Linux : installez le paquet .deb (sudo apt install ./Waverti_….deb).",
   },
   {
     title: "3. Reliez l'application à votre compte",

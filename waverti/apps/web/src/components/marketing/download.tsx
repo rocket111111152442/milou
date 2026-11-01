@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Apple, Globe, Monitor, Terminal, Download, ShieldAlert } from "lucide-react";
+import { Apple, Globe, Monitor, Terminal, Download } from "lucide-react";
 import { Badge, Button, Container, SectionHeading } from "@waverti/ui";
 import type { PublicRelease } from "@/lib/releases";
 
@@ -10,12 +10,6 @@ const platforms = [
 ];
 
 const PACKAGE_LABEL: Record<string, string> = { nsis: "Installateur (.exe)", msi: "Installateur (.msi)", deb: "Paquet .deb", dmg: "Image disque (.dmg)", appimage: "AppImage", rpm: "Paquet .rpm" };
-const ARCH_LABEL: Record<string, string> = { x86_64: "64 bits Intel/AMD", aarch64: "Apple Silicon", universal: "Intel et Apple Silicon" };
-
-function formatSize(bytes: number | null) {
-  if (!bytes) return null;
-  return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} Mo`;
-}
 
 export function DownloadSection({ releases, standalone = false }: { releases: PublicRelease[]; standalone?: boolean }) {
   return (
@@ -30,7 +24,7 @@ export function DownloadSection({ releases, standalone = false }: { releases: Pu
         />
         <ul className="mt-14 grid gap-5 md:grid-cols-3">
           {platforms.map((p) => {
-            const rel = releases.filter((r) => r.platform === p.id);
+            const rel = releases.filter((r) => r.platform === p.id && (p.id !== "windows" || r.packageType === "nsis"));
             const latest = rel[0];
             return (
               <li key={p.id} className="flex flex-col gap-5 rounded-2xl border border-line bg-white p-7">
@@ -47,17 +41,10 @@ export function DownloadSection({ releases, standalone = false }: { releases: Pu
                     {rel.map((r) => (
                       <Button key={`${r.packageType}-${r.arch}`} asChild variant="secondary">
                         <a href={r.url} rel="noopener">
-                          <Download aria-hidden="true" /> {PACKAGE_LABEL[r.packageType] ?? r.packageType.toUpperCase()}
-                          {p.id === "macos" ? ` · ${ARCH_LABEL[r.arch] ?? r.arch}` : ""}
-                          {formatSize(r.sizeBytes) ? ` · ${formatSize(r.sizeBytes)}` : ""}
+                          <Download aria-hidden="true" /> Télécharger gratuitement
                         </a>
                       </Button>
                     ))}
-                    {!latest.codeSigned ? (
-                      <p className="flex gap-1.5 text-xs text-warning">
-                        <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /> Version bêta non signée : un avertissement de sécurité peut apparaître à l'installation.
-                      </p>
-                    ) : null}
                     <details className="mt-2 text-xs text-muted-fg">
                       <summary className="cursor-pointer">Détails techniques et vérification</summary>
                       <div className="mt-3 space-y-2">
