@@ -74,3 +74,14 @@ Après :
 | 3 | Déploiement Production du commit validé (le build ne touche plus la base) | Vercel → *Instant Rollback* vers `c429092` (compatible avec une base migrée : `/api/health` n'est « degraded » que si `applied < expected`) |
 | 4 | Contrôle : `/api/health`, connexion d'un compte test, comptage des lignes (3 comptes, 4 e-mails) identique à l'avant | — |
 | 5 | Migrations de production : **séparément**, `db:migrate:env` en simulation puis, sur accord, `--execute --confirm=…` | restauration Neon (les migrations sont additives) |
+
+## 6. Branche stable `release/waverti` (créée le 1er novembre 2026)
+
+* Créée à partir du commit **`337791a`** de `claude/upbeat-ritchie-sll5u2`, validé avant création dans un worktree propre : typage, lint, 667 tests (3 ignorés) réussis.
+  Elle contient : le build sans migrations, le lot 4 non destructif, les nouveaux prix (catalogue + migration **non appliquée**), le correctif de webhook pour la rotation des prix Stripe.
+* **La Production Branch Vercel n'a pas été modifiée** et rien n'est déployé en Production.
+* Fusions futures : uniquement par pull request depuis la branche de développement, CI verte. Ne jamais pousser de travail courant dessus.
+* **Protections** — constatées : (a) le build ne touche plus à la base ; (b) aucune GitHub Action du dépôt ne déploie en Production ; (c) **un « Ignored Build Step » est actif dans le projet `watchly`** : les builds de `claude/waverti-ux-refonte` sont annulés (état `CANCELED`, `errorLink` vers la doc « ignored-build-step ») et `release/waverti` n'a produit aucun déploiement. C'est une protection contre les déploiements accidentels, mais elle empêche aussi la Preview de ces deux branches ; son contenu exact n'est pas lisible ici.
+  **Non vérifiables ici** (pas d'accès aux réglages) : règles de protection de branche GitHub sur `release/waverti` et `main` (à activer : pull request obligatoire, CI « Waverti — CI » obligatoire, pas de force-push), « Ignored Build Step » Vercel, Build Command surchargée dans Vercel, valeur réelle de la Production Branch.
+* **Autres sessions (prix Stripe)** : elles poussent sur `claude/upbeat-ritchie-sll5u2` (commits `567fc49`, `44c86a6`, `34b6b35`, `337791a`). Aucun fichier en commun avec la refonte UX (vérifié par comparaison des listes de fichiers). Risque restant : tant que la branche de développement avance, `release/waverti` ne la suit pas automatiquement (voulu).
+  La migration `20261102010000_update_plan_prices.sql` **n'est plus appliquée par les déploiements** : elle doit l'être à la main (`pnpm db:migrate:env`), en suivant `docs/PLAN-PUBLICATION-PRIX.md`.

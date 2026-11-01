@@ -274,7 +274,11 @@ export function ruleProblem(r: EditableRule): string | null {
   return issue?.message && !/^(Invalid|Too)/.test(issue.message) ? issue.message : "Vérifiez les valeurs des conditions.";
 }
 
-export function RuleBuilder({ value, onChange, id = "rb" }: { value: EditableRule; onChange: (r: EditableRule) => void; id?: string }) {
+/**
+ * `simple` : présentation allégée pour les débutants. Le choix « toutes / au moins une » n'apparaît que lorsqu'il y a plusieurs
+ * conditions, et « Ajouter un groupe » (réglage avancé) n'est proposé que si la règle contient déjà des groupes.
+ */
+export function RuleBuilder({ value, onChange, id = "rb", simple = false }: { value: EditableRule; onChange: (r: EditableRule) => void; id?: string; simple?: boolean }) {
   const total = value.conditions.length + value.groups.reduce((n, g) => n + g.conditions.length, 0);
   const set = (patch: Partial<EditableRule>) => onChange({ ...value, ...patch });
   const problem = ruleProblem(value);
@@ -282,8 +286,8 @@ export function RuleBuilder({ value, onChange, id = "rb" }: { value: EditableRul
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-medium">M'alerter quand</p>
-        <MatchToggle value={value.match} onChange={(match) => set({ match })} label="Combinaison des conditions" />
+        <p className="text-sm font-medium">{simple && total <= 1 ? "Condition" : "M'alerter quand"}</p>
+        {!simple || total > 1 ? <MatchToggle value={value.match} onChange={(match) => set({ match })} label="Combinaison des conditions" /> : null}
       </div>
       <ul className="flex flex-col gap-2" aria-label="Conditions">
         {value.conditions.map((a, i) => (
@@ -342,7 +346,7 @@ export function RuleBuilder({ value, onChange, id = "rb" }: { value: EditableRul
             <Plus aria-hidden="true" /> Ajouter une condition
           </Button>
         ) : null}
-        {value.groups.length < 3 && total < 11 ? (
+        {value.groups.length < 3 && total < 11 && (!simple || value.groups.length > 0) ? (
           <Button
             type="button"
             variant="ghost"
@@ -357,6 +361,20 @@ export function RuleBuilder({ value, onChange, id = "rb" }: { value: EditableRul
       <details className="rounded-xl border border-line p-4">
         <summary className="cursor-pointer text-sm font-medium">Exclusions et fiabilité</summary>
         <div className="mt-4 flex flex-col gap-4">
+          {simple && value.groups.length === 0 && value.groups.length < 3 && total < 11 ? (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-sm text-ink-soft">Pour combiner plusieurs conditions avec « et » / « ou » de façon imbriquée :</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="self-start"
+                onClick={() => set({ groups: [...value.groups, { match: value.match === "all" ? "any" : "all", conditions: [DEF.get("text_match")!.make(), DEF.get("text_match")!.make()] }] })}
+              >
+                <Layers aria-hidden="true" /> Ajouter un groupe
+              </Button>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={`${id}-ex`}>Ne pas alerter si l'élément contient</Label>
             <Input

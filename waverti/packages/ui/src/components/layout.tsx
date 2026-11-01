@@ -54,7 +54,8 @@ export function PageHeader({
     <div className={cn("flex flex-col gap-4 pb-6 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div className="flex flex-col gap-1.5">
         <h1 className="font-display text-2xl font-bold tracking-[-0.025em] sm:text-[28px]">{title}</h1>
-        {description ? <p className="text-sm text-muted-fg sm:text-[15px]">{description}</p> : null}
+        <span aria-hidden="true" className="h-1 w-12 rounded-full bg-waverti-gradient" />
+        {description ? <p className="text-sm text-ink-soft sm:text-[15px]">{description}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>

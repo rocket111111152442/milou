@@ -266,15 +266,35 @@ export const CATEGORIES: Category[] = [
 ];
 const CAT = new Map(CATEGORIES.map((c) => [c.id, c]));
 
+/** Objectif proposé par défaut pour une catégorie : le premier qui est disponible dans la formule et se crée depuis l'assistant. */
+function defaultGoal(id: CategoryId, topicsAllowed: boolean): Goal {
+  const c = CAT.get(id)!;
+  return c.goals.find((g) => !g.business && (!g.topic || topicsAllowed)) ?? c.goals[0]!;
+}
+
 function intervalOptions(min: number): number[] {
   const base = [60, 120, 240, 360, 720, 1440, 2880, 10080];
   return [...new Set([min, ...base.filter((m) => m > min)])].sort((a, b) => a - b);
 }
 
-const STEPS = ["Que surveiller ?", "Vos réglages", "Résumé"] as const;
+const STEPS = ["Que surveiller", "Site ou produit", "Changement", "Alertes", "Activation"] as const;
 
 /** Une couleur d'icône par catégorie : repère visuel sans dépendre du texte. */
-const CATEGORY_TILE = ["bg-info-soft text-blue", "bg-[#f1e8ff] text-violet", "bg-success-soft text-success", "bg-warning-soft text-warning", "bg-danger-soft text-danger"] as const;
+const CATEGORY_TILE = [
+  "bg-[linear-gradient(135deg,#1d3fd6,#3b6bff)] text-white",
+  "bg-[linear-gradient(135deg,#5a2de0,#8a3bff)] text-white",
+  "bg-[linear-gradient(135deg,#0b7350,#14946a)] text-white",
+  "bg-[linear-gradient(135deg,#8a3b00,#c26a00)] text-white",
+  "bg-[linear-gradient(135deg,#a8142d,#d4304a)] text-white",
+] as const;
+/** Fond de chaque tuile de catégorie : teinte douce assortie à son icône (texte sombre dessus, contraste ≥ 12:1). */
+const CATEGORY_SURFACE = [
+  "border-blue/15 bg-[linear-gradient(160deg,#dfe8ff,#f1f5ff)] hover:border-blue/40",
+  "border-violet/15 bg-[linear-gradient(160deg,#ece0ff,#f7f1ff)] hover:border-violet/40",
+  "border-success/15 bg-[linear-gradient(160deg,#d9f3e8,#eef9f4)] hover:border-success/40",
+  "border-warning/20 bg-[linear-gradient(160deg,#ffe9c2,#fff6e3)] hover:border-warning/40",
+  "border-danger/15 bg-[linear-gradient(160deg,#ffdce2,#fff0f2)] hover:border-danger/40",
+] as const;
 
 export function MonitorWizard({
   entitlements,
@@ -296,8 +316,14 @@ export function MonitorWizard({
   const topicsAllowed = entitlements.maxWebTopics > 0 && entitlements.webIntervalMinutes !== null;
   const [step, setStep] = React.useState(initialCategory ? 1 : 0);
   const [category, setCategory] = React.useState<CategoryId | null>(initialCategory ?? null);
-  const [goalId, setGoalId] = React.useState<string | null>(null);
-  const [rule, setRule] = React.useState<EditableRule>(normalizeRule({ type: "rule", conditions: [{ type: "page_changed" }] }));
+  // Arrivée directe sur une catégorie (lien, bouton) : l'objectif par défaut est présélectionné, comme après un clic sur la tuile.
+  const initialGoal = initialCategory ? defaultGoal(initialCategory, topicsAllowed) : null;
+  const [goalId, setGoalId] = React.useState<string | null>(initialGoal?.id ?? null);
+  const [rule, setRule] = React.useState<EditableRule>(
+    initialGoal?.rule && initialCategory
+      ? normalizeRule({ ...initialGoal.rule(), category: initialCategory })
+      : normalizeRule({ type: "rule", conditions: [{ type: "page_changed" }] }),
+  );
   const [assistant, setAssistant] = React.useState("");
   const [assistantNotes, setAssistantNotes] = React.useState<string[]>([]);
   const [url, setUrl] = React.useState("");
@@ -314,6 +340,8 @@ export function MonitorWizard({
   const [notifyEmail, setNotifyEmail] = React.useState(entitlements.emailAlerts);
   const [notifyDesktop, setNotifyDesktop] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
+  /** Nature de la cible saisie à l'étape 2 (« page » ou « sujet ») : si l'objectif choisi ensuite en demande une autre, on la redemande. */
+  const [targetKind, setTargetKind] = React.useState<"page" | "topic" | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [stepError, setStepError] = React.useState<string | null>(null);
   const headingRef = React.useRef<HTMLHeadingElement>(null);
@@ -336,9 +364,7 @@ export function MonitorWizard({
 
   function chooseCategory(id: CategoryId) {
     setCategory(id);
-    const c = CAT.get(id)!;
-    const first = c.goals.find((g) => !g.business && (!g.topic || topicsAllowed)) ?? c.goals[0]!;
-    pickGoal(first, id);
+    pickGoal(defaultGoal(id, topicsAllowed), id);
     setStep(1);
   }
 
@@ -391,23 +417,35 @@ export function MonitorWizard({
     }
   }
 
-  function validateStep2(): string | null {
-    if (goal?.business) return "Cette surveillance se configure dans l'espace Business.";
+  function validateTarget(): string | null {
     if (isTopic) {
       if (!topicsAllowed) return "La recherche sur Internet n'est pas incluse dans votre formule.";
       return request.trim().length < 5 ? "Décrivez le sujet à surveiller (au moins quelques mots)." : null;
     }
     if (!/^https?:\/\/[^\s]+\.[^\s]+/.test(url.trim())) return "Indiquez une adresse complète, commençant par https://";
-    if (goal?.needsZone && !selector.trim()) return "Choisissez la zone ou l'élément à surveiller (analysez la page, ou saisissez un sélecteur CSS).";
-    return ruleProblem(rule);
+    return null;
+  }
+
+  function validateChange(): string | null {
+    if (goal?.business) return "Cette surveillance se configure dans l'espace Business.";
+    const t = validateTarget();
+    if (t) return t;
+    if (!isTopic && goal?.needsZone && !selector.trim()) return "Choisissez la zone ou l'élément à surveiller (analysez la page, ou saisissez un sélecteur CSS).";
+    return isTopic ? null : ruleProblem(rule);
   }
 
   function next() {
-    const problem = step === 1 ? validateStep2() : null;
+    const problem = step === 1 ? validateTarget() : step === 2 ? validateChange() : null;
     setStepError(problem);
     if (problem) return;
-    if (step === 1 && !name.trim()) setName((isTopic ? subject || request : (preview?.observation?.title ?? url)).slice(0, 100));
-    setStep((s) => Math.min(2, s + 1));
+    if (step === 1) setTargetKind(isTopic ? "topic" : "page");
+    if (step === 2 && !name.trim()) setName((isTopic ? subject || request : (preview?.observation?.title ?? url)).slice(0, 100));
+    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  }
+
+  function back() {
+    setStepError(null);
+    setStep((s) => Math.max(0, s - 1));
   }
 
   function buildInput(): CreateMonitorInput {
@@ -456,22 +494,122 @@ export function MonitorWizard({
   const analysis = preview?.analysis;
   const ruleLines = !isTopic && !ruleProblem(rule) ? describeRule(ruleConditionSchema.parse({ type: "rule", ...rule })) : [];
   const usesUptime = ruleAtoms({ conditions: rule.conditions, groups: rule.groups }).some((a) => a.type === "site_down" || a.type === "slow_response");
+  const needsOtherTarget = step === 2 && targetKind !== null && targetKind !== (isTopic ? "topic" : "page");
+
+  /** Saisie de la cible : une adresse (page, produit) ou un sujet à rechercher sur Internet. */
+  const targetFields = isTopic ? (
+    <div className="flex flex-col gap-5">
+      <Field id="wz-request" label="Quel sujet voulez-vous suivre ?" required hint="Ex. : « Préviens-moi lorsque Samsung annonce officiellement un nouveau Galaxy ».">
+        {(p) => <Textarea {...p} rows={3} maxLength={500} value={request} onChange={(e) => setRequest(e.target.value)} />}
+      </Field>
+      <Field id="wz-domains" label="Sites officiels que vous connaissez (facultatif)" hint="Adresses séparées par des virgules. Leurs publications sont considérées comme officielles.">
+        {(p) => <Input {...p} value={domains} onChange={(e) => setDomains(e.target.value)} placeholder="samsung.com" />}
+      </Field>
+      <div>
+        <Button type="button" variant="secondary" onClick={analyseTopic} loading={planning} disabled={request.trim().length < 5}>
+          <Sparkles aria-hidden="true" /> Analyser la demande
+        </Button>
+      </div>
+      {plan ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-success/20 bg-tint-green p-4" role="status" aria-live="polite">
+          <Field id="wz-subject" label="Sujet retenu" hint="Vérifiez et corrigez si besoin.">
+            {(p) => <Input {...p} value={subject} maxLength={200} onChange={(e) => setSubject(e.target.value)} />}
+          </Field>
+          <p className="text-xs text-ink-soft">{plan.queries.length} recherche(s) par vérification, décomptées de votre quota mensuel de recherches.</p>
+        </div>
+      ) : null}
+    </div>
+  ) : (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <Field id="wz-url" label="Adresse de la page" required hint="Copiez l'adresse depuis votre navigateur (elle commence par https://)." className="flex-1">
+          {(p) => <Input {...p} type="url" inputMode="url" placeholder="https://www.exemple.fr/…" value={url} onChange={(e) => setUrl(e.target.value)} />}
+        </Field>
+        <Button type="button" variant="secondary" onClick={analysePage} loading={previewing} disabled={!/^https?:\/\/.+\..+/.test(url.trim())}>
+          <ScanSearch aria-hidden="true" /> Vérifier la page
+        </Button>
+      </div>
+      {previewing ? <div className="skeleton h-20 rounded-xl" aria-label="Analyse en cours" /> : null}
+      {preview?.error ? (
+        <Callout tone="warning" title="Cette page n'a pas pu être lue" role="status">
+          {preview.error.message} Vous pouvez tout de même continuer : Waverti réessaiera à chaque vérification.
+        </Callout>
+      ) : null}
+      {obs ? (
+        <div className="grid gap-3 rounded-xl border border-success/20 bg-tint-green p-4 sm:grid-cols-3" role="status" aria-live="polite">
+          <div className="min-w-0">
+            <p className="text-xs text-ink-soft">{analysis?.contentKind === "pdf" ? "Document trouvé" : "Page trouvée"}</p>
+            <p className="truncate text-sm font-medium">{obs.title ?? "Sans titre"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-soft">Prix repéré</p>
+            <p className="font-display text-base font-semibold">
+              {obs.price !== null ? formatPrice(obs.price, obs.currency ?? "EUR") : "Aucun"}
+              {analysis?.regularPrice ? <span className="ml-2 text-xs font-normal text-ink-soft line-through">{formatPrice(analysis.regularPrice, obs.currency ?? "EUR")}</span> : null}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-soft">Autres éléments repérés</p>
+            <p className="text-sm">
+              {[
+                analysis?.items.length ? `${analysis.items.length}+ éléments de liste` : null,
+                analysis?.documents.length ? `${analysis.documents.length} document(s)` : null,
+                analysis?.futureDates.length ? `${analysis.futureDates.length} date(s) à venir` : null,
+                analysis?.signupForm ? "formulaire d'inscription" : null,
+                obs.availability !== "unknown" ? `stock : ${obs.availability === "in_stock" ? "disponible" : obs.availability === "out_of_stock" ? "rupture" : "précommande"}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "contenu textuel"}
+            </p>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const nav = (props: { onBack: () => void; onNext?: () => void; nextLabel?: string; disabled?: boolean }) => (
+    <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-between">
+      <Button type="button" variant="ghost" onClick={props.onBack}>
+        <ArrowLeft aria-hidden="true" /> Retour
+      </Button>
+      {props.onNext ? (
+        <Button type="button" onClick={props.onNext} disabled={props.disabled}>
+          {props.nextLabel ?? "Continuer"} <ArrowRight aria-hidden="true" />
+        </Button>
+      ) : null}
+    </div>
+  );
+
+  const heading = (id: string, title: string, sub?: React.ReactNode) => (
+    <div>
+      <h2 id={id} ref={headingRef} tabIndex={-1} className="font-display text-xl font-semibold outline-none">
+        {title}
+      </h2>
+      {sub ? <p className="mt-1 text-sm text-ink-soft">{sub}</p> : null}
+    </div>
+  );
+
+  const stepError_ = stepError ? (
+    <p role="alert" className="text-sm font-medium text-danger">
+      {stepError}
+    </p>
+  ) : null;
 
   return (
     <div className="flex flex-col gap-8">
-      <StepProgress steps={[...STEPS]} current={step} />
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-semibold text-blue" aria-hidden="true">
+          Étape {step + 1} sur {STEPS.length} · {STEPS[step]}
+        </p>
+        <StepProgress steps={[...STEPS]} current={step} />
+      </div>
 
       {step === 0 ? (
         <section className="flex flex-col gap-6" aria-labelledby="wz-h0">
-          <div>
-            <h2 id="wz-h0" ref={headingRef} tabIndex={-1} className="font-display text-xl font-semibold outline-none">
-              Que voulez-vous surveiller ?
-            </h2>
-            <p className="text-sm text-muted-fg">Choisissez un type ci-dessous, ou décrivez simplement ce que vous attendez.</p>
-          </div>
-          <div className="flex flex-col gap-3 rounded-2xl border border-blue/15 bg-info-soft/60 p-4">
+          {heading("wz-h0", "Que souhaitez-vous surveiller ?", "Choisissez un type ci-dessous, ou décrivez simplement ce que vous attendez.")}
+          <div className="flex flex-col gap-3 rounded-2xl border border-blue/15 bg-tint-blue p-4">
             <Label htmlFor="wz-assistant" className="flex items-center gap-2">
-              <WandSparkles className="size-4" aria-hidden="true" /> Décrivez-le simplement
+              <WandSparkles className="size-4" aria-hidden="true" /> Décrivez-le avec vos mots
             </Label>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
@@ -491,7 +629,7 @@ export function MonitorWizard({
                 <Sparkles aria-hidden="true" /> Interpréter
               </Button>
             </div>
-            <p className="text-xs text-muted-fg">Interprétation automatique sans intelligence artificielle payante : vous vérifiez toujours la règle avant de la créer.</p>
+            <p className="text-xs text-ink-soft">Waverti traduit votre phrase en réglages, sans service payant. Vous vérifiez tout avant d'activer.</p>
             {assistantNotes.length && step === 0 ? (
               <p role="status" className="text-sm text-ink-soft">
                 {assistantNotes.join(" ")}
@@ -509,15 +647,17 @@ export function MonitorWizard({
                   disabled={locked}
                   onClick={() => chooseCategory(c.id)}
                   className={cn(
-                    "group flex flex-col gap-2 rounded-2xl border border-line bg-white p-4 text-left shadow-soft transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60",
+                    "group flex flex-col gap-2 rounded-2xl border p-4 text-left shadow-soft transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70",
+                    CATEGORY_SURFACE[ci % CATEGORY_SURFACE.length],
                   )}
                 >
                   <span className={cn("grid size-10 place-items-center rounded-xl transition-transform group-hover:scale-105 [&_svg]:size-[18px]", CATEGORY_TILE[ci % CATEGORY_TILE.length])}>{c.icon}</span>
                   <span className="flex items-center gap-1.5 font-medium">
                     {c.title}
-                    {locked ? <Lock className="size-3.5 text-muted-fg" aria-label="Non inclus dans votre formule" /> : null}
+                    {locked ? <Lock className="size-3.5 text-ink-soft" aria-hidden="true" /> : null}
                   </span>
-                  <span className="text-xs leading-snug text-muted-fg">{c.desc}</span>
+                  <span className="text-xs leading-snug text-ink-soft">{c.desc}</span>
+                  {locked ? <span className="text-xs font-semibold text-ink-soft">Non inclus dans votre formule</span> : null}
                 </button>
               );
             })}
@@ -528,17 +668,21 @@ export function MonitorWizard({
       {step === 1 && cat ? (
         <section className="flex flex-col gap-6" aria-labelledby="wz-h1">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 id="wz-h1" ref={headingRef} tabIndex={-1} className="font-display text-xl font-semibold outline-none">
-                {cat.title}
-              </h2>
-              <p className="text-sm text-muted-fg">À indiquer : {cat.target}.</p>
-            </div>
+            {heading("wz-h1", isTopic ? "Quel sujet voulez-vous suivre ?" : "Quel site ou quel produit ?", `Type choisi : ${cat.title}. À indiquer : ${cat.target}.`)}
             <Button type="button" variant="ghost" size="sm" onClick={() => setStep(0)}>
-              Changer
+              Changer de type
             </Button>
           </div>
           {assistantNotes.length ? <Callout tone="info">{assistantNotes.join(" ")}</Callout> : null}
+          {targetFields}
+          {stepError_}
+          {nav({ onBack: back, onNext: next })}
+        </section>
+      ) : null}
+
+      {step === 2 && cat ? (
+        <section className="flex flex-col gap-6" aria-labelledby="wz-h2">
+          {heading("wz-h2", "Quel changement souhaitez-vous détecter ?", "Choisissez ce qui doit déclencher une alerte.")}
           <Tip>
             <strong className="font-semibold">Ce que vous recevrez :</strong> {cat.expected}
           </Tip>
@@ -548,26 +692,28 @@ export function MonitorWizard({
               <legend className="mb-2 text-sm font-medium">Je veux être prévenu…</legend>
               <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Objectif">
                 {cat.goals.map((g) => {
-                  const locked = (g.topic && !topicsAllowed) || (g.business && entitlements.businessSites === 0);
+                  const lockedTopic = !!g.topic && !topicsAllowed;
+                  const lockedBusiness = !!g.business && entitlements.businessSites === 0;
                   return (
                     <button
                       key={g.id}
                       type="button"
                       role="radio"
                       aria-checked={goalId === g.id}
-                      disabled={!!g.topic && !topicsAllowed}
+                      disabled={lockedTopic}
                       onClick={() => pickGoal(g)}
                       className={cn(
-                        "flex flex-col gap-0.5 rounded-xl border p-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60",
-                        goalId === g.id ? "border-gradient" : "border-line bg-white hover:border-line-strong",
+                        "flex flex-col gap-0.5 rounded-xl border p-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-70",
+                        goalId === g.id ? "border-gradient" : "border-line bg-white/80 hover:border-line-strong",
                       )}
                     >
                       <span className="flex flex-wrap items-center gap-2 font-medium">
                         {g.title}
                         {g.topic ? <Badge tone="info">Recherche Internet</Badge> : null}
-                        {g.business ? <Badge tone={locked ? "neutral" : "gradient"}>{locked ? <Lock aria-hidden="true" /> : null} Business</Badge> : null}
+                        {g.business ? <Badge tone={lockedBusiness ? "neutral" : "gradient"}>{lockedBusiness ? <Lock aria-hidden="true" /> : null} Offre Business</Badge> : null}
+                        {lockedTopic ? <Badge tone="neutral">Non inclus dans votre formule</Badge> : null}
                       </span>
-                      <span className="text-xs text-muted-fg">{g.desc}</span>
+                      <span className="text-xs text-ink-soft">{g.desc}</span>
                     </button>
                   );
                 })}
@@ -575,11 +721,18 @@ export function MonitorWizard({
             </fieldset>
           ) : null}
 
+          {needsOtherTarget ? (
+            <Callout tone="info" title={isTopic ? "Cette option cherche sur Internet" : "Cette option surveille une page"}>
+              Précisez {isTopic ? "le sujet à suivre" : "l'adresse de la page"} :
+              <div className="mt-3">{targetFields}</div>
+            </Callout>
+          ) : null}
+
           {goal?.business ? (
             <Callout tone="info" title="Surveillance professionnelle">
               {entitlements.businessSites > 0 ? (
                 <>
-                  Certificat HTTPS, points de contrôle vérifiés chaque minute et scénario navigateur se configurent dans l'espace Business.{" "}
+                  Certificat HTTPS, contrôles chaque minute et scénario dans le navigateur se configurent dans l'espace Business. Cette surveillance n'est donc pas créée depuis cet assistant.{" "}
                   {businessHref ? (
                     <a className="font-medium text-blue hover:underline" href={businessHref}>
                       Ouvrir l'espace Business
@@ -588,7 +741,7 @@ export function MonitorWizard({
                 </>
               ) : (
                 <>
-                  Ces contrôles sont inclus dans l'offre Business.{" "}
+                  Ces contrôles ne sont pas inclus dans votre formule : ils font partie de l'offre Business.{" "}
                   {upgradeHref ? (
                     <a className="font-medium text-blue hover:underline" href={upgradeHref}>
                       Voir les formules
@@ -598,101 +751,47 @@ export function MonitorWizard({
               )}
             </Callout>
           ) : isTopic ? (
-            <div className="flex flex-col gap-5">
-              <Field id="wz-request" label="Votre sujet" required hint="Ex. : « Préviens-moi lorsque Samsung annonce officiellement un nouveau Galaxy ».">
-                {(p) => <Textarea {...p} rows={3} maxLength={500} value={request} onChange={(e) => setRequest(e.target.value)} />}
-              </Field>
-              <Field id="wz-domains" label="Sites officiels connus (facultatif)" hint="Domaines séparés par des virgules. Leurs publications sont considérées comme officielles.">
-                {(p) => <Input {...p} value={domains} onChange={(e) => setDomains(e.target.value)} placeholder="samsung.com" />}
-              </Field>
-              <div>
-                <Button type="button" variant="secondary" onClick={analyseTopic} loading={planning} disabled={request.trim().length < 5}>
-                  <Sparkles aria-hidden="true" /> Analyser la demande
-                </Button>
-              </div>
-              {plan ? (
-                <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-4" role="status" aria-live="polite">
-                  <Field id="wz-subject" label="Sujet recherché" hint="Vérifiez et corrigez si besoin.">
-                    {(p) => <Input {...p} value={subject} maxLength={200} onChange={(e) => setSubject(e.target.value)} />}
-                  </Field>
-                  <div className="flex items-center justify-between gap-4">
-                    <Label htmlFor="wz-official">N'alerter que si une source officielle le confirme (pas de rumeur)</Label>
-                    <Switch id="wz-official" checked={requireOfficial} onCheckedChange={setRequireOfficial} />
-                  </div>
-                  <p className="text-xs text-muted-fg">{plan.queries.length} requête(s) par vérification, décomptées de votre quota mensuel de recherches.</p>
-                </div>
-              ) : null}
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-line bg-white/80 p-4">
+              <Label htmlFor="wz-official">Ne m'alerter que si une source officielle le confirme (pas de rumeur)</Label>
+              <Switch id="wz-official" checked={requireOfficial} onCheckedChange={setRequireOfficial} />
             </div>
           ) : (
             <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                <Field id="wz-url" label="Adresse" required className="flex-1">
-                  {(p) => <Input {...p} type="url" inputMode="url" placeholder="https://www.exemple.fr/…" value={url} onChange={(e) => setUrl(e.target.value)} />}
-                </Field>
-                <Button type="button" variant="secondary" onClick={analysePage} loading={previewing} disabled={!/^https?:\/\/.+\..+/.test(url.trim())}>
-                  <ScanSearch aria-hidden="true" /> Analyser la page
-                </Button>
-              </div>
-              {previewing ? <div className="skeleton h-20 rounded-xl" aria-label="Analyse en cours" /> : null}
-              {preview?.error ? (
-                <Callout tone="warning" title="Analyse impossible" role="status">
-                  {preview.error.message}
-                </Callout>
-              ) : null}
-              {obs ? (
-                <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-4" role="status" aria-live="polite">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="min-w-0">
-                      <p className="text-xs text-muted-fg">{analysis?.contentKind === "pdf" ? "Document" : "Page"}</p>
-                      <p className="truncate text-sm font-medium">{obs.title ?? "Sans titre"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-fg">Prix détecté</p>
-                      <p className="font-display text-base font-semibold">
-                        {obs.price !== null ? formatPrice(obs.price, obs.currency ?? "EUR") : "Aucun"}
-                        {analysis?.regularPrice ? <span className="ml-2 text-xs font-normal text-muted-fg line-through">{formatPrice(analysis.regularPrice, obs.currency ?? "EUR")}</span> : null}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-fg">Détecté</p>
-                      <p className="text-sm">
-                        {[
-                          analysis?.items.length ? `${analysis.items.length}+ éléments de liste` : null,
-                          analysis?.documents.length ? `${analysis.documents.length} document(s)` : null,
-                          analysis?.futureDates.length ? `${analysis.futureDates.length} date(s) à venir` : null,
-                          analysis?.signupForm ? "formulaire d'inscription" : null,
-                          obs.availability !== "unknown" ? `stock : ${obs.availability === "in_stock" ? "disponible" : obs.availability === "out_of_stock" ? "rupture" : "précommande"}` : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || "contenu textuel"}
-                      </p>
-                    </div>
+              {preview?.suggestions?.length ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-medium">Idées pour cette page</p>
+                  <div className="flex flex-wrap gap-2">
+                    {preview.suggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        title={s.description}
+                        onClick={() => {
+                          setRule(normalizeRule({ ...s.rule, category: category ?? s.category }));
+                          setGoalId(null);
+                        }}
+                        className="rounded-full border border-blue/20 bg-tint-blue px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-blue/50 focus-visible:outline-2 focus-visible:outline-blue"
+                      >
+                        {s.title}
+                      </button>
+                    ))}
                   </div>
-                  {preview?.suggestions?.length ? (
-                    <div className="flex flex-col gap-2">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-fg">Suggestions pour cette page</p>
-                      <div className="flex flex-wrap gap-2">
-                        {preview.suggestions.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            title={s.description}
-                            onClick={() => {
-                              setRule(normalizeRule({ ...s.rule, category: category ?? s.category }));
-                              setGoalId(null);
-                            }}
-                            className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium transition-colors hover:border-line-strong focus-visible:outline-2 focus-visible:outline-blue"
-                          >
-                            {s.title}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                </div>
+              ) : null}
+              <div className="flex flex-col gap-3">
+                <p className="text-sm font-medium">Précisez la condition</p>
+                <RuleBuilder value={rule} onChange={setRule} id="wz-rb" simple />
+              </div>
+              <details className="rounded-xl border border-line bg-white/70 p-4" open={goal?.needsZone ? true : undefined}>
+                <summary className="cursor-pointer text-sm font-medium">Options avancées : surveiller une partie précise de la page</summary>
+                <div className="mt-4 flex flex-col gap-4">
+                  {!preview ? (
+                    <p className="text-sm text-ink-soft">Utilisez « Vérifier la page » à l'étape précédente pour obtenir la liste des zones repérées, ou indiquez la zone vous-même ci-dessous.</p>
                   ) : null}
                   {preview?.blocks?.length ? (
                     <div className="flex flex-col gap-2">
-                      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-fg">
-                        <MousePointerClick className="size-3.5" aria-hidden="true" /> Zone à surveiller {goal?.needsZone ? "(requise)" : "(facultatif)"}
+                      <p className="flex items-center gap-1.5 text-sm font-medium">
+                        <MousePointerClick className="size-4" aria-hidden="true" /> Zone à surveiller {goal?.needsZone ? "(obligatoire pour cet objectif)" : "(facultatif)"}
                       </p>
                       <div className="flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1" role="radiogroup" aria-label="Zone à surveiller">
                         <ZoneOption checked={!selector} onSelect={() => setSelector("")} title="Toute la page" sample="Contenu principal (menus, publicités et pied de page ignorés)" />
@@ -702,50 +801,75 @@ export function MonitorWizard({
                       </div>
                     </div>
                   ) : null}
-                </div>
-              ) : null}
-              <details className="rounded-xl border border-line p-4" open={goal?.needsZone && !preview?.blocks?.length ? true : undefined}>
-                <summary className="cursor-pointer text-sm font-medium">Sélecteur CSS (alternative)</summary>
-                <div className="mt-3">
-                  <Field id="wz-sel" label="Zone de la page" hint="Ex. : #prix-principal, .planning, table.tarifs">
+                  <Field id="wz-sel" label="Zone indiquée à la main (sélecteur CSS)" hint="Ex. : #prix-principal, .planning, table.tarifs">
                     {(p) => <Input {...p} value={selector} maxLength={300} onChange={(e) => setSelector(e.target.value)} placeholder="#prix" />}
                   </Field>
                 </div>
               </details>
-              <div className="flex flex-col gap-3">
-                <p className="text-sm font-medium">Conditions</p>
-                <RuleBuilder value={rule} onChange={setRule} id="wz-rb" />
-              </div>
             </div>
           )}
-          {stepError ? (
-            <p role="alert" className="text-sm font-medium text-danger">
-              {stepError}
-            </p>
-          ) : null}
-          <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-between">
-            <Button type="button" variant="ghost" onClick={() => setStep(0)}>
-              <ArrowLeft aria-hidden="true" /> Retour
-            </Button>
-            <Button type="button" onClick={next} disabled={!!goal?.business}>
-              Continuer <ArrowRight aria-hidden="true" />
-            </Button>
-          </div>
+          {stepError_}
+          {nav({ onBack: back, onNext: next, disabled: !!goal?.business })}
         </section>
       ) : null}
 
-      {step === 2 && cat ? (
-        <section className="flex flex-col gap-6" aria-labelledby="wz-h2">
-          <h2 id="wz-h2" ref={headingRef} tabIndex={-1} className="font-display text-xl font-semibold outline-none">
-            Résumé avant création
-          </h2>
-          <dl className="grid gap-4 rounded-2xl border border-line bg-white p-5 sm:grid-cols-[180px_1fr]">
-            <dt className="text-sm text-muted-fg">Surveillé</dt>
+      {step === 3 && cat ? (
+        <section className="flex flex-col gap-6" aria-labelledby="wz-h3">
+          {heading("wz-h3", "Comment souhaitez-vous être prévenu ?", "Vous pourrez le modifier plus tard dans les réglages de la surveillance.")}
+          <fieldset className="flex flex-col gap-3">
+            <legend className="sr-only">Canaux de notification</legend>
+            <label className="flex items-start gap-3 rounded-xl border border-line bg-white/80 p-4 text-sm">
+              <Checkbox checked disabled aria-label="Dans l'application (toujours actif)" className="mt-0.5" />
+              <span>
+                <span className="block font-medium">Dans Waverti</span>
+                <span className="text-ink-soft">L'alerte apparaît dans votre liste d'alertes. Toujours actif.</span>
+              </span>
+            </label>
+            <label className={cn("flex items-start gap-3 rounded-xl border border-line bg-white/80 p-4 text-sm", !entitlements.emailAlerts && "opacity-80")}>
+              <Checkbox checked={notifyEmail && entitlements.emailAlerts} disabled={!entitlements.emailAlerts} onCheckedChange={(v) => setNotifyEmail(v === true)} className="mt-0.5" />
+              <span>
+                <span className="block font-medium">Par e-mail</span>
+                <span className="text-ink-soft">{entitlements.emailAlerts ? "Un e-mail à l'adresse de votre compte." : "Non inclus dans votre formule."}</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-xl border border-line bg-white/80 p-4 text-sm">
+              <Checkbox checked={notifyDesktop} onCheckedChange={(v) => setNotifyDesktop(v === true)} className="mt-0.5" />
+              <span>
+                <span className="block font-medium">Sur votre ordinateur</span>
+                <span className="text-ink-soft">Nécessite l'application Waverti installée et ouverte.</span>
+              </span>
+            </label>
+          </fieldset>
+          <details className="rounded-xl border border-line bg-white/70 p-4">
+            <summary className="cursor-pointer text-sm font-medium">Options avancées : fréquence des vérifications</summary>
+            <div className="mt-4 max-w-sm">
+              <Field id="wz-interval" label="Vérifier" hint={`Le plus souvent possible avec votre formule${entitlements.planName ? ` ${entitlements.planName}` : ""} : ${formatInterval(minInterval)}.`}>
+                {(p) => (
+                  <Select {...p} value={interval} onChange={(e) => setIntervalValue(Number(e.target.value))}>
+                    {intervalOptions(minInterval).map((m) => (
+                      <option key={m} value={m}>
+                        {formatInterval(m).replace(/^./, (c) => c.toUpperCase())}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+            </div>
+          </details>
+          {nav({ onBack: back, onNext: next })}
+        </section>
+      ) : null}
+
+      {step === 4 && cat ? (
+        <section className="flex flex-col gap-6" aria-labelledby="wz-h4">
+          {heading("wz-h4", "Vérifier et activer", "Relisez le résumé, donnez un nom à votre surveillance, puis activez-la.")}
+          <dl className="grid gap-4 rounded-2xl border border-blue/15 bg-tint-blue p-5 sm:grid-cols-[180px_1fr]">
+            <dt className="text-sm text-ink-soft">Surveillé</dt>
             <dd className="min-w-0 break-words text-sm font-medium">
               {isTopic ? `Recherche sur Internet : « ${subject || request} »` : url}
-              {!isTopic && selector ? <span className="block text-xs font-normal text-muted-fg">Zone : {selector}</span> : null}
+              {!isTopic && selector ? <span className="block text-xs font-normal text-ink-soft">Zone : {selector}</span> : null}
             </dd>
-            <dt className="text-sm text-muted-fg">Alerte si</dt>
+            <dt className="text-sm text-ink-soft">Alerte si</dt>
             <dd className="text-sm">
               {isTopic ? (
                 <span>Nouvelle information {requireOfficial ? "confirmée par une source officielle" : "probable ou confirmée"} sur ce sujet.</span>
@@ -757,45 +881,20 @@ export function MonitorWizard({
                 </ul>
               )}
             </dd>
-            <dt className="text-sm text-muted-fg">Résultat attendu</dt>
-            <dd className="text-sm text-ink-soft">{cat.expected}</dd>
-            <dt className="text-sm text-muted-fg">Exécution</dt>
-            <dd className="text-sm text-ink-soft">{isTopic ? "Par les serveurs Waverti (moteur de recherche)." : "Par les serveurs Waverti, même quand votre ordinateur est éteint."}</dd>
+            <dt className="text-sm text-ink-soft">Vous serez prévenu</dt>
+            <dd className="text-sm">{["dans Waverti", notifyEmail && entitlements.emailAlerts ? "par e-mail" : null, notifyDesktop ? "sur votre ordinateur" : null].filter(Boolean).join(", ")}</dd>
+            <dt className="text-sm text-ink-soft">Vérification</dt>
+            <dd className="text-sm">
+              {formatInterval(interval).replace(/^./, (c) => c.toUpperCase())} — {isTopic ? "par les serveurs Waverti (recherche Internet)." : "par les serveurs Waverti, même quand votre ordinateur est éteint."}
+            </dd>
           </dl>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field id="wz-name" label="Nom de la surveillance" required>
-              {(p) => <Input {...p} value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />}
-            </Field>
-            <Field id="wz-interval" label="Fréquence des vérifications" hint={`Au plus fréquent avec votre formule${entitlements.planName ? ` ${entitlements.planName}` : ""} : ${formatInterval(minInterval)}.`}>
-              {(p) => (
-                <Select {...p} value={interval} onChange={(e) => setIntervalValue(Number(e.target.value))}>
-                  {intervalOptions(minInterval).map((m) => (
-                    <option key={m} value={m}>
-                      {formatInterval(m).replace(/^./, (c) => c.toUpperCase())}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          </div>
-          <fieldset className="flex flex-col gap-3">
-            <legend className="mb-2 text-sm font-medium">Notifications</legend>
-            <label className="flex items-center gap-3 text-sm">
-              <Checkbox checked disabled aria-label="Dans l'application (toujours actif)" /> Dans l'application (toujours actif)
-            </label>
-            <label className={cn("flex items-center gap-3 text-sm", !entitlements.emailAlerts && "text-muted-fg")}>
-              <Checkbox checked={notifyEmail && entitlements.emailAlerts} disabled={!entitlements.emailAlerts} onCheckedChange={(v) => setNotifyEmail(v === true)} />
-              Par e-mail {!entitlements.emailAlerts ? "(non inclus dans votre formule)" : ""}
-            </label>
-            <label className="flex items-center gap-3 text-sm">
-              <Checkbox checked={notifyDesktop} onCheckedChange={(v) => setNotifyDesktop(v === true)} /> Notification sur le bureau (application installée)
-            </label>
-          </fieldset>
-          <Callout tone="neutral" title="Limites de votre formule">
-            Chaque surveillance compte pour une seule surveillance ({entitlements.maxMonitors} au maximum), quel que soit le nombre de conditions ; la fréquence ne peut
-            pas être plus rapide que celle de votre formule.
-            {isTopic ? " Chaque vérification consomme des recherches de votre quota mensuel." : ""}
-            {usesUptime ? " Contrôles depuis un seul emplacement ; une panne est confirmée sur 2 contrôles consécutifs." : ""}
+          <Field id="wz-name" label="Nom de la surveillance" required hint="Pour la retrouver facilement dans votre liste.">
+            {(p) => <Input {...p} value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />}
+          </Field>
+          <Callout tone="neutral" title="Bon à savoir">
+            Cette surveillance compte pour une seule surveillance sur les {entitlements.maxMonitors} de votre formule, même avec plusieurs conditions. Les vérifications ne peuvent pas être plus rapides que celles de votre formule.
+            {isTopic ? " Chaque vérification utilise des recherches de votre quota mensuel." : ""}
+            {usesUptime ? " Les contrôles se font depuis un seul emplacement ; une panne est confirmée après 2 contrôles consécutifs." : ""}
           </Callout>
           {error ? (
             <Callout tone="danger" role="alert">
@@ -803,11 +902,11 @@ export function MonitorWizard({
             </Callout>
           ) : null}
           <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-between">
-            <Button type="button" variant="ghost" onClick={() => setStep(1)}>
-              <ArrowLeft aria-hidden="true" /> Modifier
+            <Button type="button" variant="ghost" onClick={back}>
+              <ArrowLeft aria-hidden="true" /> Retour
             </Button>
-            <Button type="button" size="lg" onClick={create} loading={submitting}>
-              Créer la surveillance
+            <Button type="button" size="lg" onClick={create} loading={submitting} disabled={!name.trim()}>
+              Activer la surveillance
             </Button>
           </div>
         </section>
