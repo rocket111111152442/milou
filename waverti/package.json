@@ -17,6 +17,8 @@
     "test:integration": "vitest run --project integration",
     "test:e2e": "pnpm --filter @waverti/web test:e2e",
     "db:migrate": "tsx packages/database/scripts/migrate.ts",
+    "brave:enforce": "tsx packages/monitoring/scripts/brave-enforce.ts",
+    "db:migrate:env": "tsx packages/database/scripts/migrate-env.ts",
     "db:seed": "tsx packages/database/scripts/seed.ts",
     "db:reset-data": "tsx packages/database/scripts/reset-data.ts",
     "format": "prettier --write .",

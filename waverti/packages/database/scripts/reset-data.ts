@@ -42,6 +42,7 @@ try {
   if (!args.has("--execute")) {
     console.info("Simulation seulement : rien n'a été modifié. Ajoutez --execute --confirm=<nom-de-la-base> pour effacer.");
   } else {
+    if (process.env.WAVERTI_ALLOW_DESTRUCTIVE_RESET !== "yes") throw new Error("Outil destructif désactivé : définissez WAVERTI_ALLOW_DESTRUCTIVE_RESET=yes pour cette commande uniquement");
     if (confirm !== db) throw new Error(`Confirmation absente ou incorrecte : --confirm=${db} est requis`);
     if (!isPreview && !args.has("--production")) throw new Error("Base sans marqueur « preview » : --production est requis");
     const keepBefore: Record<string, number> = {};

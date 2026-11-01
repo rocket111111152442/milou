@@ -33,6 +33,7 @@ Supabase n'est plus utilisé : comptes, sessions et double authentification sont
   framework Next.js, commande d'installation `pnpm install --frozen-lockfile` (détectée).
 - Variables : voir `docs/ENVIRONMENT.md` (Preview et Production séparées).
 - **Formule Hobby : usage non commercial uniquement.** Un site commercial nécessite la formule Pro de Vercel.
+- **Le build ne touche pas à la base** (`next build` seul). Les migrations sont un outil manuel : `docs/PLAN-DEPLOIEMENT-SECURISE.md`.
 - `NEXT_PUBLIC_LAUNCH_STATUS=preview` tant que le lancement n'est pas validé (bandeau + `noindex`).
 - Domaine : à choisir et configurer par LULLIN WEB (DNS chez le registraire).
 

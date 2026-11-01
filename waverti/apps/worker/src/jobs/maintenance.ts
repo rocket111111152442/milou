@@ -61,12 +61,13 @@ export async function runMaintenance(ctx: WorkerContext): Promise<void> {
       select id from api_usage where occurred_at < now() - make_interval(days => ${usageDays}) limit ${n}) returning id`);
   await ctx.db.execute(sql`delete from rate_limits where window_start < now() - make_interval(hours => ${rlHours})`);
   await ctx.db.execute(sql`delete from search_cache where expires_at < now() - interval '1 day'`);
-  // Conformité Brave : sans droits de stockage confirmés, aucun résultat de recherche ne doit rester en base
-  // (caches, titres et adresses des éléments déjà vus et de l'historique des recherches de sujets).
-  const braveRights = braveStorageRightsFromEnv(process.env);
-  if (braveRights === "none") {
-    const c = await enforceBraveStoragePolicy(ctx.db, braveRights);
-    if (c.searchCacheRows || c.seenItemsScrubbed || c.resultsScrubbed) logger.info({ ...c }, "brave storage policy enforced");
+  // Conformité Brave : sans droits de stockage confirmés, la maintenance ne MODIFIE ni ne supprime AUCUNE donnée existante
+  // (les nouveaux résultats, eux, ne sont pas conservés : voir runWebTopic). Elle se contente de compter, en lecture seule,
+  // ce qu'il resterait à neutraliser ; la neutralisation est une opération manuelle, explicite et confirmée
+  // (`pnpm brave:enforce`, simulation par défaut).
+  if (braveStorageRightsFromEnv(process.env) === "none") {
+    const c = await enforceBraveStoragePolicy(ctx.db, "none", { dryRun: true });
+    if (c.searchCacheRows || c.seenItemsScrubbed || c.resultsScrubbed) logger.info({ ...c }, "brave storage policy: pending manual enforcement (read-only count)");
   }
   await ctx.db.execute(sql`delete from page_cache where expires_at < now() - interval '1 hour'`);
   await ctx.db.execute(sql`delete from artifacts where expires_at < now()`);

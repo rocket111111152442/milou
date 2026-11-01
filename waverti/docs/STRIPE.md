@@ -88,7 +88,7 @@ définitif, expiré : surveillances mises en pause (rien n'est supprimé), repri
 - Base : projet Neon **distinct** (aucune donnée de production), relié au projet Vercel pour **Preview seulement**
   avec le préfixe `PREVIEW` (`PREVIEW_DATABASE_URL`, `PREVIEW_DATABASE_URL_UNPOOLED`). En Preview, le code
   n'utilise jamais `DATABASE_URL` (base de production) et refuse une adresse de test pointant vers le même
-  serveur. Les migrations y sont appliquées au déploiement.
+  serveur. Les migrations n'y sont plus appliquées au déploiement : voir `docs/PLAN-DEPLOIEMENT-SECURISE.md` (`pnpm db:migrate:env`).
 - Au build d'une Preview avec une clé `sk_test_`, les quatre prix sont contrôlés et listés dans le journal
   (`[stripe-test] …`), sans secret.
 - URL stable de la branche : `https://watchly-git-claude-upbeat-r-81df6d-lullinismael2-9456s-projects.vercel.app`.
