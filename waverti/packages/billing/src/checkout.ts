@@ -162,7 +162,9 @@ export async function createSubscriptionCheckout(
   // Abonnement déjà créé chez Stripe mais pas encore enregistré ici (confirmation en cours) : pas de second abonnement.
   try {
     const existing = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 10 });
-    if (existing.data.some((s) => ["trialing", "active", "past_due", "unpaid"].includes(s.status))) {
+    // On ne retient que les abonnements réellement rattachés à CE client (une réponse sans rapport ne bloque rien).
+    const ofCustomer = existing.data.filter((s) => (typeof s.customer === "string" ? s.customer : s.customer?.id) === customerId);
+    if (ofCustomer.some((s) => ["trialing", "active", "past_due", "unpaid"].includes(s.status))) {
       throw new BillingError("already_subscribed", "Un abonnement est déjà en cours de confirmation : patientez quelques secondes et rechargez la page Abonnement.");
     }
   } catch (err) {

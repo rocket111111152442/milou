@@ -1,3 +1,4 @@
+import type Stripe from "stripe";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   billingEvents,
@@ -481,7 +482,7 @@ describe("checkout", () => {
     const res = await createSubscriptionCheckout(t.db, fake.stripe, { userId: u.id, email: u.email, planId: "pro", appUrl: "https://app.test", now, pepper: PEPPER });
     expect(res.trialEnd?.toISOString()).toBe("2026-11-05T10:00:00.000Z");
     const call = fake.state.calls.find((c) => c.method === "checkout.sessions.create")!;
-    const params = call.args[0] as Record<string, any>;
+    const params = call.args[0] as Stripe.Checkout.SessionCreateParams;
     expect(params).toMatchObject({
       mode: "subscription",
       payment_method_collection: "always",
@@ -489,10 +490,10 @@ describe("checkout", () => {
       line_items: [{ price: PRICES.pro, quantity: 1 }],
     });
     // Essai de 3 jours compté à partir de la validation (affiché « 3 jours » par Stripe), prix en euros sans conversion.
-    expect(params.subscription_data.trial_period_days).toBe(3);
-    expect(params.subscription_data.trial_end).toBeUndefined();
+    expect(params.subscription_data?.trial_period_days).toBe(3);
+    expect(params.subscription_data?.trial_end).toBeUndefined();
     expect(params.adaptive_pricing).toEqual({ enabled: false });
-    expect(params.subscription_data.trial_settings.end_behavior.missing_payment_method).toBe("cancel");
+    expect(params.subscription_data?.trial_settings?.end_behavior?.missing_payment_method).toBe("cancel");
     const [p] = await t.db.select({ c: profiles.stripeCustomerId }).from(profiles).where(eq(profiles.id, u.id));
     expect(p!.c).toMatch(/^cus_/);
   });
@@ -505,8 +506,8 @@ describe("checkout", () => {
     const b = await createTestUser(t, "janedoe+again@gmail.com");
     expect(await checkTrialEligibility(t.db, b.id, b.email, PEPPER)).toEqual({ eligible: false, reason: "already_used" });
     await createSubscriptionCheckout(t.db, fake.stripe, { userId: b.id, email: b.email, planId: "plus", appUrl: "https://app.test", pepper: PEPPER });
-    const params = fake.state.calls.find((c) => c.method === "checkout.sessions.create")!.args[0] as Record<string, any>;
-    expect(params.subscription_data.trial_end).toBeUndefined();
+    const params = fake.state.calls.find((c) => c.method === "checkout.sessions.create")!.args[0] as Stripe.Checkout.SessionCreateParams;
+    expect(params.subscription_data?.trial_end).toBeUndefined();
   });
 
   it("refuses a second checkout while a subscription is live", async () => {
