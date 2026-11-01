@@ -33,6 +33,8 @@ export interface ProductIdentity {
   name: string;
   /** Référence fabricant (Manufacturer Part Number). */
   mpn?: string;
+  /** Nom de modèle déclaré par la fiche (propriété « model »), distinct du nom commercial. */
+  model?: string;
   /** GTIN / EAN / UPC (8, 12, 13 ou 14 chiffres). Un GTIN dont la clé de contrôle est fausse est ignoré. */
   gtin?: string;
   variant?: ProductVariant;
@@ -65,6 +67,30 @@ export interface OfferCandidate {
   discoveredAt: Date;
 }
 
+/** D'où vient une donnée : jamais d'une valeur supposée. */
+export type DataSource = "jsonld" | "microdata" | "meta" | "html_text" | "http";
+
+export type TracedField = "name" | "brand" | "model" | "gtin" | "mpn" | "price" | "currency" | "availability" | "condition" | "shipping" | "variant";
+
+/** Traçabilité d'une offre vérifiée : d'où viennent les données et quand elles ont été lues. */
+export interface OfferProvenance {
+  fetchedUrl: string;
+  finalUrl: string;
+  httpStatus: number;
+  /** Heure de la lecture de la fiche (conservée telle quelle lorsqu'une réponse vient du cache). */
+  fetchedAt: Date;
+  /** Source du prix. « html_text » = texte visible : fiabilité moindre. */
+  priceSource: DataSource;
+  fields: Partial<Record<TracedField, DataSource>>;
+  /** Anomalies relevées (données contradictoires ignorées, bloc JSON-LD malformé, variante imprécise…). */
+  warnings: string[];
+  /** Empreinte des seules données extraites (pas de la page) : change si et seulement si ces données changent. */
+  dataFingerprint: string;
+  fromCache: boolean;
+  /** Corps tronqué à la limite de taille : des données situées plus loin ont pu être manquées. */
+  truncated: boolean;
+}
+
 /** Offre vérifiée sur la fiche publique elle-même. */
 export interface VerifiedOffer {
   url: string;
@@ -83,9 +109,31 @@ export interface VerifiedOffer {
   checkedAt: Date;
   /** Offre signalée comme livrable en France (null = inconnu). */
   shipsToFrance: boolean | null;
+  /** Présente pour toute offre issue d'une vraie vérification HTTP. */
+  provenance?: OfferProvenance;
 }
 
-export type VerificationFailureReason = "blocked" | "timeout" | "not_found" | "not_a_product_page" | "parse_failed" | "unsupported_currency" | "robots_disallowed";
+export type VerificationFailureReason =
+  | "blocked"
+  | "timeout"
+  | "not_found"
+  | "not_a_product_page"
+  | "parse_failed"
+  | "unsupported_currency"
+  | "robots_disallowed"
+  /** Fiche reconnue, mais aucun prix exploitable : le prix reste inconnu (jamais déduit). */
+  | "price_not_found"
+  /** Sources de la même fiche en désaccord (prix, produits multiples…) : rien n'est retenu. */
+  | "conflicting_data"
+  /** Plusieurs variantes au prix différent et impossible de savoir laquelle correspond à l'adresse. */
+  | "ambiguous_variant"
+  | "unsafe_url"
+  | "too_large"
+  | "network_error"
+  | "unsupported_content"
+  | "server_error"
+  /** Espacement minimal par site non respectable dans le délai imparti (politesse). */
+  | "rate_limited";
 
 export interface VerificationFailure {
   ok: false;
@@ -94,6 +142,9 @@ export interface VerificationFailure {
   /** Échec temporaire : à réessayer plus tard. Dans tous les cas, jamais interprété comme une rupture ou une baisse de prix. */
   transient: boolean;
   checkedAt: Date;
+  /** Précision technique non sensible (code HTTP, motif). Jamais d'en-tête, de cookie ni de contenu de page. */
+  detail?: string;
+  httpStatus?: number;
 }
 
 export type VerificationOutcome = { ok: true; offer: VerifiedOffer } | VerificationFailure;

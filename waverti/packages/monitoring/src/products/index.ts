@@ -5,3 +5,4 @@ export * from "./match";
 export * from "./pipeline";
 export * from "./identity";
 export * from "./simulated";
+export * from "./verify/index";

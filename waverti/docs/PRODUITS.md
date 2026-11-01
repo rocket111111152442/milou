@@ -1,6 +1,6 @@
-# Recherche d'un produit sur plusieurs boutiques — lot 1 (moteur de rapprochement)
+# Recherche d'un produit sur plusieurs boutiques — lots 1 et 2
 
-État : **moteur et tests uniquement, avec des sources simulées**. Aucune interface, aucune alerte, aucun appel Brave ni
+État : **lot 1 (moteur de rapprochement) et lot 2 (vérificateur HTTP) ; la découverte reste simulée**. Aucune interface, aucune alerte, aucun appel Brave ni
 requête HTTP vers une boutique, aucune table en base, aucun changement de forfait ni de budget. Rien n'est visible des
 utilisateurs. Code : `packages/monitoring/src/products/` (export `@waverti/monitoring/products`).
 
@@ -71,3 +71,61 @@ de prix ou de stock ; elle ne peut pas devenir une « rupture » ou une « baiss
 - Aucun historique par offre ni alerte (lots suivants) ; aucune table ni migration.
 - Le « seuil » de confiance (0,55) et les pénalités sont des valeurs de départ, à calibrer sur de vraies fiches.
 - Testé uniquement sur des **données fictives** : aucun vrai site, aucun appel à Brave.
+
+---
+
+# Lot 2 — vérificateur HTTP des offres
+
+Code : `packages/monitoring/src/products/verify/` (`HttpOfferVerifier`, implémente `OfferVerifier`). **Aucune découverte
+réelle** (pas de Brave, aucun crédit consommé), **aucune interface, alerte ni table**. Testé uniquement sur des boutiques
+HTTP locales.
+
+## Ce qui est lu, et d'où
+
+| Donnée | Sources, par ordre de priorité | Si absente ou douteuse |
+| --- | --- | --- |
+| Nom, marque, modèle, MPN, GTIN, état | JSON-LD (`Product`, `ProductGroup`, `Offer`, `AggregateOffer`, `@graph`) → microdonnées → meta (Open Graph, `product:*`) | inconnu (jamais déduit) |
+| Prix + devise | JSON-LD → microdonnées → meta → **texte visible** (dernier recours : un seul prix courant, non barré, devise explicite) | échec `price_not_found` / `unsupported_currency` |
+| Disponibilité | JSON-LD → microdonnées / meta | `unknown` (jamais « en stock » par défaut) |
+| Frais de livraison | `shippingDetails` **pour la France explicitement**, même devise que le prix | `unknown` (jamais 0) ; `0` explicite = gratuit |
+| Variantes (capacité, couleur, taille…) | propriétés déclarées, ajoutées au titre | non renseignées |
+
+Règles : une devise absente n'est **jamais** supposée EUR (« $ » seul est refusé : ambigu) ; un prix ambigu
+(« 1.299 », trois décimales, fourchette `AggregateOffer`) est inconnu ; un bloc JSON-LD malformé est ignoré et signalé,
+jamais « réparé » ; des sources en désaccord (prix JSON-LD ≠ meta ou texte visible, plusieurs produits distincts, GTIN
+différents) → **aucune valeur retenue** (`conflicting_data`, ou GTIN/MPN abandonné avec avertissement) ; plusieurs
+variantes à prix différents sans variante désignée par l'adresse (`?variant=`, URL de l'offre, SKU) → `ambiguous_variant`.
+
+## Traçabilité
+
+Chaque `VerifiedOffer` porte `provenance` : adresse demandée et finale, code HTTP, **heure de lecture** (conservée lorsqu'une
+réponse vient du cache), source du prix et de chaque champ, avertissements, empreinte SHA-256 des seules données extraites
+(change si et seulement si les données changent), `fromCache`, `truncated`. Une offre plus ancienne que `maxOfferAgeMs`
+est marquée `stale` : elle reste listée mais **ne peut pas devenir « meilleur prix actuel »**.
+
+## Sécurité et coûts
+
+- Récupération par `safeFetch` (existant) : http/https seulement, ports 80/443/8080/8443, pas d'identifiants dans l'URL,
+  résolution DNS validée **à la connexion** (anti-rebinding), adresses privées/locales/métadonnées refusées, redirections
+  revalidées une à une (4 max), délais, taille maximale après décompression (1,5 Mo), types de contenu HTML seulement.
+- `robots.txt` respecté (erreur ou inaccessible = prudence) ; espacement minimal par site (2 s) ; **aucune protection
+  contournée** : page anti-robot / CAPTCHA / 401 / 403 / 429 → `blocked`, rien n'est résolu ni simulé.
+- Concurrence globale limitée (4), requêtes simultanées identiques fusionnées, cache à durée limitée (30 min ; échecs 2 min),
+  `maxCandidates`, `maxVerifications` et `concurrency` du pipeline. Le cache est derrière l'interface `OutcomeCache`
+  (mémoire par processus aujourd'hui ; une version partagée — base ou Redis — sera nécessaire avec plusieurs workers).
+- Parcours JSON-LD borné (20 blocs, 500 Ko, 5 000 nœuds, profondeur 10) ; texte visible borné (200 éléments).
+
+## Échecs possibles (`VerificationFailure.reason`)
+
+`not_found`, `blocked`, `timeout`, `server_error`, `network_error`, `too_large`, `unsupported_content`, `unsafe_url`,
+`robots_disallowed`, `rate_limited`, `not_a_product_page`, `price_not_found`, `unsupported_currency`, `conflicting_data`,
+`ambiguous_variant`, `parse_failed` — avec `transient` (réessayer plus tard ?) et un `detail` non sensible. Aucun échec
+n'est jamais traduit en rupture de stock ou en changement de prix.
+
+## Limites du lot 2
+
+- Pages rendues uniquement en JavaScript : non lues (pas de navigateur dans ce lot).
+- Place de marché : le vendeur tiers n'est lu que si la fiche le déclare ; liste de places de marché courte.
+- Pays de livraison : France ; pas de calcul de taxes ni de douane ; pas de conversion de devises.
+- Lecture de texte visible volontairement stricte : des fiches réelles à structure atypique resteront « prix inconnu ».
+- Aucun essai sur de vrais sites ni sur la Preview : il reste à calibrer sur des fiches réelles (lot suivant).

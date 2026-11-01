@@ -38,9 +38,25 @@ export interface ComparisonLimits {
   maxVerifications: number;
   /** Au-delà, une offre est signalée « périmée » (le prix affiché n'est plus garanti frais). */
   maxOfferAgeMs: number;
+  /** Vérifications lancées en parallèle (le vérificateur HTTP limite en plus sa propre concurrence et l'espacement par site). */
+  concurrency: number;
 }
 
-export const DEFAULT_LIMITS: ComparisonLimits = { maxCandidates: 40, maxVerifications: 12, maxOfferAgeMs: 24 * 3600_000 };
+export const DEFAULT_LIMITS: ComparisonLimits = { maxCandidates: 40, maxVerifications: 12, maxOfferAgeMs: 24 * 3600_000, concurrency: 3 };
+
+/** Exécute `fn` sur chaque élément avec au plus `limit` appels simultanés ; les résultats gardent l'ordre d'entrée. */
+async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker));
+  return out;
+}
 
 export interface ScoredOffer {
   offer: VerifiedOffer;
@@ -71,7 +87,7 @@ export interface ComparisonReport {
   uncertain: Array<{ url: string; title: string; reason: "inconclusive" | "budget"; match: MatchResult }>;
   sourceErrors: Array<{ source: string; message: string }>;
   stats: { discovered: number; unique: number; verified: number; budgetExhausted: boolean };
-  /** Meilleur prix article par devise, parmi les offres retenues (frais éventuellement inconnus). */
+  /** Meilleur prix article par devise, parmi les offres retenues et actuelles (non périmées ; frais éventuellement inconnus). */
   bestItemPrice: Record<string, ScoredOffer | undefined>;
   /** Meilleur prix livré par devise : uniquement parmi les offres dont les frais sont connus. */
   bestLandedPrice: Record<string, ScoredOffer | undefined>;
@@ -98,7 +114,8 @@ export function dedupeCandidates(candidates: OfferCandidate[]): OfferCandidate[]
     const key = canonicalizeUrl(c.url);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    out.push({ ...c, url: key });
+    // L'adresse d'origine est conservée : la forme canonique ne sert qu'à repérer les doublons (elle force https).
+    out.push(c);
   }
   return out;
 }
@@ -161,19 +178,17 @@ export async function compareProduct(target: ProductTarget, deps: ComparisonDeps
   // Les plus prometteurs d'abord : le budget de vérifications est consommé dans cet ordre.
   toVerify.sort((x, y) => Number(x.match.inconclusive) - Number(y.match.inconclusive) || y.match.confidence - x.match.confidence);
 
-  // 3. Vérification des fiches, dans la limite du budget.
+  // 3. Vérification des fiches, dans la limite du budget et de la concurrence.
+  const budgeted = toVerify.slice(0, limits.maxVerifications);
+  for (const { c, match } of toVerify.slice(limits.maxVerifications)) {
+    report.stats.budgetExhausted = true;
+    report.uncertain.push({ url: c.url, title: c.title, reason: "budget", match });
+  }
+  const outcomes = await mapPool(budgeted, limits.concurrency, ({ c }) =>
+    deps.verifier.verify(c).catch((): VerificationFailure => ({ ok: false, url: c.url, reason: "parse_failed", transient: true, checkedAt: now })),
+  );
   const verified: ScoredOffer[] = [];
-  let used = 0;
-  for (const { c, match } of toVerify) {
-    if (used >= limits.maxVerifications) {
-      report.stats.budgetExhausted = true;
-      report.uncertain.push({ url: c.url, title: c.title, reason: "budget", match });
-      continue;
-    }
-    used++;
-    const outcome = await deps.verifier.verify(c).catch(
-      (): VerificationFailure => ({ ok: false, url: c.url, reason: "parse_failed", transient: true, checkedAt: now }),
-    );
+  for (const outcome of outcomes) {
     if (!outcome.ok) {
       report.unverifiable.push(outcome);
       continue;
@@ -200,7 +215,8 @@ export async function compareProduct(target: ProductTarget, deps: ComparisonDeps
   // 4. Un vendeur une seule fois, tri par prix, meilleurs prix par devise (jamais de conversion).
   report.matches = dedupeBySeller(verified).sort(byPrice);
   report.variants = dedupeBySeller(report.variants).sort(byPrice);
-  for (const s of report.matches) {
+  // Une offre périmée reste listée (avec « stale ») mais ne peut pas devenir « meilleur prix actuel ».
+  for (const s of report.matches.filter((m) => !m.stale)) {
     const cur = s.offer.currency;
     const best = report.bestItemPrice[cur];
     if (!best || s.offer.priceCents < best.offer.priceCents) report.bestItemPrice[cur] = s;
