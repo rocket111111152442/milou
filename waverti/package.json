@@ -18,6 +18,7 @@
     "test:e2e": "pnpm --filter @waverti/web test:e2e",
     "db:migrate": "tsx packages/database/scripts/migrate.ts",
     "db:seed": "tsx packages/database/scripts/seed.ts",
+    "db:reset-data": "tsx packages/database/scripts/reset-data.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "admin:grant": "tsx packages/database/scripts/grant-admin.ts",
