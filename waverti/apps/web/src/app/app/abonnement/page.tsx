@@ -152,53 +152,63 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       </div>
 
 
-      <section id="formules" aria-labelledby="change-title" className="flex scroll-mt-24 flex-col gap-4">
-        <h2 id="change-title" className="font-display text-lg font-semibold">
-          {sub.subscriptionId ? "Changer de formule" : trialEligible ? "Choisir une formule — 3 jours d'essai gratuit" : "Choisir une formule"}
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {PAID_PLAN_IDS.map((id) => {
-            const p = PLAN_CATALOG[id];
-            const current = sub.planId === id && sub.subscriptionId;
-            return (
-              <Card key={id} className={current ? "border-gradient" : undefined}>
-                <CardContent className="flex h-full flex-col gap-3 pt-6">
-                  <div className="flex items-baseline justify-between">
-                    <p className="font-display text-lg font-bold">{p.name}</p>
-                    <p className="font-display font-semibold tabular-nums">{formatCents(p.priceCents)}</p>
-                  </div>
-                  <p className="text-sm text-muted-fg">{p.description}</p>
-                  <div className="mt-auto pt-2">
-                    {current ? (
-                      <Badge tone="gradient">Formule actuelle</Badge>
-                    ) : !billing ? (
-                      <Button variant="secondary" disabled className="w-full">
-                        Indisponible ici
-                      </Button>
-                    ) : sub.subscriptionId ? (
-                      <PlanActions mode="change" planId={id} planName={p.name} />
-                    ) : confirming ? (
-                      <Button variant="secondary" disabled className="w-full">
-                        Confirmation en cours
-                      </Button>
-                    ) : (
-                      <Button asChild className="w-full">
-                        <Link href={`/app/abonnement/essai?formule=${id}`}>
-                          <CreditCard aria-hidden="true" /> {trialEligible ? `Essayer ${p.name} 3 jours` : `Souscrire à ${p.name}`}
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-        <p className="text-xs text-muted-fg">
-          Les changements de formule sont proratisés par Stripe : la différence est créditée ou facturée sur la prochaine facture.
-          En cas de baisse de quotas, les surveillances excédentaires sont mises en pause, jamais supprimées.
+      {sub.subscriptionId ? (
+        <p className="text-sm text-muted-fg">
+          Pour changer de formule, rendez-vous dans{" "}
+          <Link href="/app/parametres#formule" className="font-medium text-blue underline-offset-4 hover:underline">
+            Paramètres → Formule
+          </Link>
+          .
         </p>
-      </section>
+      ) : (
+      <section id="formules" aria-labelledby="change-title" className="flex scroll-mt-24 flex-col gap-4">
+          <h2 id="change-title" className="font-display text-lg font-semibold">
+            {sub.subscriptionId ? "Changer de formule" : trialEligible ? "Choisir une formule — 3 jours d'essai gratuit" : "Choisir une formule"}
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {PAID_PLAN_IDS.map((id) => {
+              const p = PLAN_CATALOG[id];
+              const current = sub.planId === id && sub.subscriptionId;
+              return (
+                <Card key={id} className={current ? "border-gradient" : undefined}>
+                  <CardContent className="flex h-full flex-col gap-3 pt-6">
+                    <div className="flex items-baseline justify-between">
+                      <p className="font-display text-lg font-bold">{p.name}</p>
+                      <p className="font-display font-semibold tabular-nums">{formatCents(p.priceCents)}</p>
+                    </div>
+                    <p className="text-sm text-muted-fg">{p.description}</p>
+                    <div className="mt-auto pt-2">
+                      {current ? (
+                        <Badge tone="gradient">Formule actuelle</Badge>
+                      ) : !billing ? (
+                        <Button variant="secondary" disabled className="w-full">
+                          Indisponible ici
+                        </Button>
+                      ) : sub.subscriptionId ? (
+                        <PlanActions mode="change" planId={id} planName={p.name} />
+                      ) : confirming ? (
+                        <Button variant="secondary" disabled className="w-full">
+                          Confirmation en cours
+                        </Button>
+                      ) : (
+                        <Button asChild className="w-full">
+                          <Link href={`/app/abonnement/essai?formule=${id}`}>
+                            <CreditCard aria-hidden="true" /> {trialEligible ? `Essayer ${p.name} 3 jours` : `Souscrire à ${p.name}`}
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-fg">
+            Les changements de formule sont proratisés par Stripe : la différence est créditée ou facturée sur la prochaine facture.
+            En cas de baisse de quotas, les surveillances excédentaires sont mises en pause, jamais supprimées.
+          </p>
+        </section>
+      )}
     </div>
   );
 }

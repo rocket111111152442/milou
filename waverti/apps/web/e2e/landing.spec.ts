@@ -103,7 +103,7 @@ test.describe("site public", () => {
 
   test("accessibilité : aucune violation critique ou grave (axe)", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    for (const path of ["/", "/tarifs", "/connexion", "/inscription", "/entreprises", "/telecharger", "/fonctionnement"]) {
+    for (const path of ["/", "/tarifs", "/connexion", "/inscription", "/mot-de-passe-oublie", "/lien-confirmation-invalide", "/entreprises", "/telecharger", "/fonctionnement"]) {
       await page.goto(path);
       // Fait défiler la page pour révéler toutes les sections avant l'audit.
       await page.evaluate(async () => {

@@ -7,7 +7,7 @@ import { SignInForm } from "../auth-forms";
 export const metadata: Metadata = { title: "Connexion", robots: { index: false } };
 
 const ERRORS: Record<string, string> = {
-  lien: "Ce lien n'est plus valide ou a déjà été utilisé. Reconnectez-vous ou demandez un nouveau lien.",
+  lien: "Ce lien n'est plus valide ou a déjà été utilisé. Si votre adresse est déjà confirmée, connectez-vous ; sinon demandez un nouveau lien de confirmation, ou utilisez « Mot de passe oublié » pour changer de mot de passe.",
   configuration: "L'authentification n'est pas encore configurée sur cet environnement.",
   session: "Votre session a expiré, reconnectez-vous.",
 };

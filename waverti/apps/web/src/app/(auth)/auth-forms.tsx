@@ -182,3 +182,19 @@ export function ResendConfirmationForm({ email }: { email: string }) {
     </form>
   );
 }
+
+/** Renvoi du lien de confirmation depuis une page d'erreur : l'adresse est saisie (aucune information sur le compte n'est affichée). */
+export function ResendConfirmationByEmailForm() {
+  const [state, action, pending] = useActionState(resendConfirmationAction, {});
+  return (
+    <form action={action} className="flex flex-col gap-3">
+      <Field id="email" label="Adresse e-mail à confirmer" required>
+        {(p) => <Input {...p} name="email" type="email" autoComplete="email" required />}
+      </Field>
+      <FormMessages state={state} />
+      <Button type="submit" variant="secondary" loading={pending}>
+        Recevoir un nouveau lien de confirmation
+      </Button>
+    </form>
+  );
+}

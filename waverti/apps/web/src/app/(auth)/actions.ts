@@ -145,7 +145,10 @@ export async function forgotPasswordAction(_: FormState, form: FormData): Promis
     }
   }
   // Réponse identique dans tous les cas (pas d'énumération des comptes).
-  return { message: "Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d'être envoyé." };
+  return {
+    message:
+      "Si un compte existe pour cette adresse, un e-mail de réinitialisation peut vous être envoyé dans quelques minutes (pensez aux courriers indésirables). Le lien est valable 1 heure ; ouvrez toujours le message le plus récent : une nouvelle demande rend les liens précédents inutilisables.",
+  };
 }
 
 export async function resetPasswordAction(_: FormState, form: FormData): Promise<FormState> {

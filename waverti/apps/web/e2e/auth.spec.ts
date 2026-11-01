@@ -80,3 +80,37 @@ test.describe("authentification (comptes Waverti réels)", () => {
     expect(res?.status()).toBe(404);
   });
 });
+
+test.describe("liens reçus par e-mail", () => {
+  test("lien de confirmation inconnu, expiré ou déjà utilisé : page explicative, aucune session ouverte", async ({ page }) => {
+    await page.goto(`/auth/confirm?token=${"a".repeat(43)}`);
+    await expect(page).toHaveURL(/\/lien-confirmation-invalide$/);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Ce lien de confirmation n'est plus valable");
+    await expect(page.getByText(/confirmer votre adresse e-mail/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Aller à la connexion" })).toHaveAttribute("href", "/connexion");
+    await expect(page.getByRole("link", { name: "Mot de passe oublié" })).toHaveAttribute("href", "/mot-de-passe-oublie");
+    await expect(page.getByRole("button", { name: "Recevoir un nouveau lien de confirmation" })).toBeVisible();
+    // Aucune session créée par un lien invalide : l'espace reste protégé.
+    await page.goto("/app");
+    await expect(page).toHaveURL(/\/connexion/);
+  });
+
+  test("renvoi du lien de confirmation : réponse neutre pour une adresse inconnue", async ({ page }) => {
+    await page.goto("/lien-confirmation-invalide");
+    await page.getByLabel("Adresse e-mail à confirmer").fill("personne-inconnue@example.test");
+    await page.getByRole("button", { name: "Recevoir un nouveau lien de confirmation" }).click();
+    await expect(page.getByText(/Si l'adresse doit encore être vérifiée/)).toBeVisible();
+  });
+
+  test("mot de passe oublié : réponse conditionnelle, durée du lien et lien le plus récent expliqués", async ({ page }) => {
+    await page.goto("/mot-de-passe-oublie");
+    await expect(page.getByText(/valable 1 heure/).first()).toBeVisible();
+    await page.getByLabel("Adresse e-mail").fill("personne@example.test");
+    await page.getByRole("button", { name: /Recevoir un lien/ }).click();
+    const msg = page.getByText(/Si un compte existe pour cette adresse/);
+    await expect(msg).toBeVisible();
+    await expect(msg).toContainText("peut vous être envoyé");
+    await expect(msg).toContainText("le plus récent");
+    await expect(msg).not.toContainText("vient d'être envoyé");
+  });
+});

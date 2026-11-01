@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const next = safeNext(request.nextUrl.searchParams.get("next"), "/app/abonnement?bienvenue=1");
   if (!isAuthConfigured()) return NextResponse.redirect(new URL("/connexion?erreur=configuration", request.url));
   const userId = token ? await verifyEmailWithToken(getDb(), token) : null;
-  if (!userId) return NextResponse.redirect(new URL("/connexion?erreur=lien", request.url));
+  if (!userId) return NextResponse.redirect(new URL("/lien-confirmation-invalide", request.url));
   await applyInvitation(getDb(), userId);
   await startSession(userId, 1);
   return NextResponse.redirect(new URL(next, request.url));

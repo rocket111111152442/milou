@@ -95,7 +95,7 @@ export function renderEmail(template: string, subject: string, payload: Record<s
         heading: "Confirmez votre adresse e-mail",
         paragraphs: [
           "Cliquez sur le bouton ci-dessous pour activer votre compte Waverti. Ce lien est valable 24 heures et ne peut servir qu'une fois.",
-          "Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet e-mail.",
+          "Ce message sert uniquement à confirmer votre adresse e-mail ; il ne permet pas de changer de mot de passe. Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet e-mail.",
         ],
         cta: { label: "Confirmer mon adresse", url },
       });
@@ -109,7 +109,7 @@ export function renderEmail(template: string, subject: string, payload: Record<s
         heading: "Réinitialisation de votre mot de passe",
         paragraphs: [
           "Une réinitialisation du mot de passe de votre compte Waverti a été demandée. Ce lien est valable 1 heure et ne peut servir qu'une fois.",
-          "Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail : votre mot de passe reste inchangé.",
+          "Une nouvelle demande rend les liens précédents inutilisables : si vous avez reçu plusieurs messages, utilisez le plus récent. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail : votre mot de passe reste inchangé.",
         ],
         cta: { label: "Choisir un nouveau mot de passe", url },
       });

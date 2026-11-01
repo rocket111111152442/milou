@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
-import { Callout, Card, CardContent, CardHeader, CardTitle, PageHeader } from "@waverti/ui";
+import Link from "next/link";
+import { Badge, Callout, Card, CardContent, CardHeader, CardTitle, PageHeader } from "@waverti/ui";
+import { PAID_PLAN_IDS, PLAN_CATALOG } from "@waverti/billing/catalog";
+import { formatCents } from "@waverti/types";
 import { eq, profiles, withUser } from "@waverti/database";
 import { remainingRecoveryCodes } from "@waverti/auth";
 import { requireUser } from "@/lib/auth";
-import { listDevices } from "@/lib/data/account";
+import { getSubscriptionView, listDevices } from "@/lib/data/account";
+import { isBillingConfigured } from "@/lib/stripe";
 import { getDb } from "@/lib/db";
 import { InstallApp } from "@/components/pwa/install-app";
+import { PlanActions } from "../abonnement/plan-actions";
 import { DangerZone, DevicesList, MfaSettings, NotificationPrefs, PasswordForm, ProfileForm } from "./settings-forms";
 
 export const metadata: Metadata = { title: "Paramètres" };
@@ -23,9 +28,49 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       .where(eq(profiles.id, user.id)),
   );
   const devices = await listDevices(user.id);
+  const sub = await getSubscriptionView(user.id);
+  const billing = isBillingConfigured();
   return (
     <div className="flex max-w-3xl flex-col gap-6">
       <PageHeader title="Paramètres" description="Profil, notifications, sécurité et confidentialité." />
+      {sub.subscriptionId ? (
+        <Card id="formule">
+          <CardHeader>
+            <CardTitle as="h2">Formule</CardTitle>
+            <p className="text-sm text-muted-fg">
+              Formule actuelle : <strong className="text-ink">{sub.planName}</strong>
+              {sub.isTrial ? " (essai en cours)" : ""}. Un changement est proratisé par Stripe ; en cas de baisse de quotas, les surveillances
+              excédentaires sont mises en pause, jamais supprimées. Résiliation et factures :{" "}
+              <Link href="/app/abonnement" className="font-medium text-blue underline-offset-4 hover:underline">
+                page Abonnement
+              </Link>
+              .
+            </p>
+          </CardHeader>
+          <CardContent>
+            {billing ? (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {PAID_PLAN_IDS.map((id) => {
+                  const p = PLAN_CATALOG[id];
+                  const current = sub.planId === id;
+                  return (
+                    <li key={id} className="flex flex-col gap-2 rounded-2xl border border-line p-4">
+                      <div className="flex items-baseline justify-between">
+                        <span className="font-display font-bold">{p.name}</span>
+                        <span className="font-display text-sm font-semibold tabular-nums">{formatCents(p.priceCents)} / mois</span>
+                      </div>
+                      <p className="text-sm text-muted-fg">{p.description}</p>
+                      <div className="mt-auto pt-1">{current ? <Badge tone="gradient">Formule actuelle</Badge> : <PlanActions mode="change" planId={id} planName={p.name} />}</div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <Callout tone="warning">Le changement de formule n'est pas disponible sur cet environnement.</Callout>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle as="h2">Profil</CardTitle>
