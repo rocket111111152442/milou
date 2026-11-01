@@ -7,11 +7,11 @@
 import { createHash } from "node:crypto";
 import { sql, type Database } from "@waverti/database";
 import { pageObservationSchema, type PageObservation } from "@waverti/types";
-import { extractPage, looksJsRendered } from "./extract/html";
-import { extractPdfObservation, isPdf, PDF_MAX_BYTES } from "./extract/pdf";
+import { readPageResponse, sharedCacheTtl, PAGE_CONTENT_TYPES } from "./extract/response";
+import { PDF_MAX_BYTES } from "./extract/pdf";
 import type { HostPoliteness } from "./net/politeness";
 import { RobotsCache } from "./net/robots";
-import { decodeBody, FetchError, safeFetch, type SafeFetchOptions } from "./net/safe-fetch";
+import { FetchError, safeFetch, type SafeFetchOptions } from "./net/safe-fetch";
 
 export interface PageTarget {
   url: string;
@@ -42,21 +42,8 @@ export interface PageRunResult {
   durationMs: number;
 }
 
-/** Pages et documents PDF (aucun autre type de fichier n'est téléchargé). */
-const PAGE_OR_PDF_TYPES = /^(text\/html|application\/xhtml\+xml|text\/plain|application\/json|application\/ld\+json|application\/pdf)/;
-const HTML_MAX_BYTES = 2 * 1024 * 1024;
-
-function observe(res: Awaited<ReturnType<typeof safeFetch>>, target: PageTarget): PageObservation {
-  if (isPdf(res.contentType, res.body)) {
-    return extractPdfObservation({ body: res.body, url: target.url, finalUrl: res.finalUrl, httpStatus: res.status, responseMs: res.durationMs });
-  }
-  if (res.body.length > HTML_MAX_BYTES) throw new FetchError("too_large", "Page trop volumineuse (plus de 2 Mo).");
-  const html = decodeBody(res.body, res.contentType);
-  return extractPage({ html, url: target.url, finalUrl: res.finalUrl, httpStatus: res.status, cssSelector: target.cssSelector, method: "http", responseMs: res.durationMs });
-}
-
 export function pageCacheKey(t: PageTarget): string {
-  return createHash("sha256").update(`${t.url}\n${t.cssSelector ?? ""}\n${t.renderMode}`).digest("hex");
+  return createHash("sha256").update(`adaptive-v1\n${t.url}\n${t.cssSelector ?? ""}\n${t.renderMode}`).digest("hex");
 }
 
 export async function runPageCheck(deps: PageRunnerDeps, target: PageTarget): Promise<PageRunResult> {
@@ -82,16 +69,24 @@ export async function runPageCheck(deps: PageRunnerDeps, target: PageTarget): Pr
   }
 
   let observation: PageObservation;
+  let cacheTtl = 0;
   try {
+    if (target.renderMode === "browser" && !deps.browser) return { error: { code: "render_required", message: "La lecture approfondie de ce site n’est pas disponible." }, fromCache: false, durationMs: Date.now() - started };
     if (target.renderMode === "browser" && deps.browser) {
+      await deps.recordUsage?.({ provider: "playwright", cacheHit: false });
       observation = await renderWithBrowser(deps.browser, target);
     } else {
-      const res = await safeFetch(target.url, { ...deps.fetchOptions, allowedContentTypes: PAGE_OR_PDF_TYPES, maxBytes: PDF_MAX_BYTES, timeoutMs: deps.fetchOptions?.timeoutMs ?? 20_000 });
       await deps.recordUsage?.({ provider: "http_fetch", cacheHit: false });
-      observation = observe(res, target);
-      if (target.renderMode === "auto" && deps.browser && res.status < 400 && observation.contentKind !== "pdf" && looksJsRendered(decodeBody(res.body, res.contentType), observation)) {
-        observation = await renderWithBrowser(deps.browser, target);
+      const res = await safeFetch(target.url, { ...deps.fetchOptions, allowedContentTypes: PAGE_CONTENT_TYPES, maxBytes: Math.min(deps.fetchOptions?.maxBytes ?? PDF_MAX_BYTES, PDF_MAX_BYTES), timeoutMs: deps.fetchOptions?.timeoutMs ?? 20_000 });
+      const reading = readPageResponse(res, target);
+      observation = reading.observation;
+      if (reading.blocked) return { error: { code: "access_restricted", message: "Ce site limite les vérifications automatiques. Utilisez un flux public ou une source autorisée." }, fromCache: false, durationMs: Date.now() - started };
+      cacheTtl = sharedCacheTtl(res.headers, deps.cacheTtlSeconds ?? 900);
+      if (target.renderMode === "auto" && reading.needsBrowser) {
+        if (!deps.browser) return { error: { code: "render_required", message: "Certaines informations ne sont pas disponibles. Cette page nécessite une lecture approfondie." }, fromCache: false, durationMs: Date.now() - started };
         await deps.recordUsage?.({ provider: "playwright", cacheHit: false });
+        observation = await renderWithBrowser(deps.browser, target);
+        cacheTtl = 0;
       }
     }
   } catch (err) {
@@ -103,8 +98,8 @@ export async function runPageCheck(deps: PageRunnerDeps, target: PageTarget): Pr
     };
   }
 
-  if (observation.httpStatus < 400) {
-    const ttl = deps.cacheTtlSeconds ?? 900;
+  if (observation.httpStatus >= 200 && observation.httpStatus < 300 && cacheTtl > 0) {
+    const ttl = cacheTtl;
     await deps.db.execute(sql`
       insert into page_cache (cache_key, url_hash, observation, fetched_at, expires_at)
       values (${key}, ${createHash("sha256").update(target.url).digest("hex")}, ${JSON.stringify(observation)}::jsonb, now(), now() + make_interval(secs => ${ttl}))
@@ -115,7 +110,10 @@ export async function runPageCheck(deps: PageRunnerDeps, target: PageTarget): Pr
 
 async function renderWithBrowser(browser: BrowserRenderer, target: PageTarget): Promise<PageObservation> {
   const r = await browser.render(target.url, { timeoutMs: 30_000 });
-  return extractPage({ html: r.html, url: target.url, finalUrl: r.finalUrl, httpStatus: r.status, cssSelector: target.cssSelector, method: "browser" });
+  const reading = readPageResponse({ url: target.url, finalUrl: r.finalUrl, status: r.status, body: Buffer.from(r.html), contentType: "text/html", headers: {}, truncated: false, redirects: 0, durationMs: 0, remoteAddress: null }, target);
+  if (reading.blocked) throw new FetchError("unsupported_content", "Ce site limite les vérifications automatiques. Utilisez un flux public ou une source autorisée.");
+  if (reading.needsBrowser) throw new FetchError("unsupported_content", "Certaines informations ne sont pas disponibles après la lecture approfondie.");
+  return { ...reading.observation, method: "browser" };
 }
 
 /** Aperçu sans enregistrement (création d'une surveillance, page d'accueil de l'onboarding). */
@@ -126,9 +124,11 @@ export async function previewPage(target: PageTarget, fetchOptions: SafeFetchOpt
     if (!(await robots.isAllowed(url))) {
       return { error: { code: "robots_disallowed", message: "Le site interdit l'accès automatisé à cette page (robots.txt)." }, fromCache: false, durationMs: Date.now() - started };
     }
-    const res = await safeFetch(target.url, { ...fetchOptions, allowedContentTypes: PAGE_OR_PDF_TYPES, maxBytes: PDF_MAX_BYTES, timeoutMs: 15_000 });
-    const observation = observe(res, target);
-    const html = observation.contentKind === "pdf" ? null : decodeBody(res.body, res.contentType);
+    const res = await safeFetch(target.url, { ...fetchOptions, allowedContentTypes: PAGE_CONTENT_TYPES, maxBytes: Math.min(fetchOptions.maxBytes ?? PDF_MAX_BYTES, PDF_MAX_BYTES), timeoutMs: Math.min(fetchOptions.timeoutMs ?? 15_000, 15_000) });
+    const reading = readPageResponse(res, target);
+    if (reading.blocked) return { error: { code: "access_restricted", message: "Ce site limite les vérifications automatiques. Utilisez un flux public ou une source autorisée." }, fromCache: false, durationMs: Date.now() - started };
+    if (reading.needsBrowser) return { error: { code: "render_required", message: "Certaines informations ne sont pas disponibles. Cette page nécessite une lecture approfondie." }, fromCache: false, durationMs: Date.now() - started };
+    const { observation, html } = reading;
     return { observation, html, fromCache: false, durationMs: Date.now() - started };
   } catch (err) {
     const fe = err instanceof FetchError ? err : null;
