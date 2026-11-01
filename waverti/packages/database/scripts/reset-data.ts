@@ -22,7 +22,7 @@ if (!url) {
 }
 const sql = postgres(url, { max: 1, onnotice: () => undefined, connect_timeout: 20 });
 try {
-  const [{ db }] = await sql<{ db: string }[]>`select current_database() as db`;
+  const db = (await sql<{ db: string }[]>`select current_database() as db`)[0]?.db ?? "";
   const marker = await sql<{ value: unknown }[]>`select value from app_settings where key = 'environment'`;
   const isPreview = marker[0]?.value === "preview";
   const tables = (await sql<{ t: string }[]>`select tablename as t from pg_tables where schemaname = 'public' order by 1`).map((r) => r.t).filter((t) => !KEEP.has(t));
