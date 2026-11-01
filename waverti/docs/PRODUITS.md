@@ -1,4 +1,4 @@
-# Recherche d'un produit sur plusieurs boutiques — lots 1 et 2
+# Recherche d'un produit sur plusieurs boutiques — lots 1, 2 et 3
 
 État : **lot 1 (moteur de rapprochement) et lot 2 (vérificateur HTTP) ; la découverte reste simulée**. Aucune interface, aucune alerte, aucun appel Brave ni
 requête HTTP vers une boutique, aucune table en base, aucun changement de forfait ni de budget. Rien n'est visible des
@@ -129,3 +129,90 @@ n'est jamais traduit en rupture de stock ou en changement de prix.
 - Pays de livraison : France ; pas de calcul de taxes ni de douane ; pas de conversion de devises.
 - Lecture de texte visible volontairement stricte : des fiches réelles à structure atypique resteront « prix inconnu ».
 - Aucun essai sur de vrais sites ni sur la Preview : il reste à calibrer sur des fiches réelles (lot suivant).
+
+---
+
+# Lot 3 — découverte de produits via Brave Search
+
+Code : `packages/monitoring/src/products/discovery/` (`BraveOfferDiscoverySource`, `BraveSearchGateway`, constructeur de
+requêtes, filtre) et `packages/monitoring/src/search/` (`reserve.ts`, `settings.ts`). **Aucun appel Brave réel** n'a été
+fait : tout est testé avec un faux serveur au format Brave et des fournisseurs simulés. Ni interface, ni alerte.
+
+## Trois choses à ne pas confondre
+
+| Terme | Ce que c'est | Coût | Compté par |
+| --- | --- | --- | --- |
+| **Recherche utilisateur** | Une demande « trouver ce produit » (`stats.userSearches`) | — | la source Brave |
+| **Appel API Brave** | Une requête réellement émise vers Brave (`stats.apiCalls`). Une recherche utilisateur en émet 0 (cache ou requête fusionnée), 1 ou 2 | ≈ 0,005 $ (à vérifier sur le plan souscrit) | compteur global atomique + quota de l'abonnement |
+| **Vérification HTTP** | L'ouverture d'une fiche marchande par le vérificateur (lot 2) | aucun coût Brave (CPU et bande passante) | `HttpOfferVerifier.stats` |
+
+Une recherche utilisateur fait **au plus 2 appels** : une requête précise d'abord (code-barres entre guillemets, sinon référence
+fabricant, avec exclusion des accessoires), puis une requête plus large **seulement si** la première ne donne pas assez de
+fiches exploitables (5 par défaut).
+
+## Conditions contractuelles de Brave (lues le 1er novembre 2026 sur api-dashboard.search.brave.com/terms-of-service,
+version « dernière mise à jour : 1er septembre 2026 » ; lecture faite par un outil de synthèse, à relire par un humain)
+
+- **§3(b)(i)** : il est interdit de « store, cache, or create a database of Search Results, in whole or in part, other than
+  transient storage required for operation of Customer Applications » ; **§3(b)(xii)** : interdiction de « redistribute, resell,
+  or sublicense the Search Results » ; **§3(b)(ii)** : pas d'œuvre dérivée ; **§3(b)(xiii)** : pas d'entraînement ni
+  d'évaluation de modèles d'IA ; **§3(b)(xiv)** et **§13(c)(ii)** : à la fin du contrat, détruire toute copie, « except as
+  otherwise provided in an Order Form ».
+- La page tarifaire indique que le stockage et l'entraînement sont possibles « avec un plan qui inclut des droits de stockage »,
+  sans dire lesquels. Le tarif public lu : **5 $ pour 1 000 requêtes**, 5 $ de crédit mensuel offert, 50 requêtes par seconde.
+- **Conséquence appliquée** : sans confirmation écrite que votre plan inclut le stockage, **aucun résultat Brave n'est écrit en
+  base ni gardé en mémoire** au-delà de la requête en cours. Le cache partagé PostgreSQL est livré mais **désactivé par défaut** ;
+  il ne s'active qu'avec `WAVERTI_BRAVE_STORAGE_RIGHTS=granted`. `purgeExpiredBraveCache` et `purgeAllBraveResults` détruisent les
+  résultats conservés (expiration, fin de contrat). Aucun résultat n'est revendu : seuls un titre, un extrait et une adresse sont
+  transmis, pour être vérifiés sur la fiche du marchand.
+- **À faire par vous** : demander à Brave (ou lire le contrat) si votre plan inclut le stockage. Tant que ce n'est pas écrit,
+  laisser la variable vide.
+- **Point d'attention sur l'existant (non modifié ici)** : la recherche de sujets du moteur B met déjà les résultats en cache
+  6 heures (`search_cache`, fournisseur `brave`) et conserve titres et adresses dans `monitoring_seen_items`. Cela relève de la
+  même clause et doit être couvert par le même droit de stockage ; décision à prendre (voir le rapport du lot 3).
+- Attribution « POWERED BY BRAVE » : facultative (§4(d)) ; ne pas laisser entendre un partenariat.
+
+## Maîtrise des coûts
+
+- **Plafond mensuel global** : réglage `budget.brave_monthly_usd` (table `app_settings`, **50 $ par défaut**) et coût estimé
+  `cost.brave_request_usd_micros` (5 000 = 0,005 $). Plafond d'appels = 50 / 0,005 = **10 000 appels par mois civil UTC**, tous
+  usages confondus (surveillances de sujets et découverte). Compteur **atomique** (`usage_counters`, métrique
+  `brave_api_global`) : 40 réservations simultanées depuis deux workers avec un plafond de 10 en acceptent exactement 10.
+- **Quotas des abonnements conservés** : le quota de la période (Plus 90, Pro 600, Max 1 200, Business 600 par mois de 30 jours ;
+  2 par jour en essai) est le même compteur que celui des surveillances de sujets (`brave_search`, voir
+  `billing/search-quota.ts`). Un appel API consomme une unité du quota de l'utilisateur qui l'a déclenché ; une réponse venue du
+  cache ou d'une requête fusionnée ne consomme rien.
+- **Ordre des contrôles** : plafond global → quota de la période → quota journalier (essai) ; un refus restitue les étapes
+  précédentes. Au refus, **aucune requête ne part**.
+- **Échecs** : 429 et erreurs client (401, 403, 422) = non facturés : tout est restitué. Délai dépassé, erreur serveur, réponse
+  illisible = peut-être facturés : le **quota de l'utilisateur est rendu mais la dépense globale est conservée** (le compteur
+  ne sous-estime jamais). **Aucun retry automatique** : une tentative par requête, l'appelant décide.
+- **Requêtes identiques simultanées** fusionnées (un seul appel, facturé à celui qui l'a lancé) ; avec droits de stockage, un
+  verrou PostgreSQL empêche aussi deux workers d'interroger Brave pour la même requête. Sans droits de stockage, deux workers
+  distincts peuvent encore émettre le même appel en même temps (aucun résultat ne peut transiter par la base).
+- **Journal** : chaque appel est enregistré dans `provider_requests` (résultat, code HTTP, durée, coût estimé, quota restant
+  annoncé par Brave) ; les traces ne contiennent qu'une empreinte de la requête et de l'utilisateur, **jamais la clé API ni le
+  texte de la requête** (testé).
+
+## Estimation des coûts (tarif public lu : 0,005 $ l'appel ; à confirmer sur votre plan)
+
+| Hypothèse | Appels Brave / mois | Coût estimé |
+| --- | --- | --- |
+| 1 000 recherches de produits, 1 appel chacune | 1 000 | 5 $ |
+| 1 000 recherches, 2 appels chacune (cas défavorable) | 2 000 | 10 $ |
+| 5 000 recherches, 2 appels, sans cache | 10 000 | **50 $ = plafond initial atteint** |
+| Plafond initial (50 $) | 10 000 appels | ≈ 5 000 à 10 000 recherches de produits |
+
+Le crédit mensuel offert par Brave (5 $ annoncés) n'est pas déduit : l'estimation est prudente. Les vérifications HTTP (jusqu'à
+12 par recherche) ne coûtent rien chez Brave. Le cache partagé, s'il est autorisé, ne fait payer qu'une fois une requête identique
+par durée de validité (6 h par défaut, 24 h au plus).
+
+## Limites du lot 3
+
+- Jamais testé contre le vrai service Brave : forme des réponses et en-têtes de quota d'après la documentation ; **un seul
+  essai réel, plafonné, nécessitera votre accord explicite**.
+- Pas de résultats « shopping » ou produits structurés de Brave : seulement les résultats Web.
+- Le plafond global n'est atomique que pour les appels passant par `reserveBraveCall` (découverte et recherche de sujets) ; le
+  contrôle en euros de la recherche de sujets reste non atomique (existant).
+- Les listes de sites non marchands et de motifs de pages non produit sont courtes et à compléter avec des cas réels.
+- Aucune table, aucune migration ; les réglages sont lus avec des valeurs par défaut (50 $, 5 000 micro-dollars).

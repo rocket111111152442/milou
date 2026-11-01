@@ -2,7 +2,8 @@ import { sql } from "drizzle-orm";
 import type { Executor } from "./client";
 
 /** Ressources facturables suivies par compteur (une ligne par compte, métrique et période). */
-export type UsageMetric = "brave_search" | "email_alert" | "ai_call" | "browser_run";
+/** « brave_api_global » : appels Brave réellement émis par la plateforme (toutes fonctions), compteur global atomique. */
+export type UsageMetric = "brave_search" | "brave_api_global" | "email_alert" | "ai_call" | "browser_run";
 
 /** Période mensuelle (« 2026-10 ») ou journalière (« 2026-10-30 »), en UTC. */
 export function usagePeriod(kind: "month" | "day", now: Date = new Date()): string {

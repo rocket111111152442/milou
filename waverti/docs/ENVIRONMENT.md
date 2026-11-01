@@ -32,6 +32,7 @@ service n'est pas configuré. Sans Stripe, les formules payantes sont présenté
 | `WORKER_ROLES` | non | non | `scheduler,pages,web,business,email,maintenance` (séparer sur plusieurs machines si besoin). |
 | `APP_URL` | oui | non | URL publique (liens des e-mails). |
 | `RESEND_API_KEY` ou `SMTP_URL`, `EMAIL_FROM` | pour envoyer | **oui** / non | Sans l'un ni l'autre, les e-mails restent en file (signalé dans les journaux). |
+| `WAVERTI_BRAVE_STORAGE_RIGHTS` | non | non | Vide par défaut = aucun résultat Brave n'est stocké (cache de découverte de produits désactivé). `granted` active le cache partagé : **uniquement** si le plan ou contrat Brave prévoit des droits de stockage (conditions de Brave §3(b)(i)). Voir `docs/PRODUITS.md`. |
 | `BRAVE_SEARCH_API_KEY` (alias accepté : `BRAVE_API_KEY`) | pour le moteur B | **oui** | Sans clé, les recherches échouent avec un message explicite. Si les deux sont définies, `BRAVE_SEARCH_API_KEY` l'emporte. |
 | `STRIPE_SECRET_KEY` | non | **oui** | Mode test uniquement. |
 | `WORKER_*_CONCURRENCY` | non | non | Concurrence par type de contrôle. |

@@ -78,8 +78,10 @@ Business au maximum de leurs quotas.
 
 ## Points de vigilance
 
-1. **Brave** : seul coût variable significatif. Plafond global de la plateforme (`budget.monthly_api_eur`, 50 € par
-   défaut) : une fois atteint, les recherches de **tous** les abonnés sont suspendues jusqu'au mois suivant. À
+1. **Brave** : seul coût variable significatif. Depuis le lot 3, un plafond global **atomique en dollars**
+   (`budget.brave_monthly_usd`, 50 $ par défaut, avec `cost.brave_request_usd_micros` = 5 000) s'applique à tous les
+   appels Brave (surveillances de sujets et découverte de produits) ; l'ancien contrôle en euros
+   (`budget.monthly_api_eur`, 50 € par défaut) subsiste pour les surveillances de sujets : une fois atteint, les recherches de **tous** les abonnés sont suspendues jusqu'au mois suivant. À
    relever avant le lancement en fonction du nombre d'abonnés (sinon des abonnés ne recevraient pas le service
    payé).
 2. **E-mails Business** non décomptés du quota : bornés par le regroupement, la détection de site instable et le

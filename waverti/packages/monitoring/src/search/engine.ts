@@ -7,35 +7,20 @@
  *  - Déduplication : chaque information (URL ou affirmation datée) n'est signalée qu'une fois.
  */
 import { createHash } from "node:crypto";
-import {
-  and,
-  consumeUsage,
-  eq,
-  monitoringSeenItems,
-  recordProviderRequest,
-  releaseUsage,
-  sql,
-  usagePeriod,
-  type Database,
-} from "@waverti/database";
+import { and, eq, monitoringSeenItems, recordProviderRequest, sql, usagePeriod, type Database } from "@waverti/database";
 import type { Evaluation } from "../compare/evaluate";
 import type { WebFinding, WebTopicCondition, WebTopicObservation } from "@waverti/types";
 import { STATUS_LABELS } from "@waverti/types";
 import type { SearchProvider, SearchResponseMeta, SearchResultItem } from "./brave";
 import { SearchProviderError } from "./brave";
 import { classifyResult, meetsThreshold, topicStatus } from "./classify";
+import { BudgetExceededError } from "./errors";
+import { reserveBraveCall } from "./reserve";
+import { loadBraveGlobalCap, settingNumber } from "./settings";
 
 export const SEARCH_CACHE_TTL_SECONDS = 6 * 3600;
 
-export class BudgetExceededError extends Error {
-  constructor(
-    public readonly scope: "global" | "user_month" | "user_day",
-    message: string,
-  ) {
-    super(message);
-    this.name = "BudgetExceededError";
-  }
-}
+export { BudgetExceededError };
 
 export interface WebTopicTask {
   id: string;
@@ -66,12 +51,6 @@ export function queryHash(provider: string, query: string): string {
   return createHash("sha256").update(`${provider}|fr|${norm}`).digest("hex");
 }
 
-async function settingNumber(db: Database, key: string, fallback: number): Promise<number> {
-  const r = await db.execute<{ value: unknown }>(sql`select value from app_settings where key = ${key}`);
-  const v = Number(r[0]?.value);
-  return Number.isFinite(v) ? v : fallback;
-}
-
 /**
  * Réserve un appel facturable avant de l'effectuer : budget global de la plateforme (en euros), puis
  * compteurs atomiques par utilisateur (mois, et jour pendant l'essai). Renvoie la fonction qui restitue
@@ -87,22 +66,18 @@ async function reserveSearch(deps: WebRunDeps, userId: string, costMicros: numbe
   if (Number(g?.spent ?? 0) + costMicros > budgetEur * 1_000_000) {
     throw new BudgetExceededError("global", "Budget mensuel des recherches atteint");
   }
-  const month = deps.quotaPeriod ?? usagePeriod("month", now);
-  const monthOk = await consumeUsage(db, { userId, metric: "brave_search", period: month, limit: deps.monthlyCallLimit });
-  if (monthOk === null) throw new BudgetExceededError("user_month", "Quota de recherches de la période atteint pour votre formule");
-  const releases = [() => releaseUsage(db, { userId, metric: "brave_search", period: month })];
-  if (deps.dailyCallLimit !== null) {
-    const day = usagePeriod("day", now);
-    const dayOk = await consumeUsage(db, { userId, metric: "brave_search", period: day, limit: deps.dailyCallLimit });
-    if (dayOk === null) {
-      await releases[0]!();
-      throw new BudgetExceededError("user_day", "Quota journalier de recherches atteint (période d'essai)");
-    }
-    releases.push(() => releaseUsage(db, { userId, metric: "brave_search", period: day }));
-  }
-  return async () => {
-    for (const r of releases) await r();
-  };
+  // Plafond global atomique (dollars, tous usages Brave), quota de la période de l'abonnement, quota journalier d'essai.
+  const cap = await loadBraveGlobalCap(db);
+  const reservation = await reserveBraveCall({
+    db,
+    userId,
+    period: deps.quotaPeriod ?? usagePeriod("month", now),
+    periodLimit: deps.monthlyCallLimit,
+    dailyLimit: deps.dailyCallLimit,
+    globalMonthlyRequests: cap.maxRequests,
+    now,
+  });
+  return reservation.release;
 }
 
 /** Recherche avec cache partagé ; enregistre la consommation (coût estimé) dans api_usage. */
