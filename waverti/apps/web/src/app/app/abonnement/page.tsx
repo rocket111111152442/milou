@@ -3,10 +3,13 @@ import Link from "next/link";
 import { CalendarClock, CreditCard } from "lucide-react";
 import { Badge, Button, Callout, Card, CardContent, CardHeader, CardTitle, PageHeader, Progress } from "@waverti/ui";
 import { PAID_PLAN_IDS, PLAN_CATALOG } from "@waverti/billing/catalog";
+import { checkTrialEligibility, resolveCheckoutReturn, type CheckoutReturnState } from "@waverti/billing";
 import { formatCents, formatDateTime } from "@waverti/types";
 import { requireUser } from "@/lib/auth";
 import { getQuotaViews, getSubscriptionView, loadEntitlements } from "@/lib/data/account";
-import { isBillingConfigured } from "@/lib/stripe";
+import { getDb } from "@/lib/db";
+import { getStripe, isBillingConfigured } from "@/lib/stripe";
+import { ConfirmingCallout } from "./checkout-return";
 import { PlanActions, PortalButton } from "./plan-actions";
 
 export const metadata: Metadata = { title: "Abonnement" };
@@ -18,12 +21,20 @@ const STATUS: Record<string, { label: string; tone: "success" | "info" | "warnin
   unpaid: { label: "Impayé", tone: "danger" },
 };
 
-export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ checkout?: string; bienvenue?: string }> }) {
+export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ checkout?: string; bienvenue?: string; session_id?: string }> }) {
   const user = await requireUser("/app/abonnement");
-  const { checkout, bienvenue } = await searchParams;
+  const { checkout, bienvenue, session_id: sessionId } = await searchParams;
   const [sub, ent] = await Promise.all([getSubscriptionView(user.id), loadEntitlements(user.id)]);
   const quotas = await getQuotaViews(user.id, ent);
   const billing = isBillingConfigured();
+  // Retour de Checkout : message déterminé par la session Stripe vérifiée côté serveur, jamais par l'URL seule.
+  let returned: CheckoutReturnState | null = null;
+  if (checkout === "success" && billing) {
+    returned = await resolveCheckoutReturn(getDb(), getStripe(), user.id, sessionId).catch(() => ({ kind: "unverified" }) as CheckoutReturnState);
+  }
+  const confirming = returned?.kind === "confirming";
+  // Éligibilité réelle à l'essai : les boutons ne promettent « 3 jours » que si l'essai est effectivement possible.
+  const trialEligible = billing && !sub.subscriptionId ? (await checkTrialEligibility(getDb(), user.id, user.email, process.env.WAVERTI_HASH_PEPPER)).eligible : false;
   const status = sub.status ? STATUS[sub.status] : null;
 
   return (
@@ -35,11 +46,8 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
           avant la fin de l'essai, sans aucun prélèvement.
         </Callout>
       ) : null}
-      {checkout === "success" ? (
-        <Callout tone="success" title="Paiement enregistré par Stripe" role="status">
-          La confirmation de Stripe peut prendre quelques secondes. Votre formule se met à jour automatiquement dès réception.
-        </Callout>
-      ) : checkout === "canceled" ? (
+      {returned ? <CheckoutReturnBanner state={returned} /> : null}
+      {checkout === "canceled" ? (
         <Callout tone="neutral" role="status">
           Paiement abandonné : aucun abonnement n'a été créé.
         </Callout>
@@ -60,7 +68,9 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
                   ? "Accès bêta privé sans paiement, avec des quotas réduits. Aucun moyen de paiement n'est enregistré."
                   : sub.planId
                   ? `${formatCents(PLAN_CATALOG[sub.planId as keyof typeof PLAN_CATALOG]?.priceCents ?? 0)} / mois TTC, renouvelé chaque mois jusqu'à résiliation`
-                  : "Vos surveillances sont en pause. Choisissez une formule (essai gratuit de 3 jours si vous n'en avez pas encore bénéficié)."}
+                  : trialEligible
+                  ? "Vos surveillances sont en pause. Choisissez une formule : essai gratuit de 3 jours, sans prélèvement pendant l'essai."
+                  : "Vos surveillances sont en pause. Choisissez une formule : votre essai gratuit a déjà été utilisé, le premier paiement a lieu à la validation."}
               </p>
             </div>
             {sub.betaEndsAt ? (
@@ -144,7 +154,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
 
       <section id="formules" aria-labelledby="change-title" className="flex scroll-mt-24 flex-col gap-4">
         <h2 id="change-title" className="font-display text-lg font-semibold">
-          {sub.subscriptionId ? "Changer de formule" : "Choisir une formule — 3 jours d'essai gratuit"}
+          {sub.subscriptionId ? "Changer de formule" : trialEligible ? "Choisir une formule — 3 jours d'essai gratuit" : "Choisir une formule"}
         </h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {PAID_PLAN_IDS.map((id) => {
@@ -167,10 +177,14 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
                       </Button>
                     ) : sub.subscriptionId ? (
                       <PlanActions mode="change" planId={id} planName={p.name} />
+                    ) : confirming ? (
+                      <Button variant="secondary" disabled className="w-full">
+                        Confirmation en cours
+                      </Button>
                     ) : (
                       <Button asChild className="w-full">
                         <Link href={`/app/abonnement/essai?formule=${id}`}>
-                          <CreditCard aria-hidden="true" /> Essayer {p.name} 3 jours
+                          <CreditCard aria-hidden="true" /> {trialEligible ? `Essayer ${p.name} 3 jours` : `Souscrire à ${p.name}`}
                         </Link>
                       </Button>
                     )}
@@ -187,4 +201,45 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       </section>
     </div>
   );
+}
+
+function CheckoutReturnBanner({ state }: { state: CheckoutReturnState }) {
+  switch (state.kind) {
+    case "confirming":
+      return <ConfirmingCallout />;
+    case "confirmed":
+      return (
+        <Callout tone="success" title={state.status === "trialing" ? "Essai démarré" : "Abonnement confirmé"} role="status">
+          {state.status === "trialing"
+            ? "Votre essai gratuit est actif. Aucun prélèvement n'est effectué pendant l'essai."
+            : "Votre abonnement est actif."}
+        </Callout>
+      );
+    case "trial_refused":
+      return (
+        <Callout tone="warning" title="Essai annulé : essai gratuit déjà utilisé" role="status">
+          {state.noCharge
+            ? "Un essai gratuit a déjà été utilisé avec cette adresse ou ce moyen de paiement. Aucun prélèvement effectué. Vous pouvez souscrire sans essai (premier paiement à la validation)."
+            : "Un essai gratuit a déjà été utilisé avec cette adresse ou ce moyen de paiement et l'abonnement d'essai a été annulé. Vérifiez vos paiements dans le portail de facturation."}
+        </Callout>
+      );
+    case "ended":
+      return (
+        <Callout tone="neutral" role="status">
+          Cet abonnement est terminé.
+        </Callout>
+      );
+    case "incomplete":
+      return (
+        <Callout tone="neutral" role="status">
+          Paiement non terminé : aucun abonnement n'a été créé.
+        </Callout>
+      );
+    default:
+      return (
+        <Callout tone="neutral" title="Retour de paiement non vérifié" role="status">
+          Nous n'avons pas pu rattacher ce retour à votre compte. Votre abonnement ci-dessous reflète l'état réel de votre compte.
+        </Callout>
+      );
+  }
 }

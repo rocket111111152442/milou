@@ -165,6 +165,76 @@ describe("stripe webhooks", () => {
     expect(n.map((x) => x.title)).toContain("Essai gratuit déjà utilisé");
   });
 
+  describe("trial check is independent of event order", () => {
+    const subCreated = (sub: ReturnType<typeof trialSub>) => signedEvent(fake.stripe, "customer.subscription.created", sub);
+    const trialStartedCount = async (userId: string) =>
+      (await t.db.select().from(notifications).where(eq(notifications.userId, userId))).filter((n) => n.title.includes("essai Waverti") && n.title.includes("a commencé"))
+        .length;
+
+    it("valid trial: subscription.created first, then checkout.session.completed → one start notice, one trial row", async () => {
+      const u = await newCustomer("order.valid@example.test");
+      const sub = trialSub(u, "plus", "fp_order_valid");
+      const a = subCreated(sub);
+      await handleStripeWebhook(deps, a.payload, a.signature);
+      const b = checkoutCompleted(u, sub.id);
+      await handleStripeWebhook(deps, b.payload, b.signature);
+      expect(await trialStartedCount(u.id)).toBe(1);
+      expect(await t.db.select().from(trialUsage).where(eq(trialUsage.userId, u.id))).toHaveLength(1);
+      expect((await getEntitlements(t.db, u.id)).source).toBe("trial");
+    });
+
+    it("valid trial: checkout first, then subscription.created (and a replayed created) → still one start notice", async () => {
+      const u = await newCustomer("order.valid2@example.test");
+      const sub = trialSub(u, "plus", "fp_order_valid2");
+      const b = checkoutCompleted(u, sub.id);
+      await handleStripeWebhook(deps, b.payload, b.signature);
+      const a = subCreated(sub);
+      await handleStripeWebhook(deps, a.payload, a.signature);
+      await handleStripeWebhook(deps, a.payload, a.signature);
+      expect(await trialStartedCount(u.id)).toBe(1);
+      expect(await t.db.select().from(trialUsage).where(eq(trialUsage.userId, u.id))).toHaveLength(1);
+    });
+
+    for (const order of ["created-first", "checkout-first"] as const) {
+      it(`refused trial (${order}): never announces a start, cancels once, no charge confirmed by invoices`, async () => {
+        const first = await newCustomer();
+        const s1 = trialSub(first, "plus", `fp_refused_${order}`);
+        const ev1 = checkoutCompleted(first, s1.id);
+        await handleStripeWebhook(deps, ev1.payload, ev1.signature);
+
+        const second = await newCustomer();
+        const s2 = trialSub(second, "pro", `fp_refused_${order}`);
+        fake.state.invoices = [{ subscription: s2.id, amount_paid: 0 }];
+        const created = subCreated(s2);
+        const done = checkoutCompleted(second, s2.id);
+        const seq = order === "created-first" ? [created, done] : [done, created];
+        for (const e of seq) expect((await handleStripeWebhook(deps, e.payload, e.signature)).status).toBe(200);
+        // doublons
+        for (const e of seq) await handleStripeWebhook(deps, e.payload, e.signature);
+
+        expect(await trialStartedCount(second.id)).toBe(0);
+        expect(fake.state.calls.filter((c) => c.method === "subscriptions.cancel" && c.args[0] === s2.id)).toHaveLength(1);
+        expect((await t.db.select().from(trialUsage).where(eq(trialUsage.userId, second.id))).map((r) => r.status)).toEqual(["blocked_duplicate"]);
+        expect((await getEntitlements(t.db, second.id)).planId).toBeNull();
+        const notice = (await t.db.select().from(notifications).where(eq(notifications.userId, second.id))).filter((n) => n.title === "Essai gratuit déjà utilisé");
+        expect(notice).toHaveLength(1);
+        expect(notice[0]!.body).toContain("Aucun prélèvement n'a été effectué");
+      });
+    }
+
+    it("refused trial: no 'no charge' claim when an invoice shows a payment", async () => {
+      const first = await newCustomer();
+      await handleStripeWebhook(deps, ...(((e) => [e.payload, e.signature] as const)(checkoutCompleted(first, trialSub(first, "plus", "fp_paid").id))));
+      const second = await newCustomer();
+      const s2 = trialSub(second, "plus", "fp_paid");
+      fake.state.invoices = [{ subscription: s2.id, amount_paid: 599 }];
+      const e = checkoutCompleted(second, s2.id);
+      await handleStripeWebhook(deps, e.payload, e.signature);
+      const [n] = (await t.db.select().from(notifications).where(eq(notifications.userId, second.id))).filter((x) => x.title === "Essai gratuit déjà utilisé");
+      expect(n!.body).not.toContain("Aucun prélèvement n'a été effectué");
+    });
+  });
+
   it("applies the latest Stripe state even when events arrive out of order", async () => {
     const u = await newCustomer();
     const sub = trialSub(u, "plus", "fp_order");

@@ -161,6 +161,13 @@ async function processEvent(tx: Transaction, deps: WebhookDeps, event: Stripe.Ev
       if (!userId) throw new Error("subscription: utilisateur introuvable");
       const sub = await deps.stripe.subscriptions.retrieve(evSub.id);
       const before = await upsertSubscription(tx, userId, sub);
+      // Quel que soit l'ordre des événements (« subscription.created » avant « checkout.session.completed » ou
+      // l'inverse), le contrôle d'essai est exécuté AVANT toute annonce « essai commencé » (idempotent).
+      const trial = sub.status === "trialing" ? await registerTrial(tx, deps, userId, sub, null) : "none";
+      if (trial === "blocked") {
+        await recomputeEntitlements(tx, userId, deps.now?.());
+        return userId;
+      }
       if (sub.status === "canceled") {
         await tx
           .update(trialUsage)
@@ -181,6 +188,11 @@ async function processEvent(tx: Transaction, deps: WebhookDeps, event: Stripe.Ev
       if (!userId || !subId) return userId;
       const sub = await deps.stripe.subscriptions.retrieve(subId);
       const before = await upsertSubscription(tx, userId, sub);
+      const trial = sub.status === "trialing" ? await registerTrial(tx, deps, userId, sub, null) : "none";
+      if (trial === "blocked") {
+        await recomputeEntitlements(tx, userId, deps.now?.());
+        return userId;
+      }
       if (event.type === "invoice.paid" && (invoice.amount_paid ?? 0) > 0) {
         await tx
           .update(trialUsage)
@@ -265,12 +277,19 @@ async function registerTrial(
   deps: WebhookDeps,
   userId: string,
   sub: Stripe.Subscription,
-  session: Stripe.Checkout.Session,
+  session: Stripe.Checkout.Session | null,
 ): Promise<"started" | "blocked" | "existing"> {
-  const [already] = await tx.select({ id: trialUsage.id }).from(trialUsage).where(eq(trialUsage.stripeSubscriptionId, sub.id)).limit(1);
-  if (already) return "existing";
+  // Deux événements différents (ex. « subscription.created » et « checkout.session.completed ») peuvent traiter le
+  // même abonnement en parallèle : sérialisation par abonnement, puis le second voit le résultat du premier.
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${sub.id}, 43))`);
+  const [already] = await tx
+    .select({ id: trialUsage.id, status: trialUsage.status })
+    .from(trialUsage)
+    .where(eq(trialUsage.stripeSubscriptionId, sub.id))
+    .limit(1);
+  if (already) return already.status === "blocked_duplicate" ? "blocked" : "existing";
   const [profile] = await tx.select({ email: profiles.email }).from(profiles).where(eq(profiles.id, userId)).limit(1);
-  const emailHash = pepperedHash(normalizeEmailForAbuse(profile?.email ?? session.customer_details?.email ?? ""), deps.pepper);
+  const emailHash = pepperedHash(normalizeEmailForAbuse(profile?.email ?? session?.customer_details?.email ?? ""), deps.pepper);
 
   let fingerprint: string | null = null;
   const pm = sub.default_payment_method;
@@ -302,12 +321,20 @@ async function registerTrial(
     // Annulation immédiate pendant l'essai : aucun prélèvement n'a lieu.
     const canceled = await deps.stripe.subscriptions.cancel(sub.id, { invoice_now: false, prorate: false });
     await upsertSubscription(tx, userId, canceled);
+    // « Aucun prélèvement » n'est affirmé que si les factures de CET abonnement le confirment (montants encaissés nuls).
+    let noCharge = false;
+    try {
+      const inv = await deps.stripe.invoices.list({ subscription: sub.id, limit: 10 });
+      noCharge = inv.data.every((i) => (i.amount_paid ?? 0) === 0);
+    } catch {
+      noCharge = false;
+    }
     await notify(tx, {
       userId,
       type: "trial",
       priority: "high",
       title: "Essai gratuit déjà utilisé",
-      body: "Un essai gratuit a déjà été utilisé avec cette adresse ou ce moyen de paiement. L'abonnement d'essai a été annulé sans aucun prélèvement. Vous pouvez souscrire sans essai depuis la page Abonnement.",
+      body: `Un essai gratuit a déjà été utilisé avec cette adresse ou ce moyen de paiement. L'abonnement d'essai a été annulé. ${noCharge ? "Aucun prélèvement n'a été effectué." : "Vérifiez vos paiements depuis la page Abonnement."} Vous pouvez souscrire sans essai depuis la page Abonnement.`,
       linkPath: "/app/abonnement",
       dedupKey: `trial_blocked:${sub.id}`,
       emailPolicy: "transactional",

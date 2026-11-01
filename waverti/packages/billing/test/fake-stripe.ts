@@ -11,6 +11,9 @@ export interface FakeState {
   subscriptions: Map<string, Stripe.Subscription>;
   paymentMethods: Map<string, Stripe.PaymentMethod>;
   calls: Array<{ method: string; args: unknown[] }>;
+  /** Factures simulées (liste par abonnement) ; absentes = aucune facture. */
+  sessions?: Map<string, Record<string, unknown>>;
+  invoices?: Array<{ subscription: string; amount_paid: number }>;
   /** Prix actifs par clé de recherche (mode test). */
   prices: Map<string, Stripe.Price>;
 }
@@ -74,7 +77,27 @@ export function createFakeStripe(): { stripe: Stripe; state: FakeState } {
   const state: FakeState = { subscriptions: new Map(), paymentMethods: new Map(), calls: [], prices: new Map() };
   const rec = (method: string, args: unknown[]) => state.calls.push({ method, args });
 
+  Object.assign(stripe.checkout.sessions, {
+    retrieve: async (id: string) => {
+      rec("checkout.sessions.retrieve", [id]);
+      const sess = state.sessions?.get(id);
+      if (!sess) throw new Error(`no such session ${id}`);
+      return sess;
+    },
+  });
+
+  Object.assign(stripe.invoices, {
+    list: async (params: { subscription?: string }) => {
+      rec("invoices.list", [params]);
+      return { data: (state.invoices ?? []).filter((i) => !params.subscription || i.subscription === params.subscription) };
+    },
+  });
+
   Object.assign(stripe.subscriptions, {
+    list: async (params: { customer?: string }) => {
+      rec("subscriptions.list", [params]);
+      return { data: [...state.subscriptions.values()].filter((s) => (typeof s.customer === "string" ? s.customer : s.customer.id) === params.customer) };
+    },
     retrieve: async (id: string, ...rest: unknown[]) => {
       rec("subscriptions.retrieve", [id, ...rest]);
       const s = state.subscriptions.get(id);

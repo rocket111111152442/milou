@@ -159,6 +159,17 @@ export async function createSubscriptionCheckout(
     await db.update(profiles).set({ stripeCustomerId: customerId }).where(eq(profiles.id, input.userId));
   }
 
+  // Abonnement déjà créé chez Stripe mais pas encore enregistré ici (confirmation en cours) : pas de second abonnement.
+  try {
+    const existing = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 10 });
+    if (existing.data.some((s) => ["trialing", "active", "past_due", "unpaid"].includes(s.status))) {
+      throw new BillingError("already_subscribed", "Un abonnement est déjà en cours de confirmation : patientez quelques secondes et rechargez la page Abonnement.");
+    }
+  } catch (err) {
+    if (err instanceof BillingError) throw err;
+    // Contrôle complémentaire au mieux : une erreur réseau ne doit pas bloquer, l'état applicatif a déjà été vérifié.
+  }
+
   const elig = await checkTrialEligibility(db, input.userId, input.email, input.pepper);
   const trial = elig.eligible && plan.trialHours > 0 && plan.trialHours === TRIAL_HOURS;
   const trialEndSec = trial ? Math.floor(now.getTime() / 1000) + TRIAL_HOURS * 3600 : null;
