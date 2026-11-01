@@ -14,8 +14,6 @@ test.describe("site public", () => {
       "Que voulez-vous suivre ?",
       "Sur quelle page ?",
       "Quand être averti ?",
-      "Ce qui déclenche une alerte",
-      "Ce que Waverti consulte",
       "Ce que vous pouvez confier à Waverti",
       "Soyez le premier informé quand votre site a un problème.",
       "Quatre formules, sans engagement",

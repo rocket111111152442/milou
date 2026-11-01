@@ -7,15 +7,8 @@ import {
   Activity,
   ArrowRight,
   Bell,
-  BellOff,
-  BriefcaseBusiness,
-  CalendarDays,
-  FileText,
   Globe,
-  Laptop,
-  Mail,
   MousePointerClick,
-  Search,
   ShieldCheck,
   Sofa,
   Ticket,
@@ -33,21 +26,16 @@ const H2 = "font-display text-[30px] font-bold leading-[1.1] tracking-[-0.03em] 
 
 export function HomeHero() {
   return (
-    <section aria-labelledby="hero-title" className="relative overflow-hidden bg-[radial-gradient(1200px_500px_at_15%_-10%,rgb(0_229_255/0.16),transparent),radial-gradient(900px_500px_at_95%_0%,rgb(128_40_255/0.16),transparent)]">
+    <section aria-labelledby="hero-title" className="relative overflow-hidden bg-[radial-gradient(1200px_500px_at_15%_-10%,rgb(0_229_255/0.07),transparent),radial-gradient(900px_500px_at_95%_0%,rgb(128_40_255/0.07),transparent)]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-waverti-gradient" />
       <Container className="grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:py-20">
         <div className="flex flex-col items-start">
-          <p className="inline-flex items-center gap-2 rounded-full border border-line bg-white/80 px-3 py-1.5 text-[13px] font-medium text-ink-soft shadow-soft backdrop-blur">
-            <LogoMark className="size-5" />
-            Waverti suit ce que vous attendez, à votre place
-          </p>
-          <h1 id="hero-title" className="mt-6 text-balance font-display text-[40px] font-extrabold leading-[1.04] tracking-[-0.04em] sm:text-[56px] lg:text-[62px]">
+          <h1 id="hero-title" className="text-balance font-display text-[40px] font-extrabold leading-[1.04] tracking-[-0.04em] sm:text-[56px] lg:text-[62px]">
             Un prix baisse. Une place se libère.{" "}
             <span className="bg-waverti-gradient bg-clip-text text-transparent">Vous êtes prévenu.</span>
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-ink-soft">
-            Choisissez un produit, une billetterie ou une page à suivre. Waverti vérifie régulièrement la page que vous avez
-            choisie et vous avertit quand ce que vous attendez arrive. Fini les visites répétées sur les mêmes sites.
+            Choisissez une page à suivre. Waverti la vérifie à votre place et vous avertit quand ce que vous attendez arrive.
           </p>
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             <Button asChild size="lg" className="w-full sm:w-auto">
@@ -59,12 +47,6 @@ export function HomeHero() {
               Voir comment ça marche
             </Link>
           </div>
-          <p className="mt-4 text-[13px] text-muted-fg">
-            Essai gratuit de 3 jours, carte bancaire demandée, puis à partir de 5,99 € par mois. Résiliable en ligne.{" "}
-            <Link href="/tarifs" className="font-medium text-ink underline-offset-4 hover:underline">
-              Tarifs et conditions
-            </Link>
-          </p>
         </div>
         <HomeDemo />
       </Container>
@@ -123,52 +105,6 @@ export function HomeHowItWorks() {
           ))}
         </ol>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-3xl bg-ink p-6 text-white sm:p-8">
-            <h3 className="font-display text-xl font-bold">Ce qui déclenche une alerte</h3>
-            <ul className="mt-4 flex flex-col gap-3 text-[15px] text-white/85">
-              <li className="flex gap-3">
-                <BellOff className="mt-0.5 size-5 shrink-0 text-cyan" aria-hidden="true" />
-                Uniquement le changement attendu : pas de message à chaque vérification, ni quand rien ne bouge.
-              </li>
-              <li className="flex gap-3">
-                <Bell className="mt-0.5 size-5 shrink-0 text-cyan" aria-hidden="true" />
-                Dans votre espace Waverti (toujours) et par e-mail si vous le souhaitez.
-              </li>
-              <li className="flex gap-3">
-                <Mail className="mt-0.5 size-5 shrink-0 text-cyan" aria-hidden="true" />
-                E-mails désactivables pour chaque suivi, avec un plafond mensuel selon la formule (30 à 150 par mois).
-              </li>
-            </ul>
-          </div>
-          <div className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
-            <h3 className="font-display text-xl font-bold">Ce que Waverti consulte</h3>
-            <ul className="mt-4 flex flex-col gap-3 text-[15px] text-ink-soft">
-              <li className="flex gap-3">
-                <Globe className="mt-0.5 size-5 shrink-0 text-blue" aria-hidden="true" />
-                <span>
-                  <strong className="text-ink">Les pages que vous choisissez</strong>, à un rythme qui dépend de votre formule
-                  (de toutes les 6 heures à toutes les heures).
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <Search className="mt-0.5 size-5 shrink-0 text-violet" aria-hidden="true" />
-                <span>
-                  <strong className="text-ink">Une recherche sur Internet</strong> pour un sujet (une annonce, une sortie), via
-                  un moteur de recherche, une à deux fois par jour. Waverti n'explore pas tout Internet et ne lit pas les
-                  pages protégées.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <Laptop className="mt-0.5 size-5 shrink-0 text-pink" aria-hidden="true" />
-                <span>
-                  <strong className="text-ink">Rien à laisser allumé</strong> : les vérifications sont faites par les serveurs
-                  Waverti. Waverti suit et prévient ; il n'achète et ne réserve jamais à votre place.
-                </span>
-              </li>
-            </ul>
-          </div>
-        </div>
       </Container>
     </section>
   );
@@ -199,12 +135,6 @@ const USES = [
     result: "Alerte dès que la fiche produit indique de nouveau « en stock ».",
   },
 ];
-const MORE_USES = [
-  { icon: <BriefcaseBusiness />, label: "Nouvelles offres d'emploi" },
-  { icon: <FileText />, label: "Nouveau document PDF publié" },
-  { icon: <CalendarDays />, label: "Nouvelles dates annoncées" },
-  { icon: <Search />, label: "Annonce officielle d'un produit" },
-];
 
 export function HomeUses() {
   return (
@@ -225,14 +155,6 @@ export function HomeUses() {
             </li>
           ))}
         </ul>
-        <ul className="mt-6 flex flex-wrap gap-2" aria-label="Autres usages">
-          {MORE_USES.map((m) => (
-            <li key={m.label} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-sm font-medium [&_svg]:size-4 [&_svg]:text-violet">
-              {m.icon}
-              {m.label}
-            </li>
-          ))}
-        </ul>
       </Container>
     </section>
   );
@@ -241,49 +163,37 @@ export function HomeUses() {
 /* ——————————————————————————— 4. Waverti Business ——————————————————————————— */
 
 const BUSINESS = [
-  { icon: <Activity />, title: "Votre site ne répond plus", text: "Trois adresses de votre site vérifiées chaque minute ; panne confirmée avant l'alerte, puis retour à la normale signalé." },
-  { icon: <ShieldCheck />, title: "Votre certificat HTTPS expire", text: "Vérification quotidienne et alerte avant l'expiration." },
-  { icon: <MousePointerClick />, title: "Un parcours ne fonctionne plus", text: "Un parcours de votre site (ex. ajout au panier) rejoué dans un navigateur toutes les 2 heures." },
+  { icon: <Activity />, title: "Votre site ne répond plus" },
+  { icon: <ShieldCheck />, title: "Votre certificat HTTPS expire" },
+  { icon: <MousePointerClick />, title: "Un parcours ne fonctionne plus" },
 ];
 
 export function HomeBusiness() {
   return (
     <section id="business" aria-labelledby="business-title" className="py-16 sm:py-20">
       <Container>
-        <div className="overflow-hidden rounded-[32px] bg-ink text-white">
-          <div className="grid gap-10 p-6 sm:p-10 lg:grid-cols-[0.9fr_1.1fr] lg:p-12">
-            <div className="flex flex-col items-start">
-              <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
-                <BriefcaseBusiness className="size-3.5" aria-hidden="true" /> Waverti Business
-              </p>
-              <h2 id="business-title" className="mt-4 font-display text-[30px] font-bold leading-[1.1] tracking-[-0.03em] sm:text-[38px]">
-                Soyez le premier informé quand votre site a un problème.
-              </h2>
-              <p className="mt-4 text-white/75">
-                Toutes les fonctions Pro, plus la surveillance de votre site professionnel (un site inclus, après vérification
-                que vous en êtes responsable). Contrôles effectués depuis les serveurs Waverti, à un seul emplacement.
-              </p>
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Button asChild variant="secondary" className="border-transparent">
-                  <Link href="/entreprises">Découvrir Waverti Business</Link>
-                </Button>
-                <span className="text-sm text-white/70">39,99 € par mois TTC</span>
-              </div>
+        <div className="grid gap-8 rounded-3xl border border-line bg-white p-6 sm:p-10 lg:grid-cols-[1fr_1fr] lg:items-center">
+          <div className="flex flex-col items-start">
+            <p className="text-sm font-semibold text-violet">Waverti Business</p>
+            <h2 id="business-title" className="mt-2 font-display text-[28px] font-bold leading-[1.1] tracking-[-0.03em] sm:text-[34px]">
+              Soyez le premier informé quand votre site a un problème.
+            </h2>
+            <p className="mt-3 text-ink-soft">Toutes les fonctions Pro, plus la surveillance de votre site professionnel.</p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button asChild variant="secondary">
+                <Link href="/entreprises">Découvrir Waverti Business</Link>
+              </Button>
+              <span className="text-sm text-muted-fg">39,99 € par mois TTC</span>
             </div>
-            <ul className="grid gap-3">
-              {BUSINESS.map((b) => (
-                <li key={b.title} className="flex gap-4 rounded-2xl bg-white/[0.06] p-5">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-waverti-gradient text-white [&_svg]:size-5" aria-hidden="true">
-                    {b.icon}
-                  </span>
-                  <div>
-                    <h3 className="font-semibold">{b.title}</h3>
-                    <p className="mt-1 text-sm text-white/70">{b.text}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
           </div>
+          <ul className="flex flex-col gap-3">
+            {BUSINESS.map((b) => (
+              <li key={b.title} className="flex items-center gap-3 text-ink-soft [&_svg]:size-5 [&_svg]:shrink-0 [&_svg]:text-violet">
+                <span aria-hidden="true">{b.icon}</span>
+                {b.title}
+              </li>
+            ))}
+          </ul>
         </div>
       </Container>
     </section>
