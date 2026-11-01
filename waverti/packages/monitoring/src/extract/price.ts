@@ -42,7 +42,7 @@ export function detectCurrency(raw: string | null | undefined): string | null {
 /** Prix trouvés dans un texte libre, avec devise explicite avant ou après la valeur. */
 export function findPricesInText(text: string, limit = 10): Array<{ value: number; currency: string; index: number }> {
   const out: Array<{ value: number; currency: string; index: number }> = [];
-  const re = /(?:([$£€]|EUR|USD|GBP|CHF)\s*)?(\d{1,3}(?:[   .]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*([$£€]|EUR|USD|GBP|CHF)?/gi;
+  const re = /(?:([$£€]|EUR|USD|GBP|CHF)\s*)?(\d(?:[\d   .,]*\d)?)\s*([$£€]|EUR|USD|GBP|CHF)?/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) && out.length < limit) {
     const rawCurrency = m[1] ?? m[3];
@@ -55,4 +55,21 @@ export function findPricesInText(text: string, limit = 10): Array<{ value: numbe
     }
   }
   return out;
+}
+
+/**
+ * Sélectionne les prix visibles d'une offre de voyage en privilégiant le bloc
+ * « prix à partir de / par personne » et en ignorant les excursions placées
+ * plus loin dans le descriptif. Les candidats bruts restent disponibles pour
+ * la provenance et le diagnostic.
+ */
+export function findTravelPriceCandidates(text: string, limit = 20) {
+  const all = findPricesInText(text, limit);
+  const marker = /(?:prix\s+(?:à|a)\s+partir|par\s+personne|\/\s*pers\.?|prix\s+du\s+séjour)/i.exec(text);
+  const excursion = /\b(?:excursions?|options?)\b/i.exec(text);
+  const cutoff = marker?.index ?? excursion?.index ?? text.length;
+  const beforeOffer = all.filter((candidate) => candidate.index < cutoff);
+  const pool = beforeOffer.length ? beforeOffer : all;
+  const primary = (marker ? pool[pool.length - 1] : pool[0]) ?? null;
+  return { all, primary };
 }

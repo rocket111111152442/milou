@@ -18,11 +18,11 @@ Branche : `codex/extraction-reliability-lot2`, dérivée de la version livrée d
 
 Le benchmark [`RELIABILITY-BENCHMARK.json`](./RELIABILITY-BENCHMARK.json) utilise uniquement des HTML locaux synthétiques : JSON-LD, texte avec devises USD/GBP, promotion, variantes contradictoires, stock multilingue et page incomplète. Aucune collecte de site tiers n’est effectuée.
 
-Dernière mesure : 7 fixtures, 4 prix vérifiés, 2 indisponibles et 1 contradictoire ; aucune divergence attendue. Les scénarios d’alerte montrent qu’un prix incertain ne déclenche pas de baisse, alors qu’un prix devenu vérifié peut déclencher l’alerte, et qu’une modification d’enveloppe HTML à contenu stable ne déclenche pas de changement.
+Dernière mesure : 8 fixtures, 4 prix vérifiés, 1 incertain, 2 indisponibles et 1 contradictoire ; aucune divergence attendue. Les scénarios d’alerte montrent qu’un prix incertain ne déclenche pas de baisse, alors qu’un prix devenu vérifié peut déclencher l’alerte, et qu’une modification d’enveloppe HTML à contenu stable ne déclenche pas de changement.
 
 ## Vérifications
 
-- Unit : 25 fichiers, 525 tests réussis.
+- Unit : 25 fichiers, 526 tests réussis.
 - Typage TypeScript : monitoring, worker et web réussis.
 - ESLint ciblé sur l’extraction, la comparaison, les fixtures et le benchmark réussi.
 - E2E/intégration complète : à exécuter par la CI avec les services de test ; aucune base de production n’a été utilisée.

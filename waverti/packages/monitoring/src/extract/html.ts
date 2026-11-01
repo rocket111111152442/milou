@@ -3,7 +3,7 @@ import { sha256 as sha256Bytes } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import * as cheerio from "cheerio/slim";
 import type { Availability, ExtractionFieldEvidence, ExtractionStatus, PageObservation } from "@waverti/types";
-import { detectCurrency, findPricesInText, parsePrice } from "./price";
+import { detectCurrency, findTravelPriceCandidates, parsePrice } from "./price";
 import { collapseWhitespace, normalizeForMatch } from "./text";
 import { extractStructure, jsonLdItems, jsonLdRegularPrice, strikethroughPrice } from "./structure";
 
@@ -188,6 +188,8 @@ export function extractPage(input: ExtractInput): PageObservation {
   const fullText = collapseWhitespace(body.length ? body.text() : $.root().text());
   const scopedText = scope ? collapseWhitespace(scope.text()) : fullText;
   const normalized = scopedText.slice(0, 200_000);
+  const travelPrices = findTravelPriceCandidates(scopedText);
+  const primaryTextPrice = travelPrices.primary;
 
   // Prix et disponibilité
   let price: number | null = null;
@@ -197,7 +199,7 @@ export function extractPage(input: ExtractInput): PageObservation {
   let availabilitySource: PageObservation["availabilitySource"] = "none";
 
   if (scope) {
-    const p = findPricesInText(scopedText, 1)[0] ?? null;
+    const p = primaryTextPrice;
     const direct = p ? p.value : parsePrice(scopedText);
     if (direct !== null && /\d/.test(scopedText)) {
       price = direct;
@@ -247,12 +249,12 @@ export function extractPage(input: ExtractInput): PageObservation {
 
   const priceCandidates = distinctPriceCandidates([
     ...ldOffers.filter((o) => o.price !== null).map((o) => ({ value: o.price!, currency: o.currency, source: "jsonld" })),
-    ...(scope ? (findPricesInText(scopedText, 1)[0] ? [{ value: findPricesInText(scopedText, 1)[0]!.value, currency: detectCurrency(scopedText), source: "selector" }] : []) : []),
+    ...(scope && primaryTextPrice ? [{ value: primaryTextPrice.value, currency: detectCurrency(scopedText), source: "selector" }] : []),
     ...(parsePrice(mdPriceRaw) !== null ? [{ value: parsePrice(mdPriceRaw)!, currency: mdCurrency && /^[A-Za-z]{3}$/.test(mdCurrency) ? mdCurrency.toUpperCase() : null, source: "microdata" }] : []),
     ...(parsePrice(metaPrice) !== null ? [{ value: parsePrice(metaPrice)!, currency: metaCurrency && /^[A-Za-z]{3}$/.test(metaCurrency) ? metaCurrency.toUpperCase() : null, source: "meta" }] : []),
-    ...(findPricesInText(scopedText, 1)[0] ? [{ value: findPricesInText(scopedText, 1)[0]!.value, currency: findPricesInText(scopedText, 1)[0]!.currency, source: "text" }] : []),
+    ...travelPrices.all.map((candidate) => ({ value: candidate.value, currency: candidate.currency, source: "text" })),
   ]);
-  const textPrice = findPricesInText(scopedText, 1)[0] ?? null;
+  const textPrice = primaryTextPrice;
   if (price === null && textPrice) {
     price = textPrice.value;
     currency = textPrice.currency;
@@ -290,7 +292,8 @@ export function extractPage(input: ExtractInput): PageObservation {
   if (input.enrich !== false) {
     const regular = !priceContradictory && ldRegular !== null && price !== null && ldRegular > price ? ldRegular : strikethroughPrice($, scope, price);
     const st = extractStructure($, scope, input.finalUrl, ldItems);
-    const reference = collapseWhitespace(referenceRaw ?? "").slice(0, 160) || null;
+    const visibleReference = /\b(?:ref|réf(?:érence)?)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{3,})/i.exec(normalized)?.[1] ?? null;
+    const reference = collapseWhitespace(referenceRaw?.trim() || visibleReference || "").slice(0, 160) || null;
     enriched = {
       contentKind: "html",
       contentHash: st.contentHash,
