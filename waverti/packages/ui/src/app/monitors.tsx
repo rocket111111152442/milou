@@ -31,6 +31,21 @@ export function ExecutorLabel({ executor }: { executor: "agent" | "cloud" | null
   );
 }
 
+/** Liseré coloré à gauche d'une surveillance : l'état se voit d'un coup d'œil (en plus du libellé, jamais seul). */
+function statusStripe(m: Pick<MonitorSummary, "status" | "lastStatus">): string {
+  const c =
+    m.status === "paused"
+      ? "before:bg-line-strong"
+      : m.status === "error" || m.lastStatus === "error"
+        ? "before:bg-danger"
+        : m.status === "paused_quota" || m.lastStatus === "skipped"
+          ? "before:bg-[#c26a00]"
+          : m.lastStatus === "triggered"
+            ? "before:bg-violet"
+            : "before:bg-success";
+  return cn("before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:content-['']", c);
+}
+
 export function MonitorList({
   monitors,
   hrefFor,
@@ -55,18 +70,18 @@ export function MonitorList({
     );
   }
   return (
-    <ul className="divide-y divide-line/70 overflow-hidden rounded-2xl border border-line/80 bg-white shadow-[var(--shadow-card)]">
+    <ul className="flex flex-col gap-3">
       {monitors.map((m) => (
-        <li key={m.id}>
+        <li key={m.id} className={cn("card-glass relative overflow-hidden rounded-2xl shadow-[var(--shadow-card)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lift motion-reduce:hover:translate-y-0", statusStripe(m))}>
           {renderLink({
             href: hrefFor(m),
             className:
-              "group flex items-center gap-4 px-4 py-4 transition-colors hover:bg-surface/70 sm:px-5 focus-visible:-outline-offset-2",
+              "group flex items-center gap-4 py-4 pl-5 pr-4 sm:pl-6 sm:pr-5 focus-visible:-outline-offset-2",
             children: (
               <>
                 <span
                   aria-hidden="true"
-                  className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ink-soft [&_svg]:size-[18px]"
+                  className={cn("grid size-11 shrink-0 place-items-center rounded-2xl text-white [&_svg]:size-[18px]", m.kind === "page" ? "bg-[linear-gradient(135deg,#1d3fd6,#3b6bff)]" : "bg-[linear-gradient(135deg,#5a2de0,#8a3bff)]")}
                 >
                   {m.kind === "page" ? <Globe /> : <Search />}
                 </span>
@@ -75,14 +90,14 @@ export function MonitorList({
                     <span className="truncate font-medium text-ink">{m.name}</span>
                     <MonitorStatusBadge monitor={m} />
                   </span>
-                  <span className="truncate text-sm text-muted-fg">
+                  <span className="truncate text-sm text-ink-soft">
                     {m.conditionLabel} · {m.targetLabel}
                   </span>
                 </span>
                 <span className="hidden flex-col items-end gap-1 text-right sm:flex">
-                  {m.lastValue ? <span className="font-display font-semibold tabular-nums">{m.lastValue}</span> : null}
+                  {m.lastValue ? <span className="rounded-full bg-tint-blue px-2.5 py-0.5 font-display font-semibold tabular-nums text-[#1d3fd6]">{m.lastValue}</span> : null}
                   <span className="text-xs text-muted-fg">
-                    Vérifiée {formatRelative(m.lastCheckedAt, now)} · {formatInterval(m.intervalMinutes)}
+                    {m.lastCheckedAt ? `Vérifiée ${formatRelative(m.lastCheckedAt, now)}` : "Pas encore vérifiée"} · {formatInterval(m.intervalMinutes)}
                   </span>
                   <ExecutorLabel executor={m.lastExecutor} />
                 </span>

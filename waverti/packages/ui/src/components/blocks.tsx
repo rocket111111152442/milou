@@ -34,22 +34,48 @@ export function HeroBanner({
 }
 
 const tileTones = {
-  blue: "bg-info-soft text-blue",
-  violet: "bg-[#f1e8ff] text-violet",
-  green: "bg-success-soft text-success",
-  amber: "bg-warning-soft text-warning",
-  red: "bg-danger-soft text-danger",
+  blue: "bg-tint-blue text-[#1d3fd6]",
+  violet: "bg-tint-violet text-[#6a1fd6]",
+  green: "bg-tint-green text-success",
+  amber: "bg-tint-amber text-[#8a3b00]",
+  red: "bg-tint-red text-danger",
 } as const;
 export type TileTone = keyof typeof tileTones;
 
-/** Pastille d'icône colorée. */
-export function IconTile({ icon, tone = "blue", className }: { icon: React.ReactNode; tone?: TileTone; className?: string }) {
+/** Version pleine (icône blanche sur dégradé) : accents forts, jamais sous un texte long. */
+const solidTones: Record<TileTone, string> = {
+  blue: "bg-[linear-gradient(135deg,#1d3fd6,#3b6bff)] text-white",
+  violet: "bg-[linear-gradient(135deg,#5a2de0,#8a3bff)] text-white",
+  green: "bg-[linear-gradient(135deg,#0b7350,#14946a)] text-white",
+  amber: "bg-[linear-gradient(135deg,#8a3b00,#c26a00)] text-white",
+  red: "bg-[linear-gradient(135deg,#a8142d,#d4304a)] text-white",
+};
+
+/** Barre d'accent en haut d'une carte, selon la tonalité. */
+export const accentBar: Record<TileTone, string> = {
+  blue: "before:bg-[linear-gradient(90deg,#1d3fd6,#3b9bff)]",
+  violet: "before:bg-[linear-gradient(90deg,#5a2de0,#ed4df5)]",
+  green: "before:bg-[linear-gradient(90deg,#0b7350,#2bc48a)]",
+  amber: "before:bg-[linear-gradient(90deg,#c26a00,#ffb020)]",
+  red: "before:bg-[linear-gradient(90deg,#a8142d,#ff6a85)]",
+};
+
+/** Pastille d'icône colorée (teintée par défaut, `solid` pour une version pleine). */
+export function IconTile({ icon, tone = "blue", solid, className }: { icon: React.ReactNode; tone?: TileTone; solid?: boolean; className?: string }) {
   return (
-    <span aria-hidden="true" className={cn("grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-5", tileTones[tone], className)}>
+    <span aria-hidden="true" className={cn("grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-5", solid ? solidTones[tone] : tileTones[tone], className)}>
       {icon}
     </span>
   );
 }
+
+const statSurface: Record<TileTone, string> = {
+  blue: "border-blue/15 bg-[linear-gradient(135deg,#dfe8ff,#eef2ff)]",
+  violet: "border-violet/15 bg-[linear-gradient(135deg,#ece0ff,#f6efff)]",
+  green: "border-success/15 bg-[linear-gradient(135deg,#d9f3e8,#ecf9f2)]",
+  amber: "border-warning/20 bg-[linear-gradient(135deg,#ffe9c2,#fff4de)]",
+  red: "border-danger/15 bg-[linear-gradient(135deg,#ffdce2,#ffeef1)]",
+};
 
 /** Indicateur clé : un chiffre, une phrase simple, une icône colorée. */
 export function StatTile({
@@ -66,12 +92,12 @@ export function StatTile({
   tone?: TileTone;
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-line/80 bg-white p-5 shadow-[var(--shadow-card)]">
-      <IconTile icon={icon} tone={tone} />
+    <div className={cn("flex items-center gap-4 rounded-2xl border p-5 shadow-[var(--shadow-card)]", statSurface[tone])}>
+      <IconTile icon={icon} tone={tone} solid />
       <div className="min-w-0">
-        <p className="text-sm text-muted-fg">{label}</p>
+        <p className="text-sm font-medium text-ink-soft">{label}</p>
         <p className="font-display text-2xl font-semibold leading-tight text-ink">{value}</p>
-        {hint ? <p className="truncate text-xs text-muted-fg">{hint}</p> : null}
+        {hint ? <p className="truncate text-xs text-ink-soft">{hint}</p> : null}
       </div>
     </div>
   );
@@ -99,15 +125,15 @@ export function Section({
 }) {
   const titleId = id ? `${id}-title` : undefined;
   return (
-    <section id={id} aria-labelledby={titleId} className={cn("rounded-2xl border border-line/80 bg-white p-5 shadow-[var(--shadow-card)] sm:p-6", className)}>
+    <section id={id} aria-labelledby={titleId} className={cn("card-glass relative overflow-hidden rounded-2xl p-5 shadow-[var(--shadow-card)] before:absolute before:inset-x-0 before:top-0 before:h-1 before:content-[''] sm:p-6", accentBar[tone], className)}>
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          {icon ? <IconTile icon={icon} tone={tone} className="size-9 rounded-xl [&_svg]:size-4" /> : null}
+          {icon ? <IconTile icon={icon} tone={tone} solid className="size-9 rounded-xl [&_svg]:size-4" /> : null}
           <div>
             <h2 id={titleId} className="font-display text-lg font-semibold leading-tight">
               {title}
             </h2>
-            {description ? <p className="text-sm text-muted-fg">{description}</p> : null}
+            {description ? <p className="text-sm text-ink-soft">{description}</p> : null}
           </div>
         </div>
         {action ? <div className="shrink-0 text-sm">{action}</div> : null}
@@ -120,7 +146,7 @@ export function Section({
 /** Conseil contextuel : une phrase, jamais un paragraphe. */
 export function Tip({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <p className={cn("flex items-start gap-2.5 rounded-xl bg-info-soft px-3.5 py-3 text-sm leading-relaxed text-ink-soft", className)}>
+    <p className={cn("flex items-start gap-2.5 rounded-xl border border-blue/15 bg-tint-blue px-3.5 py-3 text-sm leading-relaxed text-ink", className)}>
       <Lightbulb className="mt-0.5 size-4 shrink-0 text-blue" aria-hidden="true" />
       <span>{children}</span>
     </p>
