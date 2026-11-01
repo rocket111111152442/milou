@@ -10,7 +10,7 @@ Une étape n'est « réussie » que si son contrôle a été réellement exécut
 | --- | --- |
 | Commit de référence | `337791a` ; branche de développement inchangée depuis. Une branche `release/waverti` existe aussi sur GitHub, au même commit : **si elle est la Production Branch de Vercel, toute poussée dessus déploie en Production** → ne pas y pousser pendant la campagne. |
 | Variables Vercel **Production** (noms) | Présentes : base Neon, Resend, Brave (`BRAVE_API_KEY`), inscription ouverte, bêta `pro:30`, MFA admin. **Absentes : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `WAVERTI_ALLOW_LIVE_PAYMENTS`.** Stripe est donc **inactif en Production** aujourd'hui (aucun paiement, aucun webhook traité). |
-| Correctif isolé | Branche `hotfix/webhook-price-rotation` @ `774c0aa` = `bd42dab` + **uniquement** 2 fichiers (`webhooks.ts` et son test). CI de cette branche : voir §3. |
+| Correctif isolé | Branche `hotfix/webhook-price-rotation` @ `3cc91a7` = `bd42dab` + **uniquement** 2 fichiers (`webhooks.ts` et son test ; 38 lignes ajoutées, 1 modifiée). Une première version (`774c0aa`) a échoué en CI : le test importé portait le montant Pro du nouveau catalogue ; corrigé dans `3cc91a7`. |
 | Non vérifiable par moi | Production Branch ; existence d'abonnés Live ; endpoint webhook Live existant ; version PostgreSQL de Neon ; plan/fenêtre de restauration Neon. |
 
 ## Point préalable à trancher (lecture seule, par vous)
@@ -43,9 +43,9 @@ Les deux jeux de résultats doivent être **identiques**. Preuve de restaurabili
 Retour arrière : supprimer la branche de sauvegarde (aucun effet sur la production).
 
 ## Étape 3 — Publier le correctif de webhook SEUL 🔒 (Vercel Production)
-Changement : déploiement Production du commit **`774c0aa`** (branche `hotfix/webhook-price-rotation`) ; la production passe de `bd42dab` à `bd42dab + 2 fichiers`. Aucun changement visuel, de prix, de base, ni de variable.
-Prérequis : CI verte de `774c0aa`, **sur cette branche** (3 jobs).
-Contrôles : déploiement `READY` ; alias `www.waverti.com` → nouveau `dpl_…` (API Vercel) ; `curl -s https://www.waverti.com/api/health` → `status:"ok"`, `schema.applied = 8` (inchangé) ; `/tarifs` affiche **toujours les anciens prix** (attendu à ce stade) ; `git diff bd42dab 774c0aa --stat` = 2 fichiers.
+Changement : déploiement Production du commit **`3cc91a7`** (branche `hotfix/webhook-price-rotation`) ; la production passe de `bd42dab` à `bd42dab + 2 fichiers`. Aucun changement visuel, de prix, de base, ni de variable.
+Prérequis : CI verte de `3cc91a7`, **sur cette branche** (3 jobs).
+Contrôles : déploiement `READY` ; alias `www.waverti.com` → nouveau `dpl_…` (API Vercel) ; `curl -s https://www.waverti.com/api/health` → `status:"ok"`, `schema.applied = 8` (inchangé) ; `/tarifs` affiche **toujours les anciens prix** (attendu à ce stade) ; `git diff bd42dab 3cc91a7 --stat` = 2 fichiers.
 Retour arrière : Vercel *Instant Rollback* vers `dpl_386L4GePyqMBL55DyXXvUV86WRrY`.
 
 ## Étape 4 — Créer et vérifier les nouveaux prix Stripe Live 🔒 (Stripe Live : écriture)
@@ -94,7 +94,7 @@ Retour arrière : retirer `WAVERTI_ALLOW_LIVE_PAYMENTS` (paiements bloqués, `li
 | # | Opération | Système | Effet |
 | --- | --- | --- | --- |
 | 2 | Branche de sauvegarde | Neon Production | création d'une branche copie ; aucun effet sur la production |
-| 3 | Déploiement `774c0aa` | Vercel Production | alias vers le correctif seul |
+| 3 | Déploiement `3cc91a7` | Vercel Production | alias vers le correctif seul |
 | 4 | 3 nouveaux prix | Stripe Live | création ; rien d'existant modifié |
 | 5 | Transfert de 3 clés | Stripe Live | nouveaux prix deviennent ceux du catalogue |
 | 6 | Migration des prix | Neon Production | 3 UPDATE de montants |
