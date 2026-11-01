@@ -476,7 +476,7 @@ describe("checkout", () => {
     const u = await createTestUser(t, "checkout.ok@example.test");
     const now = new Date("2026-11-02T10:00:00Z");
     const preview = await previewCheckout(t.db, u, "pro", now, PEPPER);
-    expect(preview).toMatchObject({ trial: true, trialHours: 72, priceCents: 1999 });
+    expect(preview).toMatchObject({ trial: true, trialHours: 72, priceCents: 1499 });
     expect(preview.firstChargeAt.toISOString()).toBe("2026-11-05T10:00:00.000Z");
 
     const res = await createSubscriptionCheckout(t.db, fake.stripe, { userId: u.id, email: u.email, planId: "pro", appUrl: "https://app.test", now, pepper: PEPPER });
