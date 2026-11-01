@@ -72,3 +72,65 @@ La Preview suit la même procédure avec `WAVERTI_MIGRATE_TARGET=preview` (la ba
 2. Prix Stripe non vérifiés.
 3. Sauvegarde Neon à faire.
 4. Production Branch de Vercel à vérifier (`main` annoncé).
+
+---
+
+## G. Compléments (vérifications demandées le 1er novembre, soir)
+
+### G1. État de la CI et du commit
+* Commit `34b6b35` : **CI entièrement verte à la première tentative** (typage/lint/tests, E2E web, E2E desktop : succès). Aucun autre commit ne l'a remplacé au moment du contrôle.
+  Un correctif de facturation (voir G3) crée un **nouveau commit de publication** : c'est **lui** qu'il faudra valider, pas `34b6b35`.
+
+### G2. La migration des prix est non destructive (prouvé)
+Test `packages/database/test/price-migration.int.test.ts` : le script ne contient que 3 `UPDATE plans SET price_cents` ; avec deux abonnements et deux comptes présents,
+l'empreinte de **chaque table** est identique avant/après sauf `plans` ; les abonnements restent intacts ; rejouer la migration est sans effet ; le script de retour arrière rétablit les anciens montants.
+
+### G3. Correctif découvert pendant la vérification (à déployer avant de transférer les clés Stripe)
+Après un transfert de clé de recherche, un webhook d'un abonné resté sur l'ancien prix **effaçait ses dates de période**. Corrigé et testé (`webhooks.ts`, test « rotation des prix Stripe »).
+Détails et procédure : `docs/PROCEDURE-STRIPE-PRIX.md`.
+
+### G4. Sauvegarde et restauration
+Outil **lecture seule** : `infra/ops/backup-check.sh` (pg_dump format custom → `pg_restore --list` → restauration dans une base **jetable** d'un autre serveur → comparaison du
+nombre de lignes de chaque table → suppression de la base jetable). Éprouvé en local (9 migrations, restauration concordante). Il refuse un serveur jetable identique à la source.
+* Version : utiliser un `pg_dump` **de version ≥ celle du serveur** (Neon : voir la version du projet), sinon `pg_dump` refuse.
+* Neon (avant la migration) : (a) Console Neon → projet → **Branches** → créer une branche depuis la branche de production (« backup-prix-AAAAMMJJ »), noter son identifiant ; ou en CLI
+  `neonctl branches create --project-id <id> --name backup-prix-AAAAMMJJ --parent <branche-prod>` ; (b) contrôle : se connecter à la branche de sauvegarde et comparer
+  `select count(*)` de `profiles`, `subscriptions`, `monitoring_tasks`, `notifications` avec la production ; (c) en plus, `backup-check.sh` pour un fichier hors Neon.
+* Restauration (si besoin) : Console Neon → **Restore** de la branche de production à l'instant/branche de sauvegarde (en conservant l'ancienne branche sous un autre nom), ou `neonctl branches restore`
+  (options exactes à vérifier avec `neonctl branches restore --help` : non testé ici) ; à défaut `pg_restore --clean --if-exists` du fichier. La fenêtre de restauration dépend du plan Neon : à confirmer dans la Console.
+* Les commandes `neonctl` n'ont pas été exécutées (aucun accès Neon).
+
+### G5. Production Branch de Vercel
+**Non lisible** avec les outils disponibles (le champ n'est exposé ni par `get_project` ni par la liste des projets). Preuve indirecte : sur les ~20 derniers déploiements Production,
+tous viennent de `claude/upbeat-ritchie-sll5u2` ou `codex/public-downloads` (jamais de `main`), et les poussées Git créent des Preview. À contrôler : Vercel → watchly → Settings → Git →
+« Production Branch » (annoncée `main`), et Settings → General → « Build Command » (doit rester vide/par défaut).
+
+### G6. Commandes exactes, dans l'ordre (aucune n'a été lancée)
+```bash
+# 0. Figer le commit de publication et vérifier la CI (GitHub : les 3 jobs verts sur CE commit)
+git fetch origin claude/upbeat-ritchie-sll5u2 && git rev-parse origin/claude/upbeat-ritchie-sll5u2
+
+# 1. Tests locaux
+pnpm turbo typecheck lint && TEST_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres pnpm vitest run
+
+# 2. Sauvegarde (Neon : branche de sauvegarde, §G4) + fichier vérifié
+SOURCE_URL='<url directe prod>' SCRATCH_ADMIN_URL='<serveur jetable, hôte différent>' bash infra/ops/backup-check.sh ./backups
+
+# 3. Prix Stripe : procédure docs/PROCEDURE-STRIPE-PRIX.md puis
+STRIPE_SECRET_KEY='<lecture>' pnpm stripe:prices                      # attendu : 4 conformes
+
+# 4. Migration (simulation puis exécution)
+WAVERTI_MIGRATE_TARGET=production pnpm db:migrate:env                 # attendu : 1 migration en attente (20261102010000)
+WAVERTI_MIGRATE_TARGET=production pnpm db:migrate:env --execute --confirm=<nom-exact-de-la-base>
+
+# 5. Contrôle base : prix + comptages
+psql "$DATABASE_URL_UNPOOLED" -c "select id, price_cents from plans order by 1"   # 999 / 2999 / 1999 / 4999 (ordre alphabétique : business, max, plus, pro)
+
+# 6. Déploiement du commit figé (Vercel → Deployments → ... ou création API sur le SHA exact) — sur autorisation écrite
+
+# 7. Vérifications
+curl -s https://www.waverti.com/api/health          # status ok ; schema.applied = schema.expected = 9
+curl -s https://www.waverti.com/tarifs | grep -o -E '[0-9]+,[0-9]{2} ?€' | sort | uniq -c   # 9,99 / 19,99 / 29,99 / 49,99 uniquement
+```
+**Retour arrière** : code → Vercel *Instant Rollback* vers `dpl_386L4GePyqMBL55DyXXvUV86WRrY` (`bd42dab`) ; base → `db/rollbacks/20261102010000_update_plan_prices.down.sql` puis suppression de la ligne
+`20261102010000` de `waverti_migrations.schema_migrations` ; en dernier recours, restauration Neon (§G4). Stripe : §6 de `PROCEDURE-STRIPE-PRIX.md`.

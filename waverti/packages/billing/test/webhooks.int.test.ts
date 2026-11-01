@@ -531,4 +531,30 @@ describe("checkout", () => {
     const ent = await t.db.select().from(entitlements).where(eq(entitlements.userId, u.id));
     expect(ent.every((e) => e.planId === null)).toBe(true);
   });
+
+  it("rotation des prix Stripe : un abonnement resté sur l'ANCIEN prix garde sa formule et ses dates de période", async () => {
+    const u = await newCustomer();
+    const periodEnd = Math.floor(Date.now() / 1000) + 20 * 86400;
+    const sub = makeSubscription({ customer: u.customer, priceId: PRICES.pro, status: "active", userId: u.id, planId: "pro", periodEnd });
+    fake.state.subscriptions.set(sub.id, sub);
+    let ev = signedEvent(fake.stripe, "customer.subscription.created", sub);
+    await handleStripeWebhook(deps, ev.payload, ev.signature);
+    const before = await loadCurrentSubscription(t.db, u.id);
+    expect(before?.currentPeriodEnd?.getTime()).toBe(periodEnd * 1000);
+
+    // Nouveau prix Stripe (la clé de recherche a été transférée) : la table plans pointe désormais vers lui ;
+    // l'abonnement existant, lui, reste sur l'ancien identifiant de prix.
+    await t.db.update(plans).set({ stripePriceId: "price_pro_NEW_1999" }).where(eq(plans.id, "pro"));
+    try {
+      ev = signedEvent(fake.stripe, "customer.subscription.updated", sub);
+      expect((await handleStripeWebhook(deps, ev.payload, ev.signature)).status).toBe(200);
+      const after = await loadCurrentSubscription(t.db, u.id);
+      expect(after?.planId).toBe("pro");
+      expect(after?.status).toBe("active");
+      expect(after?.currentPeriodEnd?.getTime()).toBe(periodEnd * 1000);
+      expect(await getEntitlements(t.db, u.id)).toMatchObject({ planId: "pro", source: "subscription" });
+    } finally {
+      await t.db.update(plans).set({ stripePriceId: PRICES.pro }).where(eq(plans.id, "pro"));
+    }
+  });
 });
