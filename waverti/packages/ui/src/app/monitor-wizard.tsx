@@ -274,7 +274,21 @@ function intervalOptions(min: number): number[] {
 const STEPS = ["Que surveiller ?", "Vos réglages", "Résumé"] as const;
 
 /** Une couleur d'icône par catégorie : repère visuel sans dépendre du texte. */
-const CATEGORY_TILE = ["bg-info-soft text-blue", "bg-[#f1e8ff] text-violet", "bg-success-soft text-success", "bg-warning-soft text-warning", "bg-danger-soft text-danger"] as const;
+const CATEGORY_TILE = [
+  "bg-[linear-gradient(135deg,#1d3fd6,#3b6bff)] text-white",
+  "bg-[linear-gradient(135deg,#5a2de0,#8a3bff)] text-white",
+  "bg-[linear-gradient(135deg,#0b7350,#14946a)] text-white",
+  "bg-[linear-gradient(135deg,#8a3b00,#c26a00)] text-white",
+  "bg-[linear-gradient(135deg,#a8142d,#d4304a)] text-white",
+] as const;
+/** Fond de chaque tuile de catégorie : teinte douce assortie à son icône (texte sombre dessus, contraste ≥ 12:1). */
+const CATEGORY_SURFACE = [
+  "border-blue/15 bg-[linear-gradient(160deg,#dfe8ff,#f1f5ff)] hover:border-blue/40",
+  "border-violet/15 bg-[linear-gradient(160deg,#ece0ff,#f7f1ff)] hover:border-violet/40",
+  "border-success/15 bg-[linear-gradient(160deg,#d9f3e8,#eef9f4)] hover:border-success/40",
+  "border-warning/20 bg-[linear-gradient(160deg,#ffe9c2,#fff6e3)] hover:border-warning/40",
+  "border-danger/15 bg-[linear-gradient(160deg,#ffdce2,#fff0f2)] hover:border-danger/40",
+] as const;
 
 export function MonitorWizard({
   entitlements,
@@ -509,7 +523,8 @@ export function MonitorWizard({
                   disabled={locked}
                   onClick={() => chooseCategory(c.id)}
                   className={cn(
-                    "group flex flex-col gap-2 rounded-2xl border border-line bg-white p-4 text-left shadow-soft transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60",
+                    "group flex flex-col gap-2 rounded-2xl border p-4 text-left shadow-soft transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60",
+                    CATEGORY_SURFACE[ci % CATEGORY_SURFACE.length],
                   )}
                 >
                   <span className={cn("grid size-10 place-items-center rounded-xl transition-transform group-hover:scale-105 [&_svg]:size-[18px]", CATEGORY_TILE[ci % CATEGORY_TILE.length])}>{c.icon}</span>
@@ -517,7 +532,7 @@ export function MonitorWizard({
                     {c.title}
                     {locked ? <Lock className="size-3.5 text-muted-fg" aria-label="Non inclus dans votre formule" /> : null}
                   </span>
-                  <span className="text-xs leading-snug text-muted-fg">{c.desc}</span>
+                  <span className="text-xs leading-snug text-ink-soft">{c.desc}</span>
                 </button>
               );
             })}

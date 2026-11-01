@@ -12,6 +12,9 @@ import {
   ShieldAlert,
   TriangleAlert,
   Info,
+  Settings,
+  Rocket,
+  Circle,
 } from "lucide-react";
 import { formatDateTime, formatRelative, type OverviewData } from "@waverti/types";
 import { cn } from "../lib/cn";
@@ -104,10 +107,18 @@ export function activityEntries(data: OverviewData, monitorHref: (id: string) =>
   return entries.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, max);
 }
 
+const quickSurface: Record<TileTone, string> = {
+  blue: "border-blue/15 bg-[linear-gradient(135deg,#dfe8ff,#eef2ff)]",
+  violet: "border-violet/15 bg-[linear-gradient(135deg,#ece0ff,#f6efff)]",
+  green: "border-success/15 bg-[linear-gradient(135deg,#d9f3e8,#ecf9f2)]",
+  amber: "border-warning/20 bg-[linear-gradient(135deg,#ffe9c2,#fff4de)]",
+  red: "border-danger/15 bg-[linear-gradient(135deg,#ffdce2,#ffeef1)]",
+};
+
 const attentionStyle: Record<AttentionTone, { box: string; icon: React.ReactNode; tone: TileTone }> = {
-  danger: { box: "border-danger/25 bg-danger-soft/60", icon: <ShieldAlert />, tone: "red" },
-  warning: { box: "border-warning/25 bg-warning-soft/70", icon: <TriangleAlert />, tone: "amber" },
-  info: { box: "border-blue/20 bg-info-soft/70", icon: <Info />, tone: "blue" },
+  danger: { box: "border-danger/25 bg-danger-soft", icon: <ShieldAlert />, tone: "red" },
+  warning: { box: "border-warning/25 bg-warning-soft", icon: <TriangleAlert />, tone: "amber" },
+  info: { box: "border-blue/20 bg-tint-blue", icon: <Info />, tone: "blue" },
 };
 
 export function DashboardView({
@@ -115,7 +126,8 @@ export function DashboardView({
   userName,
   renderLink = defaultRenderLink,
   newMonitorHref = "/app/surveillances/nouvelle",
-  productSearchHref = "/app/produits",
+  productSearchHref,
+  settingsHref = "/app/parametres",
   alertsHref = "/app/alertes",
   subscriptionHref = "/app/abonnement",
   monitorHref = (id: string) => `/app/surveillances/${id}`,
@@ -126,7 +138,9 @@ export function DashboardView({
   userName?: string | null;
   renderLink?: RenderLink;
   newMonitorHref?: string;
+  /** Lien de la recherche de produit : à ne fournir que lorsque la fonction est réellement utilisable. */
   productSearchHref?: string;
+  settingsHref?: string;
   alertsHref?: string;
   subscriptionHref?: string;
   monitorHref?: (id: string) => string;
@@ -161,10 +175,34 @@ export function DashboardView({
         actions={
           <>
             {link(newMonitorHref, <><Plus aria-hidden="true" /> Nouvelle surveillance</>, cn(heroBtn, "bg-white text-ink shadow-soft hover:bg-white/90"))}
-            {link(productSearchHref, <><PackageSearch aria-hidden="true" /> Rechercher un produit</>, cn(heroBtn, "bg-white/15 text-white ring-1 ring-inset ring-white/35 hover:bg-white/25"))}
+            {productSearchHref
+              ? link(productSearchHref, <><PackageSearch aria-hidden="true" /> Rechercher un produit</>, cn(heroBtn, "bg-white/15 text-white ring-1 ring-inset ring-white/35 hover:bg-white/25"))
+              : link(alertsHref, <><Bell aria-hidden="true" /> Mes alertes</>, cn(heroBtn, "bg-white/15 text-white ring-1 ring-inset ring-white/35 hover:bg-white/25"))}
           </>
         }
       />
+
+      {data.activeMonitors === 0 || data.latestResults.length === 0 ? (
+        <Section id="premiers-pas" title="Pour bien démarrer" description="Trois gestes simples, dans l'ordre." icon={<Rocket />} tone="violet">
+          <ol className="grid gap-3 sm:grid-cols-3">
+            {[
+              { done: data.activeMonitors > 0, title: "Créez votre première surveillance", text: "Choisissez ce que vous voulez suivre : un prix, un stock, une page.", href: newMonitorHref, cta: "Commencer" },
+              { done: data.latestResults.length > 0, title: "Laissez Waverti vérifier", text: "Le premier contrôle apparaît ici dès qu'il a eu lieu. Vous n'avez rien à faire.", href: undefined, cta: undefined },
+              { done: false, title: "Choisissez comment être prévenu", text: "E-mail, notification : réglez-le une fois pour toutes.", href: settingsHref, cta: "Régler" },
+            ].map((st, i) => (
+              <li key={st.title} className={cn("flex flex-col gap-2 rounded-2xl border p-4", st.done ? "border-success/20 bg-tint-green" : "border-violet/15 bg-white/70")}>
+                <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+                  {st.done ? <CheckCircle2 className="size-5 text-success" aria-hidden="true" /> : <Circle className="size-5 text-violet" aria-hidden="true" />}
+                  <span className="sr-only">{st.done ? "Fait : " : `Étape ${i + 1} : `}</span>
+                  {st.title}
+                </span>
+                <span className="text-sm text-ink-soft">{st.text}</span>
+                {st.href && st.cta && !st.done ? link(st.href, <>{st.cta} <ChevronRight className="size-4" aria-hidden="true" /></>, "mt-auto inline-flex items-center gap-1 text-sm font-semibold text-blue hover:underline") : null}
+              </li>
+            ))}
+          </ol>
+        </Section>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile label="Surveillances actives" value={data.activeMonitors} icon={<Activity />} tone="blue" hint={data.activeMonitors === 0 ? "Aucune pour l'instant" : undefined} />
@@ -190,7 +228,7 @@ export function DashboardView({
               <ul className="flex flex-col gap-3">
                 {attention.map((a) => (
                   <li key={a.key} className={cn("flex items-start gap-3 rounded-xl border p-4", attentionStyle[a.tone].box)}>
-                    <IconTile icon={attentionStyle[a.tone].icon} tone={attentionStyle[a.tone].tone} className="size-9 rounded-xl [&_svg]:size-4" />
+                    <IconTile icon={attentionStyle[a.tone].icon} tone={attentionStyle[a.tone].tone} solid className="size-9 rounded-xl [&_svg]:size-4" />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-ink">{a.title}</p>
                       {a.detail ? <p className="mt-0.5 text-sm text-ink-soft">{a.detail}</p> : null}
@@ -211,7 +249,7 @@ export function DashboardView({
               <ol className="flex flex-col">
                 {activity.map((e, i) => (
                   <li key={e.key} className={cn("flex items-start gap-3 py-3", i > 0 && "border-t border-line/70")}>
-                    <IconTile icon={e.icon} tone={e.tone} className="size-9 rounded-xl [&_svg]:size-4" />
+                    <IconTile icon={e.icon} tone={e.tone} solid className="size-9 rounded-xl [&_svg]:size-4" />
                     <div className="min-w-0 flex-1">
                       {e.href ? link(e.href, e.text, "font-medium text-ink hover:text-blue") : <p className="font-medium">{e.text}</p>}
                       {e.detail ? <p className="line-clamp-2 text-sm text-muted-fg">{e.detail}</p> : null}
@@ -231,7 +269,7 @@ export function DashboardView({
             <div className="grid grid-cols-2 gap-3">
               {[
                 { href: newMonitorHref, label: "Surveiller une page", icon: <Eye />, tone: "blue" as TileTone },
-                { href: productSearchHref, label: "Rechercher un produit", icon: <PackageSearch />, tone: "violet" as TileTone },
+                ...(productSearchHref ? [{ href: productSearchHref, label: "Rechercher un produit", icon: <PackageSearch />, tone: "violet" as TileTone }] : [{ href: settingsHref, label: "Régler mes notifications", icon: <Settings />, tone: "violet" as TileTone }]),
                 { href: alertsHref, label: "Lire mes alertes", icon: <Bell />, tone: "amber" as TileTone },
                 { href: subscriptionHref, label: "Mon abonnement", icon: <CreditCard />, tone: "green" as TileTone },
               ].map((a) => (
@@ -239,10 +277,10 @@ export function DashboardView({
                   {link(
                     a.href,
                     <>
-                      <IconTile icon={a.icon} tone={a.tone} />
+                      <IconTile icon={a.icon} tone={a.tone} solid />
                       <span className="text-sm font-medium leading-snug text-ink">{a.label}</span>
                     </>,
-                    "flex h-full flex-col items-start gap-3 rounded-2xl border border-line/80 bg-surface p-4 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:bg-white hover:shadow-lift motion-reduce:hover:translate-y-0",
+                    cn("flex h-full flex-col items-start gap-3 rounded-2xl border p-4 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lift motion-reduce:hover:translate-y-0", quickSurface[a.tone]),
                   )}
                 </div>
               ))}

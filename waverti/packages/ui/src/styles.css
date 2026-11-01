@@ -7,7 +7,7 @@
  *
  * Accessibilité des couleurs (WCAG 2.2, calculé) :
  *   - #111118 sur #FFFFFF : 18,9:1
- *   - #6B6B79 sur #FFFFFF : 5,3:1  -> texte secondaire courant (--color-muted-fg)
+ *   - #4F4F62 sur #FFFFFF : 8,1:1 et sur le fond coloré #D6DEF9 : 5,7:1 -> texte secondaire courant (--color-muted-fg)
  *   - #777785 sur #FFFFFF : 4,4:1  -> réservé aux icônes, grands textes et éléments décoratifs
  *   - blanc sur #00E5FF (début du dégradé) : 1,5:1 -> le dégradé n'est jamais utilisé sous du texte
  */
@@ -22,7 +22,7 @@
   --color-line: #e7e8ef;
   --color-line-strong: #d6d8e2;
   --color-muted: #777785;
-  --color-muted-fg: #6b6b79;
+  --color-muted-fg: #4f4f62;
   --color-cyan: #00e5ff;
   --color-blue: #245bff;
   --color-violet: #8028ff;
@@ -36,6 +36,19 @@
   --color-danger-soft: #fdecef;
   --color-info: #245bff;
   --color-info-soft: #edf2ff;
+
+  /* Espace connecté : indigo profond (menu) et fonds teintés. Contrastes calculés : blanc sur #1b1a52 = 16,0:1 ;
+     #c9cdf5 sur #1b1a52 = 10,3:1 ; blanc sur #1d3fd6 = 7,7:1 ; blanc sur #0b7350 = 5,9:1 ; blanc sur #8a3b00 = 7,8:1.
+     Fins de dégradé des icônes pleines (éléments graphiques, seuil 3:1) : #14946a 3,8:1 ; #c26a00 3,9:1 ; #3b6bff 4,4:1. */
+  --color-nav: #1b1a52;
+  --color-nav-soft: #2b2a78;
+  --color-nav-fg: #c9cdf5;
+  --color-tint-blue: #dfe8ff;
+  --color-tint-violet: #ece0ff;
+  --color-tint-green: #d9f3e8;
+  --color-tint-amber: #ffe9c2;
+  --color-tint-pink: #fde0fb;
+  --color-tint-red: #ffdce2;
 
   --font-sans: var(--font-inter, "Inter Variable"), "Inter", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", sans-serif;
@@ -185,12 +198,27 @@
     opacity: 0;
     transform: translateY(16px);
   }
-  /* Fond de l'espace connecté : bleu très pâle avec deux halos de couleur discrets (jamais sous du texte long). */
+  /* Fond de l'espace connecté : lavis de couleurs (bleu, violet, cyan) plutôt que du blanc. */
   .app-canvas {
     background:
-      radial-gradient(60rem 28rem at 8% -6%, rgb(36 91 255 / 0.10), transparent 60%),
-      radial-gradient(48rem 24rem at 100% 0%, rgb(128 40 255 / 0.08), transparent 62%),
-      var(--color-canvas);
+      radial-gradient(56rem 30rem at 6% -8%, rgb(36 91 255 / 0.22), transparent 62%),
+      radial-gradient(46rem 28rem at 100% 2%, rgb(128 40 255 / 0.18), transparent 62%),
+      radial-gradient(50rem 30rem at 55% 108%, rgb(0 229 255 / 0.16), transparent 60%),
+      #d6def9;
+    background-attachment: fixed;
+  }
+  /* Menu latéral de marque : indigo profond avec un reflet coloré. */
+  .sidebar-brand {
+    background:
+      radial-gradient(18rem 14rem at 0% 0%, rgb(36 91 255 / 0.45), transparent 70%),
+      radial-gradient(16rem 16rem at 100% 100%, rgb(237 77 245 / 0.28), transparent 70%),
+      linear-gradient(180deg, var(--color-nav) 0%, #231f66 100%);
+  }
+  /* Carte « verre » : blanc translucide sur le fond coloré (le texte reste sur un fond clair, contraste ≥ 8:1). */
+  .card-glass {
+    background: rgb(255 255 255 / 0.62);
+    border: 1px solid rgb(255 255 255 / 0.75);
+    backdrop-filter: blur(10px);
   }
   .hero-banner {
     background:
