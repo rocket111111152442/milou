@@ -188,7 +188,7 @@ export function HomeBusiness() {
               <Button asChild variant="secondary">
                 <Link href="/entreprises">Découvrir Waverti Business</Link>
               </Button>
-              <span className="text-sm text-muted-fg">39,99 € par mois TTC</span>
+              <span className="text-sm text-muted-fg">49,99 € par mois TTC</span>
             </div>
           </div>
           <ul className="flex flex-col gap-3">
@@ -300,7 +300,7 @@ export function HomeFinalCta() {
                 Commencer <ArrowRight aria-hidden="true" />
               </Link>
             </Button>
-            <p className="text-[13px] text-muted-fg">Essai gratuit de 3 jours, carte demandée, puis à partir de 5,99 € par mois.</p>
+            <p className="text-[13px] text-muted-fg">Essai gratuit de 3 jours, carte demandée, puis à partir de 9,99 € par mois.</p>
           </div>
         </div>
       </Container>

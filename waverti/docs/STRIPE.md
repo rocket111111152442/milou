@@ -8,10 +8,10 @@ accord écrit et validation juridique).
 
 | Formule | Prix TTC / mois | Clé de recherche (lookup key) | Essai |
 | --- | --- | --- | --- |
-| Plus | 5,99 € | `waverti_plus_monthly` | 72 h, carte requise |
-| Pro | 14,99 € | `waverti_pro_monthly` | 72 h, carte requise |
+| Plus | 9,99 € | `waverti_plus_monthly` | 72 h, carte requise |
+| Pro | 19,99 € | `waverti_pro_monthly` | 72 h, carte requise |
 | Max | 29,99 € | `waverti_max_monthly` | 72 h, carte requise |
-| Business | 39,99 € | `waverti_business_monthly` | 72 h, carte requise |
+| Business | 49,99 € | `waverti_business_monthly` | 72 h, carte requise |
 
 Le code ne contient **aucun identifiant `price_`** : à chaque création de paiement et à chaque changement de
 formule, le serveur recherche le prix par sa clé de recherche et vérifie qu'il est actif, en EUR, mensuel

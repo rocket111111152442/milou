@@ -31,7 +31,7 @@ describe.skipIf(!MOCK)("stripe-mock contract", () => {
     const realList = stripe.prices.list.bind(stripe.prices);
     stripe.prices.list = (async (params: unknown) => {
       const r = await realList(params as never);
-      return { ...r, data: [{ ...r.data[0]!, id: "price_1PlusTest", active: true, currency: "eur", type: "recurring", unit_amount: 599, tax_behavior: "inclusive", recurring: { interval: "month", interval_count: 1, usage_type: "licensed" }, lookup_key: "waverti_plus_monthly" }] };
+      return { ...r, data: [{ ...r.data[0]!, id: "price_1PlusTest", active: true, currency: "eur", type: "recurring", unit_amount: 999, tax_behavior: "inclusive", recurring: { interval: "month", interval_count: 1, usage_type: "licensed" }, lookup_key: "waverti_plus_monthly" }] };
     }) as typeof stripe.prices.list;
     const u = await createTestUser(t, "contract@example.test");
     const res = await createSubscriptionCheckout(t.db, stripe, { userId: u.id, email: u.email, planId: "plus", appUrl: "https://app.test", pepper: PEPPER });

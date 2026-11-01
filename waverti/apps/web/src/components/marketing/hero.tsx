@@ -59,7 +59,7 @@ export function Hero() {
             </Button>
           </div>
           <p style={delay(0.3)} className="animate-fade-up mt-4 text-[13px] text-muted-fg">
-            3 jours d'essai gratuit, puis à partir de 5,99 € par mois. Sans engagement.{" "}
+            3 jours d'essai gratuit, puis à partir de 9,99 € par mois. Sans engagement.{" "}
             <Link href="#tarifs" className="font-medium text-ink underline-offset-4 hover:underline">
               Voir les abonnements
             </Link>

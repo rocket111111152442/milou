@@ -53,8 +53,8 @@ en parallèle (réservations exclusives) ; `WORKER_ROLES` permet de spécialiser
 
 ## 4. Stripe — MODE TEST [humain]
 
-1. Prix mensuels TTC en EUR, avec leurs clés de recherche : `waverti_plus_monthly` (5,99 €),
-   `waverti_pro_monthly` (14,99 €), `waverti_max_monthly` (29,99 €), `waverti_business_monthly` (39,99 €).
+1. Prix mensuels TTC en EUR, avec leurs clés de recherche : `waverti_plus_monthly` (9,99 €),
+   `waverti_pro_monthly` (19,99 €), `waverti_max_monthly` (29,99 €), `waverti_business_monthly` (49,99 €).
    Quatre formules uniquement : l'ancienne option `waverti_business_extra_site_monthly` est abandonnée (voir
    `docs/STRIPE.md` pour l'archiver). Vérification (lecture seule, de préférence avec une clé restreinte `rk_` en lecture des prix) :
    `STRIPE_SECRET_KEY=… pnpm stripe:prices` ; enregistrement des `price_` en base : ajouter `--write` avec `DATABASE_URL`.

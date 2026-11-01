@@ -6,7 +6,7 @@ import { getPublicPlans } from "@/lib/plans";
 export const metadata: Metadata = {
   title: "Tarifs",
   description:
-    "Formules Waverti : Plus 5,99 €/mois, Pro 14,99 €/mois et Business 39,99 €/mois, sans engagement. Chaque formule s'essaie gratuitement pendant 3 jours.",
+    "Formules Waverti : Plus 9,99 €/mois, Pro 19,99 €/mois et Business 49,99 €/mois, sans engagement. Chaque formule s'essaie gratuitement pendant 3 jours.",
   alternates: { canonical: "/tarifs" },
 };
 

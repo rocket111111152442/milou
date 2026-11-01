@@ -8,10 +8,10 @@ const price = (over: Record<string, unknown> = {}) =>
 describe("contrôle des prix Stripe avant paiement", () => {
   it("quatre formules, clés de recherche et montants du catalogue", () => {
     expect(PAID_PLAN_IDS.map((id) => [PLAN_CATALOG[id].stripeLookupKey, PLAN_CATALOG[id].priceCents])).toEqual([
-      ["waverti_plus_monthly", 599],
-      ["waverti_pro_monthly", 1499],
+      ["waverti_plus_monthly", 999],
+      ["waverti_pro_monthly", 1999],
       ["waverti_max_monthly", 2999],
-      ["waverti_business_monthly", 3999],
+      ["waverti_business_monthly", 4999],
     ]);
   });
   it("accepte un prix conforme (EUR, mensuel, montant exact, TTC ou non précisé)", () => {

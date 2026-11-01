@@ -34,7 +34,7 @@ test.describe("site public", () => {
     await main.getByRole("link", { name: "Voir comment ça marche" }).click();
     await expect(page).toHaveURL(/#comment-ca-marche$/);
     await expect(page.getByRole("heading", { name: "Comment ça marche", exact: true })).toBeInViewport();
-    for (const price of ["5,99 €", "14,99 €", "29,99 €", "39,99 €"]) await expect(main.getByText(price).first()).toBeVisible();
+    for (const price of ["9,99 €", "19,99 €", "29,99 €", "49,99 €"]) await expect(main.getByText(price).first()).toBeVisible();
     for (const plan of ["plus", "pro", "max", "business"]) await expect(main.locator(`a[href="/inscription?formule=${plan}"]`)).toHaveCount(1);
     await expect(main.getByRole("link", { name: /Découvrir Waverti Business/ })).toHaveAttribute("href", "/entreprises");
     // Aucun téléchargement proposé depuis l'accueil tant qu'aucune version n'est publiée.
@@ -66,7 +66,7 @@ test.describe("site public", () => {
 
   test("tarifs : 4 formules payantes avec essai de 3 jours, aucune formule gratuite", async ({ page }) => {
     await page.goto("/tarifs");
-    for (const price of ["5,99 €", "14,99 €", "29,99 €", "39,99 €"]) await expect(page.getByText(price, { exact: false }).first()).toBeVisible();
+    for (const price of ["9,99 €", "19,99 €", "29,99 €", "49,99 €"]) await expect(page.getByText(price, { exact: false }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /Essayer Max gratuitement pendant 3 jours/ })).toBeVisible();
     await expect(page.getByText("0 €", { exact: true })).toHaveCount(0);
     await expect(page.getByText(/pour toujours|sans carte bancaire/i)).toHaveCount(0);
