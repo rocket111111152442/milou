@@ -13,3 +13,6 @@ dist/
 .DS_Store
 *firebase-adminsdk*.json
 **/secrets/
+
+# Cache de build Turborepo (généré à la racine quand turbo est lancé depuis waverti/)
+.turbo/
