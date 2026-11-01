@@ -11,7 +11,8 @@
     "./business": "./src/business/index.ts",
     "./browser": "./src/browser/index.ts",
     "./engine": "./src/engine.ts",
-    "./robots-rules": "./src/net/robots-rules.ts"
+    "./robots-rules": "./src/net/robots-rules.ts",
+    "./products": "./src/products/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
