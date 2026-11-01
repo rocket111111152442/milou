@@ -216,3 +216,13 @@ par durée de validité (6 h par défaut, 24 h au plus).
   contrôle en euros de la recherche de sujets reste non atomique (existant).
 - Les listes de sites non marchands et de motifs de pages non produit sont courtes et à compléter avec des cas réels.
 - Aucune table, aucune migration ; les réglages sont lus avec des valeurs par défaut (50 $, 5 000 micro-dollars).
+
+
+## Lot 4 — conformité Brave et persistance (préparation)
+
+* Conformité : voir `docs/BRAVE-CONFORMITE.md` (aucun résultat Brave conservé sans droits ; défaut sûr).
+* Catalogue PostgreSQL préparé, **non appliqué** : `db/migrations-pending/` (identités, marchands, offres, prix vérifiés,
+  historique des variations, provenance, rétention, révocation). Testé sur base jetable
+  (`packages/database/test/pending-migrations.int.test.ts`). Inerte même une fois promu : `source_policies` refuse toute écriture
+  tant qu'aucune source n'est autorisée avec une référence de justificatif.
+* Test réel unique : `packages/monitoring/src/products/live-test.ts` (non exécuté).

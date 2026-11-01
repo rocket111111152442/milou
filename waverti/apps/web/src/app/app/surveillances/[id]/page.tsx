@@ -111,15 +111,20 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
                 ) : (
                   <ul className="flex flex-col divide-y divide-line">
                     {latestWeb.findings.slice(0, 8).map((f) => (
-                      <li key={f.fingerprint + f.url} className="flex flex-col gap-1 py-3">
+                      <li key={f.fingerprint} className="flex flex-col gap-1 py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge tone={CLASS_TONE[f.classification]}>{STATUS_LABELS[f.classification === "irrelevant" ? "none" : f.classification]}</Badge>
-                          <span className="text-xs text-muted-fg">{f.domain}</span>
+                          {f.domain ? <span className="text-xs text-muted-fg">{f.domain}</span> : null}
                         </div>
-                        <a href={f.url} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 font-medium hover:text-blue">
-                          {f.title} <ExternalLink className="size-3.5" aria-hidden="true" />
-                        </a>
-                        <p className="text-sm text-muted-fg">{f.snippet}</p>
+                        {f.url ? (
+                          <a href={f.url} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 font-medium hover:text-blue">
+                            {f.title} <ExternalLink className="size-3.5" aria-hidden="true" />
+                          </a>
+                        ) : (
+                          <p className="font-medium">Information détectée (détail non conservé)</p>
+                        )}
+                        {f.snippet ? <p className="text-sm text-muted-fg">{f.snippet}</p> : null}
+                        {f.redacted ? <p className="text-xs text-muted-fg">Le titre et l'adresse du résultat de recherche ne sont pas conservés, conformément aux conditions du fournisseur de recherche.</p> : null}
                         {f.reasons[0] ? <p className="text-xs text-muted-fg">Pourquoi : {f.reasons[0]}</p> : null}
                       </li>
                     ))}

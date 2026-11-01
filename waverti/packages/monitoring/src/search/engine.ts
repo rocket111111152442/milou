@@ -17,6 +17,7 @@ import { classifyResult, meetsThreshold, topicStatus } from "./classify";
 import { BudgetExceededError } from "./errors";
 import { reserveBraveCall } from "./reserve";
 import { loadBraveGlobalCap, settingNumber } from "./settings";
+import { redactFinding, type BraveStorageRights } from "./storage-policy";
 
 export const SEARCH_CACHE_TTL_SECONDS = 6 * 3600;
 
@@ -43,6 +44,11 @@ export interface WebRunDeps {
   quotaPeriod?: string;
   /** Numéro de tentative du travail (> 1 : nouvelle tentative après une erreur temporaire). */
   attempt?: number;
+  /**
+   * Droits de stockage des résultats Brave (voir storage-policy.ts). « none » (défaut) : aucun cache, et aucun titre,
+   * extrait, adresse ni domaine de résultat n'est conservé dans l'historique, les éléments déjà vus ni les alertes.
+   */
+  storageRights?: BraveStorageRights;
   now?: Date;
 }
 
@@ -84,8 +90,12 @@ async function reserveSearch(deps: WebRunDeps, userId: string, costMicros: numbe
 export async function cachedSearch(deps: WebRunDeps, userId: string, query: string): Promise<{ items: SearchResultItem[]; fromCache: boolean }> {
   if (!deps.provider) throw new SearchProviderError("Aucun moteur de recherche configuré (BRAVE_SEARCH_API_KEY absente)", false);
   const hash = queryHash(deps.provider.name, query);
-  const hit = await deps.db.execute<{ results: SearchResultItem[] }>(sql`
-    update search_cache set hit_count = hit_count + 1 where query_hash = ${hash} and expires_at > now() returning results`);
+  const mayStore = deps.storageRights === "granted";
+  // Sans droits de stockage : le cache de résultats est désactivé (lecture comme écriture).
+  const hit = mayStore
+    ? await deps.db.execute<{ results: SearchResultItem[] }>(sql`
+    update search_cache set hit_count = hit_count + 1 where query_hash = ${hash} and expires_at > now() returning results`)
+    : [];
   if (hit[0]) {
     await deps.db.execute(sql`
       insert into api_usage (provider, user_id, plan_id, units, estimated_cost_micros, executed_by, cache_hit, meta)
@@ -127,10 +137,12 @@ export async function cachedSearch(deps: WebRunDeps, userId: string, query: stri
     providerQuotaRemaining: okMeta?.quotaRemaining ?? null,
     providerQuotaLimit: okMeta?.quotaLimit ?? null,
   });
-  await deps.db.execute(sql`
+  if (mayStore) {
+    await deps.db.execute(sql`
     insert into search_cache (query_hash, provider, query, results, fetched_at, expires_at)
     values (${hash}, ${deps.provider.name}, ${query.slice(0, 400)}, ${JSON.stringify(items)}::jsonb, now(), now() + make_interval(secs => ${SEARCH_CACHE_TTL_SECONDS}))
     on conflict (query_hash) do update set results = excluded.results, fetched_at = now(), expires_at = excluded.expires_at`);
+  }
   await deps.db.execute(sql`
     insert into api_usage (provider, user_id, plan_id, units, estimated_cost_micros, executed_by, cache_hit, meta)
     values ('brave_search', ${userId}, ${deps.planId}, 1, ${cost}, 'cloud', false, ${JSON.stringify({ q: hash.slice(0, 16) })}::jsonb)`);
@@ -146,6 +158,8 @@ export async function runWebTopic(deps: WebRunDeps, task: WebTopicTask): Promise
   const now = deps.now ?? new Date();
   const query = task.queries[task.runIndex % Math.max(1, task.queries.length)] ?? task.condition.subject;
   const { items, fromCache } = await cachedSearch(deps, task.userId, query);
+  // `findings` (contenu complet des résultats) ne sert qu'en mémoire, le temps de l'évaluation ; ce qui est conservé est `stored`.
+  const mayStore = deps.storageRights === "granted";
   const findings = items.map((i) => classifyResult(i, task.condition, task.officialDomains)).filter((f) => f.classification !== "irrelevant");
 
   const seen = findings.length
@@ -159,7 +173,7 @@ export async function runWebTopic(deps: WebRunDeps, task: WebTopicTask): Promise
   if (fresh.length) {
     await deps.db
       .insert(monitoringSeenItems)
-      .values(fresh.map((f) => ({ taskId: task.id, userId: task.userId, fingerprint: f.fingerprint, url: f.url, title: f.title, classification: f.classification })))
+      .values(fresh.map((f) => ({ taskId: task.id, userId: task.userId, fingerprint: f.fingerprint, url: mayStore ? (f.url ?? "") : "", title: mayStore ? f.title : null, classification: f.classification })))
       .onConflictDoNothing();
   }
   const status = topicStatus(findings);
@@ -167,7 +181,7 @@ export async function runWebTopic(deps: WebRunDeps, task: WebTopicTask): Promise
     kind: "web_topic",
     queries: [query],
     status,
-    findings: findings.slice(0, 30),
+    findings: (mayStore ? findings : findings.map(redactFinding)).slice(0, 30),
     newFingerprints: fresh.map((f) => f.fingerprint).slice(0, 30),
     provider: deps.provider?.name ?? "none",
     fromCache,
@@ -182,11 +196,21 @@ export async function runWebTopic(deps: WebRunDeps, task: WebTopicTask): Promise
     status === "none"
       ? "Aucune information pertinente trouvée."
       : `${STATUS_LABELS[status]} — ${findings.length} résultat(s) pertinent(s), ${fresh.length} nouveau(x).`;
+  // Sans droits de stockage, rien du contenu d'un résultat n'entre dans l'évaluation (donc ni dans l'alerte, ni dans
+  // l'historique, ni dans l'e-mail conservé) : seulement la classification et le niveau de source.
+  const TIER_LABEL: Record<string, string> = { official: "officielle", reference: "de référence", media: "média", community: "communautaire", unknown: "non vérifiée" };
+  const summaryOfBest = (b: WebFinding) => `${b.classification === "confirmed" ? "Information confirmée" : "Information probable"}${mayStore ? ` : ${b.title}` : " détectée"}`;
+  const bodyOfBest = (b: WebFinding) =>
+    mayStore
+      ? `${b.title}${b.extractedDate ? ` (date mentionnée : ${b.extractedDate})` : ""}. Source : ${b.domain}. ${b.reasons[0] ?? ""}`.trim()
+      : `Une information ${b.classification === "confirmed" ? "confirmée" : "probable"} a été détectée (source ${TIER_LABEL[b.sourceTier] ?? "non vérifiée"}). ${b.reasons[0] ?? ""} Le titre et l'adresse du résultat ne sont pas conservés, conformément aux conditions du fournisseur de recherche.`.replace(/\s+/g, " ").trim();
+  const changeOf = (list: WebFinding[]) =>
+    mayStore ? { findings: list.slice(0, 5).map((f) => ({ url: f.url, title: f.title, classification: f.classification })) } : { redacted: true, findings: list.slice(0, 5).map((f) => ({ classification: f.classification })) };
   const evaluation: Evaluation = best
     ? {
         outcome: "triggered",
         triggered: true,
-        summary: `${best.classification === "confirmed" ? "Information confirmée" : "Information probable"} : ${best.title}`,
+        summary: summaryOfBest(best),
         value: STATUS_LABELS[best.classification === "confirmed" ? "confirmed" : "probable"],
         alert: {
           kind: "web_topic",
@@ -194,9 +218,9 @@ export async function runWebTopic(deps: WebRunDeps, task: WebTopicTask): Promise
             best.classification === "confirmed"
               ? `Confirmé : nouvelle information sur « ${task.condition.subject} »`
               : `Nouvelle information probable sur « ${task.condition.subject} »`,
-          body: `${best.title}${best.extractedDate ? ` (date mentionnée : ${best.extractedDate})` : ""}. Source : ${best.domain}. ${best.reasons[0] ?? ""}`.trim(),
+          body: bodyOfBest(best),
         },
-        changeSummary: { sourceUrl: best.url, findings: alertable.slice(0, 5).map((f) => ({ url: f.url, title: f.title, classification: f.classification })) },
+        changeSummary: mayStore ? { sourceUrl: best.url, ...changeOf(alertable) } : changeOf(alertable),
         errorCode: null,
       }
     : {
@@ -205,7 +229,7 @@ export async function runWebTopic(deps: WebRunDeps, task: WebTopicTask): Promise
         summary,
         value: STATUS_LABELS[status],
         alert: null,
-        changeSummary: fresh.length ? { findings: fresh.slice(0, 5).map((f) => ({ url: f.url, title: f.title, classification: f.classification })) } : null,
+        changeSummary: fresh.length ? changeOf(fresh) : null,
         errorCode: null,
       };
   return { observation, evaluation };

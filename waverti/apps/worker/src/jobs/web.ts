@@ -1,7 +1,7 @@
 import { count, eq, monitoringResults, monitoringTargets, monitoringTasks, sql } from "@waverti/database";
 import { getEntitlements, loadCurrentSubscription, searchQuotaWindow } from "@waverti/billing";
 import { claimCloudJobs, StaleClaimError, submitResult } from "@waverti/monitoring";
-import { BudgetExceededError, runWebTopic, SearchProviderError } from "@waverti/monitoring/search";
+import { braveStorageRightsFromEnv, BudgetExceededError, runWebTopic, SearchProviderError } from "@waverti/monitoring/search";
 import { webTopicConditionSchema } from "@waverti/types";
 import type { WorkerContext } from "../context";
 import { logger } from "../logger";
@@ -28,7 +28,7 @@ export async function processWebJobs(ctx: WorkerContext): Promise<number> {
       submitResult(ctx.db, { jobId: claim.jobId, claimToken: claim.claimToken, executor: "cloud", durationMs: Date.now() - started, error: { code, message } });
     try {
       const { observation, evaluation } = await runWebTopic(
-        { db: ctx.db, provider: ctx.search, planId: ent.planId, monthlyCallLimit: quota.limit, dailyCallLimit: quota.dailyLimit, quotaPeriod: quota.period, attempt: claim.attempts },
+        { db: ctx.db, provider: ctx.search, planId: ent.planId, monthlyCallLimit: quota.limit, dailyCallLimit: quota.dailyLimit, quotaPeriod: quota.period, attempt: claim.attempts, storageRights: braveStorageRightsFromEnv(process.env) },
         {
           id: task.id,
           userId: task.userId,

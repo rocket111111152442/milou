@@ -16,13 +16,12 @@ import { SearchProviderError, type SearchProvider, type SearchResponseMeta, type
 import { BudgetExceededError } from "../../search/errors";
 import { reserveBraveCall, type Reservation } from "../../search/reserve";
 import { loadBraveGlobalCap } from "../../search/settings";
+import { braveStorageRightsFromEnv, type BraveStorageRights } from "../../search/storage-policy";
 
-export type StorageRights = "none" | "granted";
+export type StorageRights = BraveStorageRights;
 
-/** Les droits de stockage ne sont jamais présumés : seule la valeur « granted » les active. */
-export function storageRightsFromEnv(env: Record<string, string | undefined> = process.env): StorageRights {
-  return env.WAVERTI_BRAVE_STORAGE_RIGHTS === "granted" ? "granted" : "none";
-}
+/** Les droits de stockage ne sont jamais présumés : seule la valeur « granted » les active (source unique : search/storage-policy). */
+export const storageRightsFromEnv = braveStorageRightsFromEnv;
 
 export const CACHE_PROVIDER = "brave_products";
 export const DEFAULT_CACHE_TTL_SECONDS = 6 * 3600;

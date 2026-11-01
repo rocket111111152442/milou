@@ -50,8 +50,14 @@ export type PageObservation = z.infer<typeof pageObservationSchema>;
 export const findingClassificationSchema = z.enum(["confirmed", "probable", "rumor", "irrelevant"]);
 export type FindingClassification = z.infer<typeof findingClassificationSchema>;
 
+/**
+ * Un constat issu d'une recherche. Tant que les droits de stockage de Brave ne sont pas confirmés, l'adresse, le titre,
+ * l'extrait, le domaine et les dates tirés du résultat ne sont PAS conservés : `redacted: true`, `url: null`, textes vides.
+ * Seuls la classification, le niveau de source et l'empreinte (hachage) restent, pour la déduplication.
+ */
 export const webFindingSchema = z.object({
-  url: z.string().url(),
+  url: z.string().url().nullable(),
+  redacted: z.boolean().optional(),
   title: z.string().max(300),
   snippet: z.string().max(1000),
   domain: z.string().max(255),

@@ -36,11 +36,58 @@ async function task(userId: string, over: Record<string, unknown> = {}) {
   return { id: row!.id, userId, name: "Aurora", condition, queries: ['"Projet Aurora" date de sortie officielle'], officialDomains: ["editeur.example"], runIndex: 0, ...over };
 }
 
+describe("web topic engine — sans droits de stockage Brave (comportement par défaut)", () => {
+  const officialThenForum = () => [r("editeur.example", "Projet Aurora sortira le 14 mars 2027", "Communiqué officiel"), r("forum-jeux.example", "Projet Aurora le 14 mars 2027 ?", "rumeur")];
+
+  it("ne conserve aucun titre, extrait, adresse ni domaine de résultat, mais détecte, classe et alerte comme avant", async () => {
+    const u = await createTestUser(t);
+    const provider = fakeProvider(officialThenForum());
+    const deps: WebRunDeps = { db: t.db, provider, planId: "pro", monthlyCallLimit: 100, dailyCallLimit: null }; // droits non précisés = aucun
+    const tk = await task(u.id, { queries: ["aurora sans droits"] });
+    const run = await runWebTopic(deps, tk);
+    // Détection et décision intactes
+    expect(run.observation.status).toBe("confirmed");
+    expect(run.evaluation.triggered).toBe(true);
+    expect(run.evaluation.alert?.title).toMatch(/^Confirmé : nouvelle information sur « Projet Aurora »/);
+    // …mais rien du résultat n'est dans ce qui sera conservé
+    const kept = JSON.stringify({ o: run.observation, e: run.evaluation });
+    for (const secret of ["editeur.example", "forum-jeux.example", "Communiqué officiel", "rumeur", "sortira le 14 mars", "https://"]) expect(kept, secret).not.toContain(secret);
+    expect(run.observation.findings.every((f) => f.redacted === true && f.url === null && f.title === "" && f.snippet === "" && f.domain === "")).toBe(true);
+    expect(run.observation.findings.map((f) => f.classification).sort()).toEqual(["confirmed", "rumor"]);
+    expect(run.evaluation.changeSummary).toMatchObject({ redacted: true });
+    expect(JSON.stringify(run.evaluation.changeSummary)).not.toMatch(/url|title|sourceUrl/);
+    // Base : aucun cache, éléments déjà vus sans adresse ni titre (seule l'empreinte reste)
+    expect(await t.client`select count(*)::int as n from search_cache where query like '%aurora sans droits%'`).toEqual([{ n: 0 }]);
+    const seen = await t.client<{ url: string; title: string | null; fingerprint: string }[]>`select url, title, fingerprint from monitoring_seen_items where task_id = ${tk.id}`;
+    expect(seen).toHaveLength(2);
+    expect(seen.every((x) => x.url === "" && x.title === null && /^[0-9a-f]{40}$/.test(x.fingerprint))).toBe(true);
+  });
+
+  it("ne signale jamais deux fois la même information (déduplication par empreinte, sans contenu conservé)", async () => {
+    const u = await createTestUser(t);
+    const provider = fakeProvider(officialThenForum());
+    const deps: WebRunDeps = { db: t.db, provider, planId: "pro", monthlyCallLimit: 100, dailyCallLimit: null };
+    const tk = await task(u.id, { queries: ["aurora dedup"] });
+    expect((await runWebTopic(deps, tk)).evaluation.triggered).toBe(true);
+    expect((await runWebTopic(deps, tk)).evaluation.triggered).toBe(false);
+  });
+
+  it("deux recherches identiques = deux appels payants (pas de cache), chacun décompté à son utilisateur", async () => {
+    const [a, b] = [await createTestUser(t), await createTestUser(t)];
+    const provider = fakeProvider(officialThenForum());
+    const deps: WebRunDeps = { db: t.db, provider, planId: "pro", monthlyCallLimit: 100, dailyCallLimit: null };
+    await runWebTopic(deps, await task(a.id, { queries: ["aurora partagee non"] }));
+    await runWebTopic(deps, await task(b.id, { queries: ["aurora partagee non"] }));
+    expect(provider.calls).toBe(2);
+    expect(await t.client`select count(*)::int as n from search_cache`).toEqual([{ n: 0 }]);
+  });
+});
+
 describe("web topic engine", () => {
   it("only alerts on official confirmation when required, and never twice for the same information", async () => {
     const u = await createTestUser(t);
     const provider = fakeProvider([r("forum-jeux.example", "Projet Aurora le 14 mars 2027 ?"), r("numerama.com", "Projet Aurora : sortie en mars 2027", "Le studio vise mars 2027")]);
-    const deps: WebRunDeps = { db: t.db, provider, planId: "pro", monthlyCallLimit: 100, dailyCallLimit: null };
+    const deps: WebRunDeps = { db: t.db, provider, planId: "pro", monthlyCallLimit: 100, dailyCallLimit: null, storageRights: "granted" };
     const tk = await task(u.id);
     const first = await runWebTopic(deps, tk);
     expect(first.observation.status).toBe("probable");
@@ -62,7 +109,7 @@ describe("web topic engine", () => {
     const a = await createTestUser(t);
     const b = await createTestUser(t);
     const provider = fakeProvider([r("numerama.com", "Projet Aurora en mars 2027", "Le studio vise mars 2027")]);
-    const depsA: WebRunDeps = { db: t.db, provider, planId: "pro", monthlyCallLimit: 100, dailyCallLimit: null };
+    const depsA: WebRunDeps = { db: t.db, provider, planId: "pro", monthlyCallLimit: 100, dailyCallLimit: null, storageRights: "granted" };
     await runWebTopic(depsA, await task(a.id, { queries: ["requete partagee aurora"] }));
     await runWebTopic({ ...depsA }, await task(b.id, { queries: ["Requete   PARTAGEE aurora"] }));
     expect(provider.calls).toBe(1);

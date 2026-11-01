@@ -2,6 +2,7 @@ import { sql } from "@waverti/database";
 import { purgeExpiredSessions } from "@waverti/auth";
 import { recomputeEntitlements } from "@waverti/billing";
 import { compactPageResults } from "@waverti/monitoring";
+import { braveStorageRightsFromEnv, enforceBraveStoragePolicy } from "@waverti/monitoring/search";
 import type { WorkerContext } from "../context";
 import { logger } from "../logger";
 
@@ -60,6 +61,13 @@ export async function runMaintenance(ctx: WorkerContext): Promise<void> {
       select id from api_usage where occurred_at < now() - make_interval(days => ${usageDays}) limit ${n}) returning id`);
   await ctx.db.execute(sql`delete from rate_limits where window_start < now() - make_interval(hours => ${rlHours})`);
   await ctx.db.execute(sql`delete from search_cache where expires_at < now() - interval '1 day'`);
+  // Conformité Brave : sans droits de stockage confirmés, aucun résultat de recherche ne doit rester en base
+  // (caches, titres et adresses des éléments déjà vus et de l'historique des recherches de sujets).
+  const braveRights = braveStorageRightsFromEnv(process.env);
+  if (braveRights === "none") {
+    const c = await enforceBraveStoragePolicy(ctx.db, braveRights);
+    if (c.searchCacheRows || c.seenItemsScrubbed || c.resultsScrubbed) logger.info({ ...c }, "brave storage policy enforced");
+  }
   await ctx.db.execute(sql`delete from page_cache where expires_at < now() - interval '1 hour'`);
   await ctx.db.execute(sql`delete from artifacts where expires_at < now()`);
   await ctx.db.execute(sql`update agent_link_requests set status = 'expired' where status = 'pending' and expires_at < now()`);

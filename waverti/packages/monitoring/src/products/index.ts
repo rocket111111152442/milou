@@ -7,3 +7,4 @@ export * from "./identity";
 export * from "./simulated";
 export * from "./verify/index";
 export * from "./discovery/index";
+export * from "./live-test";
