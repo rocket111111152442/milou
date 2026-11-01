@@ -26,7 +26,7 @@ export function DownloadSection({ releases, standalone = false }: { releases: Pu
           id="download-title"
           eyebrow="Télécharger"
           title="Waverti sur votre ordinateur"
-          description="L'application desktop effectue vos contrôles locaux et vous envoie des notifications natives. Elle partage le même compte que la version navigateur."
+          description="Retrouvez vos surveillances et vos alertes sur votre ordinateur, avec votre compte Waverti."
         />
         <ul className="mt-14 grid gap-5 md:grid-cols-3">
           {platforms.map((p) => {
@@ -55,18 +55,20 @@ export function DownloadSection({ releases, standalone = false }: { releases: Pu
                     ))}
                     {!latest.codeSigned ? (
                       <p className="flex gap-1.5 text-xs text-warning">
-                        <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /> Version bêta non signée : votre
-                        système affichera un avertissement
-                        {p.id === "windows" ? " (SmartScreen : « Informations complémentaires » puis « Exécuter quand même »)" : ""}
-                        {p.id === "macos" ? " (Gatekeeper : clic droit sur l'application puis « Ouvrir »)" : ""}.
+                        <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /> Version bêta non signée : un avertissement de sécurité peut apparaître à l'installation.
                       </p>
                     ) : null}
-                    {latest.testedOn ? <p className="text-[11px] text-muted-fg">Testé : {latest.testedOn}.</p> : null}
+                    <details className="mt-2 text-xs text-muted-fg">
+                      <summary className="cursor-pointer">Détails techniques et vérification</summary>
+                      <div className="mt-3 space-y-2">
+                    {latest.testedOn ? <p>Testé : {latest.testedOn}.</p> : null}
                     {rel.map((r) => (
                       <p key={`sha-${r.packageType}-${r.arch}`} className="break-all text-[11px] text-muted-fg">
                         SHA-256 ({PACKAGE_LABEL[r.packageType] ?? r.packageType}) : {r.sha256}
                       </p>
                     ))}
+                      </div>
+                    </details>
                   </div>
                 ) : (
                   <p className="mt-auto rounded-xl bg-surface p-3 text-sm text-muted-fg">
