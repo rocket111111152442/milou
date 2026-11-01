@@ -12,14 +12,17 @@ test.describe("surveillances (moteurs A et B)", () => {
     await page.waitForURL(/surveillances\/nouvelle/);
     // Étape 1 : catégorie ; étape 2 : objectif, adresse et seuil ; étape 3 : résumé.
     await page.getByRole("listitem").filter({ hasText: "Prix" }).first().click();
-    await expect(page.getByRole("radio", { name: /Prix inférieur à une valeur/ })).toHaveAttribute("aria-checked", "true");
     await page.getByLabel(/^Adresse/).fill("https://boutique.example.com/casque");
+    await page.getByRole("button", { name: /Continuer/ }).click();
+    await expect(page.getByRole("radio", { name: /Prix inférieur à une valeur/ })).toHaveAttribute("aria-checked", "true");
     await page.getByLabel("Montant en euros").fill("99");
     await page.getByRole("button", { name: /Continuer/ }).click();
-    await expect(page.getByRole("heading", { name: "Résumé avant création" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Comment souhaitez-vous être prévenu ?" })).toBeVisible();
+    await page.getByRole("button", { name: /Continuer/ }).click();
+    await expect(page.getByRole("heading", { name: "Vérifier et activer" })).toBeVisible();
     await expect(page.getByText("Le prix est inférieur à 99 €")).toBeVisible();
     await page.getByLabel(/^Nom de la surveillance/).fill("Casque <script>alert(1)</script>");
-    await page.getByRole("button", { name: "Créer la surveillance" }).click();
+    await page.getByRole("button", { name: "Activer la surveillance" }).click();
     await page.waitForURL(/\/app\/surveillances\/[0-9a-f-]{36}$/);
     // Le nom est affiché comme du texte (aucune injection HTML).
     await expect(page.getByRole("heading", { name: "Casque <script>alert(1)</script>" })).toBeVisible();

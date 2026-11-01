@@ -240,6 +240,19 @@ export function DashboardView({
             )}
           </Section>
 
+          {data.upcoming.length ? (
+            <Section id="prochaines" title="Prochaines vérifications" description="Waverti s'en occupe, vous n'avez rien à faire." icon={<Clock />} tone="green">
+              <ul className="flex flex-col divide-y divide-line/70">
+                {data.upcoming.slice(0, 4).map((u) => (
+                  <li key={u.id} className="flex items-center justify-between gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
+                    {link(monitorHref(u.id), u.name, "truncate font-medium text-ink hover:text-blue")}
+                    <span className="shrink-0 rounded-full bg-tint-green px-2.5 py-0.5 text-xs font-medium text-success">{formatRelative(u.nextRunAt, now)}</span>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
+
           <Section id="activite" title="Activité récente" description="Ce que Waverti a fait pour vous." icon={<Activity />} tone="violet" action={link(alertsHref, "Toutes les alertes", "font-medium text-blue hover:underline")}>
             {activity.length === 0 ? (
               <p className="rounded-xl bg-surface px-4 py-6 text-center text-sm text-muted-fg">
@@ -297,19 +310,6 @@ export function DashboardView({
                 <Progress key={q.key} label={q.label} value={q.used} max={q.limit} />
               ))}
             </div>
-            {data.upcoming.length ? (
-              <div className="mt-5 border-t border-line/70 pt-4">
-                <h3 className="mb-2 text-sm font-semibold">Prochains contrôles</h3>
-                <ul className="flex flex-col gap-2">
-                  {data.upcoming.slice(0, 4).map((u) => (
-                    <li key={u.id} className="flex items-center justify-between gap-3 text-sm">
-                      {link(monitorHref(u.id), u.name, "truncate font-medium text-ink hover:text-blue")}
-                      <span className="shrink-0 text-xs text-muted-fg">{formatRelative(u.nextRunAt, now)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
             <details className="mt-5 border-t border-line/70 pt-3 text-sm">
               <summary className="cursor-pointer font-medium text-muted-fg hover:text-ink">Où sont effectués vos contrôles ?</summary>
               <div className="mt-3">

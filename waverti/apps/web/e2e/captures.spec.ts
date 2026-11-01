@@ -22,10 +22,16 @@ async function createRule(page: Page, name: string, url: string, amount: string)
   await page.goto("/app/surveillances/nouvelle");
   await page.getByRole("listitem").filter({ hasText: "Prix" }).first().click();
   await page.getByLabel(/^Adresse/).fill(url);
-  await page.getByLabel("Montant en euros").fill(amount);
-  await page.getByRole("button", { name: /Continuer/ }).click();
-  await page.getByLabel(/^Nom de la surveillance/).fill(name);
-  await page.getByRole("button", { name: "Créer la surveillance" }).click();
+  const amountField = page.getByLabel("Montant en euros");
+  const nameField = page.getByLabel(/^Nom de la surveillance/);
+  // Compatible avec l'ancien parcours (3 étapes) et le nouveau (5 étapes).
+  for (let i = 0; i < 6 && !(await nameField.isVisible()); i++) {
+    if (await amountField.isVisible()) await amountField.fill(amount);
+    await page.getByRole("button", { name: /Continuer/ }).click();
+    await page.waitForTimeout(150);
+  }
+  await nameField.fill(name);
+  await page.getByRole("button", { name: /^(Créer|Activer) la surveillance$/ }).click();
   await page.waitForURL(/\/app\/surveillances\/[0-9a-f-]{36}$/);
   return page.url().split("/").pop()!;
 }
@@ -72,5 +78,26 @@ test("captures", async ({ page }) => {
   await shot(page, "12-detail");
   await page.goto("/app/alertes");
   await shot(page, "13-alertes");
-  await expect(page).toHaveURL(/alertes/);
+  await page.goto("/app/historique");
+  await shot(page, "14-historique");
+  await page.goto("/app/abonnement");
+  await shot(page, "15-abonnement");
+  await page.goto("/app/parametres");
+  await shot(page, "16-parametres");
+  await page.goto("/app/aide");
+  await shot(page, "17-aide");
+  await expect(page).toHaveURL(/aide/);
+  // Assistant en 5 étapes (n'existe que dans la nouvelle version)
+  if (process.env.CAPTURE_WIZARD) {
+    await page.goto("/app/surveillances/nouvelle?categorie=price");
+    await page.getByLabel(/^Adresse/).fill("https://boutique.example.com/casque");
+    await shot(page, "20-assistant-2-site");
+    await page.getByRole("button", { name: /Continuer/ }).click();
+    await shot(page, "21-assistant-3-changement");
+    await page.getByLabel("Montant en euros").fill("99");
+    await page.getByRole("button", { name: /Continuer/ }).click();
+    await shot(page, "22-assistant-4-alertes");
+    await page.getByRole("button", { name: /Continuer/ }).click();
+    await shot(page, "23-assistant-5-activation");
+  }
 });
