@@ -7,44 +7,63 @@ test.describe("site public", () => {
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && errors.push(m.text()));
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Ne cherchez plus.");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Un prix baisse. Une place se libère.");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Vous êtes prévenu.");
     for (const name of [
-      "Trois étapes, puis vous n'y pensez plus",
-      "Une page, une condition, une alerte",
-      "Posez votre question une fois, Waverti la repose chaque jour",
-      "Votre site tombe en panne ? Vous le savez avant vos clients.",
-      "Voyez Waverti décider à votre place",
-      "Simple à utiliser, même quand c'est technique",
-      "Waverti sur votre ordinateur",
-      "Une formule pour chaque besoin",
-      "Tout ce que vous voulez savoir",
-      "Prêt à ne plus rien manquer ?",
+      "Comment ça marche",
+      "Que voulez-vous suivre ?",
+      "Sur quelle page ?",
+      "Quand être averti ?",
+      "Ce qui déclenche une alerte",
+      "Ce que Waverti consulte",
+      "Ce que vous pouvez confier à Waverti",
+      "Soyez le premier informé quand votre site a un problème.",
+      "Quatre formules, sans engagement",
+      "Les réponses essentielles",
+      "Arrêtez de vérifier. Soyez prévenu.",
     ]) {
-      await expect(page.getByRole("heading", { name })).toBeVisible();
+      await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
     }
     await expect(page.getByText("WAVERTI — Développé par")).toBeVisible();
     await expect(page.getByRole("link", { name: "LULLIN WEB" }).first()).toHaveAttribute("href", "https://www.lullin-web.com");
     expect(errors).toEqual([]);
   });
 
+  test("accueil : boutons principaux, ancre et formules", async ({ page }) => {
+    await page.goto("/");
+    const main = page.getByRole("main");
+    await expect(main.getByRole("link", { name: "Commencer" }).first()).toHaveAttribute("href", "/inscription");
+    await main.getByRole("link", { name: "Voir comment ça marche" }).click();
+    await expect(page).toHaveURL(/#comment-ca-marche$/);
+    await expect(page.getByRole("heading", { name: "Comment ça marche", exact: true })).toBeInViewport();
+    for (const price of ["5,99 €", "14,99 €", "29,99 €", "39,99 €"]) await expect(main.getByText(price).first()).toBeVisible();
+    for (const plan of ["plus", "pro", "max", "business"]) await expect(main.locator(`a[href="/inscription?formule=${plan}"]`)).toHaveCount(1);
+    await expect(main.getByRole("link", { name: /Découvrir Waverti Business/ })).toHaveAttribute("href", "/entreprises");
+    // Aucun téléchargement proposé depuis l'accueil tant qu'aucune version n'est publiée.
+    await expect(page.getByRole("banner").getByRole("link", { name: /Télécharger/ })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: /Télécharger/ })).toHaveCount(0);
+  });
+
+  test("la démonstration de l'accueil est étiquetée et fonctionne sans appel réseau", async ({ page }) => {
+    const apiCalls: string[] = [];
+    page.on("request", (r) => r.url().includes("/api/") && apiCalls.push(r.url()));
+    await page.goto("/");
+    await expect(page.getByText("Exemple de fonctionnement")).toBeVisible();
+    await expect(page.getByText("Vérifié à 9 h 00").first()).toBeVisible();
+    await expect(page.getByText(/Contrôle de 9|contrôle sur votre PC|Alerte envoyée/i)).toHaveCount(0);
+    await page.getByRole("tab", { name: "Une billetterie" }).click();
+    await expect(page.getByRole("tab", { name: "Une billetterie" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText("Vérification toutes les 2 heures (formule Pro)")).toBeVisible();
+    await page.getByRole("tab", { name: "Une billetterie" }).press("ArrowRight");
+    await expect(page.getByRole("tab", { name: "Un retour en stock" })).toBeFocused();
+    await expect(page.getByText("Canapé convertible", { exact: true })).toBeVisible();
+    expect(apiCalls).toEqual([]);
+  });
+
   test("aucun téléchargement actif n'est proposé sans version publiée", async ({ page }) => {
     await page.goto("/telecharger");
     await expect(page.getByText("Bientôt disponible")).toHaveCount(3);
     await expect(page.locator('a[href$=".msi"], a[href$=".dmg"], a[href$=".AppImage"], a[href$=".deb"]')).toHaveCount(0);
-  });
-
-  test("la démonstration interactive fonctionne sans appel réseau", async ({ page }) => {
-    await page.goto("/#demo");
-    const apiCalls: string[] = [];
-    page.on("request", (r) => r.url().includes("/api/") && apiCalls.push(r.url()));
-    const demo = page.locator("#demo");
-    await demo.getByRole("button", { name: "Étape suivante" }).first().click();
-    await demo.getByRole("button", { name: "Étape suivante" }).first().click();
-    await expect(demo.getByText("Journal des contrôles")).toBeVisible();
-    await demo.getByRole("tab", { name: /Panne de site pro/ }).click();
-    await demo.getByRole("button", { name: "Lancer la simulation" }).click();
-    await expect(demo.getByText("Service rétabli")).toBeVisible({ timeout: 15_000 });
-    expect(apiCalls).toEqual([]);
   });
 
   test("tarifs : 4 formules payantes avec essai de 3 jours, aucune formule gratuite", async ({ page }) => {

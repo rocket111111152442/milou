@@ -24,9 +24,8 @@ export const siteConfig = {
 };
 
 export const mainNav = [
-  { href: "/#fonctionnalites", label: "Fonctionnalités" },
   { href: "/#comment-ca-marche", label: "Comment ça marche" },
-  { href: "/entreprises", label: "Entreprises" },
-  { href: "/telecharger", label: "Télécharger" },
+  { href: "/#usages", label: "Exemples" },
+  { href: "/entreprises", label: "Waverti Business" },
   { href: "/tarifs", label: "Tarifs" },
 ] as const;

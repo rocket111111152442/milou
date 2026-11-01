@@ -6,10 +6,10 @@ const columns = [
   {
     title: "Produit",
     links: [
-      { href: "/#fonctionnalites", label: "Fonctionnalités" },
+      { href: "/#comment-ca-marche", label: "Comment ça marche" },
       { href: "/tarifs", label: "Tarifs" },
-      { href: "/telecharger", label: "Téléchargements" },
-      { href: "/entreprises", label: "Entreprises" },
+      { href: "/telecharger", label: "Applications" },
+      { href: "/entreprises", label: "Waverti Business" },
     ],
   },
   {

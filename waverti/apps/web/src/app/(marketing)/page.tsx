@@ -1,24 +1,12 @@
-import { AppShowcase } from "@/components/marketing/app-showcase";
-import { DownloadSection } from "@/components/marketing/download";
-import { FaqSection, faqItems } from "@/components/marketing/faq";
-import { Hero } from "@/components/marketing/hero";
-import { InteractiveDemo } from "@/components/marketing/interactive-demo";
-import { PricingSection, planOrder } from "@/components/marketing/pricing";
-import {
-  BusinessSection,
-  FinalCta,
-  HowItWorks,
-  PageMonitoring,
-  WebSearchSection,
-} from "@/components/marketing/sections";
+import { FaqSection } from "@/components/marketing/faq";
+import { HomeBusiness, HomeFinalCta, HomeHero, HomeHowItWorks, HomePricing, HomeUses, homeFaq } from "@/components/marketing/home";
 import { getPublicPlans } from "@/lib/plans";
-import { getPublishedReleases } from "@/lib/releases";
 import { siteConfig } from "@/lib/site";
 
 export const revalidate = 600;
 
 export default async function HomePage() {
-  const [plans, releases] = await Promise.all([getPublicPlans(), getPublishedReleases()]);
+  const plans = await getPublicPlans();
   const jsonLd = [
     {
       "@context": "https://schema.org",
@@ -38,7 +26,7 @@ export default async function HomePage() {
     {
       "@context": "https://schema.org",
       "@type": "FAQPage",
-      mainEntity: faqItems.map((f) => ({
+      mainEntity: homeFaq.map((f) => ({
         "@type": "Question",
         name: f.q,
         acceptedAnswer: { "@type": "Answer", text: f.a },
@@ -48,17 +36,13 @@ export default async function HomePage() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
-      <Hero />
-      <HowItWorks />
-      <PageMonitoring />
-      <WebSearchSection />
-      <BusinessSection />
-      <InteractiveDemo />
-      <AppShowcase />
-      <DownloadSection releases={releases} />
-      <PricingSection plans={planOrder(plans)} />
-      <FaqSection />
-      <FinalCta />
+      <HomeHero />
+      <HomeHowItWorks />
+      <HomeUses />
+      <HomeBusiness />
+      <HomePricing />
+      <FaqSection items={homeFaq} title="Les réponses essentielles" compact />
+      <HomeFinalCta />
     </>
   );
 }

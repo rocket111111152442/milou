@@ -35,7 +35,7 @@ export const faqItems: Array<{ q: string; a: string }> = [
   },
   {
     q: "Comment fonctionne l'essai gratuit ?",
-    a: "Chaque formule (Plus, Pro, Business) s'essaie gratuitement pendant 3 jours (72 heures). Vous enregistrez une carte via Stripe ; l'essai commence immédiatement, avec des limites (3 surveillances actives, 1 sujet de recherche sur Internet vérifié au plus une fois par jour, un site professionnel pour Business). Un rappel vous est envoyé avant le premier prélèvement, qui n'a lieu qu'à la fin de l'essai si vous n'avez pas résilié. Un seul essai est possible par personne.",
+    a: "Chaque formule (Plus, Pro, Max, Business) s'essaie gratuitement pendant 3 jours (72 heures). Vous enregistrez une carte via Stripe ; l'essai commence immédiatement, avec des limites (3 surveillances actives, 1 sujet de recherche sur Internet vérifié au plus une fois par jour, un site professionnel pour Business). Un rappel vous est envoyé avant le premier prélèvement, qui n'a lieu qu'à la fin de l'essai si vous n'avez pas résilié. Un seul essai est possible par personne.",
   },
   {
     q: "Puis-je résilier facilement ?",
@@ -55,19 +55,24 @@ export const faqItems: Array<{ q: string; a: string }> = [
   },
 ];
 
-export function FaqSection() {
+export function FaqSection({
+  items = faqItems,
+  title = "Tout ce que vous voulez savoir",
+  eyebrow = "Questions fréquentes",
+  compact = false,
+}: { items?: Array<{ q: string; a: string }>; title?: string; eyebrow?: string; compact?: boolean } = {}) {
   return (
-    <section id="faq" aria-labelledby="faq-title" className="py-24 sm:py-32">
+    <section id="faq" aria-labelledby="faq-title" className={compact ? "py-16 sm:py-20" : "py-24 sm:py-32"}>
       <Container className="grid gap-12 lg:grid-cols-[1fr_1.6fr]">
         <SectionHeading
           id="faq-title"
           align="left"
-          eyebrow="Questions fréquentes"
-          title="Tout ce que vous voulez savoir"
+          eyebrow={eyebrow}
+          title={title}
           description="Une autre question ? Écrivez-nous depuis la page Assistance."
         />
         <Accordion type="single" collapsible className="rounded-2xl border border-line bg-white px-6">
-          {faqItems.map((f, i) => (
+          {items.map((f, i) => (
             <AccordionItem key={f.q} value={`faq-${i}`} question={f.q}>
               {f.a}
             </AccordionItem>

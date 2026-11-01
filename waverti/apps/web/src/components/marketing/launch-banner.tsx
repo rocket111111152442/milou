@@ -8,7 +8,8 @@ export function LaunchBanner() {
       {siteConfig.launchStatus === "preview" ? (
         <>
           <strong className="font-semibold">Version de prévisualisation.</strong> Waverti n'est pas encore commercialisé : les
-          paiements fonctionnent en mode test Stripe et aucun prélèvement réel n'est effectué.
+          paiements fonctionnent en mode test, sans prélèvement réel, et les vérifications automatiques ne sont pas encore
+          activées.
         </>
       ) : (
         <>
