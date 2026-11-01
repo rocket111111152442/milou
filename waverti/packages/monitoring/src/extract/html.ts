@@ -2,8 +2,8 @@
 import { sha256 as sha256Bytes } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import * as cheerio from "cheerio/slim";
-import type { Availability, PageObservation } from "@waverti/types";
-import { detectCurrency, findPricesInText, parsePrice } from "./price";
+import type { Availability, ExtractionFieldEvidence, ExtractionStatus, PageObservation } from "@waverti/types";
+import { detectCurrency, findTravelPriceCandidates, parsePrice } from "./price";
 import { collapseWhitespace, normalizeForMatch } from "./text";
 import { extractStructure, jsonLdItems, jsonLdRegularPrice, strikethroughPrice } from "./structure";
 
@@ -19,9 +19,14 @@ const OUT_OF_STOCK = [
   "sold out",
   "currently unavailable",
   "non disponible",
+  "agotado",
+  "ausverkauft",
+  "nicht verfügbar",
+  "nicht verfugbar",
+  "non disponibile",
 ];
-const IN_STOCK = ["en stock", "disponible immediatement", "ajouter au panier", "add to cart", "in stock", "expedie sous", "livraison gratuite des demain"];
-const PREORDER = ["precommande", "pre-commande", "pre-order", "preorder", "precommander"];
+const IN_STOCK = ["en stock", "disponible immediatement", "ajouter au panier", "add to cart", "in stock", "expedie sous", "livraison gratuite des demain", "disponible", "disponibile", "verfügbar", "verfugbar", "auf lager", "available"];
+const PREORDER = ["precommande", "pre-commande", "pre-order", "preorder", "precommander", "preorden", "vorbestellung"];
 
 const SCHEMA_AVAILABILITY: Record<string, Availability> = {
   instock: "in_stock",
@@ -50,6 +55,7 @@ interface StructuredOffer {
   price: number | null;
   currency: string | null;
   availability: Availability | null;
+  source: "jsonld";
 }
 
 function* walkJsonLd(node: unknown, depth = 0): Generator<Record<string, unknown>> {
@@ -74,7 +80,6 @@ function typeIncludes(obj: Record<string, unknown>, t: string): boolean {
 export function extractJsonLdOffer($: cheerio.CheerioAPI): StructuredOffer | null {
   let best: StructuredOffer | null = null;
   $('script[type="application/ld+json"]').each((_, el) => {
-    if (best?.price !== null && best?.price !== undefined) return;
     const raw = $(el).text();
     if (!raw || raw.length > 500_000) return;
     let data: unknown;
@@ -90,15 +95,41 @@ export function extractJsonLdOffer($: cheerio.CheerioAPI): StructuredOffer | nul
           price,
           currency: typeof obj.priceCurrency === "string" ? obj.priceCurrency.toUpperCase() : null,
           availability: mapAvailability(obj.availability),
+          source: "jsonld",
         };
         if (offer.price !== null || offer.availability) {
-          best = best ? { ...best, ...Object.fromEntries(Object.entries(offer).filter(([, v]) => v !== null)) } : offer;
-          if (offer.price !== null) return;
+          best = best ?? offer;
         }
       }
     }
   });
   return best;
+}
+
+/** Collect every explicit JSON-LD offer so a disagreement is visible instead of silently picking the first block. */
+function collectJsonLdOffers($: cheerio.CheerioAPI): StructuredOffer[] {
+  const out: StructuredOffer[] = [];
+  $('script[type="application/ld+json"]').each((_, el) => {
+    const raw = $(el).text();
+    if (!raw || raw.length > 500_000) return;
+    let data: unknown;
+    try { data = JSON.parse(raw); } catch { return; }
+    for (const obj of walkJsonLd(data)) {
+      if (!typeIncludes(obj, "offer") && !typeIncludes(obj, "aggregateoffer")) continue;
+      const price = parsePrice(obj.price ?? obj.lowPrice ?? (obj.priceSpecification as Record<string, unknown> | undefined)?.price);
+      const currency = typeof obj.priceCurrency === "string" && /^[A-Za-z]{3}$/.test(obj.priceCurrency) ? obj.priceCurrency.toUpperCase() : null;
+      if (price !== null || obj.availability) out.push({ price, currency, availability: mapAvailability(obj.availability), source: "jsonld" });
+      if (out.length >= 12) return;
+    }
+  });
+  return out;
+}
+
+const evidence = (status: ExtractionStatus, sources: string[], checkedAt: string, note?: string): ExtractionFieldEvidence => ({ status, sources, checkedAt, ...(note ? { note } : {}) });
+
+function distinctPriceCandidates(candidates: Array<{ value: number; currency: string | null; source: string }>): Array<{ value: number; currency: string | null; source: string }> {
+  const seen = new Set<string>();
+  return candidates.filter((c) => { const key = `${c.value}|${c.currency ?? ""}`; if (seen.has(key)) return false; seen.add(key); return true; });
 }
 
 export interface ExtractInput {
@@ -118,7 +149,10 @@ export interface ExtractInput {
 /** Transforme une page HTML en observation structurée (prix, disponibilité, texte normalisé). */
 export function extractPage(input: ExtractInput): PageObservation {
   const $ = cheerio.load(input.html.length > 3_000_000 ? input.html.slice(0, 3_000_000) : input.html);
-  const title = collapseWhitespace($("title").first().text() || $('meta[property="og:title"]').attr("content") || "").slice(0, 300) || null;
+  const checkedAt = (input.fetchedAt ?? new Date()).toISOString();
+  const titleEl = collapseWhitespace($("title").first().text()).slice(0, 300);
+  const ogTitle = collapseWhitespace($('meta[property="og:title"]').attr("content") ?? "").slice(0, 300);
+  const title = titleEl || ogTitle || null;
 
   let selectorFound: boolean | null = null;
   let scope: cheerio.Cheerio<never> | null = null;
@@ -135,6 +169,7 @@ export function extractPage(input: ExtractInput): PageObservation {
 
   // Données structurées lues AVANT de retirer les scripts du document.
   const ld = extractJsonLdOffer($);
+  const ldOffers = collectJsonLdOffers($);
   const ldItems = input.enrich === false ? [] : jsonLdItems($, input.finalUrl);
   const ldRegular = input.enrich === false ? null : jsonLdRegularPrice($);
   const mdPriceEl = $('[itemprop="price"]').first();
@@ -145,6 +180,7 @@ export function extractPage(input: ExtractInput): PageObservation {
   const metaPrice = $('meta[property="product:price:amount"], meta[property="og:price:amount"]').first().attr("content");
   const metaCurrency = $('meta[property="product:price:currency"], meta[property="og:price:currency"]').first().attr("content");
   const metaAvail = $('meta[property="product:availability"], meta[property="og:availability"]').first().attr("content");
+  const referenceRaw = $('[itemprop="sku"], [itemprop="mpn"], meta[property="product:retailer_item_id"]').first().attr("content") ?? $('[itemprop="sku"], [itemprop="mpn"]').first().text();
 
   // Texte visible (scripts, styles et métadonnées retirés)
   $("script, style, noscript, svg, iframe, template, head, link, meta").remove();
@@ -152,6 +188,8 @@ export function extractPage(input: ExtractInput): PageObservation {
   const fullText = collapseWhitespace(body.length ? body.text() : $.root().text());
   const scopedText = scope ? collapseWhitespace(scope.text()) : fullText;
   const normalized = scopedText.slice(0, 200_000);
+  const travelPrices = findTravelPriceCandidates(scopedText);
+  const primaryTextPrice = travelPrices.primary;
 
   // Prix et disponibilité
   let price: number | null = null;
@@ -161,17 +199,17 @@ export function extractPage(input: ExtractInput): PageObservation {
   let availabilitySource: PageObservation["availabilitySource"] = "none";
 
   if (scope) {
-    const p = findPricesInText(scopedText, 1)[0] ?? null;
+    const p = primaryTextPrice;
     const direct = p ? p.value : parsePrice(scopedText);
     if (direct !== null && /\d/.test(scopedText)) {
       price = direct;
-      currency = detectCurrency(scopedText) ?? "EUR";
+      currency = detectCurrency(scopedText);
       priceSource = "selector";
     }
   }
   if (price === null && ld?.price !== null && ld?.price !== undefined) {
     price = ld.price;
-    currency = ld.currency ?? "EUR";
+    currency = ld.currency;
     priceSource = "jsonld";
   }
   if (ld?.availability) {
@@ -182,7 +220,7 @@ export function extractPage(input: ExtractInput): PageObservation {
     const v = parsePrice(mdPriceRaw);
     if (v !== null) {
       price = v;
-      currency = (mdCurrency ?? "EUR").toUpperCase();
+      currency = mdCurrency && /^[A-Za-z]{3}$/.test(mdCurrency) ? mdCurrency.toUpperCase() : null;
       priceSource = "microdata";
     }
   }
@@ -197,7 +235,7 @@ export function extractPage(input: ExtractInput): PageObservation {
     const v = parsePrice(metaPrice);
     if (v !== null) {
       price = v;
-      currency = (metaCurrency ?? "EUR").toUpperCase();
+      currency = metaCurrency && /^[A-Za-z]{3}$/.test(metaCurrency) ? metaCurrency.toUpperCase() : null;
       priceSource = "meta";
     }
   }
@@ -208,13 +246,19 @@ export function extractPage(input: ExtractInput): PageObservation {
       availabilitySource = "microdata";
     }
   }
-  if (price === null) {
-    const found = findPricesInText(scopedText, 1)[0];
-    if (found) {
-      price = found.value;
-      currency = found.currency;
-      priceSource = "text";
-    }
+
+  const priceCandidates = distinctPriceCandidates([
+    ...ldOffers.filter((o) => o.price !== null).map((o) => ({ value: o.price!, currency: o.currency, source: "jsonld" })),
+    ...(scope && primaryTextPrice ? [{ value: primaryTextPrice.value, currency: detectCurrency(scopedText), source: "selector" }] : []),
+    ...(parsePrice(mdPriceRaw) !== null ? [{ value: parsePrice(mdPriceRaw)!, currency: mdCurrency && /^[A-Za-z]{3}$/.test(mdCurrency) ? mdCurrency.toUpperCase() : null, source: "microdata" }] : []),
+    ...(parsePrice(metaPrice) !== null ? [{ value: parsePrice(metaPrice)!, currency: metaCurrency && /^[A-Za-z]{3}$/.test(metaCurrency) ? metaCurrency.toUpperCase() : null, source: "meta" }] : []),
+    ...travelPrices.all.map((candidate) => ({ value: candidate.value, currency: candidate.currency, source: "text" })),
+  ]);
+  const textPrice = primaryTextPrice;
+  if (price === null && textPrice) {
+    price = textPrice.value;
+    currency = textPrice.currency;
+    priceSource = "text";
   }
   if (availability === "unknown") {
     const norm = normalizeForMatch(scopedText).slice(0, 50_000);
@@ -223,12 +267,33 @@ export function extractPage(input: ExtractInput): PageObservation {
     else if (IN_STOCK.some((k) => norm.includes(k))) availability = "in_stock";
     if (availability !== "unknown") availabilitySource = "text";
   }
+  const authoritativePrices = priceCandidates.filter((c) => c.source !== "text");
+  const priceContradictory = authoritativePrices.length > 1;
+  const priceStatus: ExtractionStatus = priceContradictory ? "contradictory" : price === null ? "unavailable" : !currency ? "uncertain" : "verified";
+  if (priceContradictory) {
+    price = null;
+    currency = null;
+    priceSource = null;
+  }
+  const availabilityCandidates = [
+    ld?.availability,
+    mapAvailability(mdAvail),
+    mapAvailability(metaAvail),
+  ].filter((v): v is Availability => Boolean(v) && v !== "unknown");
+  const availabilityContradictory = new Set(availabilityCandidates).size > 1;
+  const availabilityStatus: ExtractionStatus = availabilityContradictory ? "contradictory" : availability === "unknown" ? "unavailable" : "verified";
+  if (availabilityContradictory) {
+    availability = "unknown";
+    availabilitySource = "none";
+  }
 
   // Données enrichies (règles personnalisées). Le texte et l'empreinte historiques ci-dessus sont inchangés.
   let enriched: Partial<PageObservation> = {};
   if (input.enrich !== false) {
-    const regular = ldRegular !== null && price !== null && ldRegular > price ? ldRegular : strikethroughPrice($, scope, price);
+    const regular = !priceContradictory && ldRegular !== null && price !== null && ldRegular > price ? ldRegular : strikethroughPrice($, scope, price);
     const st = extractStructure($, scope, input.finalUrl, ldItems);
+    const visibleReference = /\b(?:ref|réf(?:érence)?)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{3,})/i.exec(normalized)?.[1] ?? null;
+    const reference = collapseWhitespace(referenceRaw?.trim() || visibleReference || "").slice(0, 160) || null;
     enriched = {
       contentKind: "html",
       contentHash: st.contentHash,
@@ -240,6 +305,19 @@ export function extractPage(input: ExtractInput): PageObservation {
       dates: st.dates,
       tableHashes: st.tableHashes,
       forms: st.forms,
+      reference,
+      date: st.dates[0] ?? null,
+      priceKind: regular !== null && price !== null ? "promotion" : price !== null ? "current" : undefined,
+      ...(priceCandidates.length ? { priceCandidates } : {}),
+      fieldEvidence: {
+        price: evidence(priceStatus, priceCandidates.map((c) => c.source), checkedAt, priceContradictory ? "Plusieurs sources annoncent des prix différents." : undefined),
+        currency: evidence(price === null ? "unavailable" : !currency ? "uncertain" : priceStatus === "contradictory" ? "contradictory" : "verified", priceCandidates.map((c) => c.source), checkedAt),
+        availability: evidence(availabilityStatus, availabilitySource === "none" ? [] : [availabilitySource], checkedAt),
+        title: evidence(title ? "verified" : "unavailable", [titleEl ? "title" : ogTitle ? "og:title" : ""].filter(Boolean), checkedAt),
+        reference: evidence(reference ? "verified" : "unavailable", reference ? ["microdata"] : [], checkedAt),
+        date: evidence(st.dates.length ? "verified" : "unavailable", st.dates.length ? ["html"] : [], checkedAt),
+        text: evidence(normalized ? "verified" : "unavailable", normalized ? ["visible_text"] : [], checkedAt),
+      },
       ...(input.responseMs !== undefined ? { responseMs: Math.round(input.responseMs) } : {}),
     };
   }
@@ -252,7 +330,7 @@ export function extractPage(input: ExtractInput): PageObservation {
     httpStatus: input.httpStatus,
     title,
     price,
-    currency: currency && /^[A-Z]{3}$/.test(currency) ? currency : price !== null ? "EUR" : null,
+    currency: currency && /^[A-Z]{3}$/.test(currency) ? currency : null,
     priceSource,
     availability,
     availabilitySource,
@@ -261,7 +339,7 @@ export function extractPage(input: ExtractInput): PageObservation {
     excerpt: normalized.slice(0, 4000),
     selectorFound,
     method: input.method,
-    fetchedAt: (input.fetchedAt ?? new Date()).toISOString(),
+    fetchedAt: checkedAt,
   };
 }
 
