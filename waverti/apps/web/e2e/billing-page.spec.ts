@@ -19,6 +19,8 @@ test.describe("page Abonnement", () => {
     await login(page, u.email, undefined, "/app/abonnement");
     await page.waitForURL(/\/app\/abonnement$/);
     await expect(page.getByRole("heading", { name: "Choisir une formule — 3 jours d'essai gratuit" })).toBeVisible();
+    await page.goto("/app/abonnement?bienvenue=1");
+    await expect(page.getByText(/gratuitement pendant 3 jours/)).toBeVisible();
     for (const n of ["Plus", "Pro", "Max", "Business"]) await expect(page.getByRole("link", { name: `Essayer ${n} 3 jours` })).toBeVisible();
     await shot(page, "abonnement-eligible");
   });
@@ -31,7 +33,12 @@ test.describe("page Abonnement", () => {
     await expect(page.getByRole("heading", { name: "Choisir une formule", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Souscrire à Plus" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Essayer .* 3 jours/ })).toHaveCount(0);
-    await expect(page.getByText(/essai gratuit a déjà été utilisé/)).toBeVisible();
+    await expect(page.getByText(/essai gratuit a déjà été utilisé/).first()).toBeVisible();
+    // Le bandeau d'accueil ne promet pas un essai gratuit à un compte qui l'a déjà utilisé.
+    await page.goto("/app/abonnement?bienvenue=1");
+    await expect(page.getByText("Bienvenue sur Waverti")).toBeVisible();
+    await expect(page.getByText(/gratuitement pendant 3 jours/)).toHaveCount(0);
+    await expect(page.getByText(/Votre essai gratuit a déjà été utilisé/).first()).toBeVisible();
     await shot(page, "abonnement-non-eligible");
   });
 

@@ -42,8 +42,9 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       <PageHeader title="Abonnement" description="Votre formule, vos quotas et votre facturation." />
       {bienvenue && !sub.planId ? (
         <Callout tone="info" title="Bienvenue sur Waverti">
-          Choisissez la formule qui vous convient : vous l'essayez gratuitement pendant 3 jours et vous pouvez résilier en ligne
-          avant la fin de l'essai, sans aucun prélèvement.
+          {trialEligible
+            ? "Choisissez la formule qui vous convient : vous l'essayez gratuitement pendant 3 jours et vous pouvez résilier en ligne avant la fin de l'essai, sans aucun prélèvement."
+            : "Choisissez la formule qui vous convient. Votre essai gratuit a déjà été utilisé : le premier paiement a lieu à la validation, et vous pouvez résilier en ligne à tout moment."}
         </Callout>
       ) : null}
       {returned ? <CheckoutReturnBanner state={returned} /> : null}
