@@ -11,6 +11,7 @@ import {
   LifeBuoy,
   ListChecks,
   LogOut,
+  PackageSearch,
   Plus,
   Settings,
   ShieldCheck,
@@ -37,7 +38,7 @@ export function DashboardShell({
   const logoutForm = useRef<HTMLFormElement>(null);
   const active = (href: string, exact = false) => (exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
   const nav: NavItem[] = [
-    { href: "/app", label: "Vue d'ensemble", icon: <LayoutDashboard />, active: active("/app", true) },
+    { href: "/app", label: "Accueil", icon: <LayoutDashboard />, active: active("/app", true) },
     {
       href: "/app/surveillances",
       label: "Mes surveillances",
@@ -45,6 +46,7 @@ export function DashboardShell({
       active: active("/app/surveillances") && !active("/app/surveillances/nouvelle"),
     },
     { href: "/app/surveillances/nouvelle", label: "Nouvelle surveillance", icon: <Plus />, active: active("/app/surveillances/nouvelle") },
+    { href: "/app/produits", label: "Rechercher un produit", icon: <PackageSearch />, active: active("/app/produits") },
     { href: "/app/alertes", label: "Alertes", icon: <Bell />, active: active("/app/alertes"), badge: unread },
     { href: "/app/historique", label: "Historique", icon: <History />, active: active("/app/historique") },
     { href: "/app/business", label: "Business", icon: <Building2 />, active: active("/app/business") },

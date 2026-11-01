@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, Pencil } from "lucide-react";
-import { Badge, Button, Callout, Card, CardContent, CardHeader, CardTitle, LineChart, PageHeader } from "@waverti/ui";
+import { Activity, CalendarClock, CheckCircle2, ExternalLink, Pencil } from "lucide-react";
+import { Badge, Button, Callout, Card, CardContent, CardHeader, CardTitle, LineChart, PageHeader, StatTile, Tip } from "@waverti/ui";
 import { MonitorStatusBadge, ResultTimeline } from "@waverti/ui/app";
 import { isUuid } from "@waverti/database";
 import { describeRule, formatDateTime, formatInterval, formatRelative, ruleConditionSchema, STATUS_LABELS, type WebFinding } from "@waverti/types";
@@ -72,12 +72,30 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
         </Callout>
       ) : null}
 
+      <div className="grid gap-4 sm:grid-cols-3" aria-label="En un coup d'œil">
+        <StatTile
+          label="Où en est cette surveillance ?"
+          icon={<CheckCircle2 />}
+          tone={task.status === "error" || task.lastStatus === "error" ? "red" : task.status === "active" ? "green" : "amber"}
+          value={<span className="text-lg">{task.status === "error" || task.lastStatus === "error" ? "Un problème est survenu" : task.status === "active" ? (task.lastStatus === "triggered" ? "Alerte envoyée" : "Tout va bien") : task.status === "paused" ? "En pause" : "Suspendue"}</span>}
+        />
+        <StatTile label="Dernier contrôle" icon={<Activity />} tone="blue" value={<span className="text-lg">{task.lastCheckedAt ? formatRelative(task.lastCheckedAt.toISOString()) : "Pas encore"}</span>} />
+        <StatTile
+          label="Prochain contrôle"
+          icon={<CalendarClock />}
+          tone="violet"
+          value={<span className="text-lg">{task.status === "active" || task.status === "error" ? (schedule ? formatRelative(schedule.nextRunAt.toISOString()) : "—") : "En pause"}</span>}
+          hint={schedule ? `Un contrôle ${formatInterval(schedule.intervalMinutes).toLowerCase()}` : undefined}
+        />
+      </div>
+      {task.status === "active" && !task.lastCheckedAt ? <Tip>Le premier contrôle est en cours. Vous serez prévenu dès que la condition choisie est remplie.</Tip> : null}
+
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="flex flex-col gap-6">
           {ruleLines.length ? (
             <Card>
               <CardHeader>
-                <CardTitle as="h2">Règle d'alerte</CardTitle>
+                <CardTitle as="h2">Vous serez prévenu quand…</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="flex flex-col gap-1.5 text-sm" aria-label="Conditions de la règle">
@@ -144,7 +162,7 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
         </div>
         <Card className="h-fit">
           <CardHeader>
-            <CardTitle as="h2">Réglages</CardTitle>
+            <CardTitle as="h2">Résumé des réglages</CardTitle>
           </CardHeader>
           <CardContent>
             <dl className="flex flex-col gap-4 text-sm">
@@ -170,14 +188,8 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
                   <dd>{target.officialDomains.join(", ")}</dd>
                 </div>
               ) : null}
-              {target?.cssSelector ? (
-                <div>
-                  <dt className="text-muted-fg">Zone surveillée</dt>
-                  <dd className="font-mono text-xs">{target.cssSelector}</dd>
-                </div>
-              ) : null}
               <div>
-                <dt className="text-muted-fg">Fréquence</dt>
+                <dt className="text-muted-fg">Fréquence des contrôles</dt>
                 <dd>{schedule ? formatInterval(schedule.intervalMinutes) : "—"}</dd>
               </div>
               <div>
@@ -185,21 +197,32 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
                 <dd>{task.status === "active" || task.status === "error" ? (schedule ? formatRelative(schedule.nextRunAt.toISOString()) : "—") : "En pause"}</dd>
               </div>
               <div>
-                <dt className="text-muted-fg">Exécution</dt>
-                <dd>{task.kind === "web_topic" ? "Serveurs Waverti (moteur de recherche)" : EXEC_LABEL[task.executionMode]}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-fg">Notifications</dt>
+                <dt className="text-muted-fg">Où vous êtes prévenu</dt>
                 <dd>
                   Application{task.notifyEmail && ent.emailAlerts ? ", e-mail" : ""}
                   {task.notifyDesktop ? ", bureau" : ""}
                 </dd>
               </div>
-              <div>
-                <dt className="text-muted-fg">Créée le</dt>
-                <dd>{formatDateTime(task.createdAt.toISOString(), user.timezone)}</dd>
-              </div>
             </dl>
+            <details className="mt-5 border-t border-line/70 pt-3 text-sm">
+              <summary className="cursor-pointer font-medium text-muted-fg hover:text-ink">Détails techniques</summary>
+              <dl className="mt-3 flex flex-col gap-3">
+                <div>
+                  <dt className="text-muted-fg">Qui effectue les contrôles</dt>
+                  <dd>{task.kind === "web_topic" ? "Serveurs Waverti (moteur de recherche)" : EXEC_LABEL[task.executionMode]}</dd>
+                </div>
+                {target?.cssSelector ? (
+                  <div>
+                    <dt className="text-muted-fg">Zone surveillée (sélecteur)</dt>
+                    <dd className="font-mono text-xs">{target.cssSelector}</dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt className="text-muted-fg">Créée le</dt>
+                  <dd>{formatDateTime(task.createdAt.toISOString(), user.timezone)}</dd>
+                </div>
+              </dl>
+            </details>
           </CardContent>
         </Card>
       </div>

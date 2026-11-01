@@ -46,11 +46,11 @@ export function AppShell({
             onClick: close,
             className: cn(
               "group flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors [&_svg]:size-[18px]",
-              item.active ? "bg-surface-strong text-ink" : "text-ink-soft hover:bg-surface hover:text-ink",
+              item.active ? "bg-blue/10 text-blue" : "text-ink-soft hover:bg-canvas hover:text-ink",
             ),
             children: (
               <>
-                <span className={cn("text-muted transition-colors group-hover:text-ink", item.active && "text-ink")}>
+                <span className={cn("text-muted transition-colors group-hover:text-ink", item.active && "text-blue")}>
                   {item.icon}
                 </span>
                 <span className="flex-1">{item.label}</span>
@@ -81,14 +81,14 @@ export function AppShell({
   );
 
   return (
-    <div className="min-h-dvh bg-surface">
+    <div className="app-canvas min-h-dvh">
       <a
         href="#contenu"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-lg focus:bg-ink focus:px-4 focus:py-2 focus:text-white"
       >
         Aller au contenu
       </a>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-line bg-white lg:block">{sidebar}</aside>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-line/70 bg-white/80 backdrop-blur lg:block">{sidebar}</aside>
       {open ? (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <button type="button" aria-label="Fermer le menu" className="absolute inset-0 bg-ink/30" onClick={close} />
@@ -96,7 +96,7 @@ export function AppShell({
         </div>
       ) : null}
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-line bg-white/85 px-4 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-line/70 bg-white/70 px-4 backdrop-blur sm:px-6">
           <button
             type="button"
             className="grid size-10 place-items-center rounded-lg text-ink hover:bg-surface lg:hidden"

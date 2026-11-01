@@ -55,7 +55,7 @@ export function MonitorList({
     );
   }
   return (
-    <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
+    <ul className="divide-y divide-line/70 overflow-hidden rounded-2xl border border-line/80 bg-white shadow-[var(--shadow-card)]">
       {monitors.map((m) => (
         <li key={m.id}>
           {renderLink({

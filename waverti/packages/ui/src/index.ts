@@ -46,4 +46,5 @@ export {
   useInView,
 } from "./components/motion";
 export { ToastProvider, useToast } from "./components/toast";
+export { HeroBanner, IconTile, StatTile, Section, Tip, StepProgress, type TileTone } from "./components/blocks";
 export { Container, SectionHeading, PageHeader } from "./components/layout";

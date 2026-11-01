@@ -11,7 +11,6 @@ import {
   ArrowRight,
   Building,
   CalendarDays,
-  Check,
   FileText,
   Globe,
   Lock,
@@ -42,6 +41,7 @@ import { cn } from "../lib/cn";
 import { Badge } from "../components/badge";
 import { Button } from "../components/button";
 import { Callout } from "../components/feedback";
+import { StepProgress, Tip } from "../components/blocks";
 import { Checkbox, Switch } from "../components/controls";
 import { Field, Input, Label, Select, Textarea } from "../components/form";
 import type { FormEntitlements, PreviewResult, SubmitResult, TopicPlan } from "./monitor-form";
@@ -271,7 +271,10 @@ function intervalOptions(min: number): number[] {
   return [...new Set([min, ...base.filter((m) => m > min)])].sort((a, b) => a - b);
 }
 
-const STEPS = ["Catégorie", "Configuration", "Résumé"] as const;
+const STEPS = ["Que surveiller ?", "Vos réglages", "Résumé"] as const;
+
+/** Une couleur d'icône par catégorie : repère visuel sans dépendre du texte. */
+const CATEGORY_TILE = ["bg-info-soft text-blue", "bg-[#f1e8ff] text-violet", "bg-success-soft text-success", "bg-warning-soft text-warning", "bg-danger-soft text-danger"] as const;
 
 export function MonitorWizard({
   entitlements,
@@ -456,29 +459,17 @@ export function MonitorWizard({
 
   return (
     <div className="flex flex-col gap-8">
-      <ol className="flex items-center gap-2 text-xs font-medium sm:text-sm" aria-label="Étapes">
-        {STEPS.map((s, i) => (
-          <li key={s} className="flex items-center gap-2" aria-current={i === step ? "step" : undefined}>
-            <span
-              className={cn(
-                "grid size-6 place-items-center rounded-full border text-[11px] transition-colors",
-                i < step ? "border-ink bg-ink text-white" : i === step ? "border-gradient text-ink" : "border-line text-muted-fg",
-              )}
-            >
-              {i < step ? <Check className="size-3.5" aria-hidden="true" /> : i + 1}
-            </span>
-            <span className={cn(i === step ? "text-ink" : "text-muted-fg", "hidden sm:inline")}>{s}</span>
-            {i < STEPS.length - 1 ? <span className="h-px w-6 bg-line sm:w-10" aria-hidden="true" /> : null}
-          </li>
-        ))}
-      </ol>
+      <StepProgress steps={[...STEPS]} current={step} />
 
       {step === 0 ? (
         <section className="flex flex-col gap-6" aria-labelledby="wz-h0">
-          <h2 id="wz-h0" ref={headingRef} tabIndex={-1} className="font-display text-lg font-semibold outline-none">
-            Que voulez-vous surveiller ?
-          </h2>
-          <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
+          <div>
+            <h2 id="wz-h0" ref={headingRef} tabIndex={-1} className="font-display text-xl font-semibold outline-none">
+              Que voulez-vous surveiller ?
+            </h2>
+            <p className="text-sm text-muted-fg">Choisissez un type ci-dessous, ou décrivez simplement ce que vous attendez.</p>
+          </div>
+          <div className="flex flex-col gap-3 rounded-2xl border border-blue/15 bg-info-soft/60 p-4">
             <Label htmlFor="wz-assistant" className="flex items-center gap-2">
               <WandSparkles className="size-4" aria-hidden="true" /> Décrivez-le simplement
             </Label>
@@ -508,7 +499,7 @@ export function MonitorWizard({
             ) : null}
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" role="list">
-            {CATEGORIES.map((c) => {
+            {CATEGORIES.map((c, ci) => {
               const locked = c.id === "news" && !topicsAllowed;
               return (
                 <button
@@ -518,10 +509,10 @@ export function MonitorWizard({
                   disabled={locked}
                   onClick={() => chooseCategory(c.id)}
                   className={cn(
-                    "group flex flex-col gap-2 rounded-xl border border-line bg-white p-4 text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60",
+                    "group flex flex-col gap-2 rounded-2xl border border-line bg-white p-4 text-left shadow-soft transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60",
                   )}
                 >
-                  <span className="grid size-9 place-items-center rounded-lg bg-surface text-ink transition-colors group-hover:bg-waverti-gradient group-hover:text-white [&_svg]:size-[18px]">{c.icon}</span>
+                  <span className={cn("grid size-10 place-items-center rounded-xl transition-transform group-hover:scale-105 [&_svg]:size-[18px]", CATEGORY_TILE[ci % CATEGORY_TILE.length])}>{c.icon}</span>
                   <span className="flex items-center gap-1.5 font-medium">
                     {c.title}
                     {locked ? <Lock className="size-3.5 text-muted-fg" aria-label="Non inclus dans votre formule" /> : null}
@@ -538,7 +529,7 @@ export function MonitorWizard({
         <section className="flex flex-col gap-6" aria-labelledby="wz-h1">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 id="wz-h1" ref={headingRef} tabIndex={-1} className="font-display text-lg font-semibold outline-none">
+              <h2 id="wz-h1" ref={headingRef} tabIndex={-1} className="font-display text-xl font-semibold outline-none">
                 {cat.title}
               </h2>
               <p className="text-sm text-muted-fg">À indiquer : {cat.target}.</p>
@@ -548,6 +539,9 @@ export function MonitorWizard({
             </Button>
           </div>
           {assistantNotes.length ? <Callout tone="info">{assistantNotes.join(" ")}</Callout> : null}
+          <Tip>
+            <strong className="font-semibold">Ce que vous recevrez :</strong> {cat.expected}
+          </Tip>
 
           {cat.goals.length > 1 ? (
             <fieldset className="flex flex-col gap-2">
@@ -742,7 +736,7 @@ export function MonitorWizard({
 
       {step === 2 && cat ? (
         <section className="flex flex-col gap-6" aria-labelledby="wz-h2">
-          <h2 id="wz-h2" ref={headingRef} tabIndex={-1} className="font-display text-lg font-semibold outline-none">
+          <h2 id="wz-h2" ref={headingRef} tabIndex={-1} className="font-display text-xl font-semibold outline-none">
             Résumé avant création
           </h2>
           <dl className="grid gap-4 rounded-2xl border border-line bg-white p-5 sm:grid-cols-[180px_1fr]">

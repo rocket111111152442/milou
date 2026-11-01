@@ -16,8 +16,8 @@ export default async function NewMonitorPage({ searchParams }: { searchParams: P
   const initial: RuleCategory | undefined = type === "web_topic" ? "news" : (RULE_CATEGORIES as readonly string[]).includes(categorie ?? "") ? (categorie as RuleCategory) : undefined;
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <PageHeader title="Nouvelle surveillance" description="Choisissez ce que Waverti doit surveiller, vérifiez le résumé, et c'est parti." />
-      <div className="rounded-2xl border border-line bg-white p-5 sm:p-8">
+      <PageHeader title="Nouvelle surveillance" description="Trois étapes : ce que vous voulez suivre, vos réglages, puis un résumé à valider." />
+      <div className="rounded-3xl border border-line/80 bg-white p-5 shadow-[var(--shadow-card)] sm:p-8">
         <NewMonitor
           initialCategory={initial}
           entitlements={{
