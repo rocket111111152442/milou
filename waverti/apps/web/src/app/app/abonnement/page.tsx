@@ -43,8 +43,8 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       {bienvenue && !sub.planId && billing ? (
         <Callout tone="info" title="Bienvenue sur Waverti">
           {trialEligible
-            ? "Essayez la formule de votre choix 3 jours gratuitement. Résiliable en ligne, sans prélèvement pendant l'essai."
-            : "Choisissez votre formule. Résiliable en ligne à tout moment."}
+            ? "Choisissez la formule qui vous convient : vous l'essayez gratuitement pendant 3 jours et vous pouvez résilier en ligne avant la fin de l'essai, sans aucun prélèvement."
+            : "Choisissez la formule qui vous convient. Votre essai gratuit a déjà été utilisé : le premier paiement a lieu à la validation, et vous pouvez résilier en ligne à tout moment."}
         </Callout>
       ) : null}
       {returned ? <CheckoutReturnBanner state={returned} /> : null}
@@ -70,8 +70,10 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
                   : sub.planId
                   ? `${formatCents(PLAN_CATALOG[sub.planId as keyof typeof PLAN_CATALOG]?.priceCents ?? 0)} / mois TTC, renouvelé chaque mois jusqu'à résiliation`
                   : trialEligible
+                  ? "Vos surveillances sont en pause. Choisissez une formule : essai gratuit de 3 jours, sans prélèvement pendant l'essai."
+                  : !billing
                   ? "Vos surveillances sont en pause. Choisissez une formule pour les réactiver."
-                  : "Vos surveillances sont en pause. Choisissez une formule pour les réactiver."}
+                  : "Vos surveillances sont en pause. Choisissez une formule : votre essai gratuit a déjà été utilisé, le premier paiement a lieu à la validation."}
               </p>
             </div>
             {sub.betaEndsAt ? (
