@@ -7,7 +7,7 @@ Copie de travail isolée ; les modifications tarifaires non validées de la copi
 
 Premier lot seulement : audit et sélection du format dans le moteur de pages existant. Pas de nouveau moteur réseau, aucune migration, aucun changement Stripe ou Brave, aucun déploiement de worker. Les lots suivants ne sont pas commencés.
 
-Le lot est validé par les tests unitaires et les tests locaux navigateur/proxy. La validation globale reste ouverte : environnement E2E complet absent, lint préexistant en échec. Aucun résultat ci-dessous ne représente un taux de compatibilité avec Internet.
+Le lot est validé par 712 tests unitaires et d’intégration sur GitHub, le typage, le lint du projet, 57 E2E web et l’E2E du binaire desktop Linux. La Preview est construite, sans migration. Aucun résultat ci-dessous ne représente un taux de compatibilité avec Internet.
 
 ## Audit du code existant
 
@@ -75,14 +75,25 @@ node node_modules/tsx/dist/cli.mjs packages/monitoring/scripts/adaptive-benchmar
 
 - Suite unitaire complète : **24 fichiers, 515 tests réussis** (100,23 s). Deux premières exécutions ont rencontré des erreurs transitoires de dépendances et de délai ; exécution séquentielle complète réussie sans modifier les tests historiques.
 - Typage monitoring, worker et web : réussi.
-- Lint du code monitoring et des nouveaux tests : réussi. Lint global : trois erreurs préexistantes (`apps/desktop/e2e/desktop.e2e.test.ts`, deux dans `packages/monitoring/test/products-brave.int.test.ts`) et avertissements historiques ; non corrigés hors périmètre.
+- Lint prévu par les scripts de chaque package : réussi localement et sur GitHub. Lint monitoring et nouveaux tests : réussi. Un contrôle supplémentaire `eslint .` au-delà du périmètre des scripts révèle trois erreurs préexistantes (`apps/desktop/e2e/desktop.e2e.test.ts`, deux dans `packages/monitoring/test/products-brave.int.test.ts`) et avertissements historiques ; non corrigés hors périmètre.
 - Navigateur/proxy : **3 tests réussis** (16,15 s) avec `PLAYWRIGHT_CHROMIUM_EXECUTABLE` pointant vers Chrome installé localement. Le chemin Linux initial était absent.
-- Intégration PostgreSQL (`rules.int.test.ts`) : bloquée, connexion refusée sur 127.0.0.1:5432 ; 10 tests non exécutés.
-- E2E web tenté : échec au lancement du Chromium Playwright attendu, non installé ; 9 autres tests non exécutés. L'environnement applicatif/base/Mailpit complet n'est pas disponible. Aucun E2E déclaré réussi.
+- Intégration PostgreSQL locale (`rules.int.test.ts`) : connexion refusée sur 127.0.0.1:5432 ; 10 tests non exécutés localement. La suite complète a ensuite réussi sur GitHub.
+- E2E web local tenté : échec au lancement du Chromium Playwright attendu, non installé ; 9 autres tests non exécutés. Les E2E sont donc exécutés sur GitHub avec les services isolés de test.
+
+## Livraison de test
+
+- Commit du code testé : `bcfc54c445790a82c76d8d446b132b7029822270`.
+- [Proposition en brouillon n° 1](https://github.com/rocket111111152442/milou/pull/1), ciblant la branche de développement existante ; huit fichiers, un commit de code, aucune fusion.
+- [CI GitHub](https://github.com/rocket111111152442/milou/actions/runs/41339194801) : **46 fichiers, 712 tests réussis, 71,20 s** ; typage et lint réussis. PostgreSQL, stripe-mock et Chromium sont ceux de la CI, aucun service de Production.
+- E2E web GitHub : **57 tests réussis en 1,8 minute**, build compris dans le job réussi ; PostgreSQL, Mailpit et stripe-mock isolés. Cela valide les parcours existants, pas un nouveau parcours de compatibilité (prévu dans un lot suivant).
+- Desktop Linux GitHub : build de l’application, tests et lint Rust, binaire debug et E2E du binaire réel réussis ; PostgreSQL, Mailpit et stripe-mock isolés.
+- [Preview](https://watchly-16qaoxg34-lullinismael2-9456s-projects.vercel.app/) : Vercel `dpl_D5vyyCbq1hHpkz5njdUDy86R7MnK`, état READY, cible Preview (`target: null`). Construction via `pnpm exec next build`, sans script de migration. Le build automatique initial avait été ignoré ; une construction explicite de ce commit a été lancée.
+- Accès HTTP à la Preview non vérifié : protection Vercel conservée, connecteur refusé avec 403 lors de la lecture. Le statut READY atteste la construction, pas les parcours utilisateurs.
+- Build Windows local incomplet : dépendance `@radix-ui/react-hover-card` non résolue. La construction Vercel a réussi avec les dépendances installées sur le serveur.
 
 ## Limites et lots suivants — non commencés
 
-1. **Clôture du lot 1** : build Preview, validation de bout en bout dans un environnement de test complet, correction des problèmes globaux identifiés. Aucun passage automatique aux lots suivants avant cette validation.
+1. **Clôture du lot 1** : Preview construite, tests, E2E web et E2E desktop validés. Revue du lot livré avant tout passage aux lots suivants.
 2. **Fiabilité des informations** : unifier provenance et valeurs vérifiées/incertaines/indisponibles, supprimer les devises implicites, garantir les variantes, réutiliser les règles strictes du moteur produits. Tests par champ et fausses alertes.
 3. **Navigateur isolé** : service sans secrets ni accès interne, plafonds OS CPU/RAM, concurrence et file bornées, budget réseau par page, fermeture, attente ciblée, validations de chaque requête et redirection. Recette SSRF et charge avant activation.
 4. **Coûts et performance** : validateurs HTTP/304, politiques par source, coordination des domaines et requêtes simultanées, quotas par abonnement, mesures CPU/RAM/réseau et coûts HTML/Chromium comparables.
