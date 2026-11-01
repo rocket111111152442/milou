@@ -14,7 +14,7 @@ export const revalidate = 600;
 const steps = [
   {
     title: "1. Téléchargez l'installateur",
-    text: "Choisissez le fichier correspondant à votre système. Vérifiez si besoin son empreinte SHA-256 affichée sous les boutons. Cette version bêta n'est pas signée : Windows et macOS afficheront un avertissement à la première ouverture.",
+    text: "Choisissez votre système et téléchargez Waverti. Les informations de vérification sont disponibles dans « Détails techniques et vérification ».",
   },
   {
     title: "2. Installez et ouvrez Waverti",
