@@ -22,7 +22,7 @@ import {
 import { isUuid } from "@waverti/database";
 import { normalizeEmailForAbuse, pepperedHash } from "@waverti/auth";
 import { notify } from "@waverti/notifications";
-import { PLAN_CATALOG } from "./catalog";
+import { isPaidPlanId, PLAN_CATALOG } from "./catalog";
 import { loadPriceMap } from "./checkout";
 import { recomputeEntitlements } from "./store";
 import { idOf, normalizeStatus, toDate, type Stripe, type StripeClient } from "./stripe";
@@ -244,6 +244,17 @@ async function upsertSubscription(tx: Transaction, userId: string, sub: Stripe.S
   }
   planId ??= sub.metadata?.plan_id ?? null;
   if (!planId) throw new Error(`subscription ${sub.id}: formule inconnue`);
+  // Rotation des prix Stripe : après transfert de la clé de recherche vers un nouveau prix, `plans.stripe_price_id` désigne le
+  // nouveau prix alors qu'un abonnement existant reste sur l'ancien. La formule vient alors de la métadonnée `plan_id`, et la
+  // période de facturation de l'élément de formule (jamais perdue : sinon la date de renouvellement serait effacée).
+  if (periodEnd === null && planId && isPaidPlanId(planId)) {
+    const legacyExtra = new Set(sub.items.data.filter((i) => i.price.lookup_key === "waverti_business_extra_site_monthly").map((i) => i.id));
+    const planItem = sub.items.data.find((i) => !legacyExtra.has(i.id));
+    if (planItem) {
+      periodStart = planItem.current_period_start;
+      periodEnd = planItem.current_period_end;
+    }
+  }
 
   const [prev] = await tx
     .select({ status: subscriptions.status, planId: subscriptions.planId, cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd })
