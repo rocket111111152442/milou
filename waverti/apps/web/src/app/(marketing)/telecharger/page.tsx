@@ -14,11 +14,11 @@ export const revalidate = 600;
 const steps = [
   {
     title: "1. Téléchargez l'installateur",
-    text: "Choisissez le fichier correspondant à votre système. Vérifiez si besoin son empreinte SHA-256 affichée sous le bouton.",
+    text: "Choisissez le fichier correspondant à votre système. Vérifiez si besoin son empreinte SHA-256 affichée sous les boutons. Cette version bêta n'est pas signée : Windows et macOS afficheront un avertissement à la première ouverture.",
   },
   {
     title: "2. Installez et ouvrez Waverti",
-    text: "Windows : exécutez le fichier .msi. macOS : ouvrez le .dmg et glissez Waverti dans Applications. Linux : rendez l'AppImage exécutable ou installez le paquet .deb.",
+    text: "Windows : exécutez le fichier .exe (ou .msi). macOS : ouvrez le .dmg et glissez Waverti dans Applications. Linux : installez le paquet .deb (sudo apt install ./Waverti_….deb).",
   },
   {
     title: "3. Reliez l'application à votre compte",
@@ -52,7 +52,7 @@ export default async function TelechargerPage() {
             <h3 className="font-display text-base font-semibold text-ink">Désinstallation</h3>
             <p className="mt-2">
               Windows : Paramètres › Applications › Waverti › Désinstaller. macOS : quittez Waverti puis placez-le dans la
-              corbeille. Linux : supprimez l'AppImage ou exécutez <code className="rounded bg-surface px-1">sudo apt remove waverti</code>.
+              corbeille. Linux : exécutez <code className="rounded bg-surface px-1">sudo apt remove waverti</code>.
               La désinstallation révoque l'accès local ; l'appareil peut aussi être révoqué depuis vos paramètres en ligne.
             </p>
           </div>

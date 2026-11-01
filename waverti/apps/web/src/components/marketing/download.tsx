@@ -6,8 +6,11 @@ import type { PublicRelease } from "@/lib/releases";
 const platforms = [
   { id: "windows" as const, name: "Windows", icon: <Monitor />, req: "Windows 10 ou 11 (64 bits)" },
   { id: "macos" as const, name: "macOS", icon: <Apple />, req: "macOS 11 Big Sur ou plus récent" },
-  { id: "linux" as const, name: "Linux", icon: <Terminal />, req: "AppImage / .deb (x86_64)" },
+  { id: "linux" as const, name: "Linux", icon: <Terminal />, req: "Debian, Ubuntu et dérivés (x86_64)" },
 ];
+
+const PACKAGE_LABEL: Record<string, string> = { nsis: "Installateur (.exe)", msi: "Installateur (.msi)", deb: "Paquet .deb", dmg: "Image disque (.dmg)", appimage: "AppImage", rpm: "Paquet .rpm" };
+const ARCH_LABEL: Record<string, string> = { x86_64: "64 bits Intel/AMD", aarch64: "Apple Silicon", universal: "Intel et Apple Silicon" };
 
 function formatSize(bytes: number | null) {
   if (!bytes) return null;
@@ -44,18 +47,26 @@ export function DownloadSection({ releases, standalone = false }: { releases: Pu
                     {rel.map((r) => (
                       <Button key={`${r.packageType}-${r.arch}`} asChild variant="secondary">
                         <a href={r.url} rel="noopener">
-                          <Download aria-hidden="true" /> {r.packageType.toUpperCase()} · {r.arch}
+                          <Download aria-hidden="true" /> {PACKAGE_LABEL[r.packageType] ?? r.packageType.toUpperCase()}
+                          {p.id === "macos" ? ` · ${ARCH_LABEL[r.arch] ?? r.arch}` : ""}
                           {formatSize(r.sizeBytes) ? ` · ${formatSize(r.sizeBytes)}` : ""}
                         </a>
                       </Button>
                     ))}
                     {!latest.codeSigned ? (
                       <p className="flex gap-1.5 text-xs text-warning">
-                        <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /> Installateur non signé : votre
-                        système affichera un avertissement.
+                        <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /> Version bêta non signée : votre
+                        système affichera un avertissement
+                        {p.id === "windows" ? " (SmartScreen : « Informations complémentaires » puis « Exécuter quand même »)" : ""}
+                        {p.id === "macos" ? " (Gatekeeper : clic droit sur l'application puis « Ouvrir »)" : ""}.
                       </p>
                     ) : null}
-                    <p className="break-all text-[11px] text-muted-fg">SHA-256 : {latest.sha256}</p>
+                    {latest.testedOn ? <p className="text-[11px] text-muted-fg">Testé : {latest.testedOn}.</p> : null}
+                    {rel.map((r) => (
+                      <p key={`sha-${r.packageType}-${r.arch}`} className="break-all text-[11px] text-muted-fg">
+                        SHA-256 ({PACKAGE_LABEL[r.packageType] ?? r.packageType}) : {r.sha256}
+                      </p>
+                    ))}
                   </div>
                 ) : (
                   <p className="mt-auto rounded-xl bg-surface p-3 text-sm text-muted-fg">
