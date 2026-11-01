@@ -40,11 +40,11 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Abonnement" description="Votre formule, vos quotas et votre facturation." />
-      {bienvenue && !sub.planId ? (
+      {bienvenue && !sub.planId && billing ? (
         <Callout tone="info" title="Bienvenue sur Waverti">
           {trialEligible
-            ? "Choisissez la formule qui vous convient : vous l'essayez gratuitement pendant 3 jours et vous pouvez résilier en ligne avant la fin de l'essai, sans aucun prélèvement."
-            : "Choisissez la formule qui vous convient. Votre essai gratuit a déjà été utilisé : le premier paiement a lieu à la validation, et vous pouvez résilier en ligne à tout moment."}
+            ? "Essayez la formule de votre choix 3 jours gratuitement. Résiliable en ligne, sans prélèvement pendant l'essai."
+            : "Choisissez votre formule. Résiliable en ligne à tout moment."}
         </Callout>
       ) : null}
       {returned ? <CheckoutReturnBanner state={returned} /> : null}
@@ -54,12 +54,12 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         </Callout>
       ) : null}
       {!billing ? (
-        <Callout tone="warning" title="Paiement indisponible sur cet environnement">
-          Stripe n'est pas configuré ici. Les formules payantes ne peuvent pas être souscrites ; aucune donnée bancaire n'est collectée.
+        <Callout tone="warning" title="Les paiements ne sont pas encore ouverts">
+          Vous ne pouvez pas encore souscrire de formule ici, et aucune donnée bancaire n'est demandée.
         </Callout>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+      <div className={sub.planId || sub.betaEndsAt ? "grid gap-6 lg:grid-cols-[1.3fr_1fr]" : "grid gap-6"}>
         <Card>
           <CardHeader className="flex-row items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
@@ -70,8 +70,8 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
                   : sub.planId
                   ? `${formatCents(PLAN_CATALOG[sub.planId as keyof typeof PLAN_CATALOG]?.priceCents ?? 0)} / mois TTC, renouvelé chaque mois jusqu'à résiliation`
                   : trialEligible
-                  ? "Vos surveillances sont en pause. Choisissez une formule : essai gratuit de 3 jours, sans prélèvement pendant l'essai."
-                  : "Vos surveillances sont en pause. Choisissez une formule : votre essai gratuit a déjà été utilisé, le premier paiement a lieu à la validation."}
+                  ? "Vos surveillances sont en pause. Choisissez une formule pour les réactiver."
+                  : "Vos surveillances sont en pause. Choisissez une formule pour les réactiver."}
               </p>
             </div>
             {sub.betaEndsAt ? (
@@ -134,6 +134,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
             </div>
           </CardContent>
         </Card>
+        {sub.planId || sub.betaEndsAt ? (
         <Card>
           <CardHeader>
             <CardTitle as="h2">Quotas utilisés</CardTitle>
@@ -150,6 +151,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
             </p>
           </CardContent>
         </Card>
+        ) : null}
       </div>
 
 
