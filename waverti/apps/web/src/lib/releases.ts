@@ -3,32 +3,26 @@ import { unstable_cache } from "next/cache";
 import { and, desc, desktopReleases, eq } from "@waverti/database";
 import { getDb, isDatabaseConfigured } from "./db";
 
-export interface PublicRelease {
-  version: string;
-  platform: "windows" | "macos" | "linux";
-  arch: string;
-  packageType: string;
-  url: string;
-  sha256: string;
-  sizeBytes: number | null;
-  codeSigned: boolean;
-  testedOn: string | null;
-  publishedAt: string | null;
-}
+export type { PublicRelease } from "./release-parse";
+import type { PublicRelease } from "./release-parse";
+import { githubReleasesEnabled, loadGithubReleases } from "./github-releases";
 
 /**
- * Seules les versions explicitement publiées (is_published) sont proposées au téléchargement :
- * aucun bouton actif n'est affiché sans fichier réel testé.
+ * Seules les versions explicitement publiées sont proposées au téléchargement (base : is_published ; GitHub : version
+ * publiée avec marqueur de tests et sommes de contrôle). Aucun bouton actif n'est affiché sans fichier réel testé.
  */
 export const getPublishedReleases = unstable_cache(
   async (): Promise<PublicRelease[]> => {
-    if (!isDatabaseConfigured()) return [];
+    const fromGithub = async (): Promise<PublicRelease[]> => (githubReleasesEnabled() ? loadGithubReleases() : []);
+    if (!isDatabaseConfigured()) return fromGithub();
     try {
       const rows = await getDb()
         .select()
         .from(desktopReleases)
         .where(and(eq(desktopReleases.isPublished, true)))
         .orderBy(desc(desktopReleases.publishedAt));
+      // Les versions enregistrées en base (publication manuelle) priment ; sinon on lit les versions publiques GitHub.
+      if (!rows.length) return fromGithub();
       return rows.map((r) => ({
         version: r.version,
         platform: r.platform,
@@ -43,7 +37,7 @@ export const getPublishedReleases = unstable_cache(
       }));
     } catch (err) {
       console.error("releases: lecture impossible", (err as Error).message);
-      return [];
+      return fromGithub();
     }
   },
   ["desktop-releases"],

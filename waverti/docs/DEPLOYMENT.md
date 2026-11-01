@@ -96,14 +96,35 @@ Créer une clé (offre « Data for AI » ou « Pro ») → `BRAVE_SEARCH_API_KEY
 
 ## 7. Application desktop
 
-- Workflow manuel `.github/workflows/waverti-desktop-release.yml` : vérifications, construction Windows /
-  macOS (Intel et Apple Silicon) / Linux, **brouillon** de version GitHub, `SHA256SUMS.txt`.
-- Signature : certificats Authenticode (Windows) et Apple Developer ID + notarisation [humain, payants].
-  Sans eux, les installateurs sont construits non signés et la note de version le précise.
-- Mises à jour : générer une paire de clés (`pnpm --filter @waverti/desktop tauri signer generate`), mettre la
-  clé privée en secret GitHub et la clé publique en variable `TAURI_UPDATER_PUBKEY`.
-- La page Téléchargement n'affiche un installateur que s'il est enregistré comme publié dans
-  `desktop_releases` (jamais de lien vers une version non testée).
+**Publier une version** : mettre la même version dans `apps/desktop/src-tauri/tauri.conf.json`, laisser passer la CI
+(« Waverti Desktop — plateformes » doit réussir), puis pousser le tag `waverti-desktop-vX.Y.Z` :
+
+```bash
+git tag waverti-desktop-v0.1.0 && git push origin waverti-desktop-v0.1.0
+```
+
+Le workflow `.github/workflows/waverti-desktop-release.yml` (déclenché par ce tag, ou manuellement une fois présent sur la
+branche par défaut) : vérifie la version, relance les tests, construit Windows (NSIS, MSI), macOS (Apple Silicon et Intel) et
+Linux (.deb, .rpm, AppImage), crée une version GitHub en **brouillon**, ajoute `SHA256SUMS.txt`, puis — **uniquement si**
+« plateformes » a réussi sur un code desktop identique — la **publie en pré-version non signée**, avec un marqueur listant les
+installateurs réellement testés en CI. Sinon la version reste en brouillon (rien n'est public).
+
+**Ce que le site propose** (`/telecharger`) : le site lit la dernière version publiée du dépôt public (variable facultative
+`WAVERTI_RELEASES_REPO`, par défaut le dépôt du projet ; actif sur Vercel seulement) et n'affiche **que** les installateurs
+(1) de la version publiée (pas un brouillon), (2) listés comme testés dans le marqueur, (3) dont la somme SHA-256 figure dans
+`SHA256SUMS.txt`. Aujourd'hui : Windows (NSIS, MSI), Linux (.deb), macOS Apple Silicon (.dmg). **Non proposés** car non testés
+sur machine : AppImage, .rpm, macOS Intel. Les versions enregistrées dans `desktop_releases` (`is_published`), si elles existent,
+priment sur GitHub. Le cache dure 10 minutes.
+
+**Serveur cible** : l'adresse de l'API est compilée dans l'application (`WAVERTI_API_URL`) ; par défaut
+`https://www.waverti.com` (modifiable par la variable GitHub `WAVERTI_API_URL`). Une Preview protégée par Vercel ne peut pas
+servir d'API à l'application. L'application desktop fonctionne donc avec les comptes du serveur ciblé.
+
+- Signature : certificats Authenticode (Windows) et Apple Developer ID + notarisation [humain, payants]. Sans eux, les
+  installateurs sont **non signés** : SmartScreen (Windows) et Gatekeeper (macOS) affichent un avertissement ; le site l'explique.
+- Mises à jour : générer une paire de clés (`pnpm --filter @waverti/desktop tauri signer generate`), mettre la clé privée en
+  secret GitHub et la clé publique en variable `TAURI_UPDATER_PUBKEY`. Les pré-versions ne sont pas servies par
+  `releases/latest` : voir `docs/RAPPORT-2026-10-31.md` avant d'activer les mises à jour.
 
 ## 8. Avant d'ouvrir au public (liste de contrôle)
 

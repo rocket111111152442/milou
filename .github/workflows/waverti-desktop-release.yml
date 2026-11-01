@@ -1,14 +1,19 @@
 # Construction des installateurs Waverti (Windows, macOS, Linux).
 #
+# Déclenchement : poussée d'un tag « waverti-desktop-vX.Y.Z » (la version doit correspondre à tauri.conf.json) ou
+# lancement manuel (GitHub n'enregistre le lancement manuel que si le fichier existe sur la branche par défaut).
+#
 # Garde-fous :
-# - déclenchement MANUEL uniquement ; les tests doivent passer avant toute construction ;
-# - la version GitHub est créée en BROUILLON (draft) : rien n'est publié automatiquement ;
+# - les tests doivent passer avant toute construction ;
+# - la version GitHub est d'abord créée en BROUILLON (draft) ; la dernière étape ne la publie (en PRÉ-VERSION, non
+#   signée) que si le workflow « Waverti Desktop — plateformes » a réussi sur le même code. Sinon elle reste brouillon ;
+# - le site n'affiche en téléchargement que les installateurs que la CI a réellement testés (marqueur dans la note) ;
 # - signature Windows/macOS et mises à jour signées UNIQUEMENT si les secrets existent ;
 #   sinon les installateurs sont construits NON SIGNÉS et la note de version le dit ;
 # - un fichier SHA256SUMS.txt accompagne les installateurs.
 #
 # Variables / secrets attendus (Settings > Secrets and variables > Actions) :
-#   vars.WAVERTI_API_URL                       (obligatoire, https://…)
+#   vars.WAVERTI_API_URL                       (facultatif, https://… ; par défaut https://www.waverti.com)
 #   secrets.TAURI_SIGNING_PRIVATE_KEY (+ _PASSWORD), vars.TAURI_UPDATER_PUBKEY   (mises à jour signées)
 #   secrets.APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
 #           APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID                               (signature + notarisation macOS)
@@ -16,11 +21,16 @@
 name: Waverti Desktop — installateurs
 
 on:
+  push:
+    tags: ["waverti-desktop-v*"]
   workflow_dispatch:
     inputs:
       version:
         description: "Version (ex. 0.1.0) — doit correspondre à tauri.conf.json"
         required: true
+
+env:
+  WAVERTI_API_URL: ${{ vars.WAVERTI_API_URL || 'https://www.waverti.com' }}
 
 permissions:
   contents: write
@@ -29,17 +39,28 @@ jobs:
   verify:
     name: Vérifications avant construction
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
     defaults:
       run:
         working-directory: waverti
     steps:
       - uses: actions/checkout@v4
+      - name: Version
+        id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then V="$INPUT_VERSION"; else V="${REF_NAME#waverti-desktop-v}"; fi
+          [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version invalide : $V"; exit 1; }
+          echo "version=$V" >> "$GITHUB_OUTPUT"
       - name: Version cohérente
         run: |
           CONF=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
-          test "$CONF" = "${{ inputs.version }}" || { echo "tauri.conf.json=$CONF ≠ ${{ inputs.version }}"; exit 1; }
+          test "$CONF" = "${{ steps.v.outputs.version }}" || { echo "tauri.conf.json=$CONF ≠ ${{ steps.v.outputs.version }}"; exit 1; }
       - name: Serveur cible défini
-        run: test -n "${{ vars.WAVERTI_API_URL }}" && [[ "${{ vars.WAVERTI_API_URL }}" == https://* ]]
+        run: test -n "$WAVERTI_API_URL" && [[ "$WAVERTI_API_URL" == https://* ]]
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: pnpm/action-setup@v4
@@ -69,7 +90,6 @@ jobs:
           - { os: macos-latest, label: macOS (Intel), args: "--target x86_64-apple-darwin" }
     runs-on: ${{ matrix.os }}
     env:
-      WAVERTI_API_URL: ${{ vars.WAVERTI_API_URL }}
       HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
       HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
       HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
@@ -127,8 +147,8 @@ jobs:
           projectPath: waverti/apps/desktop
           tauriScript: pnpm tauri
           args: ${{ matrix.args }} ${{ env.UPDATER_ARGS }}
-          tagName: waverti-desktop-v${{ inputs.version }}
-          releaseName: Waverti ${{ inputs.version }} (brouillon)
+          tagName: waverti-desktop-v${{ needs.verify.outputs.version }}
+          releaseName: Waverti ${{ needs.verify.outputs.version }} (bêta non signée)
           releaseBody: |
             Brouillon généré automatiquement — à vérifier et tester manuellement avant toute publication.
             Signature Windows : ${{ env.HAS_WINDOWS_CERT == 'true' && 'oui' || 'NON (installateur non signé)' }}
@@ -140,13 +160,13 @@ jobs:
 
   checksums:
     name: Sommes de contrôle SHA-256
-    needs: build
+    needs: [verify, build]
     runs-on: ubuntu-24.04
     steps:
       - name: Téléchargement des installateurs du brouillon et calcul des empreintes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: waverti-desktop-v${{ inputs.version }}
+          TAG: waverti-desktop-v${{ needs.verify.outputs.version }}
         run: |
           mkdir assets && cd assets
           gh release download "$TAG" --repo "${{ github.repository }}" --pattern "*" --skip-existing
@@ -154,3 +174,55 @@ jobs:
           sha256sum -- * > SHA256SUMS.txt
           cat SHA256SUMS.txt
           gh release upload "$TAG" SHA256SUMS.txt --repo "${{ github.repository }}" --clobber
+
+  publish:
+    name: Publication en pré-version (si les tests de plateformes ont réussi)
+    needs: [verify, checksums]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Les installateurs ont-ils été testés sur ce code ?
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Un run réussi de « plateformes » dont le code desktop, les paquets et l'API agent sont identiques à ceux de ce tag.
+          WATCHED="waverti/apps/desktop waverti/packages waverti/apps/web/src/app/api/agent waverti/pnpm-lock.yaml"
+          FOUND=""
+          for SHA in $(gh run list --repo "${{ github.repository }}" --workflow waverti-desktop-platforms.yml --status success --limit 50 --json headSha --jq '.[].headSha'); do
+            git cat-file -e "$SHA^{commit}" 2>/dev/null || continue
+            if git diff --quiet "$SHA" "$GITHUB_SHA" -- $WATCHED; then FOUND="$SHA"; break; fi
+          done
+          if [ -z "$FOUND" ]; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Aucun run réussi de « Waverti Desktop — plateformes » sur un code identique : la version reste en BROUILLON."
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "sha=$FOUND" >> "$GITHUB_OUTPUT"
+            echo "Tests de plateformes réussis sur $FOUND (code desktop identique)."
+          fi
+      - name: Publication en pré-version non signée
+        if: steps.gate.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: waverti-desktop-v${{ needs.verify.outputs.version }}
+          TESTED_SHA: ${{ steps.gate.outputs.sha }}
+        run: |
+          # Marqueur lu par le site : seuls les installateurs listés ici sont proposés au téléchargement.
+          cat > notes.md <<EOF
+          Version bêta **non signée** : Windows (SmartScreen) et macOS (Gatekeeper) afficheront un avertissement. Vérifiez la somme de contrôle (SHA256SUMS.txt) si besoin.
+
+          Testés automatiquement (code identique au run \`$TESTED_SHA\` du workflow « Waverti Desktop — plateformes ») :
+          - Windows : installation, lancement et désinstallation des installateurs NSIS (.exe) et MSI ; E2E du binaire réel.
+          - Linux : installation, lancement et désinstallation du paquet .deb ; E2E du binaire réel.
+          - macOS (Apple Silicon) : application construite et lancée.
+
+          Non proposés au téléchargement car non testés : AppImage, .rpm, macOS Intel.
+          Aucun essai sur un ordinateur réel (hors machines de CI) n'a été fait.
+
+          <!-- waverti-release {"tested":{"windows:nsis":"CI Windows : E2E du binaire réel, installation, lancement et désinstallation","windows:msi":"CI Windows : installation, lancement et désinstallation","linux:deb":"CI Ubuntu : E2E du binaire réel, installation, lancement et désinstallation","macos:dmg:aarch64":"CI macOS Apple Silicon : application construite et lancée"},"testedSha":"$TESTED_SHA"} -->
+          EOF
+          gh release edit "$TAG" --repo "${{ github.repository }}" --draft=false --prerelease=true --notes-file notes.md
+          gh release view "$TAG" --repo "${{ github.repository }}" --json isDraft,isPrerelease,assets --jq '{isDraft,isPrerelease,assets:[.assets[].name]}'
