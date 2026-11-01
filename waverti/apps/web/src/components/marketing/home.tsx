@@ -15,7 +15,7 @@ import {
   Calculator,
   Clock,
 } from "lucide-react";
-import { Button, Container, LogoMark, cn } from "@waverti/ui";
+import { Button, Container, LogoMark, Reveal, cn } from "@waverti/ui";
 import { PLAN_CATALOG, PAID_PLAN_IDS } from "@waverti/billing/catalog";
 import { formatCents, formatInterval } from "@waverti/types";
 import { HomeDemo } from "./home-demo";
@@ -26,13 +26,18 @@ const H2 = "font-display text-[30px] font-bold leading-[1.1] tracking-[-0.03em] 
 
 export function HomeHero() {
   return (
-    <section aria-labelledby="hero-title" className="relative overflow-hidden bg-[radial-gradient(1200px_500px_at_15%_-10%,rgb(0_229_255/0.07),transparent),radial-gradient(900px_500px_at_95%_0%,rgb(128_40_255/0.07),transparent)]">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-waverti-gradient" />
-      <Container className="grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:py-20">
+    <section aria-labelledby="hero-title" className="relative overflow-hidden">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-0">
+        <div className="absolute -left-24 -top-24 size-[460px] animate-blob-a rounded-full bg-cyan/25 blur-3xl" />
+        <div className="absolute -right-20 top-0 size-[520px] animate-blob-b rounded-full bg-violet/20 blur-3xl" />
+        <div className="absolute bottom-[-180px] left-1/3 size-[480px] animate-blob-c rounded-full bg-pink/15 blur-3xl" />
+      </div>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-1.5 animate-gradient-pan bg-waverti-gradient-animated" />
+      <Container className="relative grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:py-20">
         <div className="flex flex-col items-start">
           <h1 id="hero-title" className="text-balance font-display text-[40px] font-extrabold leading-[1.04] tracking-[-0.04em] sm:text-[56px] lg:text-[62px]">
             Un prix baisse. Une place se libère.{" "}
-            <span className="bg-waverti-gradient bg-clip-text text-transparent">Vous êtes prévenu.</span>
+            <span className="animate-gradient-pan bg-waverti-gradient-animated bg-clip-text text-transparent">Vous êtes prévenu.</span>
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-ink-soft">
             Choisissez une page à suivre. Waverti la vérifie à votre place et vous avertit quand ce que vous attendez arrive.
@@ -91,8 +96,8 @@ export function HomeHowItWorks() {
           <p className="mt-3 text-lg text-ink-soft">Trois questions, et Waverti s'occupe des vérifications.</p>
         </div>
         <ol className="mt-10 grid gap-4 md:grid-cols-3">
-          {STEPS.map((s) => (
-            <li key={s.n} className="relative flex flex-col gap-4 overflow-hidden rounded-3xl border border-line bg-white p-6">
+          {STEPS.map((s, i) => (
+            <Reveal as="li" key={s.n} delay={i * 0.1} className="relative flex flex-col gap-4 overflow-hidden rounded-3xl border border-line bg-white p-6 transition-transform duration-300 hover:-translate-y-1">
               <div className="flex items-center gap-3">
                 <span className={cn("grid size-12 place-items-center rounded-2xl [&_svg]:size-6", s.tint)} aria-hidden="true">
                   {s.icon}
@@ -101,7 +106,7 @@ export function HomeHowItWorks() {
               </div>
               <h3 className="font-display text-xl font-bold">{s.q}</h3>
               <p className="text-ink-soft">{s.a}</p>
-            </li>
+            </Reveal>
           ))}
         </ol>
 
@@ -144,15 +149,15 @@ export function HomeUses() {
           Ce que vous pouvez confier à Waverti
         </h2>
         <ul className="mt-10 grid gap-4 md:grid-cols-3">
-          {USES.map((u) => (
-            <li key={u.title} className="flex flex-col gap-4 rounded-3xl bg-white p-6 shadow-soft">
+          {USES.map((u, i) => (
+            <Reveal as="li" key={u.title} delay={i * 0.1} className="flex flex-col gap-4 rounded-3xl bg-white p-6 shadow-soft transition-transform duration-300 hover:-translate-y-1">
               <span className={cn("grid size-14 place-items-center rounded-2xl bg-gradient-to-br text-white [&_svg]:size-7", u.tint)} aria-hidden="true">
                 {u.icon}
               </span>
               <h3 className="font-display text-xl font-bold">{u.title}</h3>
               <p className="text-ink-soft">{u.goal}</p>
               <p className="mt-auto rounded-2xl bg-surface p-3 text-sm font-medium">{u.result}</p>
-            </li>
+            </Reveal>
           ))}
         </ul>
       </Container>
@@ -221,11 +226,11 @@ export function HomePricing() {
           </Link>
         </div>
         <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {PAID_PLAN_IDS.map((id) => {
+          {PAID_PLAN_IDS.map((id, idx) => {
             const p = PLAN_CATALOG[id];
             const highlighted = id === "pro";
             return (
-              <li key={id} className={cn("flex flex-col rounded-3xl bg-white p-6", highlighted ? "border-gradient shadow-lift" : "border border-line")}>
+              <Reveal as="li" key={id} delay={idx * 0.08} className={cn("flex flex-col rounded-3xl bg-white p-6 transition-transform duration-300 hover:-translate-y-1", highlighted ? "border-gradient shadow-lift" : "border border-line")}>
                 <h3 className="font-display text-lg font-bold">{p.name}</h3>
                 <p className="mt-3 flex items-baseline gap-1">
                   <span className="font-display text-3xl font-extrabold tabular-nums">{formatCents(p.priceCents)}</span>
@@ -244,7 +249,7 @@ export function HomePricing() {
                     Commencer
                   </Link>
                 </Button>
-              </li>
+              </Reveal>
             );
           })}
         </ul>
@@ -288,7 +293,7 @@ export function HomeFinalCta() {
           <div className="flex flex-col items-center gap-5 rounded-[31px] bg-white px-6 py-12 text-center sm:py-16">
             <LogoMark className="size-14" />
             <h2 id="cta-title" className="max-w-2xl text-balance font-display text-[30px] font-extrabold leading-[1.08] tracking-[-0.035em] sm:text-[44px]">
-              Arrêtez de vérifier. <span className="bg-waverti-gradient bg-clip-text text-transparent">Soyez prévenu.</span>
+              Arrêtez de vérifier. <span className="animate-gradient-pan bg-waverti-gradient-animated bg-clip-text text-transparent">Soyez prévenu.</span>
             </h2>
             <Button asChild size="lg">
               <Link href="/inscription">

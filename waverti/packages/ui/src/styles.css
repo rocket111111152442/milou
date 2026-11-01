@@ -54,6 +54,27 @@
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-scan: scan 3.2s var(--ease-out-soft) infinite;
 
+  --animate-blob-a: blob-a 18s ease-in-out infinite;
+  --animate-blob-b: blob-b 22s ease-in-out infinite;
+  --animate-blob-c: blob-c 26s ease-in-out infinite;
+  --animate-gradient-pan: gradient-pan 8s ease-in-out infinite;
+
+  @keyframes blob-a {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(8%, 10%) scale(1.15); }
+  }
+  @keyframes blob-b {
+    0%, 100% { transform: translate(0, 0) scale(1.1); }
+    50% { transform: translate(-10%, 6%) scale(0.95); }
+  }
+  @keyframes blob-c {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-6%, -9%) scale(1.2); }
+  }
+  @keyframes gradient-pan {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
   @keyframes pulse-dot {
     0% { box-shadow: 0 0 0 0 currentColor; }
     70% { box-shadow: 0 0 0 6px transparent; }
@@ -166,6 +187,13 @@
       linear-gradient(to right, rgb(17 17 24 / 0.04) 1px, transparent 1px),
       linear-gradient(to bottom, rgb(17 17 24 / 0.04) 1px, transparent 1px);
     background-size: 48px 48px;
+  }
+}
+
+@layer utilities {
+  .bg-waverti-gradient-animated {
+    background-image: linear-gradient(90deg, #00e5ff, #245bff, #8028ff, #ed4df5, #00e5ff);
+    background-size: 200% 100%;
   }
 }
 
