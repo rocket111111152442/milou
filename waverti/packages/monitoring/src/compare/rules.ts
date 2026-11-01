@@ -16,6 +16,7 @@ import { describeAtom, formatPrice, ruleAtoms, UPTIME_ATOMS } from "@waverti/typ
 import { shortHash } from "../extract/structure";
 import { collapseWhitespace, normalizeForMatch } from "../extract/text";
 import { changeRatio, diffSentences } from "./similarity";
+import { availabilityIsReliable, priceIsReliable } from "./reliability";
 import { SIGNIFICANT_CHANGE_RATIO, type AlertKind, type Evaluation } from "./evaluate";
 
 type SetName = "items" | "links" | "docs" | "dates" | "headings";
@@ -183,20 +184,20 @@ function listLabels(entries: Entry[], max = 5): string {
 function evalAtom(a: RuleAtom, ctx: { prev: PageObservation | null; curr: PageObservation; mem: RuleMemory; exclude: string[]; now: Date }): AtomResult {
   const { prev, curr, mem, exclude, now } = ctx;
   const cur = curr.currency ?? "EUR";
-  const price = curr.price;
+  const price = curr.price ?? 0;
   const priceMissing = (): AtomResult => ({ v: null, event: false, reason: null, missing: "price_not_found" });
   switch (a.type) {
     case "price_below":
     case "price_above": {
-      if (price === null) return priceMissing();
+      if (!priceIsReliable(curr)) return priceMissing();
       if (a.currency && cur !== a.currency) return { v: null, event: false, reason: null, missing: "currency_mismatch" };
       const ok = a.type === "price_below" ? (a.orEqual ? price <= a.value : price < a.value) : a.orEqual ? price >= a.value : price > a.value;
       return { v: ok, event: false, reason: ok ? `prix relevé ${formatPrice(price, cur)} (${a.type === "price_below" ? "seuil" : "plafond"} ${formatPrice(a.value, a.currency)})` : null };
     }
     case "price_drop":
     case "price_rise": {
-      if (price === null) return priceMissing();
-      const ref = a.reference === "reference" ? mem.refPrice : (prev?.price ?? null);
+      if (!priceIsReliable(curr)) return priceMissing();
+      const ref = a.reference === "reference" ? mem.refPrice : (priceIsReliable(prev) && prev?.currency === cur ? prev.price : null);
       if (ref === null || ref <= 0) return { v: false, event: false, reason: null };
       if (prev?.currency && prev.currency !== cur) return { v: null, event: false, reason: null, missing: "currency_mismatch" };
       const delta = a.type === "price_drop" ? ref - price : price - ref;
@@ -213,17 +214,17 @@ function evalAtom(a: RuleAtom, ctx: { prev: PageObservation | null; curr: PageOb
     }
     case "promotion": {
       if (curr.regularPrice === undefined) return { v: null, event: false, reason: null, missing: "promotion_unavailable" };
-      if (price === null) return priceMissing();
+      if (!priceIsReliable(curr)) return priceMissing();
       const ok = curr.regularPrice !== null && curr.regularPrice > price;
       return { v: ok, event: false, reason: ok ? `prix barré affiché par le site : ${formatPrice(curr.regularPrice!, cur)} → ${formatPrice(price, cur)}` : null };
     }
     case "stock_is": {
-      if (curr.availability === "unknown") return { v: null, event: false, reason: null, missing: "availability_unknown" };
+      if (!availabilityIsReliable(curr)) return { v: null, event: false, reason: null, missing: "availability_unknown" };
       const ok = curr.availability === a.state;
       return { v: ok, event: false, reason: ok ? describeAtom(a).replace(/^Le produit est/, "produit") : null };
     }
     case "stock_changed": {
-      if (curr.availability === "unknown") return { v: null, event: false, reason: null, missing: "availability_unknown" };
+      if (!availabilityIsReliable(curr)) return { v: null, event: false, reason: null, missing: "availability_unknown" };
       const changed = !!prev && prev.availability !== "unknown" && prev.availability !== curr.availability;
       return { v: changed, event: changed, reason: changed ? `disponibilité : ${prev!.availability} → ${curr.availability}` : null, sig: `a:${curr.availability}` };
     }
@@ -502,7 +503,7 @@ export function evaluateRule(input: RuleInput): { evaluation: Evaluation; memory
   // Mesure de lenteur (confirmée sur 2 contrôles)
   const slow = atoms.find((a) => a.type === "slow_response");
   if (slow && slow.type === "slow_response" && obs.responseMs !== undefined) mem.slowCount = obs.responseMs > slow.ms ? mem.slowCount + 1 : 0;
-  if (mem.refPrice === null && obs.price !== null) mem.refPrice = obs.price;
+  if (mem.refPrice === null && priceIsReliable(obs)) mem.refPrice = obs.price;
 
   // ——— Évaluation des conditions ———
   const ctx = { prev, curr: obs, mem, exclude: rule.exclude, now };

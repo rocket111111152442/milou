@@ -26,6 +26,7 @@
     "admin:grant": "tsx packages/database/scripts/grant-admin.ts",
     "test:load": "WAVERTI_LOAD_TESTS=1 vitest run --project load",
     "stripe:prices": "tsx packages/billing/scripts/stripe-prices.ts",
+    "stripe:live-readiness": "tsx packages/billing/scripts/stripe-live-readiness.ts",
     "beta:grant": "tsx packages/billing/scripts/beta-grant.ts"
   },
   "devDependencies": {

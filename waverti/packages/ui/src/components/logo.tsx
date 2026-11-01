@@ -19,11 +19,11 @@ export function LogoMark({ className, title, src = "/brand/waverti-mark.png" }: 
   );
 }
 
-export function Logo({ className, markClassName }: { className?: string; markClassName?: string }) {
+export function Logo({ className, markClassName, light }: { className?: string; markClassName?: string; light?: boolean }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <LogoMark className={markClassName} />
-      <span className="font-display text-[19px] font-bold tracking-[-0.03em] text-ink">Waverti</span>
+      <span className={cn("font-display text-[19px] font-bold tracking-[-0.03em]", light ? "text-white" : "text-ink")}>Waverti</span>
     </span>
   );
 }

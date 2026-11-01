@@ -46,7 +46,7 @@ export function DashboardShell({
       active: active("/app/surveillances") && !active("/app/surveillances/nouvelle"),
     },
     { href: "/app/surveillances/nouvelle", label: "Nouvelle surveillance", icon: <Plus />, active: active("/app/surveillances/nouvelle") },
-    { href: "/app/produits", label: "Rechercher un produit", icon: <PackageSearch />, active: active("/app/produits") },
+    { href: "/app/produits", label: "Rechercher un produit", icon: <PackageSearch />, active: active("/app/produits"), tag: "Bientôt" },
     { href: "/app/alertes", label: "Alertes", icon: <Bell />, active: active("/app/alertes"), badge: unread },
     { href: "/app/historique", label: "Historique", icon: <History />, active: active("/app/historique") },
     { href: "/app/business", label: "Business", icon: <Building2 />, active: active("/app/business") },
@@ -57,11 +57,19 @@ export function DashboardShell({
     { href: "/app/aide", label: "Aide", icon: <LifeBuoy />, active: active("/app/aide") },
     ...(isAdmin ? [{ href: "/admin", label: "Administration", icon: <ShieldCheck />, active: false }] : []),
   ];
+  const tabs: NavItem[] = [
+    { href: "/app", label: "Accueil", icon: <LayoutDashboard />, active: active("/app", true) },
+    { href: "/app/surveillances", label: "Surveillances", icon: <ListChecks />, active: active("/app/surveillances") && !active("/app/surveillances/nouvelle") },
+    { href: "/app/surveillances/nouvelle", label: "Créer", icon: <Plus />, active: active("/app/surveillances/nouvelle") },
+    { href: "/app/alertes", label: "Alertes", icon: <Bell />, active: active("/app/alertes"), badge: unread },
+  ];
   const initial = (displayName ?? email).slice(0, 1).toUpperCase();
   return (
     <AppShell
       nav={nav}
       secondaryNav={secondary}
+      variant="brand"
+      mobileTabs={tabs}
       renderLink={({ href, className, children, onClick, ...rest }) => (
         <Link href={href} className={className} onClick={onClick} aria-current={rest["aria-current"]}>
           {children}
@@ -78,7 +86,7 @@ export function DashboardShell({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="grid size-10 place-items-center rounded-full border border-line bg-white font-display text-sm font-bold hover:bg-surface"
+                className="grid size-10 place-items-center rounded-full bg-[linear-gradient(135deg,#1d3fd6,#8028ff)] font-display text-sm font-bold text-white shadow-soft hover:opacity-90"
                 aria-label="Menu du compte"
               >
                 {initial}

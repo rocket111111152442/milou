@@ -15,6 +15,11 @@ async function openWizard(page: Page, plan: "plus" | "pro" | "business" = "pro",
   return u;
 }
 
+/** Clique « Continuer » n fois (étapes de l'assistant en 5 étapes). */
+async function next(page: Page, n = 1) {
+  for (let i = 0; i < n; i++) await page.getByRole("button", { name: /Continuer/ }).click();
+}
+
 test.describe("création de surveillances — nouvelle interface", () => {
   test.beforeEach(resetRateLimits);
 
@@ -27,14 +32,15 @@ test.describe("création de surveillances — nouvelle interface", () => {
 
   test("assistant en langage naturel → règle ET → création", async ({ page }) => {
     await openWizard(page);
-    await page.getByLabel("Décrivez-le simplement").fill("Préviens-moi quand ce produit passe sous 150 € et revient en stock");
+    await page.getByLabel("Décrivez-le avec vos mots").fill("Préviens-moi quand ce produit passe sous 150 € et revient en stock");
     await page.getByRole("button", { name: "Interpréter" }).click();
+    await page.getByLabel(/^Adresse/).fill("https://boutique.example.com/velo");
+    await next(page);
     await expect(page.getByText("Le prix est inférieur à 150 €")).toBeVisible();
     await expect(page.getByText("ET Le produit est en stock")).toBeVisible();
-    await page.getByLabel(/^Adresse/).fill("https://boutique.example.com/velo");
-    await page.getByRole("button", { name: /Continuer/ }).click();
+    await next(page, 2);
     await page.getByLabel(/^Nom de la surveillance/).fill("Vélo");
-    await page.getByRole("button", { name: "Créer la surveillance" }).click();
+    await page.getByRole("button", { name: "Activer la surveillance" }).click();
     await page.waitForURL(/\/app\/surveillances\/[0-9a-f-]{36}$/);
     await expect(page.getByRole("list", { name: "Conditions de la règle" })).toContainText("Le prix est inférieur à 150 €");
     const id = page.url().split("/").pop()!;
@@ -46,10 +52,11 @@ test.describe("création de surveillances — nouvelle interface", () => {
   test("constructeur : OU, groupe, exclusion, validation des champs vides", async ({ page }) => {
     await openWizard(page, "pro", "?categorie=custom");
     await page.getByLabel(/^Adresse/).fill("https://www.exemple.fr/actualites");
+    await next(page);
     await page.getByRole("button", { name: "Ajouter une condition" }).click();
     const types = page.getByLabel("Type de condition");
     await types.nth(1).selectOption("text_match");
-    await page.getByRole("button", { name: /Continuer/ }).click();
+    await next(page);
     await expect(page.getByText("Indiquez le ou les mots recherchés.").first()).toBeVisible();
     await page.getByLabel("Mots ou expressions, séparés par des virgules").fill("inscription, billetterie");
     await page.getByRole("radiogroup", { name: "Combinaison des conditions" }).getByRole("radio", { name: "Au moins une (OU)" }).click();
@@ -58,9 +65,9 @@ test.describe("création de surveillances — nouvelle interface", () => {
     await page.getByLabel(/Confirmer au contrôle suivant/).click();
     await expect(page.getByText("OU La page contient « inscription » ou « billetterie »")).toBeVisible();
     await expect(page.getByText("Sauf si « complet » figure dans l'élément concerné")).toBeVisible();
-    await page.getByRole("button", { name: /Continuer/ }).click();
+    await next(page, 2);
     await page.getByLabel(/^Nom de la surveillance/).fill("Actualités");
-    await page.getByRole("button", { name: "Créer la surveillance" }).click();
+    await page.getByRole("button", { name: "Activer la surveillance" }).click();
     await page.waitForURL(/\/app\/surveillances\/[0-9a-f-]{36}$/);
     const id = page.url().split("/").pop()!;
     const [t] = await sql<{ c: { match: string; exclude: string[]; options: { confirm: boolean } } }[]>`select condition as c from monitoring_tasks where id = ${id}`;
@@ -85,32 +92,35 @@ test.describe("création de surveillances — nouvelle interface", () => {
         }),
       }),
     );
-    await page.getByRole("radio", { name: /Modification d'une section précise/ }).click();
     await page.getByLabel(/^Adresse/).fill("https://salle.example.com/agenda");
-    await page.getByRole("button", { name: /Continuer/ }).click();
-    await expect(page.getByRole("alert").filter({ hasText: /Choisissez la zone/ })).toBeVisible();
-    await page.getByRole("button", { name: "Analyser la page" }).click();
+    await page.getByRole("button", { name: "Vérifier la page" }).click();
     await expect(page.getByText("3+ éléments de liste · 1 date(s) à venir")).toBeVisible();
+    await next(page);
+    await page.getByRole("radio", { name: /Modification d'une section précise/ }).click();
+    await next(page);
+    await expect(page.getByRole("alert").filter({ hasText: /Choisissez la zone/ })).toBeVisible();
     await page.getByRole("radio", { name: /Programme/ }).click();
     await page.getByRole("button", { name: "Nouvelle date annoncée" }).click();
     await expect(page.getByText("Une nouvelle date à venir apparaît")).toBeVisible();
-    await page.getByRole("button", { name: /Continuer/ }).click();
+    await next(page, 2);
     await expect(page.getByText("Zone : #programme")).toBeVisible();
   });
 
   test("Actualités : sujet en langage naturel (moteur de recherche) ; Business verrouillé hors offre", async ({ page }) => {
     await openWizard(page, "pro", "?categorie=news");
-    await page.getByLabel(/^Votre sujet/).fill("Préviens-moi lorsque Samsung annonce officiellement un nouveau Galaxy");
+    await page.getByRole("textbox", { name: /^Quel sujet voulez-vous suivre/ }).fill("Préviens-moi lorsque Samsung annonce officiellement un nouveau Galaxy");
     await page.getByRole("button", { name: "Analyser la demande" }).click();
-    await expect(page.getByLabel("Sujet recherché")).not.toHaveValue("");
-    await page.getByRole("button", { name: /Continuer/ }).click();
+    await expect(page.getByLabel("Sujet retenu")).not.toHaveValue("");
+    await next(page, 3);
     await expect(page.getByText(/Recherche sur Internet : «/)).toBeVisible();
-    await page.getByRole("button", { name: "Créer la surveillance" }).click();
+    await page.getByRole("button", { name: "Activer la surveillance" }).click();
     await page.waitForURL(/\/app\/surveillances\/[0-9a-f-]{36}$/);
 
     await page.goto("/app/surveillances/nouvelle?categorie=uptime");
+    await page.getByLabel(/^Adresse/).fill("https://www.exemple.fr");
+    await next(page);
     await page.getByRole("radio", { name: /Certificat HTTPS/ }).click();
-    await expect(page.getByText("Ces contrôles sont inclus dans l'offre Business.")).toBeVisible();
+    await expect(page.getByText("Ces contrôles ne sont pas inclus dans votre formule")).toBeVisible();
     await expect(page.getByRole("button", { name: /Continuer/ })).toBeDisabled();
   });
 
@@ -135,12 +145,13 @@ test.describe("mobile", () => {
     await openWizard(page);
     await page.getByRole("listitem").filter({ hasText: "Mots-clés" }).first().click();
     await page.getByLabel(/^Adresse/).fill("https://www.exemple.fr/concours");
+    await next(page);
     await page.getByLabel("Mots ou expressions, séparés par des virgules").fill("inscriptions");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
-    await page.getByRole("button", { name: /Continuer/ }).click();
+    await next(page, 2);
     await page.getByLabel(/^Nom de la surveillance/).fill("Concours");
-    await page.getByRole("button", { name: "Créer la surveillance" }).click();
+    await page.getByRole("button", { name: "Activer la surveillance" }).click();
     await page.waitForURL(/\/app\/surveillances\/[0-9a-f-]{36}$/);
   });
 });

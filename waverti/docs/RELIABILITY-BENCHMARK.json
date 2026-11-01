@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-11-01T19:23:34.262Z",
+  "node": "v24.19.0",
+  "fixtureCount": 8,
+  "confidenceCounts": {
+    "verified": 4,
+    "uncertain": 1,
+    "unavailable": 2,
+    "contradictory": 1
+  },
+  "confidenceMismatches": [],
+  "alertResults": [
+    {
+      "name": "uncertain-price-drop",
+      "beforeTriggered": false,
+      "afterTriggered": true,
+      "expectedAfter": true
+    },
+    {
+      "name": "structure-only-change",
+      "beforeTriggered": false,
+      "afterTriggered": false,
+      "expectedAfter": false
+    }
+  ],
+  "notes": "All fixtures are local HTML strings. The legacy column removes lot-2 evidence fields to replay the old decision inputs; it is not a claim that every historical page behaved identically. No third-party collection, HTTP, browser, database or monetary cost is measured."
+}

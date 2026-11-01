@@ -50,14 +50,14 @@ export function NotificationList({
     );
   }
   return (
-    <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
+    <ul className="flex flex-col gap-3">
       {items.map((n) => (
-        <li key={n.id} className={cn("flex gap-4 px-4 sm:px-5", compact ? "py-3" : "py-4", !n.readAt && "bg-info-soft/40")}>
+        <li key={n.id} className={cn("card-glass relative flex gap-4 overflow-hidden rounded-2xl px-4 shadow-[var(--shadow-card)] sm:px-5", compact ? "py-3" : "py-4", !n.readAt && "bg-tint-blue/80 before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:bg-blue before:content-['']")}>
           <span
             aria-hidden="true"
             className={cn(
-              "mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-white [&_svg]:size-4",
-              n.type === "business_down" ? "text-danger" : n.type === "business_recovered" ? "text-success" : "text-ink-soft",
+              "mt-0.5 grid size-10 shrink-0 place-items-center rounded-2xl text-white [&_svg]:size-[18px]",
+              n.type === "business_down" ? "bg-[linear-gradient(135deg,#a8142d,#d4304a)]" : n.type === "business_recovered" ? "bg-[linear-gradient(135deg,#0b7350,#14946a)]" : n.type === "price" || n.type === "stock" ? "bg-[linear-gradient(135deg,#1d3fd6,#3b6bff)]" : "bg-[linear-gradient(135deg,#5a2de0,#8a3bff)]",
             )}
           >
             {typeIcon[n.type] ?? <Bell />}
@@ -68,8 +68,8 @@ export function NotificationList({
               <p className="font-medium text-ink">{n.title}</p>
               {priorityTone[n.priority]}
             </div>
-            {!compact ? <p className="text-sm leading-relaxed text-muted-fg">{n.body}</p> : null}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-fg">
+            {!compact ? <p className="text-sm leading-relaxed text-ink-soft">{n.body}</p> : null}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
               {n.taskName ? <span>Surveillance : {n.taskName}</span> : null}
               <time dateTime={n.createdAt}>{formatRelative(n.createdAt, now)}</time>
               {n.sourceUrl ? (
