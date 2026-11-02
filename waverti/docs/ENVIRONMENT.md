@@ -15,9 +15,9 @@ Aucune valeur secrète n'est versionnée. Modèle : `.env.example` (racine) et `
 | `RESEND_API_KEY`, `EMAIL_FROM` | pour envoyer | **oui** / non | E-mails de confirmation et de réinitialisation (prioritaire sur `SMTP_URL`). |
 | `DATABASE_POOL_MAX` | non | non | Connexions par instance serverless (défaut 3). |
 | `WAVERTI_HASH_PEPPER` | oui | **oui** | ≥ 32 caractères aléatoires ; anti-abus des essais. Ne jamais le changer après lancement. |
-| `STRIPE_SECRET_KEY` | pour payer | **oui** | `sk_test_…` uniquement tant que le cadre légal n'est pas validé. |
+| `STRIPE_SECRET_KEY` | pour payer | **oui** | `sk_test_…` par défaut ; une clé `sk_live_…` reste bloquée sans activation opérationnelle explicite. |
 | `STRIPE_WEBHOOK_SECRET` | pour payer | **oui** | Secret de signature de l'endpoint `/api/stripe/webhook`. |
-| `WAVERTI_ALLOW_LIVE_PAYMENTS` | non | non | Seule valeur acceptée : `I_HAVE_LEGAL_APPROVAL`. À ne définir qu'après validation juridique. |
+| `WAVERTI_LIVE_PAYMENTS_ENABLED` | non | non | Valeur `true` : activation opérationnelle après contrôles Stripe requis. L'ancien `WAVERTI_ALLOW_LIVE_PAYMENTS=I_HAVE_LEGAL_APPROVAL` reste accepté temporairement pour compatibilité. |
 | `ADMIN_REQUIRE_MFA` | recommandé | non | `1` : l'administration exige une session validée par double authentification (TOTP) ; un administrateur sans double authentification est redirigé vers Paramètres pour l'activer. |
 
 Sans base configurée, le site public fonctionne et l'espace client affiche clairement que le
@@ -60,7 +60,7 @@ Valeurs non lues (variables sensibles) : seuls les **noms** et environnements on
 | --- | --- | --- | --- |
 | `BRAVE_API_KEY` | oui (alias) | Le nom canonique est `BRAVE_SEARCH_API_KEY` ; `BRAVE_API_KEY` est accepté en repli (si les deux existent, `BRAVE_SEARCH_API_KEY` l'emporte). **Les recherches sont faites par le worker, pas par le site** : sur Vercel, la clé ne sert qu'à l'indicateur de santé. | Placer la clé sur le serveur du worker (`worker.env`) ; la retirer de Vercel réduit son exposition. |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | **non** | Inutile : le paiement est une redirection vers Stripe Checkout créée côté serveur. Variable publique (pas un secret), mais si c'est une clé `pk_live_`, elle ne correspond pas au mode test. | Supprimer ou ignorer. |
-| `STRIPE_SECRET_KEY` | oui | Si c'est une clé `sk_live_`, le site **refuse de l'utiliser** tant que `WAVERTI_ALLOW_LIVE_PAYMENTS` n'est pas défini (garde-fou vérifié) : les paiements restent indisponibles. | Pour tester le parcours de paiement : une clé `sk_test_` dans l'environnement **Preview** (jamais la clé live), avec `STRIPE_WEBHOOK_SECRET` de l'endpoint de test. |
+| `STRIPE_SECRET_KEY` | oui | Si c'est une clé `sk_live_`, le site **refuse de l'utiliser** tant que `WAVERTI_LIVE_PAYMENTS_ENABLED=true` n'est pas défini (garde-fou vérifié) : les paiements restent indisponibles. | Pour tester le parcours de paiement : une clé `sk_test_` dans l'environnement **Preview** (jamais la clé live), avec `STRIPE_WEBHOOK_SECRET` de l'endpoint de test. |
 | `RESEND_API_KEY` | oui | Correct. Sans `EMAIL_FROM`, l'expéditeur par défaut est utilisé. | Ajouter `EMAIL_FROM=Waverti <alertes@waverti.com>` après vérification du domaine chez Resend. |
 | `NEXT_PUBLIC_LAUNCH_STATUS=preview` | oui | Correct (bandeau + `noindex`). | Conserver. |
 
