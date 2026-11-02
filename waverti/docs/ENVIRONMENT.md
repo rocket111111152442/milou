@@ -17,7 +17,7 @@ Aucune valeur secrète n'est versionnée. Modèle : `.env.example` (racine) et `
 | `WAVERTI_HASH_PEPPER` | oui | **oui** | ≥ 32 caractères aléatoires ; anti-abus des essais. Ne jamais le changer après lancement. |
 | `STRIPE_SECRET_KEY` | pour payer | **oui** | `sk_test_…` par défaut ; une clé `sk_live_…` reste bloquée sans activation opérationnelle explicite. |
 | `STRIPE_WEBHOOK_SECRET` | pour payer | **oui** | Secret de signature de l'endpoint `/api/stripe/webhook`. |
-| `WAVERTI_LIVE_PAYMENTS_ENABLED` | non | non | Valeur `true` : activation opérationnelle après contrôles Stripe requis. L'ancien `WAVERTI_ALLOW_LIVE_PAYMENTS=I_HAVE_LEGAL_APPROVAL` reste accepté temporairement pour compatibilité. |
+| `WAVERTI_LIVE_PAYMENTS_ENABLED` | non | non | Seule valeur acceptée : `true`, après contrôles Stripe requis et vérification des obligations applicables. |
 | `ADMIN_REQUIRE_MFA` | recommandé | non | `1` : l'administration exige une session validée par double authentification (TOTP) ; un administrateur sans double authentification est redirigé vers Paramètres pour l'activer. |
 
 Sans base configurée, le site public fonctionne et l'espace client affiche clairement que le

@@ -2,7 +2,7 @@
 
 État par défaut : **mode test**. Les encaissements réels sont bloqués par le code tant que
 `WAVERTI_LIVE_PAYMENTS_ENABLED=true` n'est pas défini. Cette activation intervient après les contrôles Stripe requis
-et la vérification des obligations applicables ; l'ancien nom `WAVERTI_ALLOW_LIVE_PAYMENTS` reste accepté temporairement.
+et la vérification des obligations applicables.
 
 ## 1. Les quatre formules (seules vendues)
 

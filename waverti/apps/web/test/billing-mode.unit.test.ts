@@ -9,14 +9,12 @@ describe("mode de facturation", () => {
     expect(billingMode({ STRIPE_SECRET_KEY: "sk_live_abc" })).toBe("live_blocked");
     expect(billingMode({ STRIPE_SECRET_KEY: "rk_live_abc", WAVERTI_LIVE_PAYMENTS_ENABLED: "yes" })).toBe("live_blocked");
     expect(billingMode({ STRIPE_SECRET_KEY: "sk_live_abc", WAVERTI_LIVE_PAYMENTS_ENABLED: "true" })).toBe("live");
-    expect(billingMode({ STRIPE_SECRET_KEY: "sk_live_abc", WAVERTI_ALLOW_LIVE_PAYMENTS: "I_HAVE_LEGAL_APPROVAL" })).toBe("live");
     expect(billingMode({ STRIPE_SECRET_KEY: "pk_test_abc" })).toBe("absent");
   });
-  it("utilise une activation opérationnelle claire et conserve l'ancien nom en compatibilité", () => {
+  it("utilise une activation opérationnelle claire et unique", () => {
     expect(livePaymentsEnabled({})).toBe(false);
     expect(livePaymentsEnabled({ WAVERTI_LIVE_PAYMENTS_ENABLED: "true" })).toBe(true);
     expect(livePaymentsEnabled({ WAVERTI_LIVE_PAYMENTS_ENABLED: "1" })).toBe(false);
-    expect(livePaymentsEnabled({ WAVERTI_ALLOW_LIVE_PAYMENTS: "I_HAVE_LEGAL_APPROVAL" })).toBe(true);
   });
   it("une clé live non autorisée rend le paiement indisponible (pas d'erreur 500)", () => {
     expect(integrationStatus({ STRIPE_SECRET_KEY: "sk_live_abc", STRIPE_WEBHOOK_SECRET: "whsec_x" }).stripe).toBe(false);

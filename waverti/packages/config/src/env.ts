@@ -67,12 +67,9 @@ export function integrationStatus(env: Partial<ServerEnv>): IntegrationStatus {
 
 export type BillingMode = "absent" | "test" | "live_blocked" | "live";
 
-/**
- * Activation Live explicite et non ambiguë. Le nom historique reste accepté afin de ne pas casser
- * un déploiement existant ; il est déprécié et ne doit plus être documenté pour les nouveaux déploiements.
- */
+/** Activation Live explicite et non ambiguë. */
 export function livePaymentsEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return env.WAVERTI_LIVE_PAYMENTS_ENABLED === "true" || env.WAVERTI_ALLOW_LIVE_PAYMENTS === "I_HAVE_LEGAL_APPROVAL";
+  return env.WAVERTI_LIVE_PAYMENTS_ENABLED === "true";
 }
 
 /**
