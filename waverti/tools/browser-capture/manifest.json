@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Waverti — Relevé Amazon.fr",
+  "version": "0.1.0",
+  "description": "Relève une fois le prix et la disponibilité visibles sur une fiche Amazon.fr.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_title": "Relever cette fiche pour Waverti",
+    "default_popup": "popup.html"
+  }
+}

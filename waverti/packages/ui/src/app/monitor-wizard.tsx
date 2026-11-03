@@ -277,6 +277,15 @@ function intervalOptions(min: number): number[] {
   return [...new Set([min, ...base.filter((m) => m > min)])].sort((a, b) => a - b);
 }
 
+function isAmazonProductUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return /(^|\.)amazon\.(?:com|fr|de|it|es|ca|nl|se|pl|be|ie|in|sg|ae|sa|eg|co\.uk|co\.jp|com\.(?:au|be|br|mx|tr))$/.test(host);
+  } catch {
+    return false;
+  }
+}
+
 const STEPS = ["Que surveiller", "Site ou produit", "Changement", "Alertes", "Activation"] as const;
 
 /** Une couleur d'icône par catégorie : repère visuel sans dépendre du texte. */
@@ -304,6 +313,7 @@ export function MonitorWizard({
   upgradeHref,
   businessHref,
   initialCategory,
+  initialUrl,
 }: {
   entitlements: WizardEntitlements;
   onPreview: (url: string, cssSelector?: string) => Promise<AnalysisResult>;
@@ -312,6 +322,7 @@ export function MonitorWizard({
   upgradeHref?: string;
   businessHref?: string;
   initialCategory?: CategoryId;
+  initialUrl?: string;
 }) {
   const topicsAllowed = entitlements.maxWebTopics > 0 && entitlements.webIntervalMinutes !== null;
   const [step, setStep] = React.useState(initialCategory ? 1 : 0);
@@ -326,10 +337,11 @@ export function MonitorWizard({
   );
   const [assistant, setAssistant] = React.useState("");
   const [assistantNotes, setAssistantNotes] = React.useState<string[]>([]);
-  const [url, setUrl] = React.useState("");
+  const [url, setUrl] = React.useState(initialUrl ?? "");
   const [selector, setSelector] = React.useState("");
   const [preview, setPreview] = React.useState<AnalysisResult | null>(null);
   const [previewing, setPreviewing] = React.useState(false);
+  const [previewAcknowledged, setPreviewAcknowledged] = React.useState(false);
   const previewRequest = React.useRef(0);
   const [request, setRequest] = React.useState("");
   const [domains, setDomains] = React.useState("");
@@ -346,6 +358,7 @@ export function MonitorWizard({
   const [error, setError] = React.useState<string | null>(null);
   const [stepError, setStepError] = React.useState<string | null>(null);
   const headingRef = React.useRef<HTMLHeadingElement>(null);
+  const urlRef = React.useRef<HTMLInputElement>(null);
 
   const cat = category ? CAT.get(category)! : null;
   const goal = cat?.goals.find((g) => g.id === goalId) ?? null;
@@ -357,6 +370,7 @@ export function MonitorWizard({
   React.useEffect(() => {
     headingRef.current?.focus();
   }, [step]);
+  React.useEffect(() => setPreviewAcknowledged(false), [url, selector, rule, preview]);
 
   const parsedDomains = domains
     .split(/[,\s]+/)
@@ -403,6 +417,11 @@ export function MonitorWizard({
     previewRequest.current += 1;
     setPreview(null);
     setPreviewing(false);
+  }
+
+  function chooseAnotherProduct() {
+    urlRef.current?.focus();
+    urlRef.current?.select();
   }
 
   async function analysePage() {
@@ -521,6 +540,8 @@ export function MonitorWizard({
     !priceDetected && (category === "price" || missingPrice) ? "le prix et sa devise" : null,
     !stockLabel && (category === "price" || category === "product" || missingStock) ? "la disponibilité" : null,
   ].filter(Boolean).join(" et ");
+  const needsPreviewConfirmation = !isTopic && preview !== null && !previewing && Boolean(missingSignals);
+  const showProductFallback = preview !== null && !previewing && Boolean(missingPreviewSignals);
   const detectedElements = category === "price" ? stockLabel ?? "Non détectée sur la page" : [
     analysis?.items.length ? `${analysis.items.length}+ éléments de liste` : null,
     analysis?.documents.length ? `${analysis.documents.length} document(s)` : null,
@@ -559,7 +580,7 @@ export function MonitorWizard({
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <Field id="wz-url" label="Adresse de la page" required hint="Copiez l'adresse depuis votre navigateur (elle commence par https://)." className="flex-1">
-          {(p) => <Input {...p} type="url" inputMode="url" placeholder="https://www.exemple.fr/…" value={url} onChange={(e) => changeUrl(e.target.value)} />}
+          {(p) => <Input {...p} ref={urlRef} type="url" inputMode="url" placeholder="https://www.exemple.fr/…" value={url} onChange={(e) => changeUrl(e.target.value)} />}
         </Field>
         <Button type="button" variant="secondary" onClick={analysePage} loading={previewing} disabled={!/^https?:\/\/.+\..+/.test(url.trim())}>
           <ScanSearch aria-hidden="true" /> Vérifier la page
@@ -600,13 +621,26 @@ export function MonitorWizard({
               <p className="text-sm">{detectedElements}</p>
             </div>
           ) : null}
-          {missingPreviewSignals ? (
-            <p className="text-sm text-ink-soft sm:col-span-full">
-              Impossible de confirmer {missingPreviewSignals} sur cette page. Essayez l’adresse directe de la fiche produit chez le vendeur,
-              puis cliquez sur « Vérifier la page ».
-            </p>
-          ) : null}
         </div>
+      ) : null}
+      {showProductFallback ? (
+        <Callout tone="warning" title="Données de la fiche incomplètes">
+          <p>
+            {isAmazonProductUrl(obs?.finalUrl ?? url)
+              ? obs
+                ? "La version de la fiche Amazon reçue par Waverti est incomplète."
+                : "Waverti n’a pas pu lire cette fiche Amazon."
+              : "Waverti n’a pas trouvé toutes les données sur cette fiche."}{" "}
+            Impossible de confirmer {missingPreviewSignals}.
+          </p>
+          <p className="mt-2">
+            Collez l’adresse directe du produit chez le vendeur, puis cliquez sur « Vérifier la page ». Une fiche d’un autre
+            vendeur correspond à une offre différente.
+          </p>
+          <Button type="button" variant="secondary" size="sm" className="mt-3" onClick={chooseAnotherProduct}>
+            Vérifier une autre fiche
+          </Button>
+        </Callout>
       ) : null}
     </div>
   );
@@ -941,6 +975,16 @@ export function MonitorWizard({
               concernées seront évaluées dès qu’un contrôle détectera les données nécessaires.
             </Callout>
           ) : null}
+          {needsPreviewConfirmation ? (
+            <label className="flex items-start gap-3 rounded-xl border border-line bg-surface p-4 text-sm">
+              <Checkbox
+                checked={previewAcknowledged}
+                onCheckedChange={(checked) => setPreviewAcknowledged(checked === true)}
+                className="mt-0.5"
+              />
+              <span>J’active cette surveillance même si les données nécessaires n’ont pas été confirmées.</span>
+            </label>
+          ) : null}
           <Callout tone="neutral" title="Bon à savoir">
             Cette surveillance compte pour une seule surveillance sur les {entitlements.maxMonitors} de votre formule, même avec plusieurs conditions. Les vérifications ne peuvent pas être plus rapides que celles de votre formule.
             {isTopic ? " Chaque vérification utilise des recherches de votre quota mensuel." : ""}
@@ -955,7 +999,7 @@ export function MonitorWizard({
             <Button type="button" variant="ghost" onClick={back}>
               <ArrowLeft aria-hidden="true" /> Retour
             </Button>
-            <Button type="button" size="lg" onClick={create} loading={submitting} disabled={!name.trim()}>
+            <Button type="button" size="lg" onClick={create} loading={submitting} disabled={!name.trim() || (needsPreviewConfirmation && !previewAcknowledged)}>
               Activer la surveillance
             </Button>
           </div>
