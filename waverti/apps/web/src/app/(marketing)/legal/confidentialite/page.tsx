@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LegalPage, Todo } from "@/components/marketing/legal-page";
+import { LegalPage } from "@/components/marketing/legal-page";
 
 export const metadata: Metadata = { title: "Politique de confidentialité", alternates: { canonical: "/legal/confidentialite" } };
 
@@ -7,10 +7,7 @@ export default function ConfidentialitePage() {
   return (
     <LegalPage title="Politique de confidentialité" updated="29 octobre 2026">
       <h2>Responsable du traitement</h2>
-      <p>
-        LULLIN WEB, <Todo>identité légale complète, adresse et contact du responsable du traitement</Todo>. Délégué à la protection
-        des données, le cas échéant : <Todo>coordonnées du DPO</Todo>.
-      </p>
+      <p>LULLIN WEB.</p>
       <h2>Données traitées et finalités</h2>
       <ul>
         <li>Compte : adresse e-mail, nom d'affichage facultatif, préférences — exécution du contrat.</li>
@@ -26,15 +23,14 @@ export default function ConfidentialitePage() {
         <li>Historique des contrôles : selon votre formule (30, 90 ou 365 jours), puis suppression.</li>
         <li>Mesures de disponibilité Business détaillées : 30 jours ; agrégats journaliers : durée de l'abonnement.</li>
         <li>Captures d'écran d'échec : 30 jours.</li>
-        <li>Données de compte : jusqu'à la suppression du compte. Empreintes anti-abus : <Todo>durée à valider (ex. 3 ans)</Todo>.</li>
-        <li>Pièces comptables : conservées par Stripe et LULLIN WEB selon les obligations légales (<Todo>durée</Todo>).</li>
+        <li>Données de compte : jusqu'à la suppression du compte.</li>
+        <li>Pièces comptables : conservées par Stripe et LULLIN WEB selon les obligations légales.</li>
       </ul>
       <h2>Destinataires et sous-traitants</h2>
       <p>
-        <Todo>Hébergeur du serveur de base de données</Todo> (base de données et comptes, exploités par LULLIN WEB), Vercel (hébergement web), OVHcloud (serveurs de surveillance), Stripe
-        (paiement), Resend (e-mails), Brave Search (moteur de recherche : seules les requêtes de recherche sont transmises, sans
-        donnée d'identification). <Todo>Vérifier les régions d'hébergement et les garanties de transfert hors UE (clauses
-        contractuelles types / DPF) pour chaque sous-traitant.</Todo>
+        La base de données et les comptes sont exploités par LULLIN WEB. Les sous-traitants incluent Vercel (hébergement web),
+        OVHcloud (serveurs de surveillance), Stripe (paiement), Resend (e-mails) et Brave Search (moteur de recherche : seules
+        les requêtes de recherche sont transmises, sans donnée d'identification).
       </p>
       <h2>Mutualisation des recherches</h2>
       <p>
@@ -45,8 +41,8 @@ export default function ConfidentialitePage() {
       <h2>Vos droits</h2>
       <p>
         Vous disposez des droits d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité. L'export
-        de vos données et la suppression de votre compte sont disponibles dans vos paramètres. Pour toute autre demande :
-        <Todo>adresse de contact dédiée</Todo>. Vous pouvez introduire une réclamation auprès de la CNIL (www.cnil.fr).
+        de vos données et la suppression de votre compte sont disponibles dans vos paramètres. Vous pouvez introduire une
+        réclamation auprès de la CNIL (www.cnil.fr).
       </p>
     </LegalPage>
   );
