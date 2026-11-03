@@ -506,10 +506,21 @@ export function MonitorWizard({
 
   const obs = preview?.observation;
   const analysis = preview?.analysis;
+  const priceDetected = obs?.price != null && Boolean(obs.currency);
   const stockLabel =
     obs?.availability === "in_stock" ? "Disponible"
       : obs?.availability === "out_of_stock" ? "Rupture"
         : obs?.availability === "preorder" ? "Précommande" : null;
+  const atoms = ruleAtoms({ conditions: rule.conditions, groups: rule.groups });
+  const missingPrice = atoms.some((atom) => atom.type.startsWith("price_") || atom.type === "promotion") && !priceDetected;
+  const missingStock = atoms.some((atom) => atom.type === "stock_is" || atom.type === "stock_changed") && !stockLabel;
+  const missingSignals = [missingPrice ? "le prix et sa devise" : null, missingStock ? "la disponibilité" : null]
+    .filter(Boolean)
+    .join(" et ");
+  const missingPreviewSignals = [
+    !priceDetected && (category === "price" || missingPrice) ? "le prix et sa devise" : null,
+    !stockLabel && (category === "price" || category === "product" || missingStock) ? "la disponibilité" : null,
+  ].filter(Boolean).join(" et ");
   const detectedElements = category === "price" ? stockLabel ?? "Non détectée sur la page" : [
     analysis?.items.length ? `${analysis.items.length}+ éléments de liste` : null,
     analysis?.documents.length ? `${analysis.documents.length} document(s)` : null,
@@ -518,7 +529,7 @@ export function MonitorWizard({
     stockLabel ? `stock : ${stockLabel.toLowerCase()}` : null,
   ].filter(Boolean).join(" · ") || "contenu textuel";
   const ruleLines = !isTopic && !ruleProblem(rule) ? describeRule(ruleConditionSchema.parse({ type: "rule", ...rule })) : [];
-  const usesUptime = ruleAtoms({ conditions: rule.conditions, groups: rule.groups }).some((a) => a.type === "site_down" || a.type === "slow_response");
+  const usesUptime = atoms.some((a) => a.type === "site_down" || a.type === "slow_response");
   const needsOtherTarget = step === 2 && targetKind !== null && targetKind !== (isTopic ? "topic" : "page");
 
   /** Saisie de la cible : une adresse (page, produit) ou un sujet à rechercher sur Internet. */
@@ -561,7 +572,15 @@ export function MonitorWizard({
         </Callout>
       ) : null}
       {obs ? (
-        <div className={cn("grid gap-3 rounded-xl border border-success/20 bg-tint-green p-4", detectedElements ? "sm:grid-cols-3" : "sm:grid-cols-2")} role="status" aria-live="polite">
+        <div
+          className={cn(
+            "grid gap-3 rounded-xl border p-4",
+            missingPreviewSignals ? "border-line bg-surface" : "border-success/20 bg-tint-green",
+            detectedElements ? "sm:grid-cols-3" : "sm:grid-cols-2",
+          )}
+          role="status"
+          aria-live="polite"
+        >
           <div className="min-w-0">
             <p className="text-xs text-ink-soft">{analysis?.contentKind === "pdf" ? "Document trouvé" : "Page trouvée"}</p>
             <p className="truncate text-sm font-medium">{obs.title ?? "Sans titre"}</p>
@@ -569,7 +588,7 @@ export function MonitorWizard({
           <div>
             <p className="text-xs text-ink-soft">Prix repéré</p>
             <p className="font-display text-base font-semibold">
-              {obs.price !== null && obs.currency ? formatPrice(obs.price, obs.currency) : "Non détecté"}
+              {obs.price === null ? "Non détecté" : obs.currency ? formatPrice(obs.price, obs.currency) : "Devise non détectée"}
               {obs.price !== null && obs.currency && analysis?.regularPrice && analysis.regularPrice > obs.price ? (
                 <span className="ml-2 text-xs font-normal text-ink-soft line-through">{formatPrice(analysis.regularPrice, obs.currency)}</span>
               ) : null}
@@ -580,6 +599,12 @@ export function MonitorWizard({
               <p className="text-xs text-ink-soft">{category === "price" ? "Disponibilité" : "Autres éléments repérés"}</p>
               <p className="text-sm">{detectedElements}</p>
             </div>
+          ) : null}
+          {missingPreviewSignals ? (
+            <p className="text-sm text-ink-soft sm:col-span-full">
+              Impossible de confirmer {missingPreviewSignals} sur cette page. Essayez l’adresse directe de la fiche produit chez le vendeur,
+              puis cliquez sur « Vérifier la page ».
+            </p>
           ) : null}
         </div>
       ) : null}
@@ -910,6 +935,12 @@ export function MonitorWizard({
           <Field id="wz-name" label="Nom de la surveillance" required hint="Pour la retrouver facilement dans votre liste.">
             {(p) => <Input {...p} value={name} maxLength={120} onChange={(e) => setCustomName(e.target.value)} />}
           </Field>
+          {!isTopic && missingSignals ? (
+            <Callout tone="warning" title="Données de surveillance non confirmées">
+              Waverti n’a pas encore pu confirmer {missingSignals}. Vous pouvez activer la surveillance. Les conditions
+              concernées seront évaluées dès qu’un contrôle détectera les données nécessaires.
+            </Callout>
+          ) : null}
           <Callout tone="neutral" title="Bon à savoir">
             Cette surveillance compte pour une seule surveillance sur les {entitlements.maxMonitors} de votre formule, même avec plusieurs conditions. Les vérifications ne peuvent pas être plus rapides que celles de votre formule.
             {isTopic ? " Chaque vérification utilise des recherches de votre quota mensuel." : ""}

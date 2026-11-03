@@ -101,6 +101,42 @@ describe("extractPage", () => {
     expect(obs).toMatchObject({ price: 789, currency: "EUR", priceSource: "jsonld", availability: "in_stock", availabilitySource: "jsonld" });
   });
 
+  it("reads the current nested price and currency without taking shipping or an old price", () => {
+    const offer = {
+      "@type": "Offer",
+      availability: "InStock",
+      priceSpecification: [
+        { "@type": "DeliveryChargeSpecification", price: "10.00", priceCurrency: "EUR" },
+        { "@type": "UnitPriceSpecification", priceType: "https://schema.org/StrikethroughPrice", price: "149.99", priceCurrency: "EUR" },
+        { "@type": "UnitPriceSpecification", price: "129.99", priceCurrency: "EUR" },
+      ],
+    };
+    const html = page("<p>Livraison 10 €</p>", `<script type="application/ld+json">${JSON.stringify(offer)}</script>`);
+    expect(extract(html)).toMatchObject({ price: 129.99, currency: "EUR", priceSource: "jsonld", availability: "in_stock" });
+  });
+
+  it("reports conflicting structured stock values instead of picking the first", () => {
+    const offers = ["InStock", "OutOfStock"].map((availability) => ({
+      "@type": "Offer", price: 129.99, priceCurrency: "EUR", availability,
+    }));
+    const html = page("", `<script type="application/ld+json">${JSON.stringify(offers)}</script>`);
+    expect(extract(html)).toMatchObject({
+      price: 129.99,
+      availability: "unknown",
+      fieldEvidence: { availability: { status: "contradictory" } },
+    });
+  });
+
+  it("does not fall back to a delivery charge when a structured offer has no product price", () => {
+    const offer = {
+      "@type": "Offer",
+      availability: "InStock",
+      priceSpecification: { "@type": "DeliveryChargeSpecification", price: 10, priceCurrency: "EUR" },
+    };
+    const html = page("<p>Livraison 10 €</p>", `<script type="application/ld+json">${JSON.stringify(offer)}</script>`);
+    expect(extract(html)).toMatchObject({ price: null, currency: null, availability: "in_stock" });
+  });
+
   it("reads microdata, then meta tags", () => {
     const md = extract(page(`<div itemscope itemtype="https://schema.org/Product"><span itemprop="price" content="45.90">45,90 €</span><meta itemprop="priceCurrency" content="EUR"><link itemprop="availability" href="https://schema.org/OutOfStock"></div>`));
     expect(md).toMatchObject({ price: 45.9, priceSource: "microdata", availability: "out_of_stock" });

@@ -43,7 +43,7 @@ export interface PageRunResult {
 }
 
 export function pageCacheKey(t: PageTarget): string {
-  return createHash("sha256").update(`adaptive-v1\n${t.url}\n${t.cssSelector ?? ""}\n${t.renderMode}`).digest("hex");
+  return createHash("sha256").update(`adaptive-v2\n${t.url}\n${t.cssSelector ?? ""}\n${t.renderMode}`).digest("hex");
 }
 
 export async function runPageCheck(deps: PageRunnerDeps, target: PageTarget): Promise<PageRunResult> {

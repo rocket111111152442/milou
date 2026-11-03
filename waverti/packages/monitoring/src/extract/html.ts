@@ -114,48 +114,46 @@ function typeIncludes(obj: Record<string, unknown>, t: string): boolean {
   return Array.isArray(v) ? v.some((x) => String(x).toLowerCase() === t) : String(v ?? "").toLowerCase() === t;
 }
 
-export function extractJsonLdOffer($: cheerio.CheerioAPI): StructuredOffer | null {
-  let best: StructuredOffer | null = null;
-  $('script[type="application/ld+json"]').each((_, el) => {
-    const raw = $(el).text();
-    if (!raw || raw.length > 500_000) return;
-    let data: unknown;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      return;
-    }
-    for (const obj of walkJsonLd(data)) {
-      if (typeIncludes(obj, "offer") || typeIncludes(obj, "aggregateoffer")) {
-        const price = parsePrice(obj.price ?? obj.lowPrice ?? (obj.priceSpecification as Record<string, unknown> | undefined)?.price);
-        const offer: StructuredOffer = {
-          price,
-          currency: typeof obj.priceCurrency === "string" ? obj.priceCurrency.toUpperCase() : null,
-          availability: mapAvailability(obj.availability),
-          source: "jsonld",
-        };
-        if (offer.price !== null || offer.availability) {
-          best = best ?? offer;
-        }
-      }
-    }
+function offerCurrency(raw: unknown): string | null {
+  return typeof raw === "string" && /^[A-Za-z]{3}$/.test(raw) ? raw.toUpperCase() : null;
+}
+
+function readStructuredOffer(obj: Record<string, unknown>): StructuredOffer[] {
+  const price = parsePrice(obj.price ?? obj.lowPrice);
+  const currency = offerCurrency(obj.priceCurrency);
+  const availability = mapAvailability(obj.availability);
+  if (price !== null) return [{ price, currency, availability, source: "jsonld" }];
+
+  const specs = Array.isArray(obj.priceSpecification) ? obj.priceSpecification : [obj.priceSpecification];
+  const activePrices = specs.slice(0, 12).flatMap((raw) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+    const spec = raw as Record<string, unknown>;
+    if ((spec["@type"] && !typeIncludes(spec, "unitpricespecification") && !typeIncludes(spec, "pricespecification")) ||
+        spec.priceType || spec.validForMemberTier || spec.referenceQuantity || spec.billingDuration) return [];
+    const amount = parsePrice(spec.price);
+    return amount === null ? [] : [{ price: amount, currency: offerCurrency(spec.priceCurrency) ?? currency, availability, source: "jsonld" as const }];
   });
-  return best;
+  if (activePrices.length) return activePrices;
+  return availability || obj.priceSpecification
+    ? [{ price: null, currency, availability, source: "jsonld" }] : [];
+}
+
+export function extractJsonLdOffer($: cheerio.CheerioAPI): StructuredOffer | null {
+  return collectJsonLdOffers($)[0] ?? null;
 }
 
 /** Collect every explicit JSON-LD offer so a disagreement is visible instead of silently picking the first block. */
 function collectJsonLdOffers($: cheerio.CheerioAPI): StructuredOffer[] {
   const out: StructuredOffer[] = [];
   $('script[type="application/ld+json"]').each((_, el) => {
+    if (out.length >= 12) return false;
     const raw = $(el).text();
     if (!raw || raw.length > 500_000) return;
     let data: unknown;
     try { data = JSON.parse(raw); } catch { return; }
     for (const obj of walkJsonLd(data)) {
       if (!typeIncludes(obj, "offer") && !typeIncludes(obj, "aggregateoffer")) continue;
-      const price = parsePrice(obj.price ?? obj.lowPrice ?? (obj.priceSpecification as Record<string, unknown> | undefined)?.price);
-      const currency = typeof obj.priceCurrency === "string" && /^[A-Za-z]{3}$/.test(obj.priceCurrency) ? obj.priceCurrency.toUpperCase() : null;
-      if (price !== null || obj.availability) out.push({ price, currency, availability: mapAvailability(obj.availability), source: "jsonld" });
+      out.push(...readStructuredOffer(obj).slice(0, 12 - out.length));
       if (out.length >= 12) return;
     }
   });
@@ -208,8 +206,9 @@ export function extractPage(input: ExtractInput): PageObservation {
 
 
   // Données structurées lues AVANT de retirer les scripts du document.
-  const ld = amazon ? null : extractJsonLdOffer($);
   const ldOffers = amazon ? [] : collectJsonLdOffers($);
+  const ld = ldOffers.find((offer) => offer.price !== null);
+  const ldAvailability = ldOffers.find((offer) => offer.availability)?.availability;
   const ldItems = input.enrich === false ? [] : jsonLdItems($, input.finalUrl);
   const ldRegular = input.enrich === false ? null : jsonLdRegularPrice($);
   const mdPriceEl = $('[itemprop="price"]').first();
@@ -228,7 +227,8 @@ export function extractPage(input: ExtractInput): PageObservation {
   const fullText = collapseWhitespace(body.length ? body.text() : $.root().text());
   const scopedText = scope ? collapseWhitespace(scope.text()) : fullText;
   const normalized = scopedText.slice(0, 200_000);
-  const travelPrices = amazon && !scope ? { all: [], primary: null } : findTravelPriceCandidates(scopedText);
+  const travelPrices = !scope && (amazon || (ldOffers.length > 0 && !ld))
+    ? { all: [], primary: null } : findTravelPriceCandidates(scopedText);
   const primaryTextPrice = travelPrices.primary;
 
   // Prix et disponibilité
@@ -255,8 +255,8 @@ export function extractPage(input: ExtractInput): PageObservation {
     currency = ld.currency;
     priceSource = "jsonld";
   }
-  if (ld?.availability) {
-    availability = ld.availability;
+  if (ldAvailability) {
+    availability = ldAvailability;
     availabilitySource = "jsonld";
   }
   if (price === null) {
@@ -324,7 +324,7 @@ export function extractPage(input: ExtractInput): PageObservation {
   }
   const availabilityCandidates = [
     ...amazonStock,
-    ld?.availability,
+    ...ldOffers.map((offer) => offer.availability),
     mapAvailability(mdAvail),
     mapAvailability(metaAvail),
   ].filter((v): v is Availability => Boolean(v) && v !== "unknown");

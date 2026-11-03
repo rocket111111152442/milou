@@ -28,7 +28,7 @@ export function NewMonitor({ entitlements, initialCategory, onCreated }: { entit
           const fieldErrors = Object.fromEntries((r.error.issues ?? []).map((i) => [i.path.split(".").pop() ?? i.path, i.message]));
           return { ok: false, message: r.error.message, fieldErrors };
         }
-        push({ tone: "success", title: "Surveillance créée", description: "Le premier contrôle est en cours." });
+        push({ tone: "success", title: "Surveillance créée", description: "Le premier contrôle a été planifié." });
         if (onCreated) onCreated(r.data.id);
         else router.push(`/app/surveillances/${r.data.id}`);
         return { ok: true };
