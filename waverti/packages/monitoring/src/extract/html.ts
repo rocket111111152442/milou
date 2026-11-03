@@ -47,6 +47,43 @@ function mapAvailability(raw: unknown): Availability | null {
   return SCHEMA_AVAILABILITY[key] ?? null;
 }
 
+function isAmazonProduct(url: string): boolean {
+  try {
+    const { hostname, pathname } = new URL(url);
+    return /(?:^|\.)amazon\.(?:fr|com|ca|de|it|es|nl|co\.uk|com\.be|com\.au|co\.jp)$/i.test(hostname) &&
+      /\/(?:dp|gp\/product|gp\/aw\/d)\/[a-z0-9]{10}(?:\/|$)/i.test(pathname);
+  } catch {
+    return false;
+  }
+}
+
+function amazonPriceCandidates($: cheerio.CheerioAPI) {
+  const mainPrice = "#corePrice_feature_div .a-price, #corePriceDisplay_desktop_feature_div .a-price, #corePriceDisplay_mobile_feature_div .a-price";
+  return $(mainPrice).toArray().flatMap((element) => {
+    const box = $(element);
+    if (!box.is(".priceToPay, .apex-pricetopay-value") || box.closest(".a-text-price, [data-a-strike='true'], [hidden], .aok-hidden").length) return [];
+    const whole = box.find(".a-price-whole").first().text().replace(/[.,\s]/g, "");
+    const fraction = box.find(".a-price-fraction").first().text().trim();
+    const splitPrice = /^\d+$/.test(whole) && (!fraction || /^\d{2}$/.test(fraction))
+      ? `${whole}${fraction ? `.${fraction}` : ""}${box.find(".a-price-symbol").first().text()}` : "";
+    const raw = box.find(".a-offscreen").first().text().trim() || splitPrice;
+    const currency = detectCurrency(raw);
+    const value = parsePrice(raw);
+    return currency && value !== null && value > 0 ? [{ value, currency, source: "selector" as const }] : [];
+  });
+}
+
+function amazonStockCandidates($: cheerio.CheerioAPI): Availability[] {
+  return $("#availability, #outOfStock").toArray().flatMap((element) => {
+    const block = $(element);
+    if (block.closest("[hidden], .aok-hidden").length) return [];
+    const text = normalizeForMatch(block.text()).slice(0, 500);
+    if (PREORDER.some((word) => text.includes(word))) return ["preorder"];
+    if (OUT_OF_STOCK.some((word) => text.includes(word)) || /\b(?:pas en stock|not in stock|unavailable)\b/.test(text)) return ["out_of_stock"];
+    return /\b(?:en stock|in stock|auf lager)\b/.test(text) ? ["in_stock"] : [];
+  });
+}
+
 function sha256(s: string) {
   return bytesToHex(sha256Bytes(utf8ToBytes(s)));
 }
@@ -153,6 +190,9 @@ export function extractPage(input: ExtractInput): PageObservation {
   const titleEl = collapseWhitespace($("title").first().text()).slice(0, 300);
   const ogTitle = collapseWhitespace($('meta[property="og:title"]').attr("content") ?? "").slice(0, 300);
   const title = titleEl || ogTitle || null;
+  const amazon = isAmazonProduct(input.finalUrl) || isAmazonProduct(input.url);
+  const amazonPrices = amazon ? amazonPriceCandidates($) : [];
+  const amazonStock = amazon ? amazonStockCandidates($) : [];
 
   let selectorFound: boolean | null = null;
   let scope: cheerio.Cheerio<never> | null = null;
@@ -168,18 +208,18 @@ export function extractPage(input: ExtractInput): PageObservation {
 
 
   // Données structurées lues AVANT de retirer les scripts du document.
-  const ld = extractJsonLdOffer($);
-  const ldOffers = collectJsonLdOffers($);
+  const ld = amazon ? null : extractJsonLdOffer($);
+  const ldOffers = amazon ? [] : collectJsonLdOffers($);
   const ldItems = input.enrich === false ? [] : jsonLdItems($, input.finalUrl);
   const ldRegular = input.enrich === false ? null : jsonLdRegularPrice($);
   const mdPriceEl = $('[itemprop="price"]').first();
-  const mdPriceRaw = mdPriceEl.attr("content") ?? mdPriceEl.text();
+  const mdPriceRaw = amazon ? undefined : mdPriceEl.attr("content") ?? mdPriceEl.text();
   const mdCurrency = $('[itemprop="priceCurrency"]').first().attr("content");
   const mdAvailEl = $('[itemprop="availability"]').first();
-  const mdAvail = mdAvailEl.attr("href") ?? mdAvailEl.attr("content") ?? "";
-  const metaPrice = $('meta[property="product:price:amount"], meta[property="og:price:amount"]').first().attr("content");
+  const mdAvail = amazon ? undefined : mdAvailEl.attr("href") ?? mdAvailEl.attr("content");
+  const metaPrice = amazon ? undefined : $('meta[property="product:price:amount"], meta[property="og:price:amount"]').first().attr("content");
   const metaCurrency = $('meta[property="product:price:currency"], meta[property="og:price:currency"]').first().attr("content");
-  const metaAvail = $('meta[property="product:availability"], meta[property="og:availability"]').first().attr("content");
+  const metaAvail = amazon ? undefined : $('meta[property="product:availability"], meta[property="og:availability"]').first().attr("content");
   const referenceRaw = $('[itemprop="sku"], [itemprop="mpn"], meta[property="product:retailer_item_id"]').first().attr("content") ?? $('[itemprop="sku"], [itemprop="mpn"]').first().text();
 
   // Texte visible (scripts, styles et métadonnées retirés)
@@ -188,7 +228,7 @@ export function extractPage(input: ExtractInput): PageObservation {
   const fullText = collapseWhitespace(body.length ? body.text() : $.root().text());
   const scopedText = scope ? collapseWhitespace(scope.text()) : fullText;
   const normalized = scopedText.slice(0, 200_000);
-  const travelPrices = findTravelPriceCandidates(scopedText);
+  const travelPrices = amazon && !scope ? { all: [], primary: null } : findTravelPriceCandidates(scopedText);
   const primaryTextPrice = travelPrices.primary;
 
   // Prix et disponibilité
@@ -200,12 +240,15 @@ export function extractPage(input: ExtractInput): PageObservation {
 
   if (scope) {
     const p = primaryTextPrice;
-    const direct = p ? p.value : parsePrice(scopedText);
+    const direct = p ? p.value : amazon ? null : parsePrice(scopedText);
     if (direct !== null && /\d/.test(scopedText)) {
       price = direct;
       currency = detectCurrency(scopedText);
       priceSource = "selector";
     }
+  }
+  if (price === null && amazonPrices.length) {
+    ({ value: price, currency, source: priceSource } = amazonPrices[0]!);
   }
   if (price === null && ld?.price !== null && ld?.price !== undefined) {
     price = ld.price;
@@ -248,6 +291,7 @@ export function extractPage(input: ExtractInput): PageObservation {
   }
 
   const priceCandidates = distinctPriceCandidates([
+    ...(amazon && !primaryTextPrice ? amazonPrices : []),
     ...ldOffers.filter((o) => o.price !== null).map((o) => ({ value: o.price!, currency: o.currency, source: "jsonld" })),
     ...(scope && primaryTextPrice ? [{ value: primaryTextPrice.value, currency: detectCurrency(scopedText), source: "selector" }] : []),
     ...(parsePrice(mdPriceRaw) !== null ? [{ value: parsePrice(mdPriceRaw)!, currency: mdCurrency && /^[A-Za-z]{3}$/.test(mdCurrency) ? mdCurrency.toUpperCase() : null, source: "microdata" }] : []),
@@ -260,7 +304,10 @@ export function extractPage(input: ExtractInput): PageObservation {
     currency = textPrice.currency;
     priceSource = "text";
   }
-  if (availability === "unknown") {
+  if (amazonStock.length) {
+    availability = amazonStock[0]!;
+    availabilitySource = "text";
+  } else if (!amazon && availability === "unknown") {
     const norm = normalizeForMatch(scopedText).slice(0, 50_000);
     if (PREORDER.some((k) => norm.includes(k))) availability = "preorder";
     else if (OUT_OF_STOCK.some((k) => norm.includes(k))) availability = "out_of_stock";
@@ -276,6 +323,7 @@ export function extractPage(input: ExtractInput): PageObservation {
     priceSource = null;
   }
   const availabilityCandidates = [
+    ...amazonStock,
     ld?.availability,
     mapAvailability(mdAvail),
     mapAvailability(metaAvail),
@@ -290,7 +338,7 @@ export function extractPage(input: ExtractInput): PageObservation {
   // Données enrichies (règles personnalisées). Le texte et l'empreinte historiques ci-dessus sont inchangés.
   let enriched: Partial<PageObservation> = {};
   if (input.enrich !== false) {
-    const regular = !priceContradictory && ldRegular !== null && price !== null && ldRegular > price ? ldRegular : strikethroughPrice($, scope, price);
+    const regular = amazon ? null : !priceContradictory && ldRegular !== null && price !== null && ldRegular > price ? ldRegular : strikethroughPrice($, scope, price);
     const st = extractStructure($, scope, input.finalUrl, ldItems);
     const visibleReference = /\b(?:ref|réf(?:érence)?)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{3,})/i.exec(normalized)?.[1] ?? null;
     const reference = collapseWhitespace(referenceRaw?.trim() || visibleReference || "").slice(0, 160) || null;
