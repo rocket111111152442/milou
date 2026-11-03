@@ -9,9 +9,14 @@
   </head>
   <body>
     <main>
-      <h1>Relevé Amazon.fr</h1>
-      <p>Relève une seule fois le prix et la disponibilité visibles sur la fiche ouverte. Tu pourras vérifier le relevé dans Waverti.</p>
-      <button type="button" id="capture">Relever et ouvrir Waverti</button>
+      <h1>Envoyer une page à Waverti</h1>
+      <p>Envoie l’adresse de la page ouverte et, si disponibles, son prix et son stock. Tu pourras vérifier le relevé dans Waverti.</p>
+      <button type="button" id="capture">Utiliser l’onglet actif</button>
+      <form id="paste">
+        <label for="page-url">Ou colle une autre adresse</label>
+        <input id="page-url" type="url" maxlength="2048" placeholder="https://…" autocomplete="off" required>
+        <button type="submit">Ouvrir Waverti avec cette adresse</button>
+      </form>
       <p role="status" id="status"></p>
     </main>
   </body>

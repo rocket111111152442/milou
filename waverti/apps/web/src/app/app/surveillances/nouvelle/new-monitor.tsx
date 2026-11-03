@@ -5,7 +5,7 @@ import { Button, Callout, useToast } from "@waverti/ui";
 import { MonitorWizard, type AnalysisResult, type TopicPlan, type WizardEntitlements } from "@waverti/ui/app";
 import type { RuleCategory } from "@waverti/types";
 import { apiCall } from "@/components/app/use-api";
-import { readBrowserReading, type BrowserReading } from "./browser-reading";
+import { hasBrowserOffer, readBrowserReading, type BrowserReading } from "./browser-reading";
 
 const availabilityLabel: Record<BrowserReading["availability"], string> = {
   in_stock: "En stock",
@@ -25,34 +25,43 @@ export function NewMonitor({ entitlements, initialCategory, onCreated }: { entit
     if (result === null) return;
     window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
     setReading(result);
+    if (result !== "invalid" && (result.version === 2 || !hasBrowserOffer(result))) setImportedUrl(result.url);
   }, []);
+
+  const offer = reading && reading !== "invalid" && hasBrowserOffer(reading) ? reading : null;
+  const importedCategory = importedUrl && offer ? (offer.price === null ? "product" : "price") : initialCategory;
 
   return (
     <div className="flex flex-col gap-5">
       {reading === "invalid" ? (
-        <Callout tone="warning" title="Relevé navigateur indisponible">
-          Retournez sur la fiche Amazon et lancez un nouveau relevé depuis l’extension.
+        <Callout tone="warning" title="Import depuis Chrome indisponible">
+          Rouvrez la page à surveiller et relancez l’import depuis l’extension Waverti.
         </Callout>
-      ) : reading ? (
-        <Callout tone="info" title="Relevé ponctuel Amazon importé">
+      ) : offer ? (
+        <Callout tone="info" title={offer.version === 1 ? "Relevé ponctuel Amazon importé" : "Relevé ponctuel importé depuis Chrome"}>
           <div className="flex flex-col gap-2">
             <p>
-              {reading.price === null ? "Prix non détecté" : new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(reading.price)}
-              {" · "}{availabilityLabel[reading.availability]}
-              {" · "}{new Date(reading.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+              {offer.price !== null && offer.currency ? new Intl.NumberFormat("fr-FR", { style: "currency", currency: offer.currency }).format(offer.price) : "Prix non détecté"}
+              {" · "}{availabilityLabel[offer.availability]}
+              {" · "}{new Date(offer.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
             </p>
             <p>Ces valeurs importées restent dans cette page. Waverti vérifie le suivi automatique séparément.</p>
             {!importedUrl ? (
-              <div><Button type="button" variant="secondary" onClick={() => setImportedUrl(reading.url)}>Utiliser cette adresse</Button></div>
+              <div><Button type="button" variant="secondary" onClick={() => setImportedUrl(offer.url)}>Utiliser cette adresse</Button></div>
             ) : null}
           </div>
+        </Callout>
+      ) : reading ? (
+        <Callout tone="info" title="Lien reçu depuis Chrome">
+          L’adresse de {new URL(reading.url).hostname} est déjà renseignée. Choisissez ce que vous voulez surveiller.
         </Callout>
       ) : null}
       <MonitorWizard
         key={importedUrl ?? "new"}
         entitlements={entitlements}
-        initialCategory={importedUrl ? "price" : initialCategory}
+        initialCategory={importedCategory}
         initialUrl={importedUrl}
+        browserExtensionHref="/downloads/waverti-chrome.zip"
         upgradeHref="/app/abonnement"
         businessHref="/app/business"
         onPreview={async (url, cssSelector) => {

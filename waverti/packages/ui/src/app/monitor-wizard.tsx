@@ -286,6 +286,15 @@ function isAmazonProductUrl(url: string): boolean {
   }
 }
 
+function browserPageHref(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return /^https?:$/.test(url.protocol) && !url.username && !url.password ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 const STEPS = ["Que surveiller", "Site ou produit", "Changement", "Alertes", "Activation"] as const;
 
 /** Une couleur d'icône par catégorie : repère visuel sans dépendre du texte. */
@@ -314,6 +323,7 @@ export function MonitorWizard({
   businessHref,
   initialCategory,
   initialUrl,
+  browserExtensionHref,
 }: {
   entitlements: WizardEntitlements;
   onPreview: (url: string, cssSelector?: string) => Promise<AnalysisResult>;
@@ -323,6 +333,7 @@ export function MonitorWizard({
   businessHref?: string;
   initialCategory?: CategoryId;
   initialUrl?: string;
+  browserExtensionHref?: string;
 }) {
   const topicsAllowed = entitlements.maxWebTopics > 0 && entitlements.webIntervalMinutes !== null;
   const [step, setStep] = React.useState(initialCategory ? 1 : 0);
@@ -542,6 +553,7 @@ export function MonitorWizard({
   ].filter(Boolean).join(" et ");
   const needsPreviewConfirmation = !isTopic && preview !== null && !previewing && Boolean(missingSignals);
   const showProductFallback = preview !== null && !previewing && Boolean(missingPreviewSignals);
+  const browserPage = showProductFallback && browserExtensionHref ? browserPageHref(url) : null;
   const detectedElements = category === "price" ? stockLabel ?? "Non détectée sur la page" : [
     analysis?.items.length ? `${analysis.items.length}+ éléments de liste` : null,
     analysis?.documents.length ? `${analysis.documents.length} document(s)` : null,
@@ -640,6 +652,26 @@ export function MonitorWizard({
           <Button type="button" variant="secondary" size="sm" className="mt-3" onClick={chooseAnotherProduct}>
             Vérifier une autre fiche
           </Button>
+          {browserExtensionHref ? (
+            <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">
+              <p className="font-medium">Le prix ou le stock est visible dans Chrome ?</p>
+              <p>Ouvrez la fiche dans Chrome et lancez le relevé avec l’extension Waverti. Le prix et le stock lisibles s’afficheront dans un nouvel onglet Waverti.</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                <a className="font-medium text-blue underline underline-offset-4" href={browserExtensionHref} download>
+                  Télécharger l’extension Chrome
+                </a>
+                {browserPage ? (
+                  <a className="font-medium text-blue underline underline-offset-4" href={browserPage} target="_blank" rel="noreferrer">
+                    Ouvrir la fiche
+                  </a>
+                ) : null}
+              </div>
+              <details>
+                <summary className="cursor-pointer">Installer l’extension</summary>
+                <p className="mt-2">Décompressez le fichier, ouvrez chrome://extensions, activez le mode développeur, puis choisissez « Charger l’extension non empaquetée ». Sélectionnez le dossier décompressé et connectez-vous à Waverti dans Chrome.</p>
+              </details>
+            </div>
+          ) : null}
         </Callout>
       ) : null}
     </div>

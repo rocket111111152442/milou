@@ -20,6 +20,17 @@ button {
   font: inherit;
 }
 
+form {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+input {
+  padding: 6px;
+  font: inherit;
+}
+
 #status:empty {
   display: none;
 }

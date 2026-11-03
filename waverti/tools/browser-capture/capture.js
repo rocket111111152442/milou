@@ -1,9 +1,36 @@
 /** Executed in the active tab by Chrome. Keep this function self-contained. */
-export function captureAmazonProduct() {
-  const asin = location.pathname.match(/\/(?:dp|gp\/product|gp\/aw\/d)\/([a-z0-9]{10})(?:\/|$)/i)?.[1];
-  if (location.protocol !== "https:" || !["amazon.fr", "www.amazon.fr"].includes(location.host) || !asin) {
-    return { ok: false, code: "not_product" };
+export function capturePage(href = location.href, urlOnly = false) {
+  let url;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
   }
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.href.length > 2048) {
+    return null;
+  }
+
+  const observation = {
+    version: 2,
+    url: url.href,
+    price: null,
+    currency: null,
+    availability: "unknown",
+    observedAt: new Date().toISOString(),
+  };
+  if (urlOnly) return observation;
+
+  if (!["amazon.fr", "www.amazon.fr"].includes(url.host)) {
+    return { ...observation, ...structuredOffer() };
+  }
+
+  const asin = url.pathname.match(/\/(?:dp|gp\/product|gp\/aw\/d)\/([a-z0-9]{10})(?:\/|$)/i)?.[1];
+  if (!asin) return observation;
+  const canonical = new URL("https://www.amazon.fr/dp/" + asin.toUpperCase());
+  for (const [key, value] of url.searchParams) {
+    if (!/^(?:utm_.*|tag|ref|ref_|linkCode|qid|sr)$/i.test(key)) canonical.searchParams.append(key, value);
+  }
+  canonical.hash = url.hash;
 
   function isVisible(element) {
     if (!element || element.closest("[hidden], .aok-hidden")) return false;
@@ -25,6 +52,70 @@ export function captureAmazonProduct() {
     if (!match) return null;
     const cents = Number(match[1].replace(/\s/g, "")) * 100 + Number(match[2] ?? 0);
     return Number.isSafeInteger(cents) && cents > 0 && cents <= 10_000_000_000 ? cents : null;
+  }
+
+  function structuredOffer() {
+    const products = new Set();
+    const currencies = new Set(Intl.supportedValuesOf("currency"));
+    const schemaType = (value, type) => [value].flat().some((entry) =>
+      typeof entry === "string" && [type, "https://schema.org/" + type, "http://schema.org/" + type].includes(entry));
+    const asList = (value) => Array.isArray(value) ? value : [value];
+
+    function collect(value, depth = 0) {
+      if (!value || depth > 4 || products.size > 1) return;
+      for (const item of asList(value).slice(0, 64)) {
+        if (!item || typeof item !== "object") continue;
+        if (schemaType(item["@type"], "Product")) products.add(item);
+        collect(item["@graph"], depth + 1);
+        collect(item.mainEntity, depth + 1);
+      }
+    }
+
+    let remaining = 500_000;
+    for (const script of Array.from(document.querySelectorAll('script[type="application/ld+json" i]')).slice(0, 20)) {
+      const raw = script.textContent;
+      if (raw.length > remaining) break;
+      remaining -= raw.length;
+      try {
+        collect(JSON.parse(raw));
+      } catch {
+        // Broken publisher markup is not a reliable source.
+      }
+    }
+    if (products.size !== 1) return {};
+
+    const product = products.values().next().value;
+    if (typeof product.url === "string") {
+      try {
+        const productUrl = new URL(product.url, url);
+        if (productUrl.origin !== url.origin || productUrl.pathname !== url.pathname ||
+            (productUrl.search && productUrl.search !== url.search)) return {};
+      } catch {
+        return {};
+      }
+    }
+    const offers = asList(product.offers);
+    if (!offers.length || offers.length > 12 || offers.some((offer) => !schemaType(offer?.["@type"], "Offer"))) return {};
+
+    const amounts = new Set(offers.map((offer) => {
+      const raw = String(offer.price ?? "");
+      const price = /^\d+(?:\.\d{1,3})?$/.test(raw) ? Number(raw) : 0;
+      const currency = String(offer.priceCurrency ?? "").toUpperCase();
+      return price > 0 && price <= 100_000_000 && currencies.has(currency) ? JSON.stringify([price, currency]) : null;
+    }));
+    const [price, currency] = amounts.size === 1 && !amounts.has(null)
+      ? JSON.parse(amounts.values().next().value)
+      : [null, null];
+    const available = new Set(offers.map((offer) => {
+      const status = typeof offer.availability === "string"
+        ? offer.availability.replace(/^https?:\/\/schema\.org\//, "")
+        : "";
+      if (["InStock", "LimitedAvailability"].includes(status)) return "in_stock";
+      if (["OutOfStock", "SoldOut", "Discontinued"].includes(status)) return "out_of_stock";
+      if (["PreOrder", "PreSale"].includes(status)) return "preorder";
+      return "unknown";
+    }));
+    return { price, currency, availability: available.size === 1 ? available.values().next().value : "unknown" };
   }
 
   const prices = new Set();
@@ -70,16 +161,11 @@ export function captureAmazonProduct() {
 
   const price = prices.size === 1 ? prices.values().next().value / 100 : null;
   const availability = stock.size === 1 ? stock.values().next().value : "unknown";
-  if (price === null && availability === "unknown") return { ok: false, code: "unavailable" };
   return {
-    ok: true,
-    observation: {
-      version: 1,
-      url: "https://www.amazon.fr/dp/" + asin.toUpperCase(),
-      price,
-      currency: price === null ? null : "EUR",
-      availability,
-      observedAt: new Date().toISOString(),
-    },
+    ...observation,
+    url: canonical.href,
+    price,
+    currency: price === null ? null : "EUR",
+    availability,
   };
 }

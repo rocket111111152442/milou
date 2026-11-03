@@ -1,39 +1,62 @@
-import { captureAmazonProduct } from "./capture.js";
+import { capturePage } from "./capture.js";
 
 const button = document.getElementById("capture");
+const form = document.getElementById("paste");
+const input = document.getElementById("page-url");
 const status = document.getElementById("status");
 const destination = "https://www.waverti.com/app/surveillances/nouvelle";
+
+async function openWaverti(observation) {
+  const fragment = encodeURIComponent(JSON.stringify(observation));
+  await chrome.tabs.create({ url: destination + "#waverti-releve=" + fragment });
+  window.close();
+}
 
 button.addEventListener("click", async () => {
   button.disabled = true;
   status.textContent = "";
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const activeUrl = URL.canParse(tab?.url) ? new URL(tab.url) : null;
-    if (!tab?.id || !activeUrl || activeUrl.protocol !== "https:" ||
-        !["amazon.fr", "www.amazon.fr"].includes(activeUrl.host)) {
-      status.textContent = "Ouvre une fiche produit Amazon.fr dans l’onglet actif, puis réessaie.";
+    const link = tab?.url ? capturePage(tab.url, true) : null;
+    if (!tab?.id || !link) {
+      status.textContent = "Ouvre une page Web dans l’onglet actif ou colle son adresse ci-dessous.";
       return;
     }
 
-    const [injection] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: captureAmazonProduct,
-    });
-    const result = injection?.result;
-    if (!result?.ok) {
-      status.textContent = result?.code === "not_product"
-        ? "Ouvre la fiche d’un produit Amazon.fr, puis réessaie."
-        : "Aucun prix ni stock fiable n’est visible. Sélectionne la variante et attends l’affichage de l’offre, puis réessaie.";
-      return;
+    let reading = null;
+    try {
+      const [injection] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: capturePage,
+      });
+      reading = injection?.result ?? null;
+    } catch {
+      // Chrome may forbid script execution on a page whose URL can still be sent.
     }
-
-    const fragment = encodeURIComponent(JSON.stringify(result.observation));
-    await chrome.tabs.create({ url: destination + "#waverti-releve=" + fragment });
-    window.close();
+    await openWaverti(reading ?? link);
   } catch {
-    status.textContent = "La page n’a pas pu être lue. Recharge la fiche Amazon.fr, puis réessaie.";
+    status.textContent = "Waverti n’a pas pu s’ouvrir. Réessaie.";
   } finally {
     button.disabled = false;
+  }
+});
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  status.textContent = "";
+  const link = capturePage(input.value.trim(), true);
+  if (!link) {
+    status.textContent = "Colle une adresse HTTP ou HTTPS de 2 048 caractères maximum, sans identifiant ni mot de passe.";
+    input.focus();
+    return;
+  }
+  const submit = form.querySelector("button");
+  submit.disabled = true;
+  try {
+    await openWaverti(link);
+  } catch {
+    status.textContent = "Waverti n’a pas pu s’ouvrir. Réessaie.";
+  } finally {
+    submit.disabled = false;
   }
 });
