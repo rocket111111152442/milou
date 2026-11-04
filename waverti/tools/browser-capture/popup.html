@@ -9,18 +9,33 @@
   </head>
   <body>
     <main>
-      <h1>Envoyer une page à Waverti</h1>
-      <p>Envoie l’adresse de la page ouverte et, si disponibles, son prix et son stock. Tu pourras vérifier le relevé dans Waverti.</p>
-      <button type="button" id="capture">Utiliser l’onglet actif</button>
-      <form id="paste">
-        <label for="page-url">Ou colle une autre adresse</label>
-        <input id="page-url" type="url" maxlength="2048" placeholder="https://…" autocomplete="off" required>
-        <button type="submit">Ouvrir Waverti avec cette adresse</button>
-      </form>
+      <header class="brand">
+        <img src="32x32.png" alt="" width="32" height="32">
+        <div>
+          <h1>Waverti</h1>
+          <p>Surveiller cette page</p>
+        </div>
+      </header>
+      <section class="quick-action" aria-label="Ajouter une page">
+        <button type="button" id="capture" class="primary"><span class="button-icon">＋</span> Ajouter la page ouverte</button>
+        <div class="or"><span>ou</span></div>
+        <form id="paste">
+          <label for="page-url">Coller un lien</label>
+          <div class="url-row">
+            <input id="page-url" type="url" maxlength="2048" placeholder="https://…" autocomplete="off" required>
+            <button type="submit" aria-label="Ouvrir le lien">→</button>
+          </div>
+        </form>
+      </section>
       <p role="status" id="status"></p>
-      <section aria-labelledby="monitoring-title">
-        <h2 id="monitoring-title">Contrôles récurrents</h2>
-        <p>Chrome ouvre brièvement les pages autorisées en arrière-plan quand Waverti demande un relevé de prix ou de stock. Les contrôles nécessitent que Chrome soit ouvert et peuvent utiliser la session du site déjà ouverte dans ce navigateur.</p>
+      <section class="automation" aria-labelledby="monitoring-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="monitoring-title">Contrôle automatique</h2>
+            <p>Prix et stock, sans y penser.</p>
+          </div>
+          <span class="live-dot" aria-hidden="true"></span>
+        </div>
         <p id="monitoring-status" role="status">Vérification de la liaison…</p>
         <div id="monitoring-actions">
           <button type="button" id="pair" hidden>Relier ce navigateur</button>
@@ -31,9 +46,12 @@
           <button type="button" id="authorize" hidden>Autoriser cette page et ouvrir Waverti</button>
           <button type="button" id="unlink" hidden>Délier le navigateur</button>
         </div>
-        <ul id="authorized-sites"></ul>
+        <details id="sites-details">
+          <summary>Pages autorisées</summary>
+          <ul id="authorized-sites"></ul>
+        </details>
       </section>
-      <small id="extension-version"></small>
+      <footer><small id="extension-version"></small><span>Local d’abord · relais serveur</span></footer>
     </main>
   </body>
 </html>

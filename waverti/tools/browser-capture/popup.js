@@ -93,21 +93,21 @@ function showDevice(state) {
   controls.authorize.hidden = !state.enabled || !activeTarget;
   controls.unlink.hidden = !state.paired;
   recurringStatus.textContent = state.pairing
-    ? "Code : " + state.pairing.userCode + ". Vérifie qu’il correspond dans Waverti avant d’approuver."
+    ? "Code " + state.pairing.userCode + " · valide-le dans Waverti."
     : state.lastProblem || (state.enabled
     ? activeTarget
-      ? "Contrôles actifs. Page à autoriser : " + activeTarget.href
-      : "Contrôles actifs. Ouvre une page HTTPS publique pour l’autoriser."
+      ? "Contrôle actif · autorise cette page pour commencer."
+      : "Contrôle actif · ouvre une page HTTPS pour l’autoriser."
     : state.paired
-      ? "Navigateur relié. Les contrôles sont suspendus."
-      : "Relie ce navigateur pour activer les contrôles.");
+      ? "Navigateur relié · contrôles en pause."
+      : "Relie ce navigateur pour commencer.");
 
   sites.replaceChildren();
   for (const site of state.sites) {
     const item = document.createElement("li");
     const remove = document.createElement("button");
     remove.type = "button";
-    remove.textContent = site.granted ? "Retirer " + site.origin : "Oublier " + site.origin + " (accès retiré)";
+    remove.textContent = site.granted ? "Retirer · " + site.origin : "Oublier · " + site.origin;
     remove.addEventListener("click", () => void perform(remove, async () => {
       showDevice(await worker("removeSite", { site: site.origin }));
     }));
