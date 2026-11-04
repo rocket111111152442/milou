@@ -95,7 +95,7 @@ export async function authenticateRequest(req: Request): Promise<RequestActor | 
   const bearer = bearerFrom(req.headers.get("authorization"));
   if (bearer) {
     const device = await authenticateDevice(getDb(), bearer);
-    if (!device) return null;
+    if (!device || device.platform === "chrome") return null;
     const [p] = await getDb().select({ suspendedAt: profiles.suspendedAt }).from(profiles).where(eq(profiles.id, device.userId)).limit(1);
     if (!p || p.suspendedAt) return null;
     return { kind: "device", ...device };

@@ -1,8 +1,8 @@
 /** Executed in the active tab by Chrome. Keep this function self-contained. */
-export function capturePage(href = location.href, urlOnly = false) {
+export function capturePage(href, urlOnly = false, expectedUrl) {
   let url;
   try {
-    url = new URL(href);
+    url = new URL(href ?? location.href);
   } catch {
     return null;
   }
@@ -20,12 +20,34 @@ export function capturePage(href = location.href, urlOnly = false) {
   };
   if (urlOnly) return observation;
 
+  function comparableUrl(value) {
+    const comparable = new URL(value, url);
+    const tracking = /^(utm_[a-z]+|fbclid|gclid|dclid|msclkid|mc_cid|mc_eid|_ga|igshid|yclid)$/i;
+    for (const key of [...comparable.searchParams.keys()]) if (tracking.test(key)) comparable.searchParams.delete(key);
+    return comparable.href;
+  }
+
+  const background = typeof expectedUrl === "string";
+  const httpStatus = background ? performance.getEntriesByType("navigation")[0]?.responseStatus : undefined;
+  if (background) {
+    if (comparableUrl(url.href) !== expectedUrl) return { error: "page_changed" };
+    const blocked = [401, 403, 429, 451].includes(httpStatus) ||
+      /(?:captcha|robot check|access denied|verify you are human|connexion|sign in)/i.test(document.title) ||
+      Boolean(document.querySelector('form[action*="validateCaptcha"], form[action*="captcha"], #challenge-form, #captchacharacters'));
+    if (blocked) return { error: "access_restricted" };
+    if (httpStatus !== 200) return { error: "navigation_unverified" };
+  }
+
+  function result(reading, source) {
+    return background ? { reading, source, httpStatus, loadedUrl: url.href } : reading;
+  }
+
   if (!["amazon.fr", "www.amazon.fr"].includes(url.host)) {
-    return { ...observation, ...structuredOffer() };
+    return result({ ...observation, ...structuredOffer() }, "jsonld");
   }
 
   const asin = url.pathname.match(/\/(?:dp|gp\/product|gp\/aw\/d)\/([a-z0-9]{10})(?:\/|$)/i)?.[1];
-  if (!asin) return observation;
+  if (!asin) return result(observation, "selector");
   const canonical = new URL("https://www.amazon.fr/dp/" + asin.toUpperCase());
   for (const [key, value] of url.searchParams) {
     if (!/^(?:utm_.*|tag|ref|ref_|linkCode|qid|sr)$/i.test(key)) canonical.searchParams.append(key, value);
@@ -85,7 +107,18 @@ export function capturePage(href = location.href, urlOnly = false) {
     if (products.size !== 1) return {};
 
     const product = products.values().next().value;
-    if (typeof product.url === "string") {
+    const offers = asList(product.offers);
+    if (!offers.length || offers.length > 12 || offers.some((offer) => !schemaType(offer?.["@type"], "Offer"))) return {};
+    if (background) {
+      const matches = (value) => typeof value === "string" && value.trim() !== "" && comparableUrl(value) === expectedUrl;
+      try {
+        if (product.url !== undefined && !matches(product.url)) return {};
+        if (offers.some((offer) => offer.url !== undefined && !matches(offer.url))) return {};
+        if (!product.url && new URL(expectedUrl).search && !offers.every((offer) => matches(offer.url))) return {};
+      } catch {
+        return {};
+      }
+    } else if (typeof product.url === "string") {
       try {
         const productUrl = new URL(product.url, url);
         if (productUrl.origin !== url.origin || productUrl.pathname !== url.pathname ||
@@ -94,9 +127,6 @@ export function capturePage(href = location.href, urlOnly = false) {
         return {};
       }
     }
-    const offers = asList(product.offers);
-    if (!offers.length || offers.length > 12 || offers.some((offer) => !schemaType(offer?.["@type"], "Offer"))) return {};
-
     const amounts = new Set(offers.map((offer) => {
       const raw = String(offer.price ?? "");
       const price = /^\d+(?:\.\d{1,3})?$/.test(raw) ? Number(raw) : 0;
@@ -161,11 +191,11 @@ export function capturePage(href = location.href, urlOnly = false) {
 
   const price = prices.size === 1 ? prices.values().next().value / 100 : null;
   const availability = stock.size === 1 ? stock.values().next().value : "unknown";
-  return {
+  return result({
     ...observation,
-    url: canonical.href,
+    url: canonical.href.length <= 2048 ? canonical.href : url.href,
     price,
     currency: price === null ? null : "EUR",
     availability,
-  };
+  }, "selector");
 }

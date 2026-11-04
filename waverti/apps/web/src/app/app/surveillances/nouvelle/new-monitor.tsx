@@ -14,7 +14,14 @@ const availabilityLabel: Record<BrowserReading["availability"], string> = {
   unknown: "Non détectée",
 };
 
-export function NewMonitor({ entitlements, initialCategory, onCreated }: { entitlements: WizardEntitlements; initialCategory?: RuleCategory; onCreated?: (id: string) => void }) {
+export function NewMonitor({
+  entitlements, initialCategory, browserMonitoringAvailable, onCreated,
+}: {
+  entitlements: WizardEntitlements;
+  initialCategory?: RuleCategory;
+  browserMonitoringAvailable?: boolean;
+  onCreated?: (id: string) => void;
+}) {
   const router = useRouter();
   const { push } = useToast();
   const [reading, setReading] = React.useState<BrowserReading | "invalid" | null>(null);
@@ -30,6 +37,7 @@ export function NewMonitor({ entitlements, initialCategory, onCreated }: { entit
 
   const offer = reading && reading !== "invalid" && hasBrowserOffer(reading) ? reading : null;
   const importedCategory = importedUrl && offer ? (offer.price === null ? "product" : "price") : initialCategory;
+  const browserMonitoringUrl = reading && reading !== "invalid" && reading.version === 2 && reading.recurring ? reading.url : undefined;
 
   return (
     <div className="flex flex-col gap-5">
@@ -56,11 +64,20 @@ export function NewMonitor({ entitlements, initialCategory, onCreated }: { entit
           L’adresse de {new URL(reading.url).hostname} est déjà renseignée. Choisissez ce que vous voulez surveiller.
         </Callout>
       ) : null}
+      {browserMonitoringUrl ? (
+        <Callout tone={browserMonitoringAvailable ? "info" : "warning"} title="Suivi récurrent dans Chrome">
+          {browserMonitoringAvailable
+            ? "Cette adresse a été importée pour un suivi du prix ou du stock depuis Chrome. Vérifiez le choix à l’étape suivante."
+            : "Aucune extension Chrome active n’est reliée à votre compte. Réactivez l’extension puis relancez l’import, ou choisissez les contrôles par les serveurs Waverti."}
+        </Callout>
+      ) : null}
       <MonitorWizard
         key={importedUrl ?? "new"}
         entitlements={entitlements}
         initialCategory={importedCategory}
         initialUrl={importedUrl}
+        browserMonitoringUrl={browserMonitoringUrl}
+        browserMonitoringAvailable={browserMonitoringAvailable}
         browserExtensionHref="/downloads/waverti-chrome.zip"
         upgradeHref="/app/abonnement"
         businessHref="/app/business"

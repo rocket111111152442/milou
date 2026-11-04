@@ -22,18 +22,32 @@ import {
   sql,
   tsParam,
   type Database,
+  type ExecutionMode,
   type Executor,
 } from "@waverti/database";
+import { CHROME_CONSENT_VERSION } from "@waverti/types";
 import { computeNextRun } from "./schedule/next-run";
 
 export const AGENT_ONLINE_WINDOW_MS = 3 * 60_000;
 export const DEFAULT_AGENT_GRACE_SECONDS = 600;
 export const DEFAULT_LEASE_SECONDS = 300;
 
+interface BrowserQueueScope {
+  userId: string;
+  urlHashes: string[];
+}
+
+/** Utilisé uniquement dans les requêtes dont t est l'alias de monitoring_tasks. */
+function browserTasks(scope: BrowserQueueScope) {
+  return sql`t.execution_mode = 'browser_only' and t.user_id = ${scope.userId}
+    and exists (select 1 from monitoring_targets x where x.task_id = t.id and x.url_hash in ${scope.urlHashes})`;
+}
+
 export interface ScheduleOptions {
   now?: Date;
   limit?: number;
   agentGraceSeconds?: number;
+  browser?: BrowserQueueScope;
 }
 
 export interface ScheduledJob {
@@ -50,7 +64,7 @@ interface DueRow extends Record<string, unknown> {
   interval_minutes: number;
   next_run_at: Date;
   kind: "page" | "web_topic";
-  execution_mode: "auto" | "local_only" | "cloud_only";
+  execution_mode: ExecutionMode;
 }
 
 /** Utilisateurs ayant au moins un appareil actif, consentant et vu récemment. */
@@ -63,6 +77,7 @@ async function onlineAgentUsers(db: Executor, userIds: string[], now: Date): Pro
       and(
         sql`${agentDevices.userId} in ${userIds}`,
         eq(agentDevices.status, "active"),
+        sql`${agentDevices.platform} <> 'chrome'`,
         eq(agentDevices.monitoringEnabled, true),
         isNotNull(agentDevices.consentLocalAt),
         gt(agentDevices.lastSeenAt, new Date(now.getTime() - AGENT_ONLINE_WINDOW_MS)),
@@ -75,12 +90,13 @@ async function onlineAgentUsers(db: Executor, userIds: string[], now: Date): Pro
 
 export function decideExecutor(input: {
   kind: "page" | "web_topic";
-  executionMode: "auto" | "local_only" | "cloud_only";
+  executionMode: ExecutionMode;
   cloudRelay: boolean;
   agentOnline: boolean;
 }): { preferred: "agent" | "cloud"; allowAgent: boolean; allowCloud: boolean } {
   // Les recherches Web utilisent des API payantes dont les clés restent sur le serveur.
   if (input.kind === "web_topic") return { preferred: "cloud", allowAgent: false, allowCloud: true };
+  if (input.executionMode === "browser_only") return { preferred: "agent", allowAgent: true, allowCloud: false };
   if (!input.cloudRelay || input.executionMode === "local_only") return { preferred: "agent", allowAgent: true, allowCloud: false };
   if (input.executionMode === "cloud_only") return { preferred: "cloud", allowAgent: false, allowCloud: true };
   return input.agentOnline
@@ -90,6 +106,7 @@ export function decideExecutor(input: {
 
 /** Crée les tâches arrivées à échéance et avance leur prochaine exécution. Idempotent. */
 export async function scheduleDueTasks(db: Database, opts: ScheduleOptions = {}): Promise<ScheduledJob[]> {
+  if (opts.browser?.urlHashes.length === 0) return [];
   const now = opts.now ?? new Date();
   const grace = opts.agentGraceSeconds ?? DEFAULT_AGENT_GRACE_SECONDS;
   return db.transaction(async (tx) => {
@@ -102,12 +119,13 @@ export async function scheduleDueTasks(db: Database, opts: ScheduleOptions = {})
       join entitlements en on en.user_id = s.user_id and en.plan_id is not null
         and (en.valid_until is null or en.valid_until > ${tsParam(now)})
       where s.next_run_at <= ${tsParam(now)} and t.status in ('active', 'error') and p.suspended_at is null
+        and ${opts.browser ? browserTasks(opts.browser) : sql`t.execution_mode <> 'browser_only'`}
       order by s.next_run_at
       limit ${opts.limit ?? 500}
       for update of s skip locked`);
     if (!due.length) return [];
     const userIds = [...new Set(due.map((d) => d.user_id))];
-    const online = await onlineAgentUsers(tx, userIds, now);
+    const online = opts.browser ? new Set<string>() : await onlineAgentUsers(tx, userIds, now);
     const ents = await tx
       .select({ userId: entitlements.userId, cloudRelay: entitlements.cloudRelay })
       .from(entitlements)
@@ -124,13 +142,14 @@ export async function scheduleDueTasks(db: Database, opts: ScheduleOptions = {})
       });
       const slot = new Date(d.next_run_at);
       // Agent seul (Découverte / local_only) : le PC a jusqu'au créneau suivant pour exécuter le contrôle.
-      const deadline = decision.allowCloud
+      // Chrome prépare son prochain contrôle à la connexion. Un seul créneau reste en attente hors ligne.
+      const deadline = d.execution_mode === "browser_only" ? null : decision.allowCloud
         ? new Date(slot.getTime() + grace * 1000)
         : new Date(slot.getTime() + d.interval_minutes * 60_000);
       const inserted = await tx.execute<{ id: string }>(sql`
         insert into monitoring_jobs (task_id, user_id, kind, slot_at, preferred_executor, allow_cloud, allow_agent, agent_deadline_at, priority)
         values (${d.task_id}, ${d.user_id}, ${d.kind}, ${tsParam(slot)}, ${decision.preferred}, ${decision.allowCloud}, ${decision.allowAgent},
-                ${decision.preferred === "agent" ? tsParam(deadline) : null}, 100)
+                ${decision.preferred === "agent" && deadline ? tsParam(deadline) : null}, 100)
         on conflict do nothing
         returning id`);
       // Le décalage de lissage est appliqué une seule fois à la création (cf. service) : ici on ajoute
@@ -157,21 +176,28 @@ export async function scheduleDueTasks(db: Database, opts: ScheduleOptions = {})
  * Maintenance de la file : baux expirés remis en file (ou échec après max_attempts) et
  * contrôles locaux non exécutés à temps marqués « suspendus » (formule sans relais cloud).
  */
-export async function recoverJobs(db: Database, now: Date = new Date()): Promise<{ requeued: number; failed: number; skipped: number }> {
+export async function recoverJobs(db: Database, now: Date = new Date(), browser?: BrowserQueueScope): Promise<{ requeued: number; failed: number; skipped: number }> {
+  if (browser?.urlHashes.length === 0) return { requeued: 0, failed: 0, skipped: 0 };
+  const scope = browser
+    ? sql`task_id in (select t.id from monitoring_tasks t where ${browserTasks(browser)})`
+    : sql`true`;
   return db.transaction(async (tx) => {
     const requeued = await tx.execute(sql`
       update monitoring_jobs set status = 'pending', claimed_by = null, claimed_device_id = null, claim_token = null,
              lease_expires_at = null, worker_id = null, last_error = 'lease_expired'
       where status = 'claimed' and lease_expires_at < ${tsParam(now)} and attempts < max_attempts
+        and ${scope}
       returning id`);
     const failed = await tx.execute(sql`
       update monitoring_jobs set status = 'failed', finished_at = ${tsParam(now)}, claim_token = null, lease_expires_at = null,
              last_error = 'lease_expired_max_attempts'
       where status = 'claimed' and lease_expires_at < ${tsParam(now)} and attempts >= max_attempts
+        and ${scope}
       returning id`);
     const skipped = await tx.execute<{ task_id: string }>(sql`
       update monitoring_jobs set status = 'skipped', finished_at = ${tsParam(now)}, last_error = 'agent_unavailable'
       where status = 'pending' and not allow_cloud and agent_deadline_at < ${tsParam(now)}
+        and ${scope}
       returning task_id`);
     if (skipped.length) {
       await tx.execute(sql`
@@ -192,12 +218,26 @@ export interface ClaimedJob {
   attempts: number;
 }
 
-/** Réservation par l'application desktop : uniquement les contrôles de SON utilisateur. */
+/** Réservation par un appareil : uniquement les contrôles de son compte et de son type. */
 export async function claimAgentJobs(
   db: Database,
-  params: { userId: string; deviceId: string; max: number; leaseSeconds?: number; now?: Date },
+  params: { userId: string; deviceId: string; max: number; leaseSeconds?: number; now?: Date; browserUrlHashes?: string[] },
 ): Promise<ClaimedJob[]> {
+  const hashes = params.browserUrlHashes;
+  if (hashes?.length === 0) return [];
   const now = params.now ?? new Date();
+  const browser = hashes ? { userId: params.userId, urlHashes: hashes } : undefined;
+  const chromeDevice = sql`select 1 from agent_devices a where a.id = ${params.deviceId} and a.user_id = ${params.userId}
+    and a.platform = 'chrome' and a.status = 'active' and a.monitoring_enabled
+    and a.consent_local_at is not null and a.consent_version = ${CHROME_CONSENT_VERSION}`;
+  if (browser) {
+    if (!(await db.execute(chromeDevice)).length) return [];
+    await recoverJobs(db, now, browser);
+    await scheduleDueTasks(db, { now, browser });
+  }
+  const mode = browser
+    ? sql`${browserTasks(browser)} and exists (${chromeDevice})`
+    : sql`t.execution_mode <> 'browser_only'`;
   const lease = new Date(now.getTime() + (params.leaseSeconds ?? DEFAULT_LEASE_SECONDS) * 1000);
   const rows = await db.execute<{ id: string; claim_token: string; lease_expires_at: Date; task_id: string; user_id: string; kind: "page"; attempts: number }>(sql`
     update monitoring_jobs set status = 'claimed', claimed_by = 'agent', claimed_device_id = ${params.deviceId},
@@ -210,6 +250,7 @@ export async function claimAgentJobs(
         and (en.valid_until is null or en.valid_until > ${tsParam(now)})
       where j.user_id = ${params.userId} and j.status = 'pending' and j.allow_agent and j.kind = 'page'
         and j.slot_at <= ${tsParam(now)} and t.status in ('active', 'error')
+        and ${mode}
       order by j.priority, j.slot_at
       limit ${Math.min(3, Math.max(1, params.max))}
       for update of j skip locked
@@ -245,6 +286,7 @@ export async function claimCloudJobs(
         and (j.kind = 'web_topic' or en.cloud_relay)
       where j.status = 'pending' and j.allow_cloud and j.slot_at <= ${tsParam(now)} and j.kind in ${kinds}
         and t.status in ('active', 'error')
+        and t.execution_mode <> 'browser_only'
         and (j.preferred_executor = 'cloud' or j.agent_deadline_at <= ${tsParam(now)})
       order by j.priority, j.slot_at
       limit ${Math.max(1, params.max)}
@@ -278,7 +320,7 @@ export async function enqueueImmediate(
 ): Promise<string | null> {
   const now = params.now ?? new Date();
   return db.transaction(async (tx) => {
-    const [task] = await tx.execute<{ kind: "page" | "web_topic"; execution_mode: "auto" | "local_only" | "cloud_only"; status: string; interval_minutes: number }>(sql`
+    const [task] = await tx.execute<{ kind: "page" | "web_topic"; execution_mode: ExecutionMode; status: string; interval_minutes: number }>(sql`
       select t.kind, t.execution_mode, t.status, s.interval_minutes from monitoring_tasks t
       join monitoring_schedules s on s.task_id = t.id
       where t.id = ${params.taskId} and t.user_id = ${params.userId}`);
@@ -286,13 +328,13 @@ export async function enqueueImmediate(
     const [ent] = await tx.select({ cloudRelay: entitlements.cloudRelay }).from(entitlements).where(eq(entitlements.userId, params.userId));
     const online = await onlineAgentUsers(tx, [params.userId], now);
     const d = decideExecutor({ kind: task.kind, executionMode: task.execution_mode, cloudRelay: ent?.cloudRelay ?? false, agentOnline: online.has(params.userId) });
-    const deadline = d.allowCloud
+    const deadline = task.execution_mode === "browser_only" ? null : d.allowCloud
       ? new Date(now.getTime() + (params.agentGraceSeconds ?? 120) * 1000)
       : new Date(now.getTime() + task.interval_minutes * 60_000);
     const r = await tx.execute<{ id: string }>(sql`
       insert into monitoring_jobs (task_id, user_id, kind, slot_at, preferred_executor, allow_cloud, allow_agent, agent_deadline_at, priority, manual)
       values (${params.taskId}, ${params.userId}, ${task.kind}, ${tsParam(now)}, ${d.preferred}, ${d.allowCloud}, ${d.allowAgent},
-              ${d.preferred === "agent" ? tsParam(deadline) : null}, 10, ${params.manual})
+              ${d.preferred === "agent" && deadline ? tsParam(deadline) : null}, 10, ${params.manual})
       on conflict do nothing
       returning id`);
     return r[0]?.id ?? null;

@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { pageObservationSchema } from "./observations";
 
-export const platformSchema = z.enum(["windows", "macos", "linux"]);
+export const platformSchema = z.enum(["windows", "macos", "linux", "chrome"]);
 export type Platform = z.infer<typeof platformSchema>;
+export const CHROME_CONSENT_VERSION = "chrome-monitoring-v1";
 
 export const linkStartSchema = z.object({
   deviceName: z.string().trim().min(1).max(80),
@@ -23,7 +24,10 @@ export const heartbeatSchema = z.object({
   appVersion: z.string().max(40).optional(),
 });
 
-export const claimRequestSchema = z.object({ max: z.number().int().min(1).max(3).default(1) });
+export const claimRequestSchema = z.object({
+  max: z.number().int().min(1).max(3).default(1),
+  urlHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(100).optional(),
+});
 
 export interface AgentJob {
   jobId: string;

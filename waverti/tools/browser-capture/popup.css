@@ -9,6 +9,37 @@ body {
   padding: 16px;
 }
 
+h2 {
+  font-size: 16px;
+}
+
+section {
+  margin-top: 16px;
+  border-top: 1px solid GrayText;
+}
+
+#monitoring-actions {
+  display: grid;
+  gap: 6px;
+}
+
+#monitoring-status {
+  overflow-wrap: anywhere;
+}
+
+#authorized-sites {
+  padding: 0;
+  list-style: none;
+}
+
+#authorized-sites li + li {
+  margin-top: 6px;
+}
+
+[hidden] {
+  display: none;
+}
+
 h1 {
   margin: 0;
   font-size: 18px;

@@ -2,6 +2,7 @@
  * Vérifications de quotas — toujours exécutées côté serveur, avant toute écriture.
  */
 import type { Entitlements } from "./entitlements";
+import type { ExecutionMode } from "@waverti/database";
 
 export type QuotaErrorCode =
   | "subscription_required"
@@ -33,12 +34,12 @@ export interface MonitorCounts {
 export interface MonitorRequest {
   kind: "page" | "web_topic";
   intervalMinutes?: number;
-  executionMode?: "auto" | "local_only" | "cloud_only";
+  executionMode?: ExecutionMode;
 }
 
 export interface ResolvedMonitorSettings {
   intervalMinutes: number;
-  executionMode: "auto" | "local_only" | "cloud_only";
+  executionMode: ExecutionMode;
 }
 
 /**
@@ -81,7 +82,7 @@ export function resolveSettings(e: Entitlements, req: MonitorRequest): ResolvedM
   // Les clés d'API de recherche restent sur le serveur : les sujets Web sont toujours exécutés côté cloud.
   if (req.kind === "web_topic") executionMode = "cloud_only";
   // Sans relais cloud (droit non accordé), les contrôles de pages sont exclusivement locaux.
-  else if (!e.cloudRelay) executionMode = "local_only";
+  else if (!e.cloudRelay && executionMode !== "browser_only") executionMode = "local_only";
   return { intervalMinutes, executionMode };
 }
 

@@ -10,13 +10,14 @@ export const MAX_DEVICES_PER_USER = 5;
 
 type DeviceHandler = (req: Request, device: AuthenticatedDevice, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>;
 
-/** Routes réservées à l'application desktop (jeton d'appareil Bearer, jamais de cookies). */
-export function withDevice(handler: DeviceHandler, opts: { requireConsent?: boolean; rate?: { name: string; limit: number; windowSec: number } } = {}) {
+/** Routes d'appareil authentifiées par jeton Bearer. Chrome a un accès limité aux contrôles produit. */
+export function withDevice(handler: DeviceHandler, opts: { allowChrome?: boolean; requireConsent?: boolean; rate?: { name: string; limit: number; windowSec: number } } = {}) {
   return async (req: Request, ctx: { params: Promise<Record<string, string>> }) => {
     try {
       if (!isDatabaseConfigured()) return apiError(503, "not_configured");
       const device = await authenticateDevice(getDb(), bearerFrom(req.headers.get("authorization")));
       if (!device) return apiError(401, "invalid_device", "Appareil non reconnu ou révoqué. Reliez de nouveau l'application.");
+      if (device.platform === "chrome" && !opts.allowChrome) return apiError(403, "device_scope");
       const [p] = await getDb().select({ suspendedAt: profiles.suspendedAt }).from(profiles).where(eq(profiles.id, device.userId)).limit(1);
       if (!p || p.suspendedAt) return apiError(403, "suspended", "Compte suspendu.");
       if (opts.requireConsent && (!device.consentLocalAt || !device.monitoringEnabled)) {

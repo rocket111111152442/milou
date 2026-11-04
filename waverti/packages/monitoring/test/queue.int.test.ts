@@ -14,10 +14,10 @@ import {
 } from "@waverti/database";
 import { createTestDatabase, createTestUser, type TestDatabase } from "@waverti/database/testing";
 import { recomputeEntitlements, QuotaError } from "@waverti/billing";
-import type { PageObservation } from "@waverti/types";
+import { CHROME_CONSENT_VERSION, ruleConditionSchema, type PageObservation } from "@waverti/types";
 import { claimAgentJobs, claimCloudJobs, recoverJobs, scheduleDueTasks } from "../src/queue";
 import { StaleClaimError, submitResult } from "../src/results";
-import { createMonitor, deleteMonitor, MonitorError, setMonitorPaused } from "../src/service";
+import { createMonitor, deleteMonitor, MonitorError, setMonitorPaused, urlHash } from "../src/service";
 
 let t: TestDatabase;
 
@@ -64,18 +64,18 @@ async function paidUser(planId: "plus" | "pro" | "max" = "plus") {
   return u;
 }
 
-async function device(userId: string, online = true) {
+async function device(userId: string, online = true, platform: "linux" | "chrome" = "linux") {
   const [d] = await t.db
     .insert(agentDevices)
     .values({
       userId,
       name: "PC",
-      platform: "linux",
+      platform,
       tokenHash: `h_${userId}_${Math.random()}`,
       status: "active",
       monitoringEnabled: true,
       consentLocalAt: new Date(),
-      consentVersion: "test",
+      consentVersion: platform === "chrome" ? CHROME_CONSENT_VERSION : "test",
       lastSeenAt: online ? new Date() : new Date(Date.now() - 3_600_000),
     })
     .returning({ id: agentDevices.id });
@@ -162,6 +162,126 @@ describe("monitor service — quotas and validation", () => {
 });
 
 describe("hybrid job queue", () => {
+  it("normalizes browser-only jobs inserted by an older scheduler without changing cloud jobs", async () => {
+    const user = await paidUser("pro");
+    await device(user.id, true, "chrome");
+    const browser = await createMonitor(t.db, user.id, pageInput(500, { executionMode: "browser_only" }));
+    const cloud = await createMonitor(t.db, user.id, pageInput(503, { executionMode: "cloud_only" }));
+    await settleInitialJobs(user.id);
+    const slotAt = new Date(Date.now() - 60_000);
+    const deadline = new Date(Date.now() - 1_000);
+    const legacyJob = {
+      userId: user.id,
+      kind: "page" as const,
+      slotAt,
+      preferredExecutor: "cloud" as const,
+      allowCloud: true,
+      allowAgent: false,
+      agentDeadlineAt: deadline,
+    };
+    const [browserJob, cloudJob] = await t.db.insert(monitoringJobs).values([
+      { ...legacyJob, taskId: browser.id },
+      { ...legacyJob, taskId: cloud.id },
+    ]).returning();
+
+    expect(browserJob).toMatchObject({
+      preferredExecutor: "agent", allowCloud: false, allowAgent: true, agentDeadlineAt: null,
+    });
+    expect(cloudJob).toMatchObject({
+      preferredExecutor: "cloud", allowCloud: true, allowAgent: false, agentDeadlineAt: deadline,
+    });
+  });
+
+  it("checks opted-in Chrome pages on browser polling and alerts after a verified stock change", async () => {
+    const user = await paidUser();
+    const other = await paidUser();
+    const desktop = await device(user.id);
+    const chrome = await device(user.id, true, "chrome");
+    const otherChrome = await device(other.id, true, "chrome");
+    const condition = ruleConditionSchema.parse({
+      type: "rule",
+      category: "product",
+      conditions: [{ type: "stock_changed" }],
+    });
+    const target = pageInput(501, { executionMode: "browser_only", condition });
+    const monitor = await createMonitor(t.db, user.id, target);
+    const claimArgs = { userId: user.id, deviceId: chrome, max: 1, browserUrlHashes: [urlHash(target.url)] };
+    expect(monitor.executionMode).toBe("browser_only");
+    expect(await claimAgentJobs(t.db, { ...claimArgs, deviceId: desktop })).toHaveLength(0);
+    expect(await claimAgentJobs(t.db, { ...claimArgs, browserUrlHashes: ["0".repeat(64)] })).toHaveLength(0);
+    expect(await claimAgentJobs(t.db, { ...claimArgs, userId: other.id, deviceId: otherChrome })).toHaveLength(0);
+    expect(await claimAgentJobs(t.db, { userId: user.id, deviceId: desktop, max: 1 })).toHaveLength(0);
+    expect((await claimCloudJobs(t.db, { workerId: "cloud", max: 50 })).map((c) => c.taskId)).not.toContain(monitor.id);
+
+    const makeObservation = (stock: "in_stock" | "out_of_stock", price: number | null): PageObservation => {
+      const checkedAt = new Date().toISOString();
+      return {
+        ...observation(price, target.url), method: "browser", fetchedAt: checkedAt, availability: stock,
+        fieldEvidence: { availability: { status: "verified", sources: ["browser_buy_box"], checkedAt } },
+      };
+    };
+    const [first] = await claimAgentJobs(t.db, claimArgs);
+    const resultArgs = { ...first!, executor: "agent" as const, chrome: true, deviceId: chrome, durationMs: 20 };
+    await expect(submitResult(t.db, { ...resultArgs, now: first!.leaseExpiresAt, observation: makeObservation("in_stock", 1881) }))
+      .rejects.toBeInstanceOf(StaleClaimError);
+    const initial = await submitResult(t.db, { ...resultArgs, observation: makeObservation("out_of_stock", 10) });
+    expect(initial.triggered).toBe(false);
+    await expect(submitResult(t.db, { ...resultArgs, deviceId: otherChrome, observation: makeObservation("in_stock", 1) }))
+      .rejects.toBeInstanceOf(StaleClaimError);
+
+    const makeDue = async () => {
+      await t.db.update(monitoringSchedules).set({ nextRunAt: new Date(Date.now() - 60_000) })
+        .where(eq(monitoringSchedules.taskId, monitor.id));
+    };
+    await makeDue();
+    expect((await scheduleDueTasks(t.db)).map((c) => c.taskId)).not.toContain(monitor.id);
+    const [redirected] = await claimAgentJobs(t.db, claimArgs);
+    const bad = await submitResult(t.db, {
+      ...resultArgs, ...redirected!, observation: { ...makeObservation("in_stock", 1), finalUrl: "https://wrong.example.org/produit" },
+    });
+    expect(bad).toMatchObject({ outcome: "error", triggered: false });
+
+    await t.db.update(monitoringSchedules).set({ nextRunAt: new Date(Date.now() - 1000) })
+      .where(eq(monitoringSchedules.taskId, monitor.id));
+    const [next] = await claimAgentJobs(t.db, claimArgs);
+    expect(next!.jobId).not.toBe(first!.jobId);
+    const input = { ...resultArgs, ...next!, observation: makeObservation("in_stock", null) };
+    const latest = await submitResult(t.db, input);
+    expect(latest.triggered).toBe(true);
+    expect((await submitResult(t.db, input)).duplicate).toBe(true);
+    expect(await t.db.select().from(notifications).where(eq(notifications.taskId, monitor.id))).toHaveLength(1);
+    const stored = await t.db.select().from(monitoringResults).where(eq(monitoringResults.id, initial.resultId));
+    expect(stored[0]?.observation).toMatchObject({ price: null, availability: "out_of_stock", title: null, excerpt: "" });
+  });
+
+  it("compares a fresh Chrome price against the last verified price after a stock-only reading", async () => {
+    const user = await paidUser();
+    const target = pageInput(502, { executionMode: "browser_only", condition: { type: "price_drop", minPercent: 5 } });
+    await expect(createMonitor(t.db, user.id, target)).rejects.toThrow(/Connectez l’extension Chrome/);
+    const chrome = await device(user.id, true, "chrome");
+    const monitor = await createMonitor(t.db, user.id, target);
+    const check = async (price: number | null) => {
+      const [claim] = await claimAgentJobs(t.db, {
+        userId: user.id, deviceId: chrome, max: 1, browserUrlHashes: [urlHash(target.url)],
+      });
+      const verified = { status: "verified" as const, sources: ["browser_product_jsonld"], checkedAt: new Date().toISOString() };
+      return submitResult(t.db, {
+        ...claim!, executor: "agent", chrome: true, deviceId: chrome, durationMs: 20,
+        observation: {
+          ...observation(price, target.url), method: "browser",
+          fieldEvidence: { availability: verified, ...(price === null ? {} : { price: verified }) },
+        },
+      });
+    };
+    const due = (seconds: number) => t.db.update(monitoringSchedules).set({ nextRunAt: new Date(Date.now() - seconds * 1000) })
+      .where(eq(monitoringSchedules.taskId, monitor.id));
+    expect((await check(1881)).triggered).toBe(false);
+    await due(60);
+    expect(await check(null)).toMatchObject({ outcome: "error", triggered: false });
+    await due(30);
+    expect((await check(1700)).triggered).toBe(true);
+  });
+
   it("runs a subscriber's first check in the cloud immediately; a local-only monitor only on their PC", async () => {
     const paid = await paidUser();
     const mCloud = await createMonitor(t.db, paid.id, pageInput(10));

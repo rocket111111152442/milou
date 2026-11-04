@@ -42,6 +42,13 @@ describe("browser reading", () => {
     expect(readBrowserReading(hash(offer), now)).toEqual(offer);
   });
 
+  it("keeps a recurring import bound to the exact HTTPS product variant", () => {
+    const recurring = { ...reading, version: 2, url: "https://example.com/product?variant=2", recurring: true };
+    expect(readBrowserReading(hash(recurring), now)).toEqual(recurring);
+    expect(readBrowserReading(hash({ ...recurring, url: recurring.url + "#other-variant" }), now)).toBe("invalid");
+    expect(readBrowserReading(hash({ ...recurring, url: recurring.url.replace("https:", "http:") }), now)).toBe("invalid");
+  });
+
   it.each(["javascript:alert(1)", "file:///some/file", "https://user:pass@example.com", "https:example.com"])("rejects an unsafe link: %s", (url) => {
     expect(readBrowserReading(hash({ ...reading, version: 2, url }), now)).toBe("invalid");
   });

@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { Activity, Bell, Clock, Laptop, Cloud, Plus } from "lucide-react";
+import { Activity, Bell, Clock, Laptop, Cloud, Globe, Plus } from "lucide-react";
 import { formatDateTime, formatRelative, type DeviceView, type OverviewData } from "@waverti/types";
 import { Badge } from "../components/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card";
@@ -9,7 +9,8 @@ import { ResultTimeline } from "./monitors";
 import { defaultRenderLink, type RenderLink } from "./link";
 
 export function DeviceStatusList({ devices, cloudRelay, now }: { devices: DeviceView[]; cloudRelay: boolean; now?: Date }) {
-  const online = devices.filter((d) => d.online);
+  const desktopOnline = devices.some((d) => d.online && d.platform !== "chrome");
+  const hasChrome = devices.some((d) => d.platform === "chrome");
   return (
     <div className="flex flex-col gap-3">
       {devices.length === 0 ? (
@@ -21,7 +22,7 @@ export function DeviceStatusList({ devices, cloudRelay, now }: { devices: Device
           {devices.map((d) => (
             <li key={d.id} className="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2.5">
               <span className="flex items-center gap-2.5 text-sm">
-                <Laptop className="size-4 text-muted" aria-hidden="true" />
+                {d.platform === "chrome" ? <Globe className="size-4 text-muted" aria-hidden="true" /> : <Laptop className="size-4 text-muted" aria-hidden="true" />}
                 <span className="font-medium">{d.name}</span>
               </span>
               <StatusDot
@@ -37,11 +38,12 @@ export function DeviceStatusList({ devices, cloudRelay, now }: { devices: Device
       <p className="flex items-center gap-2 text-xs text-muted-fg">
         <Cloud className="size-3.5" aria-hidden="true" />
         {cloudRelay
-          ? online.length
+          ? desktopOnline
             ? "Relais cloud prêt si votre ordinateur devient indisponible."
             : "Relais cloud actif : les serveurs Waverti prennent le relais."
           : "Aucun abonnement actif : vos surveillances sont en pause."}
       </p>
+      {hasChrome ? <p className="text-xs text-muted-fg">Les contrôles réservés à l’extension attendent que Chrome soit ouvert et que le site reste autorisé.</p> : null}
     </div>
   );
 }

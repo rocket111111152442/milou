@@ -1,9 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Waverti — Relevé navigateur",
-  "version": "0.2.0",
-  "description": "Envoie l’adresse d’une page et ses éventuelles données produit à l’assistant Waverti.",
-  "permissions": ["activeTab", "scripting"],
+  "version": "0.3.0",
+  "description": "Relève le prix et le stock des pages choisies pour Waverti.",
+  "permissions": ["activeTab", "scripting", "alarms", "storage"],
+  "host_permissions": ["https://www.waverti.com/*"],
+  "optional_host_permissions": ["https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "icons": {
     "32": "32x32.png",
     "128": "128x128.png"

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { agentDevices, eq } from "@waverti/database";
 import { LOCAL_CONSENT_VERSION } from "@waverti/config/constants";
+import { CHROME_CONSENT_VERSION } from "@waverti/types";
 import { apiError, readJson } from "@/lib/api";
 import { noStore, withDevice } from "@/lib/agent";
 import { getDb } from "@/lib/db";
@@ -9,7 +10,8 @@ import { getDb } from "@/lib/db";
 export const POST = withDevice(async (req, device) => {
   const body = await readJson(req, z.object({ accepted: z.boolean(), consentVersion: z.string().max(40) }));
   if (!body.ok) return body.res;
-  if (body.data.accepted && body.data.consentVersion !== LOCAL_CONSENT_VERSION) {
+  const version = device.platform === "chrome" ? CHROME_CONSENT_VERSION : LOCAL_CONSENT_VERSION;
+  if (body.data.accepted && body.data.consentVersion !== version) {
     return apiError(409, "consent_outdated", "Le texte d'acceptation a changé : mettez à jour l'application.");
   }
   await getDb()
@@ -21,4 +23,4 @@ export const POST = withDevice(async (req, device) => {
     )
     .where(eq(agentDevices.id, device.deviceId));
   return noStore({ ok: true, monitoringEnabled: body.data.accepted });
-});
+}, { allowChrome: true });

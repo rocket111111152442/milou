@@ -29,6 +29,7 @@ const readingSchema = z.discriminatedUnion("version", [
     version: z.literal(2),
     url: z.string().max(2048).refine(isWebUrl),
     currency: z.string().regex(/^[A-Z]{3}$/).nullable(),
+    recurring: z.literal(true).optional(),
   }).strict(),
 ]);
 
@@ -50,6 +51,7 @@ export function readBrowserReading(hash: string, now = Date.now()): BrowserReadi
     if (age < -60_000 || age > 60 * 60_000) return "invalid";
     if ((reading.price === null) !== (reading.currency === null)) return "invalid";
     if (reading.version === 1 && !hasBrowserOffer(reading)) return "invalid";
+    if (reading.version === 2 && reading.recurring && (!reading.url.startsWith("https://") || reading.url.includes("#"))) return "invalid";
     return reading;
   } catch {
     return "invalid";

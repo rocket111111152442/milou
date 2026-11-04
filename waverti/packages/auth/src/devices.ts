@@ -11,6 +11,7 @@ export function newDeviceToken(): { token: string; hash: string } {
 export interface AuthenticatedDevice {
   deviceId: string;
   userId: string;
+  platform: typeof agentDevices.$inferSelect.platform;
   monitoringEnabled: boolean;
   consentLocalAt: Date | null;
 }
@@ -23,6 +24,7 @@ export async function authenticateDevice(db: Database, bearer: string | null | u
     .select({
       id: agentDevices.id,
       userId: agentDevices.userId,
+      platform: agentDevices.platform,
       monitoringEnabled: agentDevices.monitoringEnabled,
       consentLocalAt: agentDevices.consentLocalAt,
     })
@@ -30,7 +32,7 @@ export async function authenticateDevice(db: Database, bearer: string | null | u
     .where(and(eq(agentDevices.tokenHash, hash), eq(agentDevices.status, "active")))
     .limit(1);
   if (!row) return null;
-  return { deviceId: row.id, userId: row.userId, monitoringEnabled: row.monitoringEnabled, consentLocalAt: row.consentLocalAt };
+  return { deviceId: row.id, userId: row.userId, platform: row.platform, monitoringEnabled: row.monitoringEnabled, consentLocalAt: row.consentLocalAt };
 }
 
 export function bearerFrom(header: string | null | undefined): string | null {

@@ -6,7 +6,9 @@
 import { createHash } from "node:crypto";
 import {
   and,
+  agentDevices,
   eq,
+  isNotNull,
   monitoringJobs,
   monitoringSchedules,
   monitoringTargets,
@@ -14,11 +16,14 @@ import {
   profiles,
   sql,
   type Database,
+  type ExecutionMode,
 } from "@waverti/database";
 import { checkNewMonitor, getEntitlements, QuotaError, resolveSettings } from "@waverti/billing";
 import {
   pageConditionSchema,
+  CHROME_CONSENT_VERSION,
   ruleAtoms,
+  supportsBrowserCondition,
   webTopicConditionSchema,
   type PageCondition,
   type CreateMonitorInput,
@@ -59,7 +64,7 @@ export function urlHash(url: string): string {
 export interface CreatedMonitor {
   id: string;
   intervalMinutes: number;
-  executionMode: "auto" | "local_only" | "cloud_only";
+  executionMode: ExecutionMode;
   initialJobId: string | null;
 }
 
@@ -87,6 +92,14 @@ export async function createMonitor(
     const parsed = pageConditionSchema.safeParse(input.condition);
     if (!parsed.success) throw new MonitorError("invalid_condition", parsed.error.issues[0]?.message ?? "Condition invalide");
     assertFeasible(parsed.data, input.cssSelector);
+    if (input.executionMode === "browser_only") {
+      if (url.protocol !== "https:" || url.port) {
+        throw new MonitorError("invalid_target", "L’extension Chrome surveille les fiches produit avec une adresse HTTPS standard.");
+      }
+      if (!supportsBrowserCondition(parsed.data) || input.cssSelector) {
+        throw new MonitorError("invalid_condition", "L’extension Chrome surveille le prix et la disponibilité de la fiche.");
+      }
+    }
     condition = parsed.data;
     target = {
       taskId: "",
@@ -96,7 +109,7 @@ export async function createMonitor(
       urlHash: urlHash(canonical),
       host: url.hostname.toLowerCase(),
       cssSelector: input.cssSelector || null,
-      renderMode: input.renderMode,
+      renderMode: input.executionMode === "browser_only" ? "browser" : input.renderMode,
     };
   } else {
     const plan = planWebTopic(input.request, {
@@ -123,6 +136,17 @@ export async function createMonitor(
     const [locked] = await tx.select({ id: profiles.id, suspendedAt: profiles.suspendedAt }).from(profiles).where(eq(profiles.id, userId)).for("update");
     if (!locked) throw new MonitorError("not_found", "Compte introuvable", 404);
     if (locked.suspendedAt) throw new MonitorError("state", "Compte suspendu", 403);
+    if (input.kind === "page" && input.executionMode === "browser_only") {
+      const [device] = await tx.select({ id: agentDevices.id }).from(agentDevices).where(and(
+        eq(agentDevices.userId, userId),
+        eq(agentDevices.platform, "chrome"),
+        eq(agentDevices.status, "active"),
+        eq(agentDevices.monitoringEnabled, true),
+        isNotNull(agentDevices.consentLocalAt),
+        eq(agentDevices.consentVersion, CHROME_CONSENT_VERSION),
+      )).limit(1);
+      if (!device) throw new MonitorError("state", "Connectez l’extension Chrome à votre compte et activez les contrôles automatiques.");
+    }
     const [counts] = await tx.execute<{ total: number; topics: number }>(sql`
       select count(*)::int as total, count(*) filter (where kind = 'web_topic')::int as topics
       from monitoring_tasks where user_id = ${userId}`);
@@ -132,7 +156,8 @@ export async function createMonitor(
     const settings = checkNewMonitor(ent, { total: counts?.total ?? 0, webTopics: counts?.topics ?? 0 }, {
       kind: input.kind,
       intervalMinutes: input.intervalMinutes,
-      executionMode: input.kind === "page" && !isRule ? input.executionMode : "cloud_only",
+      executionMode: input.kind === "page" && (!isRule || input.executionMode === "browser_only")
+        ? input.executionMode : "cloud_only",
     });
 
     const [task] = await tx
@@ -173,7 +198,7 @@ export async function createMonitor(
         preferredExecutor: d.preferred,
         allowCloud: d.allowCloud,
         allowAgent: d.allowAgent,
-        agentDeadlineAt: d.preferred === "agent" ? deadline : null,
+        agentDeadlineAt: d.preferred === "agent" && settings.executionMode !== "browser_only" ? deadline : null,
         priority: 20,
       })
       .onConflictDoNothing()
@@ -194,6 +219,13 @@ async function ownTask(db: Database, userId: string, taskId: string) {
 
 export async function updateMonitor(db: Database, userId: string, taskId: string, input: UpdateMonitorInput, now: Date = new Date()): Promise<void> {
   const task = await ownTask(db, userId, taskId);
+  const browser = task.executionMode === "browser_only";
+  if (input.executionMode !== undefined && (input.executionMode === "browser_only") !== browser) {
+    throw new MonitorError("state", "Choisissez le contrôle par Chrome à la création de la surveillance.");
+  }
+  if (browser && input.cssSelector) {
+    throw new MonitorError("invalid_condition", "L’extension Chrome surveille le prix et la disponibilité de la fiche.");
+  }
   const ent = await getEntitlements(db, userId, now);
   const patch: Partial<typeof monitoringTasks.$inferInsert> = {};
   if (input.name) patch.name = input.name;
@@ -201,10 +233,13 @@ export async function updateMonitor(db: Database, userId: string, taskId: string
     if (task.kind === "page") {
       const parsed = pageConditionSchema.safeParse(input.condition);
       if (!parsed.success) throw new MonitorError("invalid_condition", parsed.error.issues[0]?.message ?? "Condition invalide");
+      if (browser && !supportsBrowserCondition(parsed.data)) {
+        throw new MonitorError("invalid_condition", "L’extension Chrome surveille le prix et la disponibilité de la fiche.");
+      }
       const [t] = await db.select({ css: monitoringTargets.cssSelector }).from(monitoringTargets).where(eq(monitoringTargets.taskId, taskId));
       assertFeasible(parsed.data, input.cssSelector === undefined ? t?.css : input.cssSelector);
       patch.condition = parsed.data;
-      if (parsed.data.type === "rule") patch.executionMode = "cloud_only";
+      if (parsed.data.type === "rule" && !browser) patch.executionMode = "cloud_only";
     }
     else patch.condition = webTopicConditionSchema.parse(input.condition);
   }
@@ -214,7 +249,11 @@ export async function updateMonitor(db: Database, userId: string, taskId: string
   let settings: ReturnType<typeof resolveSettings> | null = null;
   if (input.intervalMinutes !== undefined || input.executionMode !== undefined) {
     const ruleBased = (patch.condition ?? task.condition)?.type === "rule";
-    settings = resolveSettings(ent, { kind: task.kind, intervalMinutes: input.intervalMinutes, executionMode: ruleBased ? "cloud_only" : (input.executionMode ?? task.executionMode) });
+    settings = resolveSettings(ent, {
+      kind: task.kind,
+      intervalMinutes: input.intervalMinutes,
+      executionMode: ruleBased && !browser ? "cloud_only" : (input.executionMode ?? task.executionMode),
+    });
     patch.executionMode = settings.executionMode;
   }
   await db.transaction(async (tx) => {

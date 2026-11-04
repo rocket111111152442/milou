@@ -116,13 +116,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <InstallApp />
         </CardContent>
       </Card>
-      <Card>
+      <Card id="appareils">
         <CardHeader>
           <CardTitle as="h2">Appareils reliés</CardTitle>
-          <p className="text-sm text-muted-fg">Les ordinateurs autorisés à effectuer vos contrôles locaux. Révoquez un appareil perdu ou que vous n'utilisez plus.</p>
+          <p className="text-sm text-muted-fg">Les extensions Chrome et ordinateurs autorisés à effectuer vos contrôles locaux. Révoquez les appareils que vous n’utilisez plus.</p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-3">
           <DevicesList devices={devices} />
+          <Link href="/app/appareils/lier" className="w-fit text-sm font-medium text-blue underline-offset-4 hover:underline">
+            Relier une extension Chrome ou un ordinateur
+          </Link>
         </CardContent>
       </Card>
       <Card className="border-danger/30">

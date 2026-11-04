@@ -1,4 +1,6 @@
 /** Modèles de vue partagés entre le tableau de bord web, l'application desktop et la vitrine. */
+import type { Platform } from "./agent";
+
 export type MonitorKind = "page" | "web_topic";
 export type MonitorStatus = "active" | "paused" | "paused_quota" | "error";
 export type LastStatus = "pending" | "ok" | "triggered" | "error" | "skipped";
@@ -45,7 +47,7 @@ export interface NotificationView {
 export interface DeviceView {
   id: string;
   name: string;
-  platform: "windows" | "macos" | "linux";
+  platform: Platform;
   online: boolean;
   lastSeenAt: string | null;
   monitoringEnabled: boolean;

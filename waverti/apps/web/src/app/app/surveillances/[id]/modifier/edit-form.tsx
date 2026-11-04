@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, Checkbox, Field, Input, Label, Select, Switch } from "@waverti/ui";
-import { formatInterval, type RuleConditionInput } from "@waverti/types";
+import { formatInterval, ruleConditionSchema, supportsBrowserCondition, type CreatePageMonitorInput, type RuleConditionInput } from "@waverti/types";
 import { normalizeRule, RuleBuilder, ruleProblem } from "@waverti/ui/app";
 import { useApiAction } from "@/components/app/use-api";
 
@@ -11,7 +11,7 @@ interface Initial {
   condition: Record<string, unknown>;
   intervalMinutes: number;
   cssSelector: string;
-  executionMode: "auto" | "local_only" | "cloud_only";
+  executionMode: CreatePageMonitorInput["executionMode"];
   notifyEmail: boolean;
   notifyDesktop: boolean;
   officialDomains: string[];
@@ -30,6 +30,7 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
   const [requireOfficial, setRequireOfficial] = useState(Boolean(initial.condition.requireOfficial));
   const [domains, setDomains] = useState(initial.officialDomains.join(", "));
   const isRule = initial.condition.type === "rule";
+  const browserOnly = initial.executionMode === "browser_only";
   const [rule, setRule] = useState(() => normalizeRule((isRule ? initial.condition : { type: "rule", conditions: [{ type: "page_changed" }] }) as RuleConditionInput));
   const [ruleError, setRuleError] = useState<string | null>(null);
   const options = [...new Set([minInterval, 120, 240, 360, 720, 1440, 2880, 10080].filter((m) => m >= minInterval))].sort((a, b) => a - b);
@@ -40,6 +41,13 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
       const problem = ruleProblem(rule);
       setRuleError(problem);
       if (problem) return;
+      if (browserOnly) {
+        const parsed = ruleConditionSchema.safeParse({ type: "rule", ...rule });
+        if (!parsed.success || !supportsBrowserCondition(parsed.data)) {
+          setRuleError("Chrome peut suivre uniquement le prix ou le stock d’un produit.");
+          return;
+        }
+      }
     }
     const condition = isRule
       ? { type: "rule", ...rule }
@@ -53,7 +61,7 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
       intervalMinutes: interval,
       notify: { email, desktop },
       ...(condition ? { condition } : {}),
-      ...(kind === "page" ? { cssSelector: selector || null, ...(isRule ? {} : { executionMode: cloudRelay ? exec : "local_only" }) } : {}),
+      ...(kind === "page" && !browserOnly ? { cssSelector: selector || null, ...(isRule ? {} : { executionMode: cloudRelay ? exec : "local_only" }) } : {}),
       ...(kind === "web_topic" ? { officialDomains: domains.split(/[,\s]+/).map((d) => d.trim().toLowerCase()).filter(Boolean).slice(0, 5) } : {}),
     };
     const r = await run(`/api/monitors/${id}`, body, { method: "PATCH", success: "Modifications enregistrées", refresh: false });
@@ -91,11 +99,11 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
             {(p) => <Input {...p} value={domains} onChange={(e) => setDomains(e.target.value)} />}
           </Field>
         </>
-      ) : (
+      ) : !browserOnly ? (
         <Field id="e-sel" label="Zone de la page (sélecteur CSS)">
           {(p) => <Input {...p} value={selector} maxLength={300} onChange={(e) => setSelector(e.target.value)} />}
         </Field>
-      )}
+      ) : null}
       <Field id="e-interval" label="Fréquence">
         {(p) => (
           <Select {...p} value={interval} onChange={(e) => setInterval(Number(e.target.value))}>
@@ -107,8 +115,10 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
           </Select>
         )}
       </Field>
-      {kind === "page" && isRule ? <p className="text-sm text-muted-fg">Les règles personnalisées sont contrôlées par les serveurs Waverti.</p> : null}
-      {kind === "page" && cloudRelay && !isRule ? (
+      {browserOnly ? (
+        <p className="text-sm text-muted-fg">Cette surveillance reste dans Chrome. L’extension doit rester autorisée pour cette adresse.</p>
+      ) : kind === "page" && isRule ? <p className="text-sm text-muted-fg">Les règles personnalisées sont contrôlées par les serveurs Waverti.</p> : null}
+      {kind === "page" && cloudRelay && !isRule && !browserOnly ? (
         <Field id="e-exec" label="Exécution">
           {(p) => (
             <Select {...p} value={exec} onChange={(e) => setExec(e.target.value as Initial["executionMode"])}>

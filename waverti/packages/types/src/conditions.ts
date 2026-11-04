@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ruleConditionSchema } from "./rules";
+import { ruleAtoms, ruleConditionSchema } from "./rules";
 
 /** Conditions d'alerte du moteur A (surveillance d'une URL). */
 /** Conditions historiques (une seule condition par surveillance) : toujours prises en charge. */
@@ -28,6 +28,16 @@ export type LegacyPageCondition = z.infer<typeof legacyPageConditionSchema>;
 /** Condition d'une surveillance de page : historique ou règle personnalisée. */
 export const pageConditionSchema = z.union([legacyPageConditionSchema, ruleConditionSchema]);
 export type PageCondition = z.infer<typeof pageConditionSchema>;
+
+/** Les contrôles Chrome ne transmettent que le prix et la disponibilité du produit. */
+export function supportsBrowserCondition(condition: PageCondition): boolean {
+  if (condition.type !== "rule") {
+    return ["price_below", "price_drop", "back_in_stock"].includes(condition.type);
+  }
+  return condition.exclude.length === 0 && ruleAtoms(condition).every((atom) =>
+    ["price_below", "price_above", "price_drop", "price_rise", "stock_is", "stock_changed"].includes(atom.type),
+  );
+}
 
 export const webTopicIntentSchema = z.enum([
   "release_date",

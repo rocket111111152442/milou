@@ -3,7 +3,7 @@ import { PageHeader } from "@waverti/ui";
 import { RULE_CATEGORIES, type RuleCategory } from "@waverti/types";
 import { PLAN_CATALOG } from "@waverti/billing/catalog";
 import { requireUser } from "@/lib/auth";
-import { loadEntitlements } from "@/lib/data/account";
+import { listDevices, loadEntitlements } from "@/lib/data/account";
 import { NewMonitor } from "./new-monitor";
 
 export const metadata: Metadata = { title: "Nouvelle surveillance" };
@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Nouvelle surveillance" };
 
 export default async function NewMonitorPage({ searchParams }: { searchParams: Promise<{ type?: string; categorie?: string }> }) {
   const user = await requireUser("/app/surveillances/nouvelle");
-  const ent = await loadEntitlements(user.id);
+  const [ent, devices] = await Promise.all([loadEntitlements(user.id), listDevices(user.id)]);
   const { type, categorie } = await searchParams;
   const initial: RuleCategory | undefined = type === "web_topic" ? "news" : (RULE_CATEGORIES as readonly string[]).includes(categorie ?? "") ? (categorie as RuleCategory) : undefined;
   return (
@@ -20,6 +20,7 @@ export default async function NewMonitorPage({ searchParams }: { searchParams: P
       <div className="card-glass rounded-3xl p-5 shadow-[var(--shadow-card)] sm:p-8">
         <NewMonitor
           initialCategory={initial}
+          browserMonitoringAvailable={devices.some((device) => device.platform === "chrome" && device.monitoringEnabled)}
           entitlements={{
             pageIntervalMinutes: ent.pageIntervalMinutes,
             webIntervalMinutes: ent.webIntervalMinutes,

@@ -18,6 +18,22 @@
         <button type="submit">Ouvrir Waverti avec cette adresse</button>
       </form>
       <p role="status" id="status"></p>
+      <section aria-labelledby="monitoring-title">
+        <h2 id="monitoring-title">Contrôles récurrents</h2>
+        <p>Chrome ouvre brièvement les pages autorisées en arrière-plan quand Waverti demande un relevé de prix ou de stock. Les contrôles nécessitent que Chrome soit ouvert et peuvent utiliser la session du site déjà ouverte dans ce navigateur.</p>
+        <p id="monitoring-status" role="status">Vérification de la liaison…</p>
+        <div id="monitoring-actions">
+          <button type="button" id="pair" hidden>Relier ce navigateur</button>
+          <button type="button" id="verify-link" hidden>Ouvrir la validation dans Waverti</button>
+          <button type="button" id="poll" hidden>J’ai approuvé la liaison</button>
+          <button type="button" id="enable" hidden>Accepter et activer les contrôles</button>
+          <button type="button" id="pause" hidden>Suspendre les contrôles</button>
+          <button type="button" id="authorize" hidden>Autoriser cette page et ouvrir Waverti</button>
+          <button type="button" id="unlink" hidden>Délier le navigateur</button>
+        </div>
+        <ul id="authorized-sites"></ul>
+      </section>
+      <small id="extension-version"></small>
     </main>
   </body>
 </html>
