@@ -1,5 +1,5 @@
 import { FaqSection } from "@/components/marketing/faq";
-import { HomeBusiness, HomeFinalCta, HomeHero, HomeHowItWorks, HomePricing, HomeUses, homeFaq } from "@/components/marketing/home";
+import { HomeBusiness, HomeFinalCta, HomeHero, HomeHowItWorks, HomePricing, HomeShowcase, HomeTicker, HomeUses, homeFaq } from "@/components/marketing/home";
 import { getPublicPlans } from "@/lib/plans";
 import { siteConfig } from "@/lib/site";
 
@@ -37,6 +37,8 @@ export default async function HomePage() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <HomeHero />
+      <HomeTicker />
+      <HomeShowcase />
       <HomeHowItWorks />
       <HomeUses />
       <HomeBusiness />

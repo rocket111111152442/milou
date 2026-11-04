@@ -9,6 +9,12 @@ import { requireUser } from "@/lib/auth";
 import { getQuotaViews, getSubscriptionView, loadEntitlements } from "@/lib/data/account";
 import { getDb } from "@/lib/db";
 import { getStripe, isBillingConfigured } from "@/lib/stripe";
+import { Celebration } from "@/components/app/celebration";
+import { BillingFaq } from "@/components/app/billing-faq";
+import { PlanCompare } from "@/components/app/plan-compare";
+import { TrialTimeline } from "@/components/app/trial-timeline";
+import { Unlockables } from "@/components/app/unlockables";
+import { HowItWorks, WelcomeHero } from "@/components/app/welcome-gate";
 import { ConfirmingCallout } from "./checkout-return";
 import { PlanActions, PortalButton } from "./plan-actions";
 
@@ -36,10 +42,24 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   // Éligibilité réelle à l'essai : les boutons ne promettent « 3 jours » que si l'essai est effectivement possible.
   const trialEligible = billing && !sub.subscriptionId ? (await checkTrialEligibility(getDb(), user.id, user.email, process.env.WAVERTI_HASH_PEPPER)).eligible : false;
   const status = sub.status ? STATUS[sub.status] : null;
+  // Compte sans formule, sans essai ni accès bêta : page d'accueil complète (le menu complet n'apparaît qu'avec une formule active).
+  const locked = !sub.planId && !sub.subscriptionId && !sub.betaEndsAt;
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Abonnement" description="Votre formule, vos quotas et votre facturation." />
+      {returned?.kind === "confirmed" ? (
+        <Celebration
+          storageKey={`waverti-celebrated-${sessionId ?? sub.subscriptionId ?? "achat"}`}
+          planName={sub.planName}
+          trialing={returned.status === "trialing"}
+          trialEndsAtLabel={sub.trialEndsAt ? formatDateTime(sub.trialEndsAt) : null}
+        />
+      ) : null}
+      {locked ? (
+        <WelcomeHero name={user.displayName} trialEligible={trialEligible} billing={billing} />
+      ) : (
+        <PageHeader title="Abonnement" description="Votre formule, vos quotas et votre facturation." />
+      )}
       {bienvenue && !sub.planId && billing ? (
         <Callout tone="info" title="Bienvenue sur Waverti">
           {trialEligible
@@ -58,6 +78,14 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
           Vous ne pouvez pas encore souscrire de formule ici, et aucune donnée bancaire n'est demandée.
         </Callout>
       ) : null}
+
+      {locked ? (
+        <>
+          <HowItWorks />
+          <Unlockables />
+        </>
+      ) : null}
+      {sub.isTrial && sub.trialEndsAt ? <TrialTimeline trialEndsAt={sub.trialEndsAt} cancelAtPeriodEnd={sub.cancelAtPeriodEnd} /> : null}
 
       <div className={sub.planId || sub.betaEndsAt ? "grid gap-6 lg:grid-cols-[1.3fr_1fr]" : "grid gap-6"}>
         <Card>
@@ -214,6 +242,13 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
           </p>
         </section>
       )}
+      <section aria-labelledby="compare-title" className="flex flex-col gap-4">
+        <h2 id="compare-title" className="font-display text-lg font-semibold">
+          Comparatif des formules
+        </h2>
+        <PlanCompare currentPlanId={sub.planId} />
+      </section>
+      <BillingFaq />
     </div>
   );
 }

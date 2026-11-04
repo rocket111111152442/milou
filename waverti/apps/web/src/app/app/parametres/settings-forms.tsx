@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Download, Laptop, ShieldCheck, Trash2 } from "lucide-react";
+import { Laptop, ShieldCheck, Trash2 } from "lucide-react";
 import { Button, Callout, Dialog, DialogClose, DialogContent, DialogTrigger, Field, Input, Label, Select, Switch } from "@waverti/ui";
 import { formatDateTime, formatRelative, type DeviceView } from "@waverti/types";
 import { apiCall, useApiAction } from "@/components/app/use-api";
@@ -310,17 +310,6 @@ export function DangerZone() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium">Exporter mes données</p>
-          <p className="text-xs text-muted-fg">Fichier JSON contenant votre profil, vos surveillances, résultats et alertes.</p>
-        </div>
-        <Button asChild variant="secondary" size="sm">
-          <a href="/api/account/export">
-            <Download aria-hidden="true" /> Exporter
-          </a>
-        </Button>
-      </div>
-      <div className="flex flex-col gap-2 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-medium text-danger">Supprimer mon compte</p>
           <p className="text-xs text-muted-fg">Abonnement résilié immédiatement, données supprimées définitivement.</p>
