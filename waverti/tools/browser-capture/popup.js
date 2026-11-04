@@ -6,6 +6,27 @@ const form = document.getElementById("paste");
 const input = document.getElementById("page-url");
 const status = document.getElementById("status");
 const destination = "https://www.waverti.com/app/surveillances/nouvelle";
+const pageTitle = document.getElementById("page-title");
+const pageHost = document.getElementById("page-host");
+const pageState = document.getElementById("page-state");
+
+function showCurrentPage(tab) {
+  const url = monitoringUrl(tab?.url);
+  if (!url) {
+    pageTitle.textContent = "Aucune page sélectionnée";
+    pageHost.textContent = "Ouvre une fiche produit ou une page Web";
+    pageState.textContent = "Prêt";
+    return;
+  }
+  pageTitle.textContent = tab.title?.trim() || url.hostname;
+  pageHost.textContent = url.hostname;
+  pageState.textContent = "Page active";
+}
+
+document.getElementById("open-dashboard").addEventListener("click", () => {
+  void chrome.tabs.create({ url: "https://www.waverti.com/app/surveillances" });
+  window.close();
+});
 
 async function openWaverti(observation) {
   const fragment = encodeURIComponent(JSON.stringify(observation));
@@ -16,6 +37,7 @@ async function openWaverti(observation) {
 button.addEventListener("click", async () => {
   button.disabled = true;
   status.textContent = "";
+  pageState.textContent = "Lecture…";
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const link = tab?.url ? capturePage(tab.url, true) : null;
@@ -39,6 +61,7 @@ button.addEventListener("click", async () => {
     status.textContent = "Waverti n’a pas pu s’ouvrir. Réessaie.";
   } finally {
     button.disabled = false;
+    if (pageState.textContent === "Lecture…") pageState.textContent = "Page active";
   }
 });
 
@@ -64,6 +87,7 @@ form.addEventListener("submit", async (event) => {
 
 const recurringStatus = document.getElementById("monitoring-status");
 const sites = document.getElementById("authorized-sites");
+const sitesSummary = document.querySelector("#sites-details summary");
 document.getElementById("extension-version").textContent = "Extension Waverti " + chrome.runtime.getManifest().version;
 const controls = Object.fromEntries(["pair", "verify-link", "poll", "enable", "pause", "authorize", "unlink"]
   .map((id) => [id, document.getElementById(id)]));
@@ -103,6 +127,7 @@ function showDevice(state) {
       : "Relie ce navigateur pour commencer.");
 
   sites.replaceChildren();
+  sitesSummary.textContent = state.sites.length ? `Pages autorisées · ${state.sites.length}` : "Pages autorisées";
   for (const site of state.sites) {
     const item = document.createElement("li");
     const remove = document.createElement("button");
@@ -162,7 +187,9 @@ void Promise.all([
 ]).then(([[tab], state]) => {
   activeTab = tab;
   activeTarget = monitoringUrl(tab?.url);
+  showCurrentPage(tab);
   showDevice(state);
 }, () => {
+  showCurrentPage(null);
   recurringStatus.textContent = "L’état des contrôles récurrents est indisponible.";
 });
