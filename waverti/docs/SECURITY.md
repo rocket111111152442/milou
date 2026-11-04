@@ -31,7 +31,7 @@ l'adresse de contact de LULLIN WEB. Ne joignez jamais de mot de passe ni de donn
 | Surveillance massive d'un site | Cadence minimale par formule, espacement par hôte, cache mutualisé, robots.txt (moteur A), budget API | Tests unitaires et de charge |
 | Injection HTML (XSS) | Rendu React échappé, e-mails échappés, CSP | E2E (nom contenant `<script>`) |
 | Injection de formules dans les exports CSV | Préfixe des cellules commençant par `= + - @` | Code des exports |
-| Paiements réels involontaires | Clés `sk_live_` refusées sans `WAVERTI_ALLOW_LIVE_PAYMENTS=I_HAVE_LEGAL_APPROVAL` | Tests unitaires |
+| Paiements réels involontaires | Clés `sk_live_` refusées sans `WAVERTI_LIVE_PAYMENTS_ENABLED=true` | Tests unitaires |
 
 ## En-têtes HTTP
 

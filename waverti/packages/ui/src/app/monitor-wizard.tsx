@@ -896,6 +896,14 @@ export function MonitorWizard({
             {isTopic ? " Chaque vérification utilise des recherches de votre quota mensuel." : ""}
             {usesUptime ? " Les contrôles se font depuis un seul emplacement ; une panne est confirmée après 2 contrôles consécutifs." : ""}
           </Callout>
+          {!entitlements.planName && upgradeHref ? (
+            <Callout tone="warning" title="Abonnement requis">
+              Souscrivez à un abonnement ou démarrez votre essai gratuit de 3 jours pour activer cette surveillance. {" "}
+              <a className="font-medium text-blue hover:underline" href={upgradeHref}>
+                Souscrire à une formule
+              </a>
+            </Callout>
+          ) : null}
           {error ? (
             <Callout tone="danger" role="alert">
               {error}
@@ -905,8 +913,8 @@ export function MonitorWizard({
             <Button type="button" variant="ghost" onClick={back}>
               <ArrowLeft aria-hidden="true" /> Retour
             </Button>
-            <Button type="button" size="lg" onClick={create} loading={submitting} disabled={!name.trim()}>
-              Activer la surveillance
+            <Button type="button" size="lg" onClick={create} loading={submitting} disabled={!name.trim() || !entitlements.planName}>
+              {entitlements.planName ? "Activer la surveillance" : "Abonnement requis"}
             </Button>
           </div>
         </section>

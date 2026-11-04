@@ -63,4 +63,4 @@ l'ancien montant). Ne pas supprimer.
 | Un abonné semble avoir perdu sa date de renouvellement | Ne rien corriger à la main : redéclencher l'événement dans Stripe (Développeurs → Webhooks → renvoyer `customer.subscription.updated`) après déploiement du correctif. |
 
 ## 7. Garde-fous
-Aucune étape n'exécute de paiement. Ne pas ouvrir les paiements (variables Stripe de Production, drapeau `WAVERTI_ALLOW_LIVE_PAYMENTS`) tant que l'étape 3 n'est pas verte.
+Aucune étape n'exécute de paiement. Ne pas ouvrir les paiements (variables Stripe de Production, drapeau `WAVERTI_LIVE_PAYMENTS_ENABLED=true`) tant que l'étape 3 n'est pas verte.

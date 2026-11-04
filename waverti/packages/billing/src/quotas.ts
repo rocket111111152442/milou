@@ -66,7 +66,7 @@ export function requireSubscription(e: Entitlements): void {
   if (e.source === "none" || e.planId === null) {
     throw new QuotaError(
       "subscription_required",
-      "Un abonnement ou un essai gratuit de 3 jours est nécessaire. Choisissez une formule pour commencer.",
+      "Souscrivez à un abonnement ou démarrez votre essai gratuit de 3 jours pour activer une surveillance. Choisissez une formule pour commencer.",
     );
   }
 }

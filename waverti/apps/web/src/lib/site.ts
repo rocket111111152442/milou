@@ -18,7 +18,7 @@ export const siteConfig = {
    * Statut de lancement affiché publiquement :
    *  - preview : site de démonstration, paiements en mode test uniquement ;
    *  - beta : accès anticipé ;
-   *  - live : lancement commercial (uniquement après validation juridique et compte marchand).
+   *  - live : lancement commercial après vérification des obligations applicables et du compte marchand.
    */
   launchStatus: (process.env.NEXT_PUBLIC_LAUNCH_STATUS ?? "preview") as "preview" | "beta" | "live",
 };

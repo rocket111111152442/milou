@@ -28,6 +28,8 @@ export const serverEnvSchema = z.object({
   BRAVE_API_KEY: optional,
   BRAVE_SEARCH_API_BASE: optionalUrl,
   WAVERTI_HASH_PEPPER: z.string().min(32).optional(),
+  /** Activation opérationnelle explicite des paiements Live (après contrôles Stripe et obligations applicables). */
+  WAVERTI_LIVE_PAYMENTS_ENABLED: z.enum(["true"]).optional(),
   WAVERTI_ALLOW_PRIVATE_TARGETS: z.enum(["0", "1"]).default("0"),
 });
 
@@ -65,30 +67,35 @@ export function integrationStatus(env: Partial<ServerEnv>): IntegrationStatus {
 
 export type BillingMode = "absent" | "test" | "live_blocked" | "live";
 
+/** Activation Live explicite et non ambiguë. */
+export function livePaymentsEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.WAVERTI_LIVE_PAYMENTS_ENABLED === "true";
+}
+
 /**
  * Mode de facturation déduit de la clé secrète (jamais affichée) :
  * - absent : aucune clé ;
  * - test : clé sk_test_/rk_test_ (paiements fictifs uniquement) ;
- * - live_blocked : clé live présente mais paiements réels non autorisés (WAVERTI_ALLOW_LIVE_PAYMENTS absent) ;
- * - live : paiements réels explicitement autorisés.
+ * - live_blocked : clé live présente mais activation explicite absente ;
+ * - live : paiements réels explicitement activés.
  */
 export function billingMode(env: Record<string, string | undefined> = process.env): BillingMode {
   const key = env.STRIPE_SECRET_KEY;
   if (!key) return "absent";
   if (key.startsWith("sk_test_") || key.startsWith("rk_test_")) return "test";
   if (key.startsWith("sk_live_") || key.startsWith("rk_live_")) {
-    return env.WAVERTI_ALLOW_LIVE_PAYMENTS === "I_HAVE_LEGAL_APPROVAL" ? "live" : "live_blocked";
+    return livePaymentsEnabled(env) ? "live" : "live_blocked";
   }
   return "absent";
 }
 
-/** Refuse les clés Stripe live tant que le lancement commercial n'est pas validé. */
+/** Refuse les clés Stripe live tant que l'activation opérationnelle explicite n'est pas présente. */
 export function assertStripeTestMode(secretKey: string | undefined): void {
   if (!secretKey) return;
   if (secretKey.startsWith("sk_live_") || secretKey.startsWith("rk_live_")) {
-    if (process.env.WAVERTI_ALLOW_LIVE_PAYMENTS !== "I_HAVE_LEGAL_APPROVAL") {
+    if (!livePaymentsEnabled(process.env)) {
       throw new Error(
-        "Clé Stripe live refusée : les paiements réels sont désactivés tant que le cadre légal n'est pas validé.",
+        "Clé Stripe live refusée : activez WAVERTI_LIVE_PAYMENTS_ENABLED=true après les contrôles Stripe requis.",
       );
     }
   }

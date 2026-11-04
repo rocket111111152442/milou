@@ -1,8 +1,8 @@
 # Facturation Stripe — Waverti
 
-État : **mode test uniquement**. Les encaissements réels sont bloqués par le code tant que
-`WAVERTI_ALLOW_LIVE_PAYMENTS=I_HAVE_LEGAL_APPROVAL` n'est pas défini (jamais fait par l'équipe technique sans
-accord écrit et validation juridique).
+État par défaut : **mode test**. Les encaissements réels sont bloqués par le code tant que
+`WAVERTI_LIVE_PAYMENTS_ENABLED=true` n'est pas défini. Cette activation intervient après les contrôles Stripe requis
+et la vérification des obligations applicables.
 
 ## 1. Les quatre formules (seules vendues)
 
@@ -106,4 +106,4 @@ définitif, expiré : surveillances mises en pause (rien n'est supprimé), repri
 CGV / mentions légales / confidentialité complétées et validées, statut TVA tranché (prix TTC affichés),
 compte Stripe live activé, prix live créés avec les mêmes clés de recherche et vérifiés par
 `pnpm stripe:prices`, webhook live et son secret, puis seulement : clé live + 
-`WAVERTI_ALLOW_LIVE_PAYMENTS=I_HAVE_LEGAL_APPROVAL`, sur décision écrite du responsable.
+`WAVERTI_LIVE_PAYMENTS_ENABLED=true`, après décision du responsable.
