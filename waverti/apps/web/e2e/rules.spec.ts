@@ -4,6 +4,7 @@
  * lui-même est couvert par les tests unitaires et d'intégration sur pages contrôlées.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { CHROME_CONSENT_VERSION } from "@waverti/types";
 import { createConfirmedUser, login, resetRateLimits, sql, uniqueEmail } from "./helpers";
 
 const ORIGIN = { origin: "http://localhost:3000" };
@@ -28,6 +29,36 @@ test.describe("création de surveillances — nouvelle interface", () => {
     for (const c of ["Prix", "Produits", "Pages web", "Mots-clés", "Événements", "Entreprises", "Actualités", "Disponibilité de sites", "Documents", "Personnalisée"]) {
       await expect(page.getByRole("listitem").filter({ hasText: c }).first()).toBeVisible();
     }
+  });
+
+  test("le relevé Chrome reste distinct d’une vérification serveur incomplète", async ({ page }) => {
+    const { id } = await openWizard(page);
+    await sql`insert into agent_devices (user_id, name, platform, token_hash, status, monitoring_enabled, consent_local_at, consent_version)
+      values (${id}, 'Chrome de recette', 'chrome', ${"chrome_import_" + id}, 'active', true, now(), ${CHROME_CONSENT_VERSION})`;
+    const url = "https://boutique.example.com/produit";
+    const reading = { version: 2, recurring: true, url, price: 1297.99, currency: "EUR", availability: "in_stock", observedAt: new Date().toISOString() };
+    await page.goto("/app");
+    await page.goto("/app/surveillances/nouvelle#waverti-releve=" + encodeURIComponent(JSON.stringify(reading)));
+    await expect(page.getByText("Relevé ponctuel de Chrome", { exact: true })).toBeVisible();
+    await expect(page.getByText(/1\s*297,99/)).toBeVisible();
+    await expect(page.getByText("Disponible", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Changer de type" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Produits" }).click();
+    await page.route("**/api/monitors/preview", (route) => route.fulfill({
+      json: {
+        ok: true,
+        observation: { title: "Produit", price: null, currency: null, priceSource: null, availability: "unknown", availabilitySource: "none", selectorFound: null, httpStatus: 200, finalUrl: url },
+        analysis: { title: "Produit", contentKind: "html", price: null, currency: null, regularPrice: null, availability: "unknown", items: [{ t: "Autre offre" }], documents: [], futureDates: [], headings: [], linksCount: 0, tablesCount: 0, signupForm: false, textSample: "" },
+      },
+    }));
+    await page.getByRole("button", { name: "Vérifier depuis les serveurs" }).click();
+    await expect(page.getByText("Vérification ponctuelle par les serveurs", { exact: true })).toBeVisible();
+    await expect(page.getByText("Disponibilité côté serveur non détectée.", { exact: false })).toBeVisible();
+    await expect(page.getByText("Disponible", { exact: true })).toBeVisible();
+    await expect(page.getByText(/éléments de liste|Impossible de confirmer/)).toHaveCount(0);
+    await next(page, 3);
+    await expect(page.getByText("Données de surveillance non confirmées")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Activer la surveillance" })).toBeEnabled();
   });
 
   test("assistant en langage naturel → règle ET → création", async ({ page }) => {

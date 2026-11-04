@@ -67,6 +67,8 @@ export interface AnalysisResult extends PreviewResult {
   blocks?: PageBlockOption[];
 }
 
+type BrowserMonitoringReading = Pick<PageAnalysis, "price" | "currency" | "availability"> & { observedAt: string };
+
 type CategoryId = NonNullable<RuleConditionInput["category"]>;
 type WizardExecutionMode = "cloud_only" | "browser_only";
 
@@ -288,6 +290,15 @@ function isAmazonProductUrl(url: string): boolean {
   }
 }
 
+function availabilityLabel(value: string | undefined): string | null {
+  switch (value) {
+    case "in_stock": return "Disponible";
+    case "out_of_stock": return "Rupture";
+    case "preorder": return "Précommande";
+    default: return null;
+  }
+}
+
 function browserPageHref(value: string): string | null {
   try {
     const url = new URL(value);
@@ -327,6 +338,7 @@ export function MonitorWizard({
   initialUrl,
   browserExtensionHref,
   browserMonitoringUrl,
+  browserMonitoringReading,
   browserMonitoringAvailable = false,
 }: {
   entitlements: WizardEntitlements;
@@ -339,6 +351,7 @@ export function MonitorWizard({
   initialUrl?: string;
   browserExtensionHref?: string;
   browserMonitoringUrl?: string;
+  browserMonitoringReading?: BrowserMonitoringReading;
   browserMonitoringAvailable?: boolean;
 }) {
   const topicsAllowed = entitlements.maxWebTopics > 0 && entitlements.webIntervalMinutes !== null;
@@ -393,7 +406,7 @@ export function MonitorWizard({
   React.useEffect(() => {
     headingRef.current?.focus();
   }, [step]);
-  React.useEffect(() => setPreviewAcknowledged(false), [url, selector, rule, preview]);
+  React.useEffect(() => setPreviewAcknowledged(false), [url, selector, rule, preview, executionMode, browserMonitoringReading]);
 
   const parsedDomains = domains
     .split(/[,\s]+/)
@@ -554,25 +567,30 @@ export function MonitorWizard({
 
   const obs = preview?.observation;
   const analysis = preview?.analysis;
-  const priceDetected = obs?.price != null && Boolean(obs.currency);
-  const stockLabel =
-    obs?.availability === "in_stock" ? "Disponible"
-      : obs?.availability === "out_of_stock" ? "Rupture"
-        : obs?.availability === "preorder" ? "Précommande" : null;
+  const chromeReading = browserMonitoringAvailable && url.trim() === browserMonitoringUrl ? browserMonitoringReading : undefined;
+  const browserOnly = executionMode === "browser_only";
+  const separateServerPreview = browserOnly || Boolean(chromeReading);
+  const serverPriceDetected = obs?.price != null && Boolean(obs.currency);
+  const stockLabel = availabilityLabel(obs?.availability);
+  const chromeStockLabel = availabilityLabel(chromeReading?.availability);
+  const chromePriceDetected = chromeReading?.price != null && Boolean(chromeReading.currency);
   const atoms = ruleAtoms({ conditions: rule.conditions, groups: rule.groups });
-  const missingPrice = atoms.some((atom) => atom.type.startsWith("price_") || atom.type === "promotion") && !priceDetected;
-  const missingStock = atoms.some((atom) => atom.type === "stock_is" || atom.type === "stock_changed") && !stockLabel;
+  const needsPrice = atoms.some((atom) => atom.type.startsWith("price_") || atom.type === "promotion");
+  const needsStock = atoms.some((atom) => atom.type === "stock_is" || atom.type === "stock_changed");
+  const missingPrice = needsPrice && !(browserOnly ? chromePriceDetected : serverPriceDetected);
+  const missingStock = needsStock && !(browserOnly ? chromeStockLabel : stockLabel);
   const missingSignals = [missingPrice ? "le prix et sa devise" : null, missingStock ? "la disponibilité" : null]
     .filter(Boolean)
     .join(" et ");
   const missingPreviewSignals = [
-    !priceDetected && (category === "price" || missingPrice) ? "le prix et sa devise" : null,
-    !stockLabel && (category === "price" || category === "product" || missingStock) ? "la disponibilité" : null,
+    !serverPriceDetected && (category === "price" || needsPrice) ? "le prix et sa devise" : null,
+    !stockLabel && (category === "price" || category === "product" || needsStock) ? "la disponibilité" : null,
   ].filter(Boolean).join(" et ");
-  const needsPreviewConfirmation = !isTopic && preview !== null && !previewing && Boolean(missingSignals);
-  const showProductFallback = preview !== null && !previewing && Boolean(missingPreviewSignals);
+  const completedPreview = browserOnly ? Boolean(chromeReading) : preview !== null && !previewing;
+  const needsPreviewConfirmation = !isTopic && completedPreview && Boolean(missingSignals);
+  const showProductFallback = !browserOnly && preview !== null && !previewing && Boolean(missingPreviewSignals);
   const browserPage = showProductFallback && browserExtensionHref ? browserPageHref(url) : null;
-  const verificationLabel = executionMode === "browser_only" ? "Vérifier depuis les serveurs" : "Vérifier la page";
+  const verificationLabel = separateServerPreview ? "Vérifier depuis les serveurs" : "Vérifier la page";
   const detectedElements = category === "price" ? stockLabel ?? "Non détectée sur la page" : [
     analysis?.items.length ? `${analysis.items.length}+ éléments de liste` : null,
     analysis?.documents.length ? `${analysis.documents.length} document(s)` : null,
@@ -624,13 +642,41 @@ export function MonitorWizard({
           <ScanSearch aria-hidden="true" /> {verificationLabel}
         </Button>
       </div>
-      {previewing ? <div className="skeleton h-20 rounded-xl" aria-label="Analyse en cours" /> : null}
-      {preview?.error ? (
-        <Callout tone="warning" title="Cette page n'a pas pu être lue" role="status">
-          {preview.error.message} Vous pouvez tout de même continuer : Waverti réessaiera à chaque vérification.
+      {chromeReading ? (
+        <Callout tone="info" title="Relevé ponctuel de Chrome" role="status">
+          <dl className="mb-2 grid gap-3 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs">Prix dans Chrome</dt>
+              <dd className="font-medium">{chromeReading.price !== null && chromeReading.currency ? formatPrice(chromeReading.price, chromeReading.currency) : "Non détecté"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs">Disponibilité dans Chrome</dt>
+              <dd className="font-medium">{chromeStockLabel ?? "Non détectée"}</dd>
+            </div>
+          </dl>
+          <p className="text-xs">
+            Relevé à <time dateTime={chromeReading.observedAt}>{new Date(chromeReading.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</time>.
+            Le suivi automatique utilisera ses propres contrôles après l’activation.
+          </p>
         </Callout>
       ) : null}
-      {obs ? (
+      {previewing ? <div className="skeleton h-20 rounded-xl" aria-label={separateServerPreview ? "Analyse des serveurs en cours" : "Analyse en cours"} /> : null}
+      {preview?.error ? (
+        <Callout tone="warning" title={separateServerPreview ? "Vérification ponctuelle côté serveur indisponible" : "Cette page n'a pas pu être lue"} role="status">
+          {preview.error.message} {separateServerPreview
+            ? "Ce test est indépendant du relevé Chrome."
+            : "Vous pouvez tout de même continuer : Waverti réessaiera à chaque vérification."}
+        </Callout>
+      ) : null}
+      {obs && separateServerPreview ? (
+        <Callout tone="neutral" title="Vérification ponctuelle par les serveurs" role="status">
+          <p>
+            Prix côté serveur {obs.price !== null && obs.currency ? formatPrice(obs.price, obs.currency) : "non détecté"}.
+            {" "}Disponibilité côté serveur {(stockLabel ?? "non détectée").toLowerCase()}.
+          </p>
+          <p className="mt-1 text-xs">Ce test est indépendant du relevé Chrome.</p>
+        </Callout>
+      ) : obs ? (
         <div
           className={cn(
             "grid gap-3 rounded-xl border p-4",
@@ -662,7 +708,7 @@ export function MonitorWizard({
         </div>
       ) : null}
       {showProductFallback ? (
-        <Callout tone="warning" title="Données de la fiche incomplètes">
+        <Callout tone="warning" title={separateServerPreview ? "Données manquantes côté serveur" : "Données de la fiche incomplètes"}>
           <p>
             {isAmazonProductUrl(obs?.finalUrl ?? url)
               ? obs
@@ -896,7 +942,7 @@ export function MonitorWizard({
             </div>
           ) : (
             <div className="flex flex-col gap-5">
-              {preview?.suggestions?.length ? (
+              {!browserOnly && preview?.suggestions?.length ? (
                 <div className="flex flex-col gap-2">
                   <p className="text-sm font-medium">Idées pour cette page</p>
                   <div className="flex flex-wrap gap-2">
@@ -1053,7 +1099,8 @@ export function MonitorWizard({
           </Field>
           {!isTopic && missingSignals ? (
             <Callout tone="warning" title="Données de surveillance non confirmées">
-              Waverti n’a pas encore pu confirmer {missingSignals}. Vous pouvez activer la surveillance. Les conditions
+              {browserOnly ? "Le relevé Chrome n’a pas confirmé" : "Waverti n’a pas encore pu confirmer"} {missingSignals}.
+              Vous pouvez activer la surveillance. Les conditions
               concernées seront évaluées dès qu’un contrôle détectera les données nécessaires.
             </Callout>
           ) : null}

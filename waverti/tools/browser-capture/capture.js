@@ -158,7 +158,7 @@ export function capturePage(href, urlOnly = false, expectedUrl) {
     if (!box.matches(".priceToPay, .apex-pricetopay-value") ||
         box.closest(".a-text-price, [data-a-strike='true'], del, s, strike") || !isVisible(box)) continue;
 
-    const whole = visibleText(box, ".a-price-whole").replace(/[.,]$/, "");
+    const whole = visibleText(box, ".a-price-whole").replace(/[.,]$/, "").trimEnd();
     const fraction = visibleText(box, ".a-price-fraction");
     const symbol = visibleText(box, ".a-price-symbol");
     const amount = whole && symbol && (fraction || !box.querySelector(".a-price-fraction"))

@@ -37,7 +37,8 @@ export function NewMonitor({
 
   const offer = reading && reading !== "invalid" && hasBrowserOffer(reading) ? reading : null;
   const importedCategory = importedUrl && offer ? (offer.price === null ? "product" : "price") : initialCategory;
-  const browserMonitoringUrl = reading && reading !== "invalid" && reading.version === 2 && reading.recurring ? reading.url : undefined;
+  const recurringReading = reading && reading !== "invalid" && reading.version === 2 && reading.recurring ? reading : undefined;
+  const browserMonitoringUrl = recurringReading?.url;
 
   return (
     <div className="flex flex-col gap-5">
@@ -45,7 +46,7 @@ export function NewMonitor({
         <Callout tone="warning" title="Import depuis Chrome indisponible">
           Rouvrez la page à surveiller et relancez l’import depuis l’extension Waverti.
         </Callout>
-      ) : offer ? (
+      ) : offer && !(recurringReading && browserMonitoringAvailable) ? (
         <Callout tone="info" title={offer.version === 1 ? "Relevé ponctuel Amazon importé" : "Relevé ponctuel importé depuis Chrome"}>
           <div className="flex flex-col gap-2">
             <p>
@@ -59,7 +60,7 @@ export function NewMonitor({
             ) : null}
           </div>
         </Callout>
-      ) : reading ? (
+      ) : reading && !offer ? (
         <Callout tone="info" title="Lien reçu depuis Chrome">
           L’adresse de {new URL(reading.url).hostname} est déjà renseignée. Choisissez ce que vous voulez surveiller.
         </Callout>
@@ -77,6 +78,7 @@ export function NewMonitor({
         initialCategory={importedCategory}
         initialUrl={importedUrl}
         browserMonitoringUrl={browserMonitoringUrl}
+        browserMonitoringReading={recurringReading}
         browserMonitoringAvailable={browserMonitoringAvailable}
         browserExtensionHref="/downloads/waverti-chrome.zip"
         upgradeHref="/app/abonnement"
