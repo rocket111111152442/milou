@@ -3,6 +3,18 @@ import { z } from "zod";
 export const availabilitySchema = z.enum(["in_stock", "out_of_stock", "preorder", "unknown"]);
 export type Availability = z.infer<typeof availabilitySchema>;
 
+/** Qualité d'une information extraite. Optional on purpose: old desktop observations remain valid. */
+export const extractionStatusSchema = z.enum(["verified", "uncertain", "unavailable", "contradictory"]);
+export type ExtractionStatus = z.infer<typeof extractionStatusSchema>;
+
+export const extractionFieldEvidenceSchema = z.object({
+  status: extractionStatusSchema,
+  sources: z.array(z.string().max(80)).max(12),
+  checkedAt: z.string().datetime(),
+  note: z.string().max(300).optional(),
+});
+export type ExtractionFieldEvidence = z.infer<typeof extractionFieldEvidenceSchema>;
+
 /** Lien ou élément repéré sur une page : adresse absolue et libellé. */
 export const linkRefSchema = z.object({ u: z.string().max(500), t: z.string().max(160) });
 export type LinkRef = z.infer<typeof linkRefSchema>;
@@ -17,6 +29,10 @@ export const pageObservationSchema = z.object({
   price: z.number().nonnegative().max(100_000_000).nullable(),
   currency: z.string().length(3).nullable(),
   priceSource: z.enum(["jsonld", "microdata", "meta", "selector", "text"]).nullable(),
+  /** Current/regular/promotion/range classification; absent on legacy observations. */
+  priceKind: z.enum(["current", "regular", "promotion", "range"]).optional(),
+  /** All materially different price readings retained for contradiction diagnostics. */
+  priceCandidates: z.array(z.object({ value: z.number().nonnegative(), currency: z.string().length(3).nullable(), source: z.string().max(80) })).max(12).optional(),
   availability: availabilitySchema,
   availabilitySource: z.enum(["jsonld", "microdata", "text", "none"]),
   textHash: z.string().regex(/^[a-f0-9]{64}$/),
@@ -26,6 +42,9 @@ export const pageObservationSchema = z.object({
   selectorFound: z.boolean().nullable(),
   method: z.enum(["http", "browser"]),
   fetchedAt: z.string().datetime(),
+  reference: z.string().max(160).nullable().optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  fieldEvidence: z.record(z.string(), extractionFieldEvidenceSchema).optional(),
   // ——— Données enrichies (facultatives : absentes des observations antérieures et des anciennes versions desktop) ———
   /** Nature du contenu : page HTML ou document (PDF…). */
   contentKind: z.enum(["html", "pdf", "document"]).optional(),

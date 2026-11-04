@@ -9,7 +9,7 @@ Une étape n'est « réussie » que si son contrôle a été réellement exécut
 | Élément | Constat |
 | --- | --- |
 | Commit de référence | `337791a` ; branche de développement inchangée depuis. Une branche `release/waverti` existe aussi sur GitHub, au même commit : **si elle est la Production Branch de Vercel, toute poussée dessus déploie en Production** → ne pas y pousser pendant la campagne. |
-| Variables Vercel **Production** (noms) | Présentes : base Neon, Resend, Brave (`BRAVE_API_KEY`), inscription ouverte, bêta `pro:30`, MFA admin. **Absentes : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `WAVERTI_ALLOW_LIVE_PAYMENTS`.** Stripe est donc **inactif en Production** aujourd'hui (aucun paiement, aucun webhook traité). |
+| Variables Vercel **Production** (noms) | Présentes : base Neon, Resend, Brave (`BRAVE_API_KEY`), inscription ouverte, bêta `pro:30`, MFA admin. **Absentes : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `WAVERTI_LIVE_PAYMENTS_ENABLED`.** Stripe est donc **inactif en Production** aujourd'hui (aucun paiement, aucun webhook traité). |
 | Correctif isolé | Branche `hotfix/webhook-price-rotation` @ `3cc91a7` = `bd42dab` + **uniquement** 2 fichiers (`webhooks.ts` et son test ; 38 lignes ajoutées, 1 modifiée). Une première version (`774c0aa`) a échoué en CI : le test importé portait le montant Pro du nouveau catalogue ; corrigé dans `3cc91a7`. |
 | Non vérifiable par moi | Production Branch ; existence d'abonnés Live ; endpoint webhook Live existant ; version PostgreSQL de Neon ; plan/fenêtre de restauration Neon. |
 
@@ -81,14 +81,14 @@ Contrôles : build `READY`, alias basculé ; `/api/health` → `ok`, `schema.app
 Retour arrière : Instant Rollback vers le déploiement de l'étape 3 (qui garde le correctif) ; si la base doit aussi revenir : script de l'étape 6.
 
 ## Étape 8 — Ouvrir Stripe en Production et vérifier 🔒 (Vercel Production + Stripe Live)
-8a. Changements Vercel Production (variables **sensibles**, saisies par vous, jamais dans le chat) : `STRIPE_SECRET_KEY` (clé `sk_live_…` ou restreinte), `STRIPE_WEBHOOK_SECRET` (`whsec_…` de l'endpoint Live vers `https://www.waverti.com/api/stripe/webhook`, 7 événements de `STRIPE.md` §4), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, puis **`WAVERTI_ALLOW_LIVE_PAYMENTS=I_HAVE_LEGAL_APPROVAL`** — ce dernier atteste votre validation juridique (CGV, TVA) : **il ne sera posé que sur votre déclaration écrite explicite**. Puis redéploiement du même commit (les variables ne s'appliquent qu'au déploiement suivant).
+8a. Changements Vercel Production (variables **sensibles**, saisies par vous, jamais dans le chat) : `STRIPE_SECRET_KEY` (clé `sk_live_…` ou restreinte), `STRIPE_WEBHOOK_SECRET` (`whsec_…` de l'endpoint Live vers `https://www.waverti.com/api/stripe/webhook`, 7 événements de `STRIPE.md` §4), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, puis **`WAVERTI_LIVE_PAYMENTS_ENABLED=true`** après validation des obligations applicables. Puis redéploiement du même commit (les variables ne s'appliquent qu'au déploiement suivant).
 8b. Contrôles réels :
 * `/api/health` → `billing.mode = "live"` (pas `live_blocked`).
 * Montants : `pnpm stripe:prices` → 4 conformes ; création d'une session Checkout via l'application (sans payer) : le récapitulatif affiche le bon montant et la date du premier prélèvement.
 * Abonnés existants : mêmes comptages et mêmes `current_period_end` qu'avant (comparaison avec l'étape 2) ; renvoyer un `customer.subscription.updated` d'un abonné existant depuis Stripe → 200, **dates et formule conservées** (c'est le test réel du correctif).
 * Webhooks : Stripe → Développeurs → Webhooks → livraisons récentes toutes en 2xx ; renvoyer les événements en échec accumulés avant l'ouverture.
 * Facturation réelle (**optionnelle, autorisation séparée**) : un paiement réel de Plus (9,99 €) par vous, vérification du montant sur la facture, puis remboursement et résiliation.
-Retour arrière : retirer `WAVERTI_ALLOW_LIVE_PAYMENTS` (paiements bloqués, `live_blocked`) puis, si besoin, retirer les clés Stripe de Production et redéployer ; les abonnements ne sont pas touchés.
+Retour arrière : retirer `WAVERTI_LIVE_PAYMENTS_ENABLED` (paiements bloqués, `live_blocked`) puis, si besoin, retirer les clés Stripe de Production et redéployer ; les abonnements ne sont pas touchés.
 
 ## Tableau des autorisations demandées
 | # | Opération | Système | Effet |

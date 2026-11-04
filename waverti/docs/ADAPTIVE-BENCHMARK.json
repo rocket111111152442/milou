@@ -1,0 +1,53 @@
+{
+  "date": "2026-11-01T18:49:44.664Z",
+  "node": "v24.19.0",
+  "platform": "win32",
+  "rounds": 100,
+  "scope": "Extraction in one Node process. Decoded != usable/authorized. Title and price assertions only. RSS includes runtime, both engines and GC; not per-check allocation. HTTP timings use one local HTML page, 5 warmups then 30 samples, no DB/robots/scheduler/TLS. Payload bytes exclude headers and wire compression. No Chromium or monetary cost measured. Sequential engine order and OS contention limit timing comparisons.",
+  "results": [
+    {
+      "mode": "baseline",
+      "fixtures": 40,
+      "decoded": 36,
+      "expectedTitleAndPrice": 33,
+      "decodeRate": 0.9,
+      "extractionRate": 0.825,
+      "meanExtractionMs": 1.40512345,
+      "processPeakRssBytes": 108802048,
+      "failures": [
+        "application/json: title/price mismatch",
+        "application/ld+json: title/price mismatch",
+        "rss-application/rss+xml: unsupported/failed",
+        "rss-application/xml: unsupported/failed",
+        "rss-text/xml: unsupported/failed",
+        "atom: unsupported/failed",
+        "json-data: title/price mismatch"
+      ]
+    },
+    {
+      "mode": "adaptive",
+      "fixtures": 40,
+      "decoded": 40,
+      "expectedTitleAndPrice": 40,
+      "decodeRate": 1,
+      "extractionRate": 1,
+      "meanExtractionMs": 1.7616277499999997,
+      "processPeakRssBytes": 147025920,
+      "failures": []
+    }
+  ],
+  "httpResults": [
+    {
+      "mode": "baseline",
+      "samples": 30,
+      "meanCheckMs": 11.813710000000235,
+      "meanDecodedBodyBytes": 189
+    },
+    {
+      "mode": "adaptive",
+      "samples": 30,
+      "meanCheckMs": 11.085973333333397,
+      "meanDecodedBodyBytes": 189
+    }
+  ]
+}

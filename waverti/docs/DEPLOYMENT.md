@@ -83,8 +83,8 @@ en parallèle (réservations exclusives) ; `WORKER_ROLES` permet de spécialiser
    5. Prérequis côté site : `DATABASE_URL`, `STRIPE_SECRET_KEY` (sk_test_), `WAVERTI_HASH_PEPPER` ; sinon la route
       répond 503 « not_configured » (aucune donnée traitée). Envoyer un événement de test depuis Stripe : réponse 200.
 4. Portail client : autoriser la mise à jour de carte, l'historique des factures et la résiliation.
-5. **Paiements réels** : uniquement après validation juridique (CGV, mentions légales, TVA, compte marchand
-   activé), puis clés live + `WAVERTI_ALLOW_LIVE_PAYMENTS=I_HAVE_LEGAL_APPROVAL`.
+5. **Paiements réels** : après vérification des obligations applicables (CGV, mentions légales, TVA, compte marchand
+   activé), puis clés Live + `WAVERTI_LIVE_PAYMENTS_ENABLED=true`.
 
 ## 5. Resend (e-mails) [humain]
 

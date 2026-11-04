@@ -7,6 +7,7 @@ import type { LegacyPageCondition, PageObservation } from "@waverti/types";
 import { formatPrice } from "@waverti/types";
 import { normalizeForMatch } from "../extract/text";
 import { changeRatio, diffSentences } from "./similarity";
+import { availabilityIsReliable, priceIsReliable } from "./reliability";
 
 export type AlertKind = "price" | "stock" | "page_change" | "keyword" | "web_topic";
 
@@ -30,15 +31,15 @@ const availabilityLabel: Record<string, string> = {
 };
 
 function priceChange(prev: PageObservation | null, curr: PageObservation) {
-  if (!prev || prev.price === null || curr.price === null || prev.price === curr.price) return null;
-  return { from: prev.price, to: curr.price, delta: Math.round((curr.price - prev.price) * 100) / 100 };
+  if (!priceIsReliable(prev) || !priceIsReliable(curr) || (prev!.currency ?? "EUR") !== (curr.currency ?? "EUR") || prev!.price === curr.price) return null;
+  return { from: prev!.price!, to: curr.price!, delta: Math.round((curr.price! - prev!.price!) * 100) / 100 };
 }
 
 export function evaluatePage(condition: LegacyPageCondition, prev: PageObservation | null, curr: PageObservation, taskName: string): Evaluation {
   const value =
     condition.type === "price_below" || condition.type === "price_drop"
-      ? curr.price !== null
-        ? formatPrice(curr.price, curr.currency ?? "EUR")
+      ? priceIsReliable(curr)
+        ? formatPrice(curr.price!, curr.currency ?? "EUR")
         : null
       : condition.type === "back_in_stock"
         ? availabilityLabel[curr.availability] ?? null
@@ -61,21 +62,23 @@ export function evaluatePage(condition: LegacyPageCondition, prev: PageObservati
 
   switch (condition.type) {
     case "price_below": {
-      if (curr.price === null) {
-        return { ...base, outcome: "error", triggered: false, summary: "Aucun prix fiable n'a été trouvé sur la page.", alert: null, errorCode: "price_not_found" };
+      if (!priceIsReliable(curr)) {
+        return curr.price === null
+          ? { ...base, outcome: "error", triggered: false, summary: "Aucun prix fiable n'a été trouvé sur la page.", alert: null, errorCode: "price_not_found" }
+          : { ...base, outcome: "ok", triggered: false, summary: "Prix détecté mais incertain : aucune alerte de prix n'est déclenchée.", alert: null };
       }
-      const below = curr.price < condition.threshold;
-      const wasBelow = prev?.price !== null && prev?.price !== undefined && prev.price < condition.threshold;
+      const below = curr.price! < condition.threshold && (!condition.currency || (curr.currency ?? "EUR") === condition.currency);
+      const wasBelow = priceIsReliable(prev) && prev!.price! < condition.threshold && (!condition.currency || (prev!.currency ?? "EUR") === condition.currency);
       if (below && !wasBelow) {
         return {
           ...base,
           outcome: "triggered",
           triggered: true,
-          summary: `Prix relevé : ${formatPrice(curr.price)} (seuil ${formatPrice(condition.threshold)}).`,
+          summary: `Prix relevé : ${formatPrice(curr.price!, curr.currency ?? "EUR")} (seuil ${formatPrice(condition.threshold, condition.currency)}).`,
           alert: {
             kind: "price",
-            title: `Le prix est passé sous ${formatPrice(condition.threshold)}`,
-            body: `${taskName} : ${formatPrice(curr.price)}${prev?.price ? ` au lieu de ${formatPrice(prev.price)} lors du contrôle précédent` : ""}.`,
+            title: `Le prix est passé sous ${formatPrice(condition.threshold, condition.currency)}`,
+            body: `${taskName} : ${formatPrice(curr.price!, curr.currency ?? "EUR")}${priceIsReliable(prev) ? ` au lieu de ${formatPrice(prev!.price!, prev!.currency ?? "EUR")}` : ""}.`,
           },
         };
       }
@@ -84,29 +87,32 @@ export function evaluatePage(condition: LegacyPageCondition, prev: PageObservati
         outcome: pc ? "changed" : "ok",
         triggered: false,
         summary: pc
-          ? `Prix : ${formatPrice(pc.from)} → ${formatPrice(pc.to)}${below ? " (toujours sous le seuil)" : ", au-dessus du seuil"}.`
-          : `Prix inchangé : ${formatPrice(curr.price)}.`,
+          ? `Prix : ${formatPrice(pc.from, curr.currency ?? "EUR")} → ${formatPrice(pc.to, curr.currency ?? "EUR")}${below ? " (toujours sous le seuil)" : ", au-dessus du seuil"}.`
+          : `Prix inchangé : ${formatPrice(curr.price!, curr.currency ?? "EUR")}.`,
         alert: null,
       };
     }
     case "price_drop": {
-      if (curr.price === null) {
-        return { ...base, outcome: "error", triggered: false, summary: "Aucun prix fiable n'a été trouvé sur la page.", alert: null, errorCode: "price_not_found" };
+      if (!priceIsReliable(curr)) {
+        return curr.price === null
+          ? { ...base, outcome: "error", triggered: false, summary: "Aucun prix fiable n'a été trouvé sur la page.", alert: null, errorCode: "price_not_found" }
+          : { ...base, outcome: "ok", triggered: false, summary: "Prix détecté mais incertain : aucune alerte de prix n'est déclenchée.", alert: null };
       }
-      if (!prev || prev.price === null) {
-        return { ...base, outcome: "ok", triggered: false, summary: `Prix de référence enregistré : ${formatPrice(curr.price)}.`, alert: null };
+      if (!priceIsReliable(prev)) {
+        return { ...base, outcome: "ok", triggered: false, summary: `Prix de référence enregistré : ${formatPrice(curr.price!, curr.currency ?? "EUR")}.`, alert: null };
       }
-      const dropPct = ((prev.price - curr.price) / prev.price) * 100;
-      if (curr.price < prev.price && dropPct >= condition.minPercent) {
+      if ((prev!.currency ?? "EUR") !== (curr.currency ?? "EUR")) return { ...base, outcome: "error", triggered: false, summary: "La devise a changé : aucune baisse comparable n'est calculée.", alert: null, errorCode: "currency_mismatch" };
+      const dropPct = ((prev!.price! - curr.price!) / prev!.price!) * 100;
+      if (curr.price! < prev!.price! && dropPct >= condition.minPercent) {
         return {
           ...base,
           outcome: "triggered",
           triggered: true,
-          summary: `Baisse de ${dropPct.toFixed(1).replace(".", ",")} % : ${formatPrice(prev.price)} → ${formatPrice(curr.price)}.`,
+          summary: `Baisse de ${dropPct.toFixed(1).replace(".", ",")} % : ${formatPrice(prev!.price!, curr.currency ?? "EUR")} → ${formatPrice(curr.price!, curr.currency ?? "EUR")}.`,
           alert: {
             kind: "price",
-            title: `Baisse de prix : ${formatPrice(curr.price)}`,
-            body: `${taskName} : ${formatPrice(prev.price)} → ${formatPrice(curr.price)} (−${dropPct.toFixed(1).replace(".", ",")} %).`,
+            title: `Baisse de prix : ${formatPrice(curr.price!, curr.currency ?? "EUR")}`,
+            body: `${taskName} : ${formatPrice(prev!.price!, curr.currency ?? "EUR")} → ${formatPrice(curr.price!, curr.currency ?? "EUR")} (−${dropPct.toFixed(1).replace(".", ",")} %).`,
           },
         };
       }
@@ -114,12 +120,12 @@ export function evaluatePage(condition: LegacyPageCondition, prev: PageObservati
         ...base,
         outcome: pc ? "changed" : "ok",
         triggered: false,
-        summary: pc ? `Prix : ${formatPrice(pc.from)} → ${formatPrice(pc.to)}.` : `Prix inchangé : ${formatPrice(curr.price)}.`,
+        summary: pc ? `Prix : ${formatPrice(pc.from, curr.currency ?? "EUR")} → ${formatPrice(pc.to, curr.currency ?? "EUR")}.` : `Prix inchangé : ${formatPrice(curr.price!, curr.currency ?? "EUR")}.`,
         alert: null,
       };
     }
     case "back_in_stock": {
-      if (curr.availability === "unknown") {
+      if (!availabilityIsReliable(curr)) {
         return { ...base, outcome: "error", triggered: false, summary: "La disponibilité n'a pas pu être déterminée sur la page.", alert: null, errorCode: "availability_unknown" };
       }
       const backNow = curr.availability === "in_stock" && prev?.availability === "out_of_stock";
@@ -147,7 +153,11 @@ export function evaluatePage(condition: LegacyPageCondition, prev: PageObservati
       if (!prev) {
         return { ...base, outcome: "ok", triggered: false, summary: "Version de référence de la page enregistrée.", alert: null };
       }
-      if (prev.textHash === curr.textHash) {
+      const stableHashAvailable = Boolean(prev.contentHash && curr.contentHash);
+      const unchanged = stableHashAvailable
+        ? prev.contentHash === curr.contentHash && prev.excerpt === curr.excerpt
+        : prev.textHash === curr.textHash;
+      if (unchanged) {
         return { ...base, outcome: "ok", triggered: false, summary: "Aucune modification du contenu.", alert: null };
       }
       const ratio = changeRatio(prev.excerpt, curr.excerpt);
