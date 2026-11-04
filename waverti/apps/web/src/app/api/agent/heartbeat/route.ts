@@ -15,6 +15,9 @@ export const POST = withDevice(
       .update(agentDevices)
       .set({ lastSeenAt: new Date(), lastState: body.data.state, appVersion: body.data.appVersion ?? undefined })
       .where(eq(agentDevices.id, device.deviceId));
+    if (device.platform === "chrome") {
+      return noStore({ monitoringEnabled: device.monitoringEnabled, consent: Boolean(device.consentLocalAt) });
+    }
     // Historique échantillonné (au plus une ligne par minute et par appareil).
     await db.execute(sql`
       insert into agent_heartbeats (device_id, user_id, state, running_jobs, app_version)
@@ -33,5 +36,5 @@ export const POST = withDevice(
       pendingNotifications: pending?.n ?? 0,
     });
   },
-  { rate: { name: "hb", limit: 240, windowSec: 3600 } },
+  { allowChrome: true, rate: { name: "hb", limit: 240, windowSec: 3600 } },
 );

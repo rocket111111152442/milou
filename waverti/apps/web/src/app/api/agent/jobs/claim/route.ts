@@ -11,7 +11,14 @@ export const POST = withDevice(
     const body = await readJson(req, claimRequestSchema);
     if (!body.ok) return body.res;
     const db = getDb();
-    const claims = await claimAgentJobs(db, { userId: device.userId, deviceId: device.deviceId, max: body.data.max, leaseSeconds: 180 });
+    const chrome = device.platform === "chrome";
+    const claims = await claimAgentJobs(db, {
+      userId: device.userId,
+      deviceId: device.deviceId,
+      max: chrome ? 1 : body.data.max,
+      leaseSeconds: 180,
+      browserUrlHashes: chrome ? body.data.urlHashes ?? [] : undefined,
+    });
     if (!claims.length) return noStore({ jobs: [] });
     const rows = await db
       .select({ id: monitoringTasks.id, name: monitoringTasks.name, url: monitoringTargets.url, cssSelector: monitoringTargets.cssSelector, renderMode: monitoringTargets.renderMode })
@@ -32,5 +39,5 @@ export const POST = withDevice(
       });
     return noStore({ jobs });
   },
-  { requireConsent: true, rate: { name: "claim", limit: 720, windowSec: 3600 } },
+  { allowChrome: true, requireConsent: true, rate: { name: "claim", limit: 720, windowSec: 3600 } },
 );

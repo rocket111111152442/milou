@@ -2,31 +2,34 @@
 import { useState } from "react";
 import { Laptop } from "lucide-react";
 import { Button, Callout, Card, CardContent, Field, Input } from "@waverti/ui";
+import type { Platform } from "@waverti/types";
 import { apiCall } from "@/components/app/use-api";
 
 export function LinkDevice({ initialCode }: { initialCode: string }) {
   const [code, setCode] = useState(initialCode.toUpperCase());
   const [state, setState] = useState<"idle" | "busy" | "approved" | "denied">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [device, setDevice] = useState<string | null>(null);
+  const [device, setDevice] = useState<{ deviceName: string; platform: Platform } | null>(null);
 
   async function decide(approve: boolean) {
     setState("busy");
     setError(null);
-    const r = await apiCall<{ device: { deviceName: string } }>("/api/agent/link/approve", { body: { userCode: code, approve } });
+    const r = await apiCall<{ device: { deviceName: string; platform: Platform } }>("/api/agent/link/approve", { body: { userCode: code, approve } });
     if (!r.ok) {
       setError(r.error.message ?? "Code invalide.");
       setState("idle");
       return;
     }
-    setDevice(r.data.device.deviceName);
+    setDevice(r.data.device);
     setState(approve ? "approved" : "denied");
   }
 
-  if (state === "approved") {
+  if (state === "approved" && device) {
     return (
-      <Callout tone="success" title="Application reliée" role="status">
-        « {device} » est maintenant relié à votre compte. Revenez dans l'application : elle vous demandera d'accepter le fonctionnement local.
+      <Callout tone="success" title="Liaison autorisée" role="status">
+        {device.platform === "chrome"
+          ? `Rouvrez « ${device.deviceName} » dans Chrome pour terminer la liaison. Vous pourrez ensuite autoriser les contrôles dans l’extension, puis choisir les fiches à surveiller.`
+          : `Rouvrez « ${device.deviceName} » pour terminer la liaison et accepter les contrôles depuis cet ordinateur.`}
       </Callout>
     );
   }
@@ -43,7 +46,7 @@ export function LinkDevice({ initialCode }: { initialCode: string }) {
         <span className="grid size-12 place-items-center rounded-2xl bg-surface">
           <Laptop className="size-5" aria-hidden="true" />
         </span>
-        <Field id="code" label="Code affiché par l'application" hint="Format XXXX-XXXX. Ne validez jamais un code que vous n'avez pas demandé.">
+        <Field id="code" label="Code de l’extension ou de l’application" hint="Format XXXX-XXXX. Validez uniquement un code que vous avez demandé.">
           {(p) => <Input {...p} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={9} className="font-mono text-lg tracking-[0.2em]" autoComplete="off" />}
         </Field>
         {error ? (

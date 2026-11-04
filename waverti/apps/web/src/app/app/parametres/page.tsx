@@ -205,8 +205,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </div>
               <div className="border-t border-line/70 pt-6">
                 <h3 className="mb-1 font-display text-base font-semibold">Appareils reliés</h3>
-                <p className="mb-3 text-sm text-ink-soft">Révoquez un appareil perdu ou que vous n'utilisez plus.</p>
+                <p className="mb-3 text-sm text-ink-soft">Les extensions Chrome et ordinateurs autorisés à effectuer vos contrôles locaux. Révoquez les appareils que vous n'utilisez plus.</p>
                 <DevicesList devices={devices} />
+                <Link href="/app/appareils/lier" className="mt-3 inline-block text-sm font-medium text-blue underline-offset-4 hover:underline">
+                  Relier une extension Chrome ou un ordinateur
+                </Link>
               </div>
             </div>
           </Section>

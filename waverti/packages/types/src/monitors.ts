@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { pageConditionSchema, webTopicConditionSchema } from "./conditions";
 
-export const executionModeSchema = z.enum(["auto", "local_only", "cloud_only"]);
+export const executionModeSchema = z.enum(["auto", "local_only", "cloud_only", "browser_only"]);
 export const renderModeSchema = z.enum(["auto", "http", "browser"]);
 
 export const notifyPrefsSchema = z

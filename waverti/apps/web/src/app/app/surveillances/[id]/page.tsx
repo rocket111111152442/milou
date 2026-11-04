@@ -7,13 +7,18 @@ import { MonitorStatusBadge, ResultTimeline } from "@waverti/ui/app";
 import { isUuid } from "@waverti/database";
 import { describeRule, formatDateTime, formatInterval, formatRelative, ruleConditionSchema, STATUS_LABELS, type WebFinding } from "@waverti/types";
 import { requireUser } from "@/lib/auth";
-import { loadEntitlements } from "@/lib/data/account";
+import { listDevices, loadEntitlements } from "@/lib/data/account";
 import { conditionLabel, getMonitorDetail, toResultView } from "@/lib/data/monitors";
 import { MonitorActions } from "./monitor-actions";
 
 export const metadata: Metadata = { title: "Surveillance" };
 
-const EXEC_LABEL = { auto: "Ordinateur en priorité, serveurs en relais", local_only: "Uniquement sur votre ordinateur", cloud_only: "Uniquement sur les serveurs Waverti" } as const;
+const EXEC_LABEL = {
+  auto: "Ordinateur en priorité, serveurs en relais",
+  local_only: "Uniquement sur votre ordinateur",
+  cloud_only: "Uniquement sur les serveurs Waverti",
+  browser_only: "Chrome en priorité, serveurs en relais",
+} as const;
 const CLASS_TONE = { confirmed: "success", probable: "info", rumor: "warning", irrelevant: "neutral" } as const;
 
 export default async function MonitorDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -23,6 +28,10 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
   const [d, ent] = await Promise.all([getMonitorDetail(user.id, id), loadEntitlements(user.id)]);
   if (!d) notFound();
   const { task, target, schedule } = d;
+  const browserOnly = task.executionMode === "browser_only";
+  const browserActive = browserOnly && task.status === "active";
+  const browserOffline = browserActive && !(await listDevices(user.id)).some((device) => device.platform === "chrome" && device.monitoringEnabled && device.online);
+  const browserWaiting = browserActive && !task.lastCheckedAt;
   const results = d.results.map((r) => toResultView(r, task.condition));
   const prices = d.series
     .map((s) => ({ t: s.checkedAt.toISOString(), v: typeof (s.observation as { price?: unknown } | null)?.price === "number" ? ((s.observation as { price: number }).price) : null }))
@@ -71,24 +80,31 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
           {task.lastError}
         </Callout>
       ) : null}
+      {browserOnly ? (
+        <Callout tone="info" title="Contrôles dans Chrome">
+          Chrome est utilisé en priorité avec l’extension active et l’autorisation pour cette adresse. Si Chrome est indisponible,
+          les serveurs Waverti prennent le relais selon votre formule.{" "}
+          <Link className="font-medium underline" href="/app/parametres#appareils">Gérer les appareils</Link>
+        </Callout>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-3" aria-label="En un coup d'œil">
         <StatTile
           label="Où en est cette surveillance ?"
           icon={<CheckCircle2 />}
-          tone={task.status === "error" || task.lastStatus === "error" ? "red" : task.status === "active" ? "green" : "amber"}
-          value={<span className="text-lg">{task.status === "error" || task.lastStatus === "error" ? "Un problème est survenu" : task.status === "active" ? (task.lastStatus === "triggered" ? "Alerte envoyée" : "Tout va bien") : task.status === "paused" ? "En pause" : "Suspendue"}</span>}
+          tone={browserOffline ? "amber" : task.status === "error" || task.lastStatus === "error" ? "red" : task.status === "active" && !browserWaiting ? "green" : "amber"}
+          value={<span className="text-lg">{task.status === "error" || task.lastStatus === "error" ? "Un problème est survenu" : browserWaiting ? "Premier contrôle en attente" : task.status === "active" ? (task.lastStatus === "triggered" ? "Alerte envoyée" : "Tout va bien") : task.status === "paused" ? "En pause" : "Suspendue"}</span>}
         />
         <StatTile label="Dernier contrôle" icon={<Activity />} tone="blue" value={<span className="text-lg">{task.lastCheckedAt ? formatRelative(task.lastCheckedAt.toISOString()) : "Pas encore"}</span>} />
         <StatTile
-          label="Prochain contrôle"
+          label={browserOnly ? "Prochain contrôle prévu" : "Prochain contrôle"}
           icon={<CalendarClock />}
           tone="violet"
           value={<span className="text-lg">{task.status === "active" || task.status === "error" ? (schedule ? formatRelative(schedule.nextRunAt.toISOString()) : "—") : "En pause"}</span>}
           hint={schedule ? `Un contrôle ${formatInterval(schedule.intervalMinutes).toLowerCase()}` : undefined}
         />
       </div>
-      {task.status === "active" && !task.lastCheckedAt ? <Tip>Le premier contrôle est en cours. Vous serez prévenu dès que la condition choisie est remplie.</Tip> : null}
+      {task.status === "active" && !task.lastCheckedAt && !browserOnly ? <Tip>Le premier contrôle est en cours. Vous serez prévenu dès que la condition choisie est remplie.</Tip> : null}
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="flex flex-col gap-6">

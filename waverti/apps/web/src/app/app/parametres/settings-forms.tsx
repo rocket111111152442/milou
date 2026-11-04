@@ -287,7 +287,7 @@ export function DevicesList({ devices }: { devices: DeviceView[] }) {
             <span className="flex flex-col">
               <span className="text-sm font-medium">{d.name}</span>
               <span className="text-xs text-muted-fg">
-                {d.platform} · {d.online ? "en ligne" : `vu ${formatRelative(d.lastSeenAt)}`}
+                {d.platform === "chrome" ? "Extension Chrome" : d.platform} · {d.online ? "en ligne" : `vu ${formatRelative(d.lastSeenAt)}`}
                 {d.appVersion ? ` · v${d.appVersion}` : ""}
                 {d.monitoringEnabled ? " · contrôles locaux actifs" : " · contrôles locaux inactifs"}
               </span>

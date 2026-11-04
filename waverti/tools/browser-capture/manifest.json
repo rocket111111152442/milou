@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Waverti — Relevé navigateur",
+  "version": "0.3.1",
+  "description": "Relève le prix et le stock des pages choisies pour Waverti.",
+  "permissions": ["activeTab", "scripting", "alarms", "storage"],
+  "host_permissions": ["https://www.waverti.com/*"],
+  "optional_host_permissions": ["https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "32": "32x32.png",
+    "128": "128x128.png"
+  },
+  "action": {
+    "default_title": "Envoyer une page à Waverti",
+    "default_icon": {
+      "32": "32x32.png",
+      "128": "128x128.png"
+    },
+    "default_popup": "popup.html"
+  }
+}

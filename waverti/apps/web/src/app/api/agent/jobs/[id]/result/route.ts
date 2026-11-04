@@ -17,6 +17,7 @@ export const POST = withDevice(
         claimToken: body.data.claimToken,
         executor: "agent",
         deviceId: device.deviceId,
+        chrome: device.platform === "chrome",
         durationMs: body.data.durationMs,
         observation: body.data.observation,
         error: body.data.error,
@@ -27,5 +28,5 @@ export const POST = withDevice(
       throw err;
     }
   },
-  { requireConsent: true, rate: { name: "result", limit: 720, windowSec: 3600 } },
+  { allowChrome: true, requireConsent: true, rate: { name: "result", limit: 720, windowSec: 3600 } },
 );

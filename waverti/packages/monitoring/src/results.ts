@@ -4,9 +4,11 @@
  * un exécutant dont le bail a expiré ne peut plus écrire de résultat.
  */
 import {
+  agentDevices,
   desc,
   eq,
   monitoringResults,
+  monitoringTargets,
   monitoringTasks,
   sql,
   and,
@@ -18,6 +20,7 @@ import {
 } from "@waverti/database";
 import { notify } from "@waverti/notifications";
 import {
+  CHROME_CONSENT_VERSION,
   pageConditionSchema,
   pageObservationSchema,
   webTopicObservationSchema,
@@ -25,7 +28,9 @@ import {
   type WebTopicObservation,
 } from "@waverti/types";
 import { evaluatePage, type Evaluation } from "./compare/evaluate";
+import { availabilityIsReliable, priceIsReliable } from "./compare/reliability";
 import { evaluateRule, parseMemory, type RuleMemory } from "./compare/rules";
+import { canonicalUrl } from "./net/safe-url";
 
 export class StaleClaimError extends Error {
   readonly code = "stale_claim";
@@ -40,6 +45,7 @@ export interface SubmitInput {
   claimToken: string;
   executor: "agent" | "cloud";
   deviceId?: string | null;
+  chrome?: boolean;
   durationMs: number;
   observation?: PageObservation | WebTopicObservation;
   error?: { code: string; message: string };
@@ -61,16 +67,62 @@ export interface SubmitOutcome {
 const ALERT_TYPE = { price: "price", stock: "stock", page_change: "page_change", keyword: "keyword", web_topic: "web_topic" } as const;
 const MAX_CONSECUTIVE_ERRORS_BEFORE_ERROR_STATE = 5;
 
-async function previousPageObservation(tx: Transaction, taskId: string): Promise<PageObservation | null> {
+async function previousPageObservation(tx: Transaction, taskId: string, field?: "price" | "availability"): Promise<PageObservation | null> {
+  const observed = field === "price"
+    ? sql`observation -> 'price' <> 'null'::jsonb`
+    : field === "availability"
+      ? sql`observation ->> 'availability' <> 'unknown'`
+      : ne(monitoringResults.outcome, "error");
   const [row] = await tx
     .select({ observation: monitoringResults.observation })
     .from(monitoringResults)
-    .where(and(eq(monitoringResults.taskId, taskId), ne(monitoringResults.outcome, "error"), isNotNull(monitoringResults.observation)))
+    .where(and(eq(monitoringResults.taskId, taskId), observed, isNotNull(monitoringResults.observation)))
     .orderBy(desc(monitoringResults.checkedAt))
     .limit(1);
   const parsed = pageObservationSchema.safeParse(row?.observation);
   return parsed.success ? parsed.data : null;
 }
+
+async function previousBrowserObservation(tx: Transaction, taskId: string): Promise<PageObservation | null> {
+  const price = await previousPageObservation(tx, taskId, "price");
+  const stock = await previousPageObservation(tx, taskId, "availability");
+  if (!price || !stock) return price ?? stock;
+  return { ...price, availability: stock.availability, availabilitySource: stock.availabilitySource };
+}
+
+function browserObservation(
+  observation: PageObservation | WebTopicObservation | undefined,
+  url: string | null,
+  claimedAt: Date,
+  now: Date,
+): PageObservation | undefined {
+  if (observation?.kind !== "page" || observation.method !== "browser" || observation.httpStatus !== 200 || !url) return;
+  if (observation.url !== url || canonicalUrl(new URL(observation.finalUrl)) !== url) return;
+  const capturedAt = Date.parse(observation.fetchedAt);
+  if (capturedAt < claimedAt.getTime() - 30_000 || capturedAt > now.getTime() + 30_000) return;
+  const hasPrice = observation.fieldEvidence?.price?.status === "verified" && priceIsReliable(observation)
+    && observation.price! > 0 && /^[A-Z]{3}$/.test(observation.currency ?? "")
+    && (observation.priceSource === "selector" || observation.priceSource === "jsonld");
+  const hasStock = observation.fieldEvidence?.availability?.status === "verified" && availabilityIsReliable(observation)
+    && (observation.availabilitySource === "text" || observation.availabilitySource === "jsonld");
+  if (!hasPrice && !hasStock) return;
+  return {
+    kind: "page", url, finalUrl: url, httpStatus: 200, method: "browser", fetchedAt: now.toISOString(),
+    price: hasPrice ? observation.price : null,
+    currency: hasPrice ? observation.currency : null,
+    priceSource: hasPrice ? observation.priceSource : null,
+    availability: hasStock ? observation.availability : "unknown",
+    availabilitySource: hasStock ? observation.availabilitySource : "none",
+    title: null, excerpt: "", textHash: "0".repeat(64), textLength: 0, selectorFound: null,
+  };
+}
+
+const browserFailureMessages = new Map([
+  ["access_restricted", "La fiche demande une connexion ou bloque les contrôles dans Chrome."],
+  ["navigation_unverified", "Chrome n’a pas pu confirmer le chargement de la fiche."],
+  ["page_changed", "La fiche autorisée a redirigé vers une autre adresse."],
+  ["site_not_allowed", "La fiche n’est plus autorisée dans Chrome."],
+]);
 
 export async function submitResult(db: Database, input: SubmitInput): Promise<SubmitOutcome> {
   const now = input.now ?? new Date();
@@ -83,9 +135,13 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
       claim_token: string | null;
       claimed_by: string | null;
       claimed_device_id: string | null;
+      claimed_at: Date | null;
+      lease_expires_at: Date | null;
       kind: "page" | "web_topic";
-    }>(sql`select id, task_id, user_id, status, claim_token, claimed_by, claimed_device_id, kind from monitoring_jobs where id = ${input.jobId} for update`);
-    if (!job) throw new StaleClaimError();
+    }>(sql`select id, task_id, user_id, status, claim_token, claimed_by, claimed_device_id, kind, claimed_at, lease_expires_at
+      from monitoring_jobs where id = ${input.jobId} for update`);
+    if (!job || job.claim_token !== input.claimToken || job.claimed_by !== input.executor
+      || (input.executor === "agent" && job.claimed_device_id !== input.deviceId)) throw new StaleClaimError();
 
     // Résultat déjà enregistré pour cette tâche (nouvelle tentative réseau du client) : idempotence.
     const [existing] = await tx
@@ -94,14 +150,34 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
       .where(eq(monitoringResults.jobId, input.jobId))
       .limit(1);
     if (existing) {
-      if (job.claim_token !== null && job.claim_token !== input.claimToken) throw new StaleClaimError();
       return { resultId: existing.id, outcome: existing.outcome, triggered: existing.outcome === "triggered", summary: "", notificationId: null, duplicate: true };
     }
-    if (job.status !== "claimed" || job.claim_token !== input.claimToken || job.claimed_by !== input.executor) throw new StaleClaimError();
-    if (input.executor === "agent" && job.claimed_device_id !== input.deviceId) throw new StaleClaimError();
+    if (job.status !== "claimed" || !job.lease_expires_at || new Date(job.lease_expires_at) <= now) throw new StaleClaimError();
 
     const [task] = await tx.select().from(monitoringTasks).where(eq(monitoringTasks.id, job.task_id)).limit(1);
-    if (!task) throw new StaleClaimError();
+    // Un contrôle Chrome est autorisé pour une surveillance browser_only. Le relais cloud
+    // peut aussi rendre le résultat lorsque l’extension est indisponible.
+    if (!task || (input.chrome && task.executionMode !== "browser_only") || (!input.chrome && task.executionMode === "browser_only" && job.claimed_by !== "cloud")) throw new StaleClaimError();
+    let received = input.observation;
+    let failure = input.error;
+    if (input.chrome) {
+      if (!input.deviceId || !job.claimed_at || !["active", "error"].includes(task.status)) throw new StaleClaimError();
+      const [device] = await tx.select().from(agentDevices).where(and(
+        eq(agentDevices.id, input.deviceId), eq(agentDevices.userId, job.user_id), eq(agentDevices.platform, "chrome"),
+        eq(agentDevices.status, "active"), eq(agentDevices.monitoringEnabled, true), isNotNull(agentDevices.consentLocalAt),
+        eq(agentDevices.consentVersion, CHROME_CONSENT_VERSION),
+      )).limit(1).for("share");
+      if (!device) throw new StaleClaimError();
+      const [target] = await tx.select({ url: monitoringTargets.url }).from(monitoringTargets).where(eq(monitoringTargets.taskId, task.id));
+      received = browserObservation(received, target?.url ?? null, new Date(job.claimed_at), now);
+      const reportedCode = failure?.code ?? "";
+      const reportedMessage = browserFailureMessages.get(reportedCode);
+      failure = received ? undefined : {
+        code: reportedMessage ? reportedCode : "browser_product_unverified",
+        message: reportedMessage ?? "Chrome n’a pas pu confirmer le prix ni la disponibilité de la fiche autorisée.",
+      };
+    }
+    const previous = input.chrome ? previousBrowserObservation : previousPageObservation;
 
     let evaluation: Evaluation;
     let observation: Record<string, unknown> | null = null;
@@ -110,13 +186,13 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
     const rule = pageCond?.success && pageCond.data.type === "rule" ? pageCond.data : null;
     if (rule) {
       // Règle personnalisée : évaluée aussi en cas d'échec (détection de panne confirmée sur 2 contrôles).
-      const obs = !input.error && input.observation ? pageObservationSchema.parse(input.observation) : null;
-      const prev = await previousPageObservation(tx, task.id);
+      const obs = !failure && received ? pageObservationSchema.parse(received) : null;
+      const prev = obs ? await previous(tx, task.id) : null;
       const r = evaluateRule({
         rule,
         prev,
         curr: obs,
-        failure: obs ? null : { code: input.error?.code?.slice(0, 60) ?? "unknown_error", message: input.error?.message?.slice(0, 300) || "Le contrôle a échoué." },
+        failure: obs ? null : { code: failure?.code?.slice(0, 60) ?? "unknown_error", message: failure?.message?.slice(0, 300) || "Le contrôle a échoué." },
         memory: parseMemory(task.ruleState),
         taskName: task.name,
         now,
@@ -124,25 +200,25 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
       evaluation = r.evaluation;
       memory = r.memory;
       observation = obs as unknown as Record<string, unknown> | null;
-    } else if (input.error || !input.observation) {
+    } else if (failure || !received) {
       evaluation = {
         outcome: "error",
         triggered: false,
-        summary: input.error?.message?.slice(0, 300) || "Le contrôle a échoué.",
+        summary: failure?.message?.slice(0, 300) || "Le contrôle a échoué.",
         value: null,
         alert: null,
         changeSummary: null,
-        errorCode: input.error?.code?.slice(0, 60) ?? "unknown_error",
+        errorCode: failure?.code?.slice(0, 60) ?? "unknown_error",
       };
     } else if (job.kind === "page") {
-      const obs = pageObservationSchema.parse(input.observation);
+      const obs = pageObservationSchema.parse(received);
       const cond = pageConditionSchema.parse(task.condition);
       if (cond.type === "rule") throw new Error("règle traitée ci-dessus");
-      const prev = await previousPageObservation(tx, task.id);
+      const prev = await previous(tx, task.id);
       evaluation = evaluatePage(cond, prev, obs, task.name);
       observation = obs as unknown as Record<string, unknown>;
     } else {
-      const obs = webTopicObservationSchema.parse(input.observation);
+      const obs = webTopicObservationSchema.parse(received);
       if (!input.webEvaluation) throw new Error("webEvaluation requise pour une recherche Web");
       evaluation = input.webEvaluation;
       observation = obs as unknown as Record<string, unknown>;

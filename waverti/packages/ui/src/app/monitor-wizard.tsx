@@ -31,6 +31,7 @@ import {
   parseRuleRequest,
   ruleAtoms,
   ruleConditionSchema,
+  supportsBrowserCondition,
   type CreateMonitorInput,
   type PageAnalysis,
   type RuleConditionInput,
@@ -66,7 +67,10 @@ export interface AnalysisResult extends PreviewResult {
   blocks?: PageBlockOption[];
 }
 
+type BrowserMonitoringReading = Pick<PageAnalysis, "price" | "currency" | "availability"> & { observedAt: string };
+
 type CategoryId = NonNullable<RuleConditionInput["category"]>;
+type WizardExecutionMode = "auto" | "browser_only";
 
 interface Goal {
   id: string;
@@ -277,6 +281,33 @@ function intervalOptions(min: number): number[] {
   return [...new Set([min, ...base.filter((m) => m > min)])].sort((a, b) => a - b);
 }
 
+function isAmazonProductUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return /(^|\.)amazon\.(?:com|fr|de|it|es|ca|nl|se|pl|be|ie|in|sg|ae|sa|eg|co\.uk|co\.jp|com\.(?:au|be|br|mx|tr))$/.test(host);
+  } catch {
+    return false;
+  }
+}
+
+function availabilityLabel(value: string | undefined): string | null {
+  switch (value) {
+    case "in_stock": return "Disponible";
+    case "out_of_stock": return "Rupture";
+    case "preorder": return "Précommande";
+    default: return null;
+  }
+}
+
+function browserPageHref(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return /^https?:$/.test(url.protocol) && !url.username && !url.password ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 const STEPS = ["Que surveiller", "Site ou produit", "Changement", "Alertes", "Activation"] as const;
 
 /** Une couleur d'icône par catégorie : repère visuel sans dépendre du texte. */
@@ -304,6 +335,11 @@ export function MonitorWizard({
   upgradeHref,
   businessHref,
   initialCategory,
+  initialUrl,
+  browserExtensionHref,
+  browserMonitoringUrl,
+  browserMonitoringReading,
+  browserMonitoringAvailable = false,
 }: {
   entitlements: WizardEntitlements;
   onPreview: (url: string, cssSelector?: string) => Promise<AnalysisResult>;
@@ -312,6 +348,11 @@ export function MonitorWizard({
   upgradeHref?: string;
   businessHref?: string;
   initialCategory?: CategoryId;
+  initialUrl?: string;
+  browserExtensionHref?: string;
+  browserMonitoringUrl?: string;
+  browserMonitoringReading?: BrowserMonitoringReading;
+  browserMonitoringAvailable?: boolean;
 }) {
   const topicsAllowed = entitlements.maxWebTopics > 0 && entitlements.webIntervalMinutes !== null;
   const [step, setStep] = React.useState(initialCategory ? 1 : 0);
@@ -326,17 +367,24 @@ export function MonitorWizard({
   );
   const [assistant, setAssistant] = React.useState("");
   const [assistantNotes, setAssistantNotes] = React.useState<string[]>([]);
-  const [url, setUrl] = React.useState("");
+  const [url, setUrl] = React.useState(initialUrl ?? "");
+  const [executionMode, setExecutionMode] = React.useState<WizardExecutionMode | null>(
+    browserMonitoringUrl
+      ? browserMonitoringAvailable && initialUrl?.trim() === browserMonitoringUrl ? "browser_only" : "auto"
+      : "auto",
+  );
   const [selector, setSelector] = React.useState("");
   const [preview, setPreview] = React.useState<AnalysisResult | null>(null);
   const [previewing, setPreviewing] = React.useState(false);
+  const [previewAcknowledged, setPreviewAcknowledged] = React.useState(false);
+  const previewRequest = React.useRef(0);
   const [request, setRequest] = React.useState("");
   const [domains, setDomains] = React.useState("");
   const [plan, setPlan] = React.useState<TopicPlan | null>(null);
   const [planning, setPlanning] = React.useState(false);
   const [subject, setSubject] = React.useState("");
   const [requireOfficial, setRequireOfficial] = React.useState(true);
-  const [name, setName] = React.useState("");
+  const [customName, setCustomName] = React.useState<string | null>(null);
   const [notifyEmail, setNotifyEmail] = React.useState(entitlements.emailAlerts);
   const [notifyDesktop, setNotifyDesktop] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
@@ -345,16 +393,19 @@ export function MonitorWizard({
   const [error, setError] = React.useState<string | null>(null);
   const [stepError, setStepError] = React.useState<string | null>(null);
   const headingRef = React.useRef<HTMLHeadingElement>(null);
+  const urlRef = React.useRef<HTMLInputElement>(null);
 
   const cat = category ? CAT.get(category)! : null;
   const goal = cat?.goals.find((g) => g.id === goalId) ?? null;
   const isTopic = !!goal?.topic || category === "news";
+  const name = customName ?? (isTopic ? subject || request : (preview?.observation?.title ?? url)).slice(0, 100);
   const minInterval = isTopic ? (entitlements.webIntervalMinutes ?? 1440) : entitlements.pageIntervalMinutes;
   const [interval, setIntervalValue] = React.useState<number>(minInterval);
   React.useEffect(() => setIntervalValue(minInterval), [minInterval]);
   React.useEffect(() => {
     headingRef.current?.focus();
   }, [step]);
+  React.useEffect(() => setPreviewAcknowledged(false), [url, selector, rule, preview, executionMode, browserMonitoringReading]);
 
   const parsedDomains = domains
     .split(/[,\s]+/)
@@ -395,14 +446,34 @@ export function MonitorWizard({
     }
   }
 
+  function changeUrl(nextUrl: string) {
+    setUrl(nextUrl);
+    if (nextUrl.trim() === url.trim()) return;
+    if (executionMode === "browser_only" && nextUrl.trim() !== browserMonitoringUrl) setExecutionMode("auto");
+    previewRequest.current += 1;
+    setPreview(null);
+    setPreviewing(false);
+  }
+
+  function chooseAnotherProduct() {
+    urlRef.current?.focus();
+    urlRef.current?.select();
+  }
+
   async function analysePage() {
+    const requestId = ++previewRequest.current;
     setPreviewing(true);
     setPreview(null);
-    const r = await onPreview(url.trim(), selector.trim() || undefined);
-    setPreviewing(false);
-    setPreview(r);
-    const o = r.observation;
-    if (o && !name && o.title) setName(o.title.slice(0, 100));
+    try {
+      const result = await onPreview(url.trim(), selector.trim() || undefined);
+      if (requestId === previewRequest.current) setPreview(result);
+    } catch {
+      if (requestId === previewRequest.current) {
+        setPreview({ ok: false, error: { code: "preview_failed", message: "Analyse impossible." } });
+      }
+    } finally {
+      if (requestId === previewRequest.current) setPreviewing(false);
+    }
   }
 
   async function analyseTopic() {
@@ -413,7 +484,6 @@ export function MonitorWizard({
       setPlan(p);
       setSubject(p.condition.subject);
       setRequireOfficial(p.condition.requireOfficial);
-      if (!name) setName(p.condition.subject.slice(0, 100));
     }
   }
 
@@ -431,7 +501,7 @@ export function MonitorWizard({
     const t = validateTarget();
     if (t) return t;
     if (!isTopic && goal?.needsZone && !selector.trim()) return "Choisissez la zone ou l'élément à surveiller (analysez la page, ou saisissez un sélecteur CSS).";
-    return isTopic ? null : ruleProblem(rule);
+    return (isTopic ? null : ruleProblem(rule)) ?? executionProblem;
   }
 
   function next() {
@@ -439,7 +509,6 @@ export function MonitorWizard({
     setStepError(problem);
     if (problem) return;
     if (step === 1) setTargetKind(isTopic ? "topic" : "page");
-    if (step === 2 && !name.trim()) setName((isTopic ? subject || request : (preview?.observation?.title ?? url)).slice(0, 100));
     setStep((s) => Math.min(STEPS.length - 1, s + 1));
   }
 
@@ -448,7 +517,7 @@ export function MonitorWizard({
     setStep((s) => Math.max(0, s - 1));
   }
 
-  function buildInput(): CreateMonitorInput {
+  function buildInput(mode: WizardExecutionMode): CreateMonitorInput {
     const notify = { inapp: true, email: notifyEmail && entitlements.emailAlerts, desktop: notifyDesktop };
     if (isTopic) {
       const intent = goal?.topic ?? plan?.condition.intent ?? "generic";
@@ -470,16 +539,21 @@ export function MonitorWizard({
       renderMode: "auto",
       condition: ruleConditionSchema.parse({ type: "rule", ...rule, category: category ?? "custom" }),
       intervalMinutes: interval,
-      executionMode: "cloud_only",
+      executionMode: mode,
       notify,
     };
   }
 
   async function create() {
     setError(null);
+    const problem = validateChange();
+    if (problem || !executionMode) {
+      setError(problem ?? "Le mode automatique n’est pas disponible pour cette surveillance.");
+      return;
+    }
     let input: CreateMonitorInput;
     try {
-      input = buildInput();
+      input = buildInput(executionMode);
     } catch {
       setError("La règle n'est pas valide : revenez à l'étape précédente.");
       return;
@@ -492,8 +566,46 @@ export function MonitorWizard({
 
   const obs = preview?.observation;
   const analysis = preview?.analysis;
-  const ruleLines = !isTopic && !ruleProblem(rule) ? describeRule(ruleConditionSchema.parse({ type: "rule", ...rule })) : [];
-  const usesUptime = ruleAtoms({ conditions: rule.conditions, groups: rule.groups }).some((a) => a.type === "site_down" || a.type === "slow_response");
+  const chromeReading = browserMonitoringAvailable && url.trim() === browserMonitoringUrl ? browserMonitoringReading : undefined;
+  const browserOnly = executionMode === "browser_only";
+  const separateServerPreview = browserOnly || Boolean(chromeReading);
+  const serverPriceDetected = obs?.price != null && Boolean(obs.currency);
+  const stockLabel = availabilityLabel(obs?.availability);
+  const chromeStockLabel = availabilityLabel(chromeReading?.availability);
+  const chromePriceDetected = chromeReading?.price != null && Boolean(chromeReading.currency);
+  const atoms = ruleAtoms({ conditions: rule.conditions, groups: rule.groups });
+  const needsPrice = atoms.some((atom) => atom.type.startsWith("price_") || atom.type === "promotion");
+  const needsStock = atoms.some((atom) => atom.type === "stock_is" || atom.type === "stock_changed");
+  const missingPrice = needsPrice && !(browserOnly ? chromePriceDetected : serverPriceDetected);
+  const missingStock = needsStock && !(browserOnly ? chromeStockLabel : stockLabel);
+  const missingSignals = [missingPrice ? "le prix et sa devise" : null, missingStock ? "la disponibilité" : null]
+    .filter(Boolean)
+    .join(" et ");
+  const missingPreviewSignals = [
+    !serverPriceDetected && (category === "price" || needsPrice) ? "le prix et sa devise" : null,
+    !stockLabel && (category === "price" || category === "product" || needsStock) ? "la disponibilité" : null,
+  ].filter(Boolean).join(" et ");
+  const completedPreview = browserOnly ? Boolean(chromeReading) : preview !== null && !previewing;
+  const needsPreviewConfirmation = !isTopic && completedPreview && Boolean(missingSignals);
+  const showProductFallback = !browserOnly && preview !== null && !previewing && Boolean(missingPreviewSignals);
+  const browserPage = showProductFallback && browserExtensionHref ? browserPageHref(url) : null;
+  const verificationLabel = separateServerPreview ? "Vérifier depuis les serveurs" : "Vérifier la page";
+  const detectedElements = category === "price" ? stockLabel ?? "Non détectée sur la page" : [
+    analysis?.items.length ? `${analysis.items.length}+ éléments de liste` : null,
+    analysis?.documents.length ? `${analysis.documents.length} document(s)` : null,
+    analysis?.futureDates.length ? `${analysis.futureDates.length} date(s) à venir` : null,
+    analysis?.signupForm ? "formulaire d'inscription" : null,
+    stockLabel ? `stock : ${stockLabel.toLowerCase()}` : null,
+  ].filter(Boolean).join(" · ") || "contenu textuel";
+  const parsedRule = !isTopic && !ruleProblem(rule) ? ruleConditionSchema.parse({ type: "rule", ...rule }) : null;
+  const ruleLines = parsedRule ? describeRule(parsedRule) : [];
+  const browserUnavailable =
+    !browserMonitoringAvailable ? "Reliez et activez l’extension Chrome dans votre compte."
+      : url.trim() !== browserMonitoringUrl ? "Autorisez cette adresse exacte depuis l’extension Chrome."
+        : !parsedRule || !supportsBrowserCondition(parsedRule) ? "Chrome peut suivre le prix ou le stock d’un produit."
+          : selector.trim() ? "Chrome lit la fiche entière. Retirez le sélecteur CSS pour utiliser ce mode." : null;
+  const executionProblem = executionMode === "browser_only" ? browserUnavailable : null;
+  const usesUptime = atoms.some((a) => a.type === "site_down" || a.type === "slow_response");
   const needsOtherTarget = step === 2 && targetKind !== null && targetKind !== (isTopic ? "topic" : "page");
 
   /** Saisie de la cible : une adresse (page, produit) ou un sujet à rechercher sur Internet. */
@@ -523,20 +635,58 @@ export function MonitorWizard({
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <Field id="wz-url" label="Adresse de la page" required hint="Copiez l'adresse depuis votre navigateur (elle commence par https://)." className="flex-1">
-          {(p) => <Input {...p} type="url" inputMode="url" placeholder="https://www.exemple.fr/…" value={url} onChange={(e) => setUrl(e.target.value)} />}
+          {(p) => <Input {...p} ref={urlRef} type="url" inputMode="url" placeholder="https://www.exemple.fr/…" value={url} onChange={(e) => changeUrl(e.target.value)} />}
         </Field>
-        <Button type="button" variant="secondary" onClick={analysePage} loading={previewing} disabled={!/^https?:\/\/.+\..+/.test(url.trim())}>
-          <ScanSearch aria-hidden="true" /> Vérifier la page
-        </Button>
+        {!chromeReading ? (
+          <Button type="button" variant="secondary" onClick={analysePage} loading={previewing} disabled={!/^https?:\/\/.+\..+/.test(url.trim())}>
+            <ScanSearch aria-hidden="true" /> {verificationLabel}
+          </Button>
+        ) : null}
       </div>
-      {previewing ? <div className="skeleton h-20 rounded-xl" aria-label="Analyse en cours" /> : null}
-      {preview?.error ? (
-        <Callout tone="warning" title="Cette page n'a pas pu être lue" role="status">
-          {preview.error.message} Vous pouvez tout de même continuer : Waverti réessaiera à chaque vérification.
+      {chromeReading ? (
+        <Callout tone="info" title="Relevé ponctuel de Chrome" role="status">
+          <dl className="mb-2 grid gap-3 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs">Prix dans Chrome</dt>
+              <dd className="font-medium">{chromeReading.price !== null && chromeReading.currency ? formatPrice(chromeReading.price, chromeReading.currency) : "Non détecté"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs">Disponibilité dans Chrome</dt>
+              <dd className="font-medium">{chromeStockLabel ?? "Non détectée"}</dd>
+            </div>
+          </dl>
+          <p className="text-xs">
+            Relevé à <time dateTime={chromeReading.observedAt}>{new Date(chromeReading.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</time>.
+            Le suivi automatique utilisera ses propres contrôles après l’activation.
+          </p>
         </Callout>
       ) : null}
-      {obs ? (
-        <div className="grid gap-3 rounded-xl border border-success/20 bg-tint-green p-4 sm:grid-cols-3" role="status" aria-live="polite">
+      {previewing ? <div className="skeleton h-20 rounded-xl" aria-label={separateServerPreview ? "Analyse des serveurs en cours" : "Analyse en cours"} /> : null}
+      {preview?.error ? (
+        <Callout tone="warning" title={separateServerPreview ? "Vérification ponctuelle côté serveur indisponible" : "Cette page n'a pas pu être lue"} role="status">
+          {preview.error.message} {separateServerPreview
+            ? "Ce test est indépendant du relevé Chrome."
+            : "Vous pouvez tout de même continuer : Waverti réessaiera à chaque vérification."}
+        </Callout>
+      ) : null}
+      {obs && separateServerPreview ? (
+        <Callout tone="neutral" title="Vérification ponctuelle par les serveurs" role="status">
+          <p>
+            Prix côté serveur {obs.price !== null && obs.currency ? formatPrice(obs.price, obs.currency) : "non détecté"}.
+            {" "}Disponibilité côté serveur {(stockLabel ?? "non détectée").toLowerCase()}.
+          </p>
+          <p className="mt-1 text-xs">Ce test est indépendant du relevé Chrome.</p>
+        </Callout>
+      ) : obs ? (
+        <div
+          className={cn(
+            "grid gap-3 rounded-xl border p-4",
+            missingPreviewSignals ? "border-line bg-surface" : "border-success/20 bg-tint-green",
+            detectedElements ? "sm:grid-cols-3" : "sm:grid-cols-2",
+          )}
+          role="status"
+          aria-live="polite"
+        >
           <div className="min-w-0">
             <p className="text-xs text-ink-soft">{analysis?.contentKind === "pdf" ? "Document trouvé" : "Page trouvée"}</p>
             <p className="truncate text-sm font-medium">{obs.title ?? "Sans titre"}</p>
@@ -544,25 +694,61 @@ export function MonitorWizard({
           <div>
             <p className="text-xs text-ink-soft">Prix repéré</p>
             <p className="font-display text-base font-semibold">
-              {obs.price !== null ? formatPrice(obs.price, obs.currency ?? "EUR") : "Aucun"}
-              {analysis?.regularPrice ? <span className="ml-2 text-xs font-normal text-ink-soft line-through">{formatPrice(analysis.regularPrice, obs.currency ?? "EUR")}</span> : null}
+              {obs.price === null ? "Non détecté" : obs.currency ? formatPrice(obs.price, obs.currency) : "Devise non détectée"}
+              {obs.price !== null && obs.currency && analysis?.regularPrice && analysis.regularPrice > obs.price ? (
+                <span className="ml-2 text-xs font-normal text-ink-soft line-through">{formatPrice(analysis.regularPrice, obs.currency)}</span>
+              ) : null}
             </p>
           </div>
-          <div>
-            <p className="text-xs text-ink-soft">Autres éléments repérés</p>
-            <p className="text-sm">
-              {[
-                analysis?.items.length ? `${analysis.items.length}+ éléments de liste` : null,
-                analysis?.documents.length ? `${analysis.documents.length} document(s)` : null,
-                analysis?.futureDates.length ? `${analysis.futureDates.length} date(s) à venir` : null,
-                analysis?.signupForm ? "formulaire d'inscription" : null,
-                obs.availability !== "unknown" ? `stock : ${obs.availability === "in_stock" ? "disponible" : obs.availability === "out_of_stock" ? "rupture" : "précommande"}` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ") || "contenu textuel"}
-            </p>
-          </div>
+          {detectedElements ? (
+            <div>
+              <p className="text-xs text-ink-soft">{category === "price" ? "Disponibilité" : "Autres éléments repérés"}</p>
+              <p className="text-sm">{detectedElements}</p>
+            </div>
+          ) : null}
         </div>
+      ) : null}
+      {showProductFallback ? (
+        <Callout tone="warning" title={separateServerPreview ? "Données manquantes côté serveur" : "Données de la fiche incomplètes"}>
+          <p>
+            {isAmazonProductUrl(obs?.finalUrl ?? url)
+              ? obs
+                ? "La version de la fiche Amazon reçue par Waverti est incomplète."
+                : "Waverti n’a pas pu lire cette fiche Amazon."
+              : "Waverti n’a pas trouvé toutes les données sur cette fiche."}{" "}
+            Impossible de confirmer {missingPreviewSignals}.
+          </p>
+          <p className="mt-2">
+            Collez l’adresse directe du produit chez le vendeur, puis cliquez sur « {verificationLabel} ». Une fiche d’un autre
+            vendeur correspond à une offre différente.
+          </p>
+          <Button type="button" variant="secondary" size="sm" className="mt-3" onClick={chooseAnotherProduct}>
+            Vérifier une autre fiche
+          </Button>
+          {browserExtensionHref ? (
+            <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">
+              <p className="font-medium">Le prix ou le stock est visible dans Chrome ?</p>
+              <p>
+                Ouvrez la fiche dans Chrome et reliez l’extension Waverti à votre compte. Dans l’extension, activez les contrôles,
+                puis cliquez sur « Autoriser cette page et ouvrir Waverti ». Vous pourrez ensuite activer la surveillance dans Waverti.
+              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                <a className="font-medium text-blue underline underline-offset-4" href={browserExtensionHref} download>
+                  Télécharger l’extension Chrome
+                </a>
+                {browserPage ? (
+                  <a className="font-medium text-blue underline underline-offset-4" href={browserPage} target="_blank" rel="noreferrer">
+                    Ouvrir la fiche
+                  </a>
+                ) : null}
+              </div>
+              <details>
+                <summary className="cursor-pointer">Installer l’extension</summary>
+                <p className="mt-2">Décompressez le fichier, ouvrez chrome://extensions, activez le mode développeur, puis choisissez « Charger l’extension non empaquetée ». Sélectionnez le dossier décompressé et connectez-vous à Waverti dans Chrome.</p>
+              </details>
+            </div>
+          ) : null}
+        </Callout>
       ) : null}
     </div>
   );
@@ -757,7 +943,7 @@ export function MonitorWizard({
             </div>
           ) : (
             <div className="flex flex-col gap-5">
-              {preview?.suggestions?.length ? (
+              {!browserOnly && preview?.suggestions?.length ? (
                 <div className="flex flex-col gap-2">
                   <p className="text-sm font-medium">Idées pour cette page</p>
                   <div className="flex flex-wrap gap-2">
@@ -786,7 +972,7 @@ export function MonitorWizard({
                 <summary className="cursor-pointer text-sm font-medium">Options avancées : surveiller une partie précise de la page</summary>
                 <div className="mt-4 flex flex-col gap-4">
                   {!preview ? (
-                    <p className="text-sm text-ink-soft">Utilisez « Vérifier la page » à l'étape précédente pour obtenir la liste des zones repérées, ou indiquez la zone vous-même ci-dessous.</p>
+                    <p className="text-sm text-ink-soft">Utilisez « {verificationLabel} » à l'étape précédente pour obtenir la liste des zones repérées, ou indiquez la zone vous-même ci-dessous.</p>
                   ) : null}
                   {preview?.blocks?.length ? (
                     <div className="flex flex-col gap-2">
@@ -808,6 +994,12 @@ export function MonitorWizard({
               </details>
             </div>
           )}
+          {!goal?.business && !isTopic ? (
+            <Callout tone="info" title="Contrôle automatique">
+              Waverti utilise d’abord votre ordinateur ou l’extension Chrome quand ils peuvent lire cette page. Si le contrôle local n’est pas disponible, les serveurs Waverti prennent le relais selon votre formule.
+              {executionMode === "browser_only" && browserUnavailable ? <span className="mt-1 block">{browserUnavailable}</span> : null}
+            </Callout>
+          ) : null}
           {stepError_}
           {nav({ onBack: back, onNext: next, disabled: !!goal?.business })}
         </section>
@@ -885,12 +1077,33 @@ export function MonitorWizard({
             <dd className="text-sm">{["dans Waverti", notifyEmail && entitlements.emailAlerts ? "par e-mail" : null, notifyDesktop ? "sur votre ordinateur" : null].filter(Boolean).join(", ")}</dd>
             <dt className="text-sm text-ink-soft">Vérification</dt>
             <dd className="text-sm">
-              {formatInterval(interval).replace(/^./, (c) => c.toUpperCase())} — {isTopic ? "par les serveurs Waverti (recherche Internet)." : "par les serveurs Waverti, même quand votre ordinateur est éteint."}
+              {formatInterval(interval).replace(/^./, (c) => c.toUpperCase())} — {isTopic
+                ? "par les serveurs Waverti (recherche Internet)."
+                : executionMode === "browser_only"
+                  ? "d’abord dans Chrome, puis côté serveur si nécessaire."
+                  : "d’abord sur votre ordinateur, puis côté serveur si nécessaire."}
             </dd>
           </dl>
           <Field id="wz-name" label="Nom de la surveillance" required hint="Pour la retrouver facilement dans votre liste.">
-            {(p) => <Input {...p} value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />}
+            {(p) => <Input {...p} value={name} maxLength={120} onChange={(e) => setCustomName(e.target.value)} />}
           </Field>
+          {!isTopic && missingSignals ? (
+            <Callout tone="warning" title="Données de surveillance non confirmées">
+              {browserOnly ? "Le relevé Chrome n’a pas confirmé" : "Waverti n’a pas encore pu confirmer"} {missingSignals}.
+              Vous pouvez activer la surveillance. Les conditions
+              concernées seront évaluées dès qu’un contrôle détectera les données nécessaires.
+            </Callout>
+          ) : null}
+          {needsPreviewConfirmation ? (
+            <label className="flex items-start gap-3 rounded-xl border border-line bg-surface p-4 text-sm">
+              <Checkbox
+                checked={previewAcknowledged}
+                onCheckedChange={(checked) => setPreviewAcknowledged(checked === true)}
+                className="mt-0.5"
+              />
+              <span>J’active cette surveillance même si les données nécessaires n’ont pas été confirmées.</span>
+            </label>
+          ) : null}
           <Callout tone="neutral" title="Bon à savoir">
             Cette surveillance compte pour une seule surveillance sur les {entitlements.maxMonitors} de votre formule, même avec plusieurs conditions. Les vérifications ne peuvent pas être plus rapides que celles de votre formule.
             {isTopic ? " Chaque vérification utilise des recherches de votre quota mensuel." : ""}
@@ -913,7 +1126,7 @@ export function MonitorWizard({
             <Button type="button" variant="ghost" onClick={back}>
               <ArrowLeft aria-hidden="true" /> Retour
             </Button>
-            <Button type="button" size="lg" onClick={create} loading={submitting} disabled={!name.trim() || !entitlements.planName}>
+            <Button type="button" size="lg" onClick={create} loading={submitting} disabled={!name.trim() || !entitlements.planName || (needsPreviewConfirmation && !previewAcknowledged)}>
               {entitlements.planName ? "Activer la surveillance" : "Abonnement requis"}
             </Button>
           </div>

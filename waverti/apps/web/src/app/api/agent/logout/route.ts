@@ -9,4 +9,4 @@ export const POST = withDevice(async (_req, device) => {
     .set({ status: "revoked", revokedAt: new Date(), monitoringEnabled: false })
     .where(eq(agentDevices.id, device.deviceId));
   return noStore({ ok: true });
-});
+}, { allowChrome: true });

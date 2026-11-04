@@ -35,6 +35,60 @@ describe("parsePrice", () => {
 });
 
 describe("extractPage", () => {
+  it.each([
+    ["1 881,00 €", 1881],
+    ["10,00 €", 10],
+    [null, null],
+  ])("uses the Amazon purchase box rather than site-wide prices (%s)", (purchasePrice, expected) => {
+    const url = "https://www.amazon.fr/Produit/dp/B0D9HXTGVS";
+    const purchaseBox = purchasePrice
+      ? `<div id="corePrice_feature_div"><span class="a-price apex-pricetopay-value"><span class="a-offscreen">${purchasePrice}</span></span></div><div id="availability">En stock</div>`
+      : "";
+    const html = page(`<aside>Carte cadeau de 10,00 € — articles en rupture de stock</aside>${purchaseBox}`);
+    expect(extractPage({ html, url, finalUrl: url, httpStatus: 200, method: "http" })).toMatchObject({
+      price: expected,
+      currency: expected === null ? null : "EUR",
+      availability: expected === null ? "unknown" : "in_stock",
+    });
+  });
+
+  it("reads an Amazon purchase price from its split digits when accessible text is empty", () => {
+    const url = "https://www.amazon.fr/dp/B0D9HXTGVS";
+    const html = page(`<div id="corePriceDisplay_desktop_feature_div">
+      <span class="a-price priceToPay"><span class="a-offscreen"></span><span class="a-price-whole">1 881,</span><span class="a-price-fraction">50</span><span class="a-price-symbol">€</span></span>
+      <span class="a-price a-text-price"><span class="a-offscreen">2 099,99 €</span></span>
+    </div>`);
+    expect(extractPage({ html, url, finalUrl: url, httpStatus: 200, method: "http" })).toMatchObject({
+      price: 1881.5,
+      currency: "EUR",
+    });
+  });
+
+  it("does not infer Amazon stock from recommendations or contradictory purchase signals", () => {
+    const url = "https://www.amazon.fr/dp/B0D9HXTGVS";
+    const observe = (body: string) => extractPage({ html: page(body), url, finalUrl: url, httpStatus: 200, method: "http" });
+    expect(observe('<aside>En stock</aside><div id="availability"></div><div id="outOfStock">Actuellement indisponible</div>')).toMatchObject({
+      availability: "out_of_stock",
+    });
+    expect(observe('<div id="availability" hidden>En stock</div><div id="outOfStock">Actuellement indisponible</div>')).toMatchObject({
+      availability: "out_of_stock",
+    });
+    expect(observe('<div id="availability">En stock</div><div id="outOfStock">Actuellement indisponible</div>')).toMatchObject({
+      availability: "unknown",
+      fieldEvidence: { availability: { status: "contradictory" } },
+    });
+  });
+
+  it("does not turn incomplete or contradictory Amazon purchase prices into a verified price", () => {
+    const url = "https://www.amazon.fr/dp/B0D9HXTGVS";
+    const observe = (body: string) => extractPage({ html: page(body), url, finalUrl: url, httpStatus: 200, method: "http", cssSelector: "#delivery" });
+    expect(observe('<div id="corePrice_feature_div"><span class="a-price priceToPay"><span class="a-price-fraction">50</span><span class="a-price-symbol">€</span></span></div>')).toMatchObject({ price: null });
+    expect(observe('<p id="delivery">Livré le 10</p><div id="corePrice_feature_div"><span class="a-price priceToPay"><span class="a-offscreen">129,99 €</span></span><span class="a-price priceToPay"><span class="a-offscreen">149,99 €</span></span></div>')).toMatchObject({
+      price: null,
+      fieldEvidence: { price: { status: "contradictory" } },
+    });
+  });
+
   it("reads price and availability from JSON-LD (including @graph and AggregateOffer)", () => {
     const ld = {
       "@context": "https://schema.org",
@@ -45,6 +99,42 @@ describe("extractPage", () => {
     };
     const obs = extract(page(`<p>Autre prix 12 €</p>`, `<script type="application/ld+json">${JSON.stringify(ld)}</script>`));
     expect(obs).toMatchObject({ price: 789, currency: "EUR", priceSource: "jsonld", availability: "in_stock", availabilitySource: "jsonld" });
+  });
+
+  it("reads the current nested price and currency without taking shipping or an old price", () => {
+    const offer = {
+      "@type": "Offer",
+      availability: "InStock",
+      priceSpecification: [
+        { "@type": "DeliveryChargeSpecification", price: "10.00", priceCurrency: "EUR" },
+        { "@type": "UnitPriceSpecification", priceType: "https://schema.org/StrikethroughPrice", price: "149.99", priceCurrency: "EUR" },
+        { "@type": "UnitPriceSpecification", price: "129.99", priceCurrency: "EUR" },
+      ],
+    };
+    const html = page("<p>Livraison 10 €</p>", `<script type="application/ld+json">${JSON.stringify(offer)}</script>`);
+    expect(extract(html)).toMatchObject({ price: 129.99, currency: "EUR", priceSource: "jsonld", availability: "in_stock" });
+  });
+
+  it("reports conflicting structured stock values instead of picking the first", () => {
+    const offers = ["InStock", "OutOfStock"].map((availability) => ({
+      "@type": "Offer", price: 129.99, priceCurrency: "EUR", availability,
+    }));
+    const html = page("", `<script type="application/ld+json">${JSON.stringify(offers)}</script>`);
+    expect(extract(html)).toMatchObject({
+      price: 129.99,
+      availability: "unknown",
+      fieldEvidence: { availability: { status: "contradictory" } },
+    });
+  });
+
+  it("does not fall back to a delivery charge when a structured offer has no product price", () => {
+    const offer = {
+      "@type": "Offer",
+      availability: "InStock",
+      priceSpecification: { "@type": "DeliveryChargeSpecification", price: 10, priceCurrency: "EUR" },
+    };
+    const html = page("<p>Livraison 10 €</p>", `<script type="application/ld+json">${JSON.stringify(offer)}</script>`);
+    expect(extract(html)).toMatchObject({ price: null, currency: null, availability: "in_stock" });
   });
 
   it("reads microdata, then meta tags", () => {

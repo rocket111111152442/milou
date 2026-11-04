@@ -243,7 +243,7 @@ export const agentDevices = pgTable("agent_devices", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull(),
   name: text("name").notNull(),
-  platform: text("platform").$type<"windows" | "macos" | "linux">().notNull(),
+  platform: text("platform").$type<"windows" | "macos" | "linux" | "chrome">().notNull(),
   appVersion: text("app_version"),
   tokenHash: text("token_hash").notNull(),
   status: text("status").$type<"active" | "revoked">().notNull(),
@@ -261,7 +261,7 @@ export const agentLinkRequests = pgTable("agent_link_requests", {
   deviceCodeHash: text("device_code_hash").notNull(),
   userCode: text("user_code").notNull(),
   deviceName: text("device_name").notNull(),
-  platform: text("platform").$type<"windows" | "macos" | "linux">().notNull(),
+  platform: text("platform").$type<"windows" | "macos" | "linux" | "chrome">().notNull(),
   appVersion: text("app_version"),
   status: text("status").$type<"pending" | "approved" | "denied" | "consumed" | "expired">().notNull(),
   userId: uuid("user_id"),
@@ -284,7 +284,7 @@ export const agentHeartbeats = pgTable("agent_heartbeats", {
 
 export type TaskKind = "page" | "web_topic";
 export type TaskStatus = "active" | "paused" | "paused_quota" | "error";
-export type ExecutionMode = "auto" | "local_only" | "cloud_only";
+export type ExecutionMode = "auto" | "local_only" | "cloud_only" | "browser_only";
 
 export const monitoringTasks = pgTable("monitoring_tasks", {
   id: uuid("id").primaryKey().defaultRandom(),

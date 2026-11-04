@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Relevé Waverti</title>
+    <link rel="stylesheet" href="popup.css">
+    <script type="module" src="popup.js"></script>
+  </head>
+  <body>
+    <main>
+      <header class="brand">
+        <img src="32x32.png" alt="" width="32" height="32">
+        <div>
+          <h1>Waverti</h1>
+          <p>Surveiller cette page</p>
+        </div>
+        <button type="button" id="open-dashboard" class="icon-button" title="Ouvrir Waverti" aria-label="Ouvrir Waverti">↗</button>
+      </header>
+      <section class="current-page" aria-label="Page courante">
+        <div class="page-icon">◎</div>
+        <div class="page-copy">
+          <strong id="page-title">Aucune page sélectionnée</strong>
+          <span id="page-host">Ouvre une fiche produit ou une page Web</span>
+        </div>
+        <span id="page-state" class="state-pill">Prêt</span>
+      </section>
+      <section class="quick-action" aria-label="Ajouter une page">
+        <button type="button" id="capture" class="primary"><span class="button-icon">＋</span> Ajouter la page ouverte</button>
+        <div class="or"><span>ou</span></div>
+        <form id="paste">
+          <label for="page-url">Coller un lien</label>
+          <div class="url-row">
+            <input id="page-url" type="url" maxlength="2048" placeholder="https://…" autocomplete="off" required>
+            <button type="submit" aria-label="Ouvrir le lien">→</button>
+          </div>
+        </form>
+      </section>
+      <p role="status" id="status"></p>
+      <section class="automation" aria-labelledby="monitoring-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="monitoring-title">Contrôle automatique</h2>
+            <p>Prix et stock, sans y penser.</p>
+          </div>
+          <span class="live-dot" aria-hidden="true"></span>
+        </div>
+        <p id="monitoring-status" role="status">Vérification de la liaison…</p>
+        <div id="monitoring-actions">
+          <button type="button" id="pair" hidden>Relier ce navigateur</button>
+          <button type="button" id="verify-link" hidden>Ouvrir la validation dans Waverti</button>
+          <button type="button" id="poll" hidden>J’ai approuvé la liaison</button>
+          <button type="button" id="enable" hidden>Accepter et activer les contrôles</button>
+          <button type="button" id="pause" hidden>Suspendre les contrôles</button>
+          <button type="button" id="authorize" hidden>Autoriser cette page et ouvrir Waverti</button>
+          <button type="button" id="unlink" hidden>Délier le navigateur</button>
+        </div>
+        <details id="sites-details">
+          <summary>Pages autorisées</summary>
+          <ul id="authorized-sites"></ul>
+        </details>
+      </section>
+      <footer><small id="extension-version"></small><span>Local d’abord · relais serveur</span></footer>
+    </main>
+  </body>
+</html>
