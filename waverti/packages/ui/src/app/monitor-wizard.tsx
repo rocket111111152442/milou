@@ -913,8 +913,8 @@ export function MonitorWizard({
             <Button type="button" variant="ghost" onClick={back}>
               <ArrowLeft aria-hidden="true" /> Retour
             </Button>
-            <Button type="button" size="lg" onClick={create} loading={submitting} disabled={!name.trim()}>
-              Activer la surveillance
+            <Button type="button" size="lg" onClick={create} loading={submitting} disabled={!name.trim() || !entitlements.planName}>
+              {entitlements.planName ? "Activer la surveillance" : "Abonnement requis"}
             </Button>
           </div>
         </section>
