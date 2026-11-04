@@ -153,8 +153,10 @@ test.describe("animation d'achat validé", () => {
   test("boîte de dialogue accessible : titre, focus, Échap, durée de l'essai", async ({ page }) => {
     const u = await createConfirmedUser(uniqueEmail("celebrate"), { plan: "pro", status: "trialing" });
     await signIn(page, u.email);
-    const res = await page.goto("/app/abonnement/apercu-achat");
-    test.skip(res?.status() === 404, "outil de recette désactivé sur cet environnement (WAVERTI_BILLING_TEST_TOOLS)");
+    await page.goto("/app/abonnement/apercu-achat");
+    // Désactivé hors recette (comme en Production) : la page « introuvable » peut être servie avec un statut 200 (réponse en flux).
+    const enabled = (await page.getByText("Aperçu de l'animation d'achat validé").count()) > 0;
+    test.skip(!enabled, "outil de recette désactivé sur cet environnement (WAVERTI_BILLING_TEST_TOOLS)");
     const dialog = page.getByRole("dialog", { name: "Achat validé !" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(/essai gratuit de 3 jours/)).toBeVisible();
