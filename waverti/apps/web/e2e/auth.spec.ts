@@ -50,7 +50,8 @@ test.describe("authentification (comptes Waverti réels)", () => {
     await page.getByLabel("Nouveau mot de passe").fill(next);
     await page.getByLabel("Confirmez le mot de passe").fill(next);
     await page.getByRole("button", { name: "Enregistrer le mot de passe" }).click();
-    await expect(page).toHaveURL(/\/app/);
+    // URL finale (le compte n'a pas de formule : /app redirige vers l'abonnement) : évite de naviguer pendant une redirection en cours.
+    await expect(page).toHaveURL(/\/app\/abonnement/);
     await page.context().clearCookies();
     await login(page, email, next);
     await expect(page).toHaveURL(/\/app/);
