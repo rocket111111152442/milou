@@ -96,7 +96,9 @@ export function decideExecutor(input: {
 }): { preferred: "agent" | "cloud"; allowAgent: boolean; allowCloud: boolean } {
   // Les recherches Web utilisent des API payantes dont les clés restent sur le serveur.
   if (input.kind === "web_topic") return { preferred: "cloud", allowAgent: false, allowCloud: true };
-  if (input.executionMode === "browser_only") return { preferred: "agent", allowAgent: true, allowCloud: false };
+  // Chrome reste prioritaire pour les fiches autorisées, mais le serveur peut reprendre
+  // le contrôle lorsque l’extension est fermée ou que la page bloque la lecture locale.
+  if (input.executionMode === "browser_only") return { preferred: "agent", allowAgent: true, allowCloud: input.cloudRelay };
   if (!input.cloudRelay || input.executionMode === "local_only") return { preferred: "agent", allowAgent: true, allowCloud: false };
   if (input.executionMode === "cloud_only") return { preferred: "cloud", allowAgent: false, allowCloud: true };
   return input.agentOnline
@@ -143,7 +145,7 @@ export async function scheduleDueTasks(db: Database, opts: ScheduleOptions = {})
       const slot = new Date(d.next_run_at);
       // Agent seul (Découverte / local_only) : le PC a jusqu'au créneau suivant pour exécuter le contrôle.
       // Chrome prépare son prochain contrôle à la connexion. Un seul créneau reste en attente hors ligne.
-      const deadline = d.execution_mode === "browser_only" ? null : decision.allowCloud
+      const deadline = decision.allowCloud
         ? new Date(slot.getTime() + grace * 1000)
         : new Date(slot.getTime() + d.interval_minutes * 60_000);
       const inserted = await tx.execute<{ id: string }>(sql`
@@ -286,7 +288,6 @@ export async function claimCloudJobs(
         and (j.kind = 'web_topic' or en.cloud_relay)
       where j.status = 'pending' and j.allow_cloud and j.slot_at <= ${tsParam(now)} and j.kind in ${kinds}
         and t.status in ('active', 'error')
-        and t.execution_mode <> 'browser_only'
         and (j.preferred_executor = 'cloud' or j.agent_deadline_at <= ${tsParam(now)})
       order by j.priority, j.slot_at
       limit ${Math.max(1, params.max)}
@@ -328,7 +329,7 @@ export async function enqueueImmediate(
     const [ent] = await tx.select({ cloudRelay: entitlements.cloudRelay }).from(entitlements).where(eq(entitlements.userId, params.userId));
     const online = await onlineAgentUsers(tx, [params.userId], now);
     const d = decideExecutor({ kind: task.kind, executionMode: task.execution_mode, cloudRelay: ent?.cloudRelay ?? false, agentOnline: online.has(params.userId) });
-    const deadline = task.execution_mode === "browser_only" ? null : d.allowCloud
+    const deadline = d.allowCloud
       ? new Date(now.getTime() + (params.agentGraceSeconds ?? 120) * 1000)
       : new Date(now.getTime() + task.interval_minutes * 60_000);
     const r = await tx.execute<{ id: string }>(sql`

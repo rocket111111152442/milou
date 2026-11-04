@@ -17,7 +17,7 @@ const EXEC_LABEL = {
   auto: "Ordinateur en priorité, serveurs en relais",
   local_only: "Uniquement sur votre ordinateur",
   cloud_only: "Uniquement sur les serveurs Waverti",
-  browser_only: "Uniquement dans Chrome",
+  browser_only: "Chrome en priorité, serveurs en relais",
 } as const;
 const CLASS_TONE = { confirmed: "success", probable: "info", rumor: "warning", irrelevant: "neutral" } as const;
 
@@ -82,8 +82,8 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
       ) : null}
       {browserOnly ? (
         <Callout tone="info" title="Contrôles dans Chrome">
-          Chrome doit être ouvert, avec l’extension active et l’autorisation pour cette adresse. Les serveurs Waverti
-          ne prennent pas le relais.{" "}
+          Chrome est utilisé en priorité avec l’extension active et l’autorisation pour cette adresse. Si Chrome est indisponible,
+          les serveurs Waverti prennent le relais selon votre formule.{" "}
           <Link className="font-medium underline" href="/app/parametres#appareils">Gérer les appareils</Link>
         </Callout>
       ) : null}
@@ -93,7 +93,7 @@ export default async function MonitorDetailPage({ params }: { params: Promise<{ 
           label="Où en est cette surveillance ?"
           icon={<CheckCircle2 />}
           tone={browserOffline ? "amber" : task.status === "error" || task.lastStatus === "error" ? "red" : task.status === "active" && !browserWaiting ? "green" : "amber"}
-          value={<span className="text-lg">{browserOffline ? "En attente de Chrome" : task.status === "error" || task.lastStatus === "error" ? "Un problème est survenu" : browserWaiting ? "Premier contrôle en attente" : task.status === "active" ? (task.lastStatus === "triggered" ? "Alerte envoyée" : "Tout va bien") : task.status === "paused" ? "En pause" : "Suspendue"}</span>}
+          value={<span className="text-lg">{task.status === "error" || task.lastStatus === "error" ? "Un problème est survenu" : browserWaiting ? "Premier contrôle en attente" : task.status === "active" ? (task.lastStatus === "triggered" ? "Alerte envoyée" : "Tout va bien") : task.status === "paused" ? "En pause" : "Suspendue"}</span>}
         />
         <StatTile label="Dernier contrôle" icon={<Activity />} tone="blue" value={<span className="text-lg">{task.lastCheckedAt ? formatRelative(task.lastCheckedAt.toISOString()) : "Pas encore"}</span>} />
         <StatTile

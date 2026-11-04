@@ -70,7 +70,7 @@ export interface AnalysisResult extends PreviewResult {
 type BrowserMonitoringReading = Pick<PageAnalysis, "price" | "currency" | "availability"> & { observedAt: string };
 
 type CategoryId = NonNullable<RuleConditionInput["category"]>;
-type WizardExecutionMode = "cloud_only" | "browser_only";
+type WizardExecutionMode = "auto" | "browser_only";
 
 interface Goal {
   id: string;
@@ -370,10 +370,9 @@ export function MonitorWizard({
   const [url, setUrl] = React.useState(initialUrl ?? "");
   const [executionMode, setExecutionMode] = React.useState<WizardExecutionMode | null>(
     browserMonitoringUrl
-      ? browserMonitoringAvailable && initialUrl?.trim() === browserMonitoringUrl ? "browser_only" : null
-      : "cloud_only",
+      ? browserMonitoringAvailable && initialUrl?.trim() === browserMonitoringUrl ? "browser_only" : "auto"
+      : "auto",
   );
-  const executionGroup = React.useId();
   const [selector, setSelector] = React.useState("");
   const [preview, setPreview] = React.useState<AnalysisResult | null>(null);
   const [previewing, setPreviewing] = React.useState(false);
@@ -450,7 +449,7 @@ export function MonitorWizard({
   function changeUrl(nextUrl: string) {
     setUrl(nextUrl);
     if (nextUrl.trim() === url.trim()) return;
-    if (executionMode === "browser_only" && nextUrl.trim() !== browserMonitoringUrl) setExecutionMode(null);
+    if (executionMode === "browser_only" && nextUrl.trim() !== browserMonitoringUrl) setExecutionMode("auto");
     previewRequest.current += 1;
     setPreview(null);
     setPreviewing(false);
@@ -549,7 +548,7 @@ export function MonitorWizard({
     setError(null);
     const problem = validateChange();
     if (problem || !executionMode) {
-      setError(problem ?? "Choisissez où effectuer les contrôles.");
+      setError(problem ?? "Le mode automatique n’est pas disponible pour cette surveillance.");
       return;
     }
     let input: CreateMonitorInput;
@@ -605,7 +604,7 @@ export function MonitorWizard({
       : url.trim() !== browserMonitoringUrl ? "Autorisez cette adresse exacte depuis l’extension Chrome."
         : !parsedRule || !supportsBrowserCondition(parsedRule) ? "Chrome peut suivre le prix ou le stock d’un produit."
           : selector.trim() ? "Chrome lit la fiche entière. Retirez le sélecteur CSS pour utiliser ce mode." : null;
-  const executionProblem = executionMode === null ? "Choisissez où effectuer les contrôles." : executionMode === "browser_only" ? browserUnavailable : null;
+  const executionProblem = executionMode === "browser_only" ? browserUnavailable : null;
   const usesUptime = atoms.some((a) => a.type === "site_down" || a.type === "slow_response");
   const needsOtherTarget = step === 2 && targetKind !== null && targetKind !== (isTopic ? "topic" : "page");
 
@@ -638,9 +637,11 @@ export function MonitorWizard({
         <Field id="wz-url" label="Adresse de la page" required hint="Copiez l'adresse depuis votre navigateur (elle commence par https://)." className="flex-1">
           {(p) => <Input {...p} ref={urlRef} type="url" inputMode="url" placeholder="https://www.exemple.fr/…" value={url} onChange={(e) => changeUrl(e.target.value)} />}
         </Field>
-        <Button type="button" variant="secondary" onClick={analysePage} loading={previewing} disabled={!/^https?:\/\/.+\..+/.test(url.trim())}>
-          <ScanSearch aria-hidden="true" /> {verificationLabel}
-        </Button>
+        {!chromeReading ? (
+          <Button type="button" variant="secondary" onClick={analysePage} loading={previewing} disabled={!/^https?:\/\/.+\..+/.test(url.trim())}>
+            <ScanSearch aria-hidden="true" /> {verificationLabel}
+          </Button>
+        ) : null}
       </div>
       {chromeReading ? (
         <Callout tone="info" title="Relevé ponctuel de Chrome" role="status">
@@ -993,22 +994,11 @@ export function MonitorWizard({
               </details>
             </div>
           )}
-          {browserMonitoringUrl && !goal?.business ? (
-            <fieldset className="flex flex-col gap-3 rounded-xl border border-line bg-white/80 p-4">
-              <legend className="px-1 text-sm font-medium">Où effectuer les contrôles ?</legend>
-              <label className="flex items-start gap-3 text-sm">
-                <input type="radio" name={executionGroup} checked={executionMode === "browser_only"} disabled={Boolean(browserUnavailable)} onChange={() => { setExecutionMode("browser_only"); setStepError(null); }} className="mt-1 accent-blue" />
-                <span>
-                  <span className="block font-medium">Uniquement dans Chrome</span>
-                  <span className="text-ink-soft">Chrome doit être ouvert et l’extension autorisée pour cette adresse. Les serveurs Waverti ne prennent pas le relais.</span>
-                  {browserUnavailable ? <span className="mt-1 block text-ink-soft">{browserUnavailable}</span> : null}
-                </span>
-              </label>
-              <label className="flex items-start gap-3 text-sm">
-                <input type="radio" name={executionGroup} checked={executionMode === "cloud_only"} onChange={() => { setExecutionMode("cloud_only"); setStepError(null); }} className="mt-1 accent-blue" />
-                <span>Par les serveurs Waverti</span>
-              </label>
-            </fieldset>
+          {!goal?.business && !isTopic ? (
+            <Callout tone="info" title="Contrôle automatique">
+              Waverti utilise d’abord votre ordinateur ou l’extension Chrome quand ils peuvent lire cette page. Si le contrôle local n’est pas disponible, les serveurs Waverti prennent le relais selon votre formule.
+              {executionMode === "browser_only" && browserUnavailable ? <span className="mt-1 block">{browserUnavailable}</span> : null}
+            </Callout>
           ) : null}
           {stepError_}
           {nav({ onBack: back, onNext: next, disabled: !!goal?.business })}
@@ -1090,8 +1080,8 @@ export function MonitorWizard({
               {formatInterval(interval).replace(/^./, (c) => c.toUpperCase())} — {isTopic
                 ? "par les serveurs Waverti (recherche Internet)."
                 : executionMode === "browser_only"
-                  ? "dans Chrome lorsqu’il est ouvert et que cette adresse reste autorisée."
-                  : "par les serveurs Waverti, même quand votre ordinateur est éteint."}
+                  ? "d’abord dans Chrome, puis côté serveur si nécessaire."
+                  : "d’abord sur votre ordinateur, puis côté serveur si nécessaire."}
             </dd>
           </dl>
           <Field id="wz-name" label="Nom de la surveillance" required hint="Pour la retrouver facilement dans votre liste.">

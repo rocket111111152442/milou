@@ -17,13 +17,12 @@ interface Initial {
   officialDomains: string[];
 }
 
-export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, emailAlerts }: { id: string; kind: "page" | "web_topic"; initial: Initial; minInterval: number; cloudRelay: boolean; emailAlerts: boolean }) {
+export function EditMonitorForm({ id, kind, initial, minInterval, emailAlerts }: { id: string; kind: "page" | "web_topic"; initial: Initial; minInterval: number; emailAlerts: boolean }) {
   const router = useRouter();
   const { run, pending } = useApiAction();
   const [name, setName] = useState(initial.name);
   const [interval, setInterval] = useState(Math.max(initial.intervalMinutes, minInterval));
   const [selector, setSelector] = useState(initial.cssSelector);
-  const [exec, setExec] = useState(initial.executionMode);
   const [email, setEmail] = useState(initial.notifyEmail);
   const [desktop, setDesktop] = useState(initial.notifyDesktop);
   const [threshold, setThreshold] = useState(initial.condition.type === "price_below" ? String(initial.condition.threshold) : "");
@@ -61,7 +60,7 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
       intervalMinutes: interval,
       notify: { email, desktop },
       ...(condition ? { condition } : {}),
-      ...(kind === "page" && !browserOnly ? { cssSelector: selector || null, ...(isRule ? {} : { executionMode: cloudRelay ? exec : "local_only" }) } : {}),
+      ...(kind === "page" && !browserOnly ? { cssSelector: selector || null, executionMode: "auto" } : {}),
       ...(kind === "web_topic" ? { officialDomains: domains.split(/[,\s]+/).map((d) => d.trim().toLowerCase()).filter(Boolean).slice(0, 5) } : {}),
     };
     const r = await run(`/api/monitors/${id}`, body, { method: "PATCH", success: "Modifications enregistrées", refresh: false });
@@ -118,17 +117,7 @@ export function EditMonitorForm({ id, kind, initial, minInterval, cloudRelay, em
       {browserOnly ? (
         <p className="text-sm text-muted-fg">Cette surveillance reste dans Chrome. L’extension doit rester autorisée pour cette adresse.</p>
       ) : kind === "page" && isRule ? <p className="text-sm text-muted-fg">Les règles personnalisées sont contrôlées par les serveurs Waverti.</p> : null}
-      {kind === "page" && cloudRelay && !isRule && !browserOnly ? (
-        <Field id="e-exec" label="Exécution">
-          {(p) => (
-            <Select {...p} value={exec} onChange={(e) => setExec(e.target.value as Initial["executionMode"])}>
-              <option value="auto">Ordinateur en priorité, serveurs en relais</option>
-              <option value="local_only">Uniquement sur mon ordinateur</option>
-              <option value="cloud_only">Uniquement sur les serveurs Waverti</option>
-            </Select>
-          )}
-        </Field>
-      ) : null}
+      {kind === "page" && !browserOnly ? <p className="text-sm text-muted-fg">Contrôle automatique : votre ordinateur est utilisé en priorité, puis les serveurs Waverti prennent le relais si nécessaire.</p> : null}
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-2 text-sm font-medium">Notifications</legend>
         <label className="flex items-center gap-3 text-sm">

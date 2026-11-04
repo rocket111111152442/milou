@@ -33,7 +33,6 @@ export default async function EditMonitorPage({ params }: { params: Promise<{ id
             officialDomains: d.target?.officialDomains ?? [],
           }}
           minInterval={d.task.kind === "web_topic" ? (ent.webIntervalMinutes ?? 1440) : ent.pageIntervalMinutes}
-          cloudRelay={ent.cloudRelay}
           emailAlerts={ent.emailAlerts}
         />
       </div>

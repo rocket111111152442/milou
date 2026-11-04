@@ -155,7 +155,9 @@ export async function submitResult(db: Database, input: SubmitInput): Promise<Su
     if (job.status !== "claimed" || !job.lease_expires_at || new Date(job.lease_expires_at) <= now) throw new StaleClaimError();
 
     const [task] = await tx.select().from(monitoringTasks).where(eq(monitoringTasks.id, job.task_id)).limit(1);
-    if (!task || (task.executionMode === "browser_only") !== Boolean(input.chrome)) throw new StaleClaimError();
+    // Un contrôle Chrome est autorisé pour une surveillance browser_only. Le relais cloud
+    // peut aussi rendre le résultat lorsque l’extension est indisponible.
+    if (!task || (input.chrome && task.executionMode !== "browser_only") || (!input.chrome && task.executionMode === "browser_only" && job.claimed_by !== "cloud")) throw new StaleClaimError();
     let received = input.observation;
     let failure = input.error;
     if (input.chrome) {
