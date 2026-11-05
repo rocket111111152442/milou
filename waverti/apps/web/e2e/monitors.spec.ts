@@ -30,8 +30,8 @@ test.describe("surveillances (moteurs A et B)", () => {
 
     const id = page.url().split("/").pop()!;
     const [task] = await sql<{ status: string; execution_mode: string; type: string }[]>`select status, execution_mode, condition->>'type' as type from monitoring_tasks where id = ${id}`;
-    // Les règles sont contrôlées par les serveurs Waverti.
-    expect(task).toEqual({ status: "active", execution_mode: "cloud_only", type: "rule" });
+    // Mode « auto » par défaut : contrôle local si un appareil est relié, sinon repli automatique sur les serveurs Waverti.
+    expect(task).toEqual({ status: "active", execution_mode: "auto", type: "rule" });
 
     await page.getByRole("button", { name: "Autres actions" }).click();
     await page.getByRole("menuitem", { name: "Mettre en pause" }).click();

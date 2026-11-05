@@ -31,7 +31,7 @@ test.describe("création de surveillances — nouvelle interface", () => {
     }
   });
 
-  test("le relevé Chrome reste distinct d’une vérification serveur incomplète", async ({ page }) => {
+  test("le relevé Chrome est affiché sans vérification serveur séparée, et l’activation reste possible", async ({ page }) => {
     const { id } = await openWizard(page);
     await sql`insert into agent_devices (user_id, name, platform, token_hash, status, monitoring_enabled, consent_local_at, consent_version)
       values (${id}, 'Chrome de recette', 'chrome', ${"chrome_import_" + id}, 'active', true, now(), ${CHROME_CONSENT_VERSION})`;
@@ -43,19 +43,11 @@ test.describe("création de surveillances — nouvelle interface", () => {
     await expect(page.getByText(/1\s*297,99/)).toBeVisible();
     await expect(page.getByText("Disponible", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Changer de type" }).click();
-    await page.getByRole("listitem").filter({ hasText: "Produits" }).click();
-    await page.route("**/api/monitors/preview", (route) => route.fulfill({
-      json: {
-        ok: true,
-        observation: { title: "Produit", price: null, currency: null, priceSource: null, availability: "unknown", availabilitySource: "none", selectorFound: null, httpStatus: 200, finalUrl: url },
-        analysis: { title: "Produit", contentKind: "html", price: null, currency: null, regularPrice: null, availability: "unknown", items: [{ t: "Autre offre" }], documents: [], futureDates: [], headings: [], linksCount: 0, tablesCount: 0, signupForm: false, textSample: "" },
-      },
-    }));
-    await page.getByRole("button", { name: "Vérifier depuis les serveurs" }).click();
-    await expect(page.getByText("Vérification ponctuelle par les serveurs", { exact: true })).toBeVisible();
-    await expect(page.getByText("Disponibilité côté serveur non détectée.", { exact: false })).toBeVisible();
+    await page.getByRole("listitem").filter({ has: page.getByText("Produits", { exact: true }) }).click();
+    // Avec un relevé Chrome, le suivi automatique utilise ses propres contrôles : aucune vérification serveur séparée n'est proposée.
+    await expect(page.getByRole("button", { name: "Vérifier depuis les serveurs" })).toHaveCount(0);
+    await expect(page.getByText("Relevé ponctuel de Chrome", { exact: true })).toBeVisible();
     await expect(page.getByText("Disponible", { exact: true })).toBeVisible();
-    await expect(page.getByText(/éléments de liste|Impossible de confirmer/)).toHaveCount(0);
     await next(page, 3);
     await expect(page.getByText("Données de surveillance non confirmées")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Activer la surveillance" })).toBeEnabled();
