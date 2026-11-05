@@ -1,42 +1,38 @@
 import { ArrowDown, ArrowRight, BellRing, CreditCard, ScanSearch, Sparkles, MousePointerClick } from "lucide-react";
-import { Radar } from "@/components/visual/radar";
+import { ExampleAlert } from "@/components/visual/example-alert";
 
 /** Premier écran d'un compte sans formule : accueil, promesse, accès direct au choix de la formule. */
 export function WelcomeHero({ name, trialEligible, billing }: { name: string | null; trialEligible: boolean; billing: boolean }) {
   return (
-    <section aria-labelledby="welcome-title" className="grain relative overflow-hidden rounded-[32px] bg-[#0d0c2b] text-white shadow-lift">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="anim-glow absolute -left-24 -top-32 size-[420px] rounded-full bg-blue/40 blur-3xl" />
-        <div className="anim-glow absolute -bottom-40 right-0 size-[460px] rounded-full bg-violet/35 blur-3xl" style={{ animationDelay: "1.5s" }} />
-      </div>
+    <section aria-labelledby="welcome-title" className="relative overflow-hidden rounded-[28px] border-2 border-ink bg-[#f1ece1] text-ink">
       <div className="relative grid items-center gap-8 p-6 sm:p-10 lg:grid-cols-[1.1fr_0.9fr] lg:p-14">
         <div className="flex flex-col items-start gap-5">
           {trialEligible && billing ? (
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs font-semibold backdrop-blur">
-              <Sparkles className="size-3.5 text-cyan" aria-hidden="true" /> 3 jours d'essai gratuit
+            <span className="inline-flex items-center gap-2 rounded-md border-2 border-ink bg-[#ffd84d] px-3 py-1 text-xs font-bold uppercase tracking-wide">
+              <Sparkles className="size-3.5" aria-hidden="true" /> 3 jours d'essai gratuit
             </span>
           ) : null}
           <h1 id="welcome-title" className="text-balance font-display text-4xl font-extrabold leading-[1.05] tracking-[-0.035em] sm:text-5xl">
             Bienvenue{name ? `, ${name}` : ""}.{" "}
-            <span className="bg-[linear-gradient(90deg,#00e5ff,#8aa4ff,#ed4df5)] bg-clip-text text-transparent">Votre espace est prêt.</span>
+            <span className="px-1 [box-decoration-break:clone] [background:linear-gradient(transparent_60%,#ffd84d_60%,#ffd84d_94%,transparent_94%)]">Votre espace est prêt.</span>
           </h1>
-          <p className="max-w-xl text-lg leading-relaxed text-white/85">
+          <p className="max-w-xl text-lg leading-relaxed text-ink-soft">
             {billing
               ? "Il ne manque qu'une formule pour l'activer. Choisissez-la en quelques clics : le reste du mode d'emploi se trouve juste en dessous."
               : "Les paiements ne sont pas encore ouverts : vous pouvez découvrir ce que Waverti proposera, sans qu'aucune donnée bancaire ne soit demandée."}
           </p>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <a href="#formules" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-[#0d0c2b] shadow-soft transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white motion-reduce:hover:translate-y-0">
+            <a href="#formules" className="inline-flex h-12 items-center justify-center gap-2 rounded-full border-2 border-ink bg-ink px-6 text-sm font-semibold text-white shadow-[4px_4px_0_0_#245bff] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue motion-reduce:hover:translate-y-0">
               Choisir ma formule <ArrowRight className="size-4" aria-hidden="true" />
             </a>
-            <a href="#mode-emploi" className="inline-flex h-12 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white ring-1 ring-inset ring-white/35 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+            <a href="#mode-emploi" className="inline-flex h-12 items-center justify-center gap-2 rounded-full border-2 border-ink px-5 text-sm font-semibold hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue">
               Voir le mode d'emploi <ArrowDown className="size-4" aria-hidden="true" />
             </a>
           </div>
         </div>
         <div>
-          <Radar />
-          <p className="mt-2 text-center text-xs text-white/70">Illustration animée : exemples de surveillances, aucune donnée réelle.</p>
+          <ExampleAlert />
+          <p className="mt-1 text-center text-xs text-ink-soft">Illustration : un exemple, aucune donnée réelle.</p>
         </div>
       </div>
     </section>
@@ -60,10 +56,10 @@ export function HowItWorks() {
         <p className="mt-1 text-sm text-ink-soft">Vous n'avez rien à installer pour commencer : tout se passe depuis ce site.</p>
       </div>
       <ol className="relative grid gap-4 md:grid-cols-4">
-        <span aria-hidden="true" className="absolute left-[12%] right-[12%] top-[34px] hidden h-px bg-[linear-gradient(90deg,#245bff,#8028ff,#ed4df5)] opacity-40 md:block" />
+        <span aria-hidden="true" className="absolute left-[12%] right-[12%] top-[34px] hidden h-0 border-t-2 border-dashed border-ink/40 md:block" />
         {STEPS.map((s, i) => (
           <li key={s.title} className="card-glass relative flex flex-col gap-3 rounded-2xl p-5 shadow-[var(--shadow-card)]">
-            <span className="relative grid size-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,#1d3fd6,#8a3bff)] text-white shadow-soft [&_svg]:size-5" aria-hidden="true">
+            <span className="relative grid size-12 place-items-center rounded-2xl border-2 border-ink bg-[#ffd84d] text-ink shadow-[3px_3px_0_0_#111118] [&_svg]:size-5" aria-hidden="true">
               {s.icon}
             </span>
             <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Étape {i + 1}</span>

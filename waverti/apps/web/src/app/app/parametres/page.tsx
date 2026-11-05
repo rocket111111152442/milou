@@ -61,12 +61,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const initial = (user.displayName ?? user.email).slice(0, 1).toUpperCase();
   return (
     <div className="flex flex-col gap-6">
-      <section aria-labelledby="settings-title" className="grain relative overflow-hidden rounded-[28px] bg-[#0d0c2b] p-6 text-white shadow-lift sm:p-8">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 size-[360px] rounded-full bg-violet/40 blur-3xl" />
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 left-10 size-[300px] rounded-full bg-blue/40 blur-3xl" />
+      <section aria-labelledby="settings-title" className="relative overflow-hidden rounded-[28px] border-2 border-ink bg-ink p-6 text-white sm:p-8">
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
-            <span className="grid size-16 place-items-center rounded-2xl bg-[linear-gradient(135deg,#1d3fd6,#8028ff)] font-display text-2xl font-bold shadow-soft" aria-hidden="true">
+            <span className="grid size-16 place-items-center rounded-2xl bg-[#ffd84d] text-ink font-display text-2xl font-bold" aria-hidden="true">
               {initial}
             </span>
             <div className="min-w-0">
@@ -86,12 +84,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </p>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur lg:min-w-[300px]">
+          <div className="rounded-2xl border border-white/30 p-4 lg:min-w-[300px]">
             <p className="flex items-center justify-between text-sm font-semibold">
               Sécurité du compte <span aria-label={`${done} points sur ${checks.length}`}>{done}/{checks.length}</span>
             </p>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/20" aria-hidden="true">
-              <div className="h-full rounded-full bg-[linear-gradient(90deg,#00e5ff,#14946a)] transition-[width] duration-700" style={{ width: `${(done / checks.length) * 100}%` }} />
+              <div className="h-full rounded-full bg-[#4ade80] transition-[width] duration-700" style={{ width: `${(done / checks.length) * 100}%` }} />
             </div>
             <ul className="mt-3 flex flex-col gap-1.5 text-sm">
               {checks.map((c) => (

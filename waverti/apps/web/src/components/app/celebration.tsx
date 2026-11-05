@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, BellRing, CalendarClock, PartyPopper, Rocket } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "@waverti/ui";
 
-const COLORS = ["#00e5ff", "#245bff", "#8028ff", "#ed4df5", "#ffb020", "#14946a"];
+const COLORS = ["#ffd84d", "#245bff", "#111118", "#14946a", "#ed6a5a"];
 
 /**
  * Animation de confirmation d'achat (motion design) : affichée une seule fois par retour de paiement vérifié par le serveur.
@@ -51,7 +51,7 @@ export function Celebration({ storageKey, planName, trialing, trialEndsAtLabel }
       {open ? (
         <motion.div
           key="celebration"
-          className="fixed inset-0 z-[80] grid place-items-center bg-[#0d0c2b]/80 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-[80] grid place-items-center bg-ink/70 p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -67,19 +67,19 @@ export function Celebration({ storageKey, planName, trialing, trialEndsAtLabel }
             </div>
           ) : null}
           <motion.div
-            className="grain relative w-full max-w-lg overflow-hidden rounded-[32px] bg-white p-8 text-center shadow-lift sm:p-10"
+            className="relative w-full max-w-lg overflow-hidden rounded-[28px] border-2 border-ink bg-white p-8 text-center shadow-[8px_8px_0_0_#111118] sm:p-10"
             initial={reduced ? false : { scale: 0.86, y: 24, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             transition={{ type: "spring", stiffness: 260, damping: 22 }}
           >
-            <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-waverti-gradient" />
+            <div aria-hidden="true" className="absolute inset-x-0 top-0 h-2 bg-[#ffd84d]" />
             <motion.div
-              className="mx-auto grid size-24 place-items-center rounded-full bg-[linear-gradient(135deg,#0b7350,#2bc48a)] shadow-[0_12px_40px_-8px_rgba(11,115,80,0.6)]"
+              className="mx-auto grid size-24 place-items-center rounded-full border-2 border-ink bg-[#4ade80] shadow-[4px_4px_0_0_#111118]"
               initial={reduced ? false : { scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 300, damping: 14, delay: 0.15 }}
             >
-              <svg viewBox="0 0 24 24" className="size-12" fill="none" stroke="white" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="size-12" fill="none" stroke="#111118" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path className="anim-draw" d="M5 12.5l4.5 4.5L19 7.5" />
               </svg>
             </motion.div>
