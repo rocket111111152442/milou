@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { PageHero, SectionTitle } from "@/components/ui";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion";
-import { Blob, Owl, Star, Wave } from "@/components/decor";
+import Image from "next/image";
+import { Blob, Star, Wave } from "@/components/decor";
 import { RequestForm } from "@/components/RequestForm";
 import { SITE } from "@/lib/site";
 
@@ -24,8 +25,8 @@ export default function AnniversairesPage() {
             magique… et <strong className="text-ink">sans stress pour les parents</strong>.
           </p>
         }
-        image="/images/gateau-anniversaire.webp"
-        imageAlt="Gâteau d'anniversaire coloré avec bougies et ballons"
+        image="/images/anniversaire-enfants.webp"
+        imageAlt="Enfants qui soufflent les bougies d'un gâteau d'anniversaire"
         color="peach"
       >
         <a href="#demande" className="btn-primary">Demander une formule</a>
@@ -56,9 +57,11 @@ export default function AnniversairesPage() {
         <Reveal>
           <div className="relative overflow-hidden rounded-[3rem] bg-ink p-8 text-white sm:p-14">
             <Blob className="-top-16 -right-16 h-72 w-72 opacity-30" color="var(--color-coral)" />
-            <Owl className="absolute right-8 bottom-6 hidden h-32 w-32 animate-float md:block" />
+            <div className="absolute right-8 bottom-8 hidden h-40 w-40 rotate-3 overflow-hidden rounded-3xl ring-4 ring-white/20 md:block">
+              <Image src="/images/anniversaire-table.webp" alt="Table d'anniversaire décorée" fill sizes="160px" className="object-cover" />
+            </div>
             <h2 className="max-w-2xl text-4xl font-semibold text-white sm:text-5xl">Comment se passe la réservation ?</h2>
-            <ol className="relative mt-10 grid gap-8 md:grid-cols-3 md:pr-32">
+            <ol className="relative mt-10 grid gap-8 md:grid-cols-3 md:pr-48">
               {[
                 { t: "Votre demande", d: "Par téléphone, e-mail ou formulaire, en précisant l'âge de l'enfant, la date souhaitée et le nombre d'invités." },
                 { t: "Notre proposition", d: "Nous vous recontactons avec une formule adaptée et les disponibilités." },

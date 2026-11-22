@@ -29,8 +29,8 @@ export default async function EvenementsPage() {
             toujours quelque chose !
           </p>
         }
-        image="/images/ateliers/chouet-foraine.webp"
-        imageAlt="Illustration fête foraine Chouet'Foraine"
+        image="/images/photos/chouet-foraine.webp"
+        imageAlt="Petite fille sur un manège"
         color="butter"
       >
         <a href="#planning" className="btn-primary">Prochaines dates</a>

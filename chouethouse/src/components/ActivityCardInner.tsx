@@ -13,7 +13,7 @@ export function ActivityCardInner({ a, showNext = true }: { a: Activity; showNex
           alt={a.title}
           fill
           sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw"
-          className="object-contain p-4 transition duration-700 group-hover:scale-110 group-hover:rotate-1"
+          className="object-cover transition duration-700 group-hover:scale-110"
         />
         <span className={`absolute top-4 left-4 rounded-full ${CATEGORY_COLORS[a.category]} px-3 py-1 text-xs font-extrabold tracking-wide text-white uppercase`}>
           {a.kind === "atelier" ? CATEGORY_LABELS[a.category] : KIND_LABELS[a.kind]}

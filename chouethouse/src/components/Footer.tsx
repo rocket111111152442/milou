@@ -72,6 +72,14 @@ export function Footer() {
             <Link href="/confidentialite" className="hover:text-white">Confidentialité</Link>
           </div>
         </div>
+        <div className="container-x pb-6 text-center text-sm">
+          <p>
+            Réalisé par{" "}
+            <a href="https://lullin-web.com" target="_blank" rel="noopener" className="font-bold text-white underline decoration-mustard decoration-2 underline-offset-4 transition hover:text-mustard">
+              lullin-web.com
+            </a>
+          </p>
+        </div>
       </div>
     </footer>
   );

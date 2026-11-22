@@ -21,7 +21,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     ageLabel: "12 mois – 4 ans",
     price: 20,
     duration: "1 h",
-    image: "/images/ateliers/cinq-sens.webp",
+    image: "/images/photos/cinq-sens.webp",
     featured: true,
     description:
       "Plongez dans un voyage sensoriel avec votre tout-petit. Cet atelier invite parents et enfants à explorer les 5 sens à travers des activités ludiques et stimulantes : textures à toucher, sons à écouter et créations à réaliser autour d'une thématique différente à chaque séance.",
@@ -35,7 +35,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     ageLabel: "3 – 5 ans",
     price: 20,
     duration: "1 h",
-    image: "/images/ateliers/cinq-sens.webp",
+    image: "/images/photos/cinq-sens-grands.webp",
     description:
       "La version « grands » de notre atelier sensoriel : toucher, écouter, sentir, goûter et créer autour d'un thème qui change à chaque séance. Un moment de découverte et de complicité parent-enfant.",
   }),
@@ -49,7 +49,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     price: 22,
     duration: "1 h",
     host: "Lauren",
-    image: "/images/ateliers/mini-english.webp",
+    image: "/images/photos/mini-english.webp",
     featured: true,
     description:
       "En duo parent-enfant. Lauren, native d'Angleterre, fait découvrir l'anglais aux tout-petits avec des comptines, des jeux et des activités ludiques : une première immersion douce et joyeuse.",
@@ -65,7 +65,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     price: 22,
     duration: "1 h",
     host: "Lauren",
-    image: "/images/ateliers/mini-english.webp",
+    image: "/images/photos/mini-english-fratrie.webp",
     description:
       "En duo parent-enfant, ouvert à toute la fratrie de 6 mois à 6 ans. Chansons, histoires et jeux pour découvrir l'anglais ensemble, en famille.",
     sessions: [{ id: "s-me2", date: "2026-11-28", start: "09:45", end: "10:45" }],
@@ -80,7 +80,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     price: 22,
     duration: "1 h",
     host: "Lauren",
-    image: "/images/ateliers/mini-english.webp",
+    image: "/images/photos/mini-english-3-6.webp",
     description:
       "En duo parent-enfant. Des activités ludiques et créatives pour enrichir son vocabulaire et oser parler anglais, dans un environnement immersif et bienveillant.",
   }),
@@ -93,7 +93,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     ageLabel: "6 mois – 3 ans",
     price: 20,
     host: "Lauren",
-    image: "/images/ateliers/baby-sensory.webp",
+    image: "/images/photos/baby-sensory.webp",
     description:
       "Lauren, native d'Angleterre, anime des ateliers parents-enfants et fait découvrir l'anglais en s'amusant avec des activités sensorielles. Un environnement immersif pour découvrir l'anglais en famille, tout en partageant un moment convivial et enrichissant.",
   }),
@@ -107,7 +107,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     price: 50,
     priceNote: "190 € la semaine",
     host: "Lauren",
-    image: "/images/ateliers/immersion-anglais.webp",
+    image: "/images/photos/immersion-anglais.webp",
     featured: true,
     description:
       "Stage pendant les vacances scolaires : approfondir le vocabulaire, gagner en confiance, s'amuser et s'exprimer en anglais grâce à des activités créatives, du théâtre et de la pâtisserie.",
@@ -122,7 +122,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     price: 20,
     duration: "45 min",
     host: "Armelle",
-    image: "/images/ateliers/patisserie.webp",
+    image: "/images/photos/patisserie.webp",
     featured: true,
     description:
       "Apprendre en s'amusant ! Les petits chefs mettent la main à la pâte et repartent avec leur gâteau. Un résultat toujours magique…",
@@ -136,7 +136,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     ageLabel: "Tout-petits",
     price: 15,
     duration: "45 min",
-    image: "/images/ateliers/eveil-musical.webp",
+    image: "/images/photos/eveil-musical.webp",
     description:
       "Comptines, livres et découverte d'instruments sont les maîtres mots de cet atelier pour éveiller l'oreille et le rythme des tout-petits.",
   }),
@@ -148,7 +148,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     category: "eveil",
     ageLabel: "0 – 6 ans",
     price: 20,
-    image: "/images/ateliers/comptines.webp",
+    image: "/images/photos/comptines.webp",
     description:
       "Des comptines accompagnées de signes pour communiquer avec bébé avant les mots. Un atelier doux pour enrichir la relation parent-enfant.",
     sessions: [{ id: "s-cs1", date: "2026-12-05", start: "09:45", end: "10:45" }],
@@ -161,7 +161,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     category: "musique-danse",
     ageLabel: "0 – 6 ans",
     price: 20,
-    image: "/images/ateliers/danse.webp",
+    image: "/images/photos/danse.webp",
     featured: true,
     description:
       "On bouge ensemble ! Un moment de danse joyeux et complice pour partager le plaisir du mouvement en musique avec son enfant.",
@@ -176,7 +176,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     ageLabel: "15 mois – 6 ans",
     price: 15,
     duration: "Durée variable",
-    image: "/images/ateliers/danse.webp",
+    image: "/images/photos/danse-grands.webp",
     description: "Danser, sauter, tourner : un atelier en duo pour se dépenser et rire ensemble.",
   }),
   A({
@@ -187,7 +187,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     category: "creatif",
     ageLabel: "12 mois – 4 ans",
     price: 15,
-    image: "/images/ateliers/messy-play.webp",
+    image: "/images/photos/messy-play.webp",
     description:
       "Le droit de se salir ! Peinture, textures et matières à manipuler librement, en duo parent-enfant, pour stimuler la créativité et les sens.",
   }),
@@ -199,7 +199,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     category: "creatif",
     ageLabel: "Enfants",
     price: 20,
-    image: "/images/ateliers/body-painting.webp",
+    image: "/images/photos/body-painting.webp",
     description: "Des couleurs plein les mains (et partout ailleurs) : un atelier de peinture corporelle festif et créatif.",
   }),
   A({
@@ -210,7 +210,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     category: "bien-etre",
     ageLabel: "0 – 12 mois",
     price: 20,
-    image: "/images/ateliers/reflexologie.webp",
+    image: "/images/photos/reflexologie.webp",
     description: "Apprenez des gestes simples de réflexologie plantaire pour apaiser et détendre votre bébé.",
   }),
   A({
@@ -222,7 +222,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     ageLabel: "1 mois – 1 an",
     price: 20,
     priceNote: "Duo parent-bébé",
-    image: "/images/ateliers/reflexologie.webp",
+    image: "/images/photos/massage-bebe.webp",
     featured: true,
     description:
       "En duo parent-bébé : découvrez les gestes du massage pour bébé, un moment de tendresse qui favorise la détente et le lien.",
@@ -237,7 +237,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     ageLabel: "Mamans & futures mamans",
     price: 35,
     duration: "2 h",
-    image: "/images/ateliers/cercle-mamans.webp",
+    image: "/images/photos/cercle-mamans.webp",
     description:
       "Un temps d'échange bienveillant entre (futures) mamans : partager son vécu, poser ses questions et se ressourcer, autour d'un bon café.",
   }),
@@ -250,7 +250,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     ageLabel: "Adultes",
     price: 70,
     priceNote: "2 ateliers",
-    image: "/images/ateliers/auto-coaching.webp",
+    image: "/images/photos/auto-coaching.webp",
     description: "Deux ateliers pour prendre soin de soi : ralentir et apprendre à s'écouter, puis s'initier à l'auto-massage du visage.",
   }),
   A({
@@ -261,7 +261,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     category: "bien-etre",
     ageLabel: "Filles 6 – 10 ans",
     price: 50,
-    image: "/images/ateliers/retraite-enchantee.webp",
+    image: "/images/photos/retraite-enchantee.webp",
     featured: true,
     description: "Une parenthèse enchantée réservée aux filles de 6 à 10 ans : bien-être, créativité et confiance en soi, dans une ambiance douce et magique.",
     sessions: [{ id: "s-re1", date: "2026-12-12", start: "10:00", end: "11:30" }],
@@ -274,7 +274,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     category: "creatif",
     ageLabel: "18 mois – 6 ans",
     price: 20,
-    image: "/images/ateliers/chouet-foraine.webp",
+    image: "/images/photos/chouet-foraine.webp",
     description: "La fête foraine version Chouet'House : stands de jeux, attractions et gourmandises pour les petits.",
   }),
   A({
@@ -286,7 +286,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     ageLabel: "Tout public",
     price: 10,
     priceNote: "Emplacement exposant",
-    image: "/images/ateliers/bourse-jouets.webp",
+    image: "/images/photos/bourse-jouets.webp",
     description: "Videz les coffres à jouets et faites de bonnes affaires ! Réservez votre emplacement pour vendre jouets, livres et jeux d'enfants.",
   }),
   A({
@@ -297,7 +297,7 @@ export const SEED_ACTIVITIES: Activity[] = [
     category: "musique-danse",
     ageLabel: "15 mois – 6 ans",
     price: 15,
-    image: "/images/ateliers/halloween.webp",
+    image: "/images/photos/halloween.webp",
     published: false,
     description: "Déguisements bienvenus ! Une séance de danse parents-enfants aux couleurs d'Halloween.",
   }),
@@ -340,7 +340,7 @@ Nous organisons aussi des **anniversaires** inoubliables et des **stages ludique
     title: "Que faire avec un bébé ou un tout-petit à La Seyne-sur-Mer ?",
     excerpt:
       "Éveil sensoriel, bébés signes, massage bébé, anglais dès 6 mois : nos idées d'activités pour les 0-4 ans près de Toulon.",
-    cover: "/images/ateliers/cinq-sens.webp",
+    cover: "/images/photos/cinq-sens.webp",
     tags: ["Ateliers", "Bébé", "Idées sorties"],
     published: true,
     date: "2026-11-15",
@@ -370,7 +370,7 @@ Consultez le [planning des ateliers](/ateliers-enfants) et réservez votre place
     title: "Organiser l'anniversaire de son enfant près de Toulon : nos conseils",
     excerpt:
       "Âge, nombre d'invités, déroulé : nos conseils pour un anniversaire réussi, sans stress pour les parents.",
-    cover: "/images/gateau-anniversaire.webp",
+    cover: "/images/anniversaire-enfants.webp",
     tags: ["Anniversaires", "Conseils"],
     published: true,
     date: "2026-11-08",

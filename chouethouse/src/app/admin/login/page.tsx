@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { useState } from "react";
-import { Owl } from "@/components/decor";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,7 +29,6 @@ export default function LoginPage() {
         animate={{ opacity: 1, y: 0 }}
         className="card w-full max-w-sm p-8 text-center"
       >
-        <Owl className="mx-auto h-20 w-20 animate-float" />
         <Image src="/images/logo-horizontal.webp" alt="Chouet'House" width={200} height={46} className="mx-auto mt-4 h-10 w-auto" />
         <h1 className="mt-4 text-2xl">Espace admin</h1>
         <label htmlFor="pwd" className="label mt-6 text-left">Mot de passe</label>

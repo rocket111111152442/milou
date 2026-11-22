@@ -195,7 +195,7 @@ function BookingDialog({ selected, onClose }: { selected: { a: Activity; s?: Ses
             </button>
             <div className="grid gap-0 sm:grid-cols-5">
               <div className="relative h-56 bg-white sm:col-span-2 sm:h-auto">
-                <Image src={a.image} alt={a.title} fill sizes="400px" className="object-contain p-6" />
+                <Image src={a.image} alt={a.title} fill sizes="400px" className="object-cover" />
               </div>
               <div className="p-6 sm:col-span-3 sm:p-8">
                 <span className={`inline-block rounded-full ${CATEGORY_COLORS[a.category]} px-3 py-1 text-xs font-extrabold text-white uppercase`}>

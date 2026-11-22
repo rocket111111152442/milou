@@ -26,7 +26,9 @@ export default function MentionsPage() {
           Directeur·rice de la publication : <em>[à compléter]</em>
         </p>
         <h2>Conception</h2>
-        <p>Site conçu et réalisé par lullin-web.com.</p>
+        <p>
+          Site conçu et réalisé par <a href="https://lullin-web.com" target="_blank" rel="noopener">lullin-web.com</a>.
+        </p>
         <h2>Hébergement</h2>
         <p>Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis – vercel.com</p>
         <h2>Propriété intellectuelle</h2>

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
-import { Blob, Star, Owl } from "./decor";
+import { Blob, Star } from "./decor";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -140,7 +140,7 @@ export function HomeHero() {
             transition={{ type: "spring", delay: 1.1 }}
             className="absolute right-[6%] bottom-[4%] w-28 animate-float sm:w-32"
           >
-            <Owl className="h-auto w-full drop-shadow-xl" />
+            <Image src="/images/logo-coffee.webp" alt="" width={160} height={160} className="h-auto w-full rounded-full bg-white p-2 shadow-xl" />
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 30 }}

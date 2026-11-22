@@ -29,24 +29,6 @@ export function Squiggle({ className, color = "var(--color-tomato)" }: { classNa
   );
 }
 
-/** Petite chouette en SVG – clin d'œil au nom */
-export function Owl({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden viewBox="0 0 120 130" className={className}>
-      <path d="M20 40 L28 8 L48 28 Q60 24 72 28 L92 8 L100 40 Q112 70 100 100 Q88 126 60 126 Q32 126 20 100 Q8 70 20 40Z" fill="#8db5af" />
-      <ellipse cx="60" cy="92" rx="26" ry="28" fill="#fbdccf" />
-      <path d="M42 84 q6 -5 12 0 M66 84 q6 -5 12 0 M42 98 q6 -5 12 0 M66 98 q6 -5 12 0 M54 110 q6 -5 12 0" stroke="#f09a86" strokeWidth="3" fill="none" strokeLinecap="round" />
-      <circle cx="42" cy="52" r="17" fill="#fff" />
-      <circle cx="78" cy="52" r="17" fill="#fff" />
-      <circle cx="44" cy="54" r="8" fill="#2b2a36" />
-      <circle cx="76" cy="54" r="8" fill="#2b2a36" />
-      <circle cx="47" cy="51" r="2.5" fill="#fff" />
-      <circle cx="79" cy="51" r="2.5" fill="#fff" />
-      <path d="M54 64 L60 76 L66 64 Z" fill="#edb23a" />
-    </svg>
-  );
-}
-
 export function Wave({ className, color = "var(--color-cream)", flip = false }: { className?: string; color?: string; flip?: boolean }) {
   return (
     <svg

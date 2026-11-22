@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
-import { Owl } from "./decor";
+import Image from "next/image";
 
 const ease = [0.76, 0, 0.24, 1] as const;
 
@@ -41,7 +41,7 @@ export function PageTransition({ children }: { children: ReactNode }) {
           transition={{ duration: 0.75, ease }}
         >
           <motion.div initial={{ scale: 1, opacity: 1 }} animate={{ scale: 0.6, opacity: 0 }} transition={{ duration: 0.35 }}>
-            <Owl className="h-20 w-20" />
+            <Image src="/images/logo-horizontal.webp" alt="" width={220} height={50} className="h-12 w-auto" />
           </motion.div>
         </motion.div>
       </div>

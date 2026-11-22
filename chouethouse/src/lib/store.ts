@@ -69,7 +69,12 @@ export async function getActivities({ includeDrafts = false } = {}) {
   const list = await readCollection("activities");
   return list
     .filter((a) => includeDrafts || a.published)
-    .map((a) => ({ ...a, sessions: [...(a.sessions ?? [])].sort(byDate) }));
+    .map((a) => ({
+      ...a,
+      // anciennes illustrations remplacées par des photos (dossier renommé)
+      image: a.image?.replace("/images/ateliers/", "/images/photos/") ?? a.image,
+      sessions: [...(a.sessions ?? [])].sort(byDate),
+    }));
 }
 
 export async function getActivity(slug: string) {

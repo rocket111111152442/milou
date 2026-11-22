@@ -17,7 +17,7 @@ const EMPTY: Activity = {
   ageLabel: "",
   price: 20,
   description: "",
-  image: "/images/ateliers/cinq-sens.webp",
+  image: "/images/photos/cinq-sens.webp",
   published: true,
   sessions: [],
 };
@@ -100,7 +100,7 @@ export function AdminActivities() {
             return (
               <div key={a.id} className="card flex flex-wrap items-center gap-4 p-4">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.image} alt="" className="h-16 w-16 rounded-2xl bg-cream object-contain" />
+                <img src={a.image} alt="" className="h-16 w-16 rounded-2xl bg-cream object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="font-display text-xl font-semibold">
                     {a.title} {!a.published && <span className="ml-1 rounded-full bg-ink/10 px-2 py-0.5 align-middle text-xs">brouillon</span>}

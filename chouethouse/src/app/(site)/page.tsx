@@ -5,7 +5,7 @@ import { HomeHero } from "@/components/HomeHero";
 import { Marquee } from "@/components/Marquee";
 import { Counter, Parallax, Reveal, Stagger, StaggerItem, Tilt } from "@/components/motion";
 import { ActivityCard, ArrowLink, CTABand, SectionTitle } from "@/components/ui";
-import { Blob, Owl, Star, Wave } from "@/components/decor";
+import { Blob, Star, Wave } from "@/components/decor";
 import { Faq } from "@/components/Faq";
 import { faqJsonLd, type QA } from "@/lib/faq";
 import { getActivities, getPosts } from "@/lib/store";
@@ -56,16 +56,15 @@ const PILLARS = [
     href: "/ateliers-enfants",
     title: "Ateliers",
     text: "Éveil sensoriel, anglais, danse, musique, pâtisserie : des ateliers parents-enfants dès 0 an.",
-    img: "/images/ateliers/cinq-sens.webp",
+    img: "/images/photos/ateliers-hero.webp",
     color: "bg-sage",
     emoji: "🎨",
-    contain: true,
   },
   {
     href: "/anniversaires",
     title: "Anniversaires",
     text: "Une fête inoubliable pour votre enfant, sans stress pour les parents.",
-    img: "/images/gateau-anniversaire.webp",
+    img: "/images/anniversaire-enfants.webp",
     color: "bg-coral",
     emoji: "🎂",
   },
@@ -169,13 +168,13 @@ export default async function HomePage() {
                 <Tilt>
                   <Link href={p.href} className="group block h-full overflow-hidden rounded-[2.5rem] bg-white shadow-xl ring-1 ring-ink/5">
                     <div className="relative aspect-[4/3]">
-                      <div className={`absolute inset-0 overflow-hidden ${p.contain ? "bg-white" : ""}`}>
+                      <div className="absolute inset-0 overflow-hidden">
                         <Image
                           src={p.img}
                           alt={p.title}
                           fill
                           sizes="(min-width:768px) 33vw, 100vw"
-                          className={`${p.contain ? "object-contain p-6" : "object-cover"} transition duration-700 group-hover:scale-110`}
+                          className="object-cover transition duration-700 group-hover:scale-110"
                         />
                       </div>
                       <span className={`absolute -bottom-6 left-6 grid h-16 w-16 place-items-center rounded-2xl ${p.color} text-3xl shadow-lg transition duration-500 group-hover:-translate-y-3 group-hover:rotate-12`}>
@@ -230,7 +229,7 @@ export default async function HomePage() {
             { src: "/images/smoothies.webp", alt: "Smoothie fraise et milkshake vanille", cls: "aspect-square" },
             { src: "/images/toast-avocat.webp", alt: "Tartine gourmande et œuf", cls: "aspect-square" },
             { src: "/images/table-brunch.webp", alt: "Table de brunch partagée", cls: "row-span-2 aspect-[3/4] sm:aspect-auto" },
-            { src: "/images/gateau-anniversaire.webp", alt: "Gâteau d'anniversaire coloré", cls: "aspect-square" },
+            { src: "/images/anniversaire-enfants.webp", alt: "Enfants soufflant les bougies d'un gâteau d'anniversaire", cls: "aspect-square" },
             { src: "/images/salle.webp", alt: "La salle de Chouet'House", cls: "aspect-square" },
           ].map((g, i) => (
             <Reveal key={g.src + i} delay={i * 0.07} className={`group relative overflow-hidden rounded-[2rem] ${g.cls}`}>
@@ -272,7 +271,6 @@ export default async function HomePage() {
       <section className="container-x">
         <Reveal>
           <div className="relative overflow-hidden rounded-[3rem] bg-sage-deep px-6 py-14 text-center text-white sm:px-16">
-            <Owl className="absolute -bottom-6 -left-4 h-32 w-32 opacity-90 sm:h-40 sm:w-40" />
             <Star className="top-8 right-10 h-12 w-12 animate-spin-slow" color="var(--color-mustard)" />
             <p className="font-display text-7xl font-bold text-mustard sm:text-8xl">
               <Counter to={4.9} decimals={1} />

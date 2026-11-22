@@ -54,8 +54,8 @@ export default async function AteliersPage() {
             dans un cadre doux et bienveillant. Des moments de découverte et de complicité, dès les premiers mois.
           </p>
         }
-        image="/images/ateliers/cinq-sens.webp"
-        imageAlt="Illustration d'un bébé en atelier d'éveil sensoriel"
+        image="/images/photos/ateliers-hero.webp"
+        imageAlt="Maman et sa fille en atelier d'éveil musical"
         color="sage"
       >
         <a href="#planning" className="btn-primary">Voir le planning</a>
