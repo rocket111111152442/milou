@@ -1,7 +1,9 @@
-# Worker Waverti (serveur OVH ou équivalent) : planification, contrôles serveur, recherche Web,
-# Business (HTTP, HTTPS, scénarios navigateur), e-mails et maintenance.
+# Worker Waverti : planification, contrôles serveur, recherche Web, Business (HTTP, HTTPS,
+# scénarios navigateur), e-mails et maintenance. Ce Dockerfile ne concerne QUE le worker
+# (le site est construit par Vercel, qui l'ignore).
+# Placé à la racine de waverti/ pour être détecté automatiquement par Railway (Root Directory = waverti).
 # Construction (depuis le dossier waverti/) :
-#   docker build -f infra/docker/worker.Dockerfile -t waverti-worker .
+#   docker build -t waverti-worker .
 
 # --- Étape 1 : dépendances et bundle --------------------------------------------
 FROM node:22-bookworm-slim AS build

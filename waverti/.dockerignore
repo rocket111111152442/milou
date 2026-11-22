@@ -1,0 +1,20 @@
+# Contexte de construction du worker (Dockerfile) : uniquement le nécessaire.
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+.turbo
+apps/web
+apps/desktop
+docs
+tools
+db
+supabase
+**/test-results
+**/playwright-report
+**/*.log
+.env
+.env.*
+**/.env
+**/.env.*
+infra/docker/*.env

@@ -37,7 +37,33 @@ Supabase n'est plus utilisé : comptes, sessions et double authentification sont
 - `NEXT_PUBLIC_LAUNCH_STATUS=preview` tant que le lancement n'est pas validé (bandeau + `noindex`).
 - Domaine : à choisir et configurer par LULLIN WEB (DNS chez le registraire).
 
-## 3. Worker (serveur OVH ou équivalent) [humain : achat du serveur]
+## 3. Worker [humain : compte d'hébergement]
+
+Sans worker en ligne, rien n'est contrôlé et aucun e-mail n'est envoyé (l'administration l'affiche).
+Image unique : `waverti/Dockerfile` (worker seulement ; Vercel l'ignore). Vérifié le 2026-11-22 : construction de
+l'image, démarrage contre PostgreSQL 17, battement de cœur `worker_heartbeats` écrit, Chromium lancé avec un
+`/dev/shm` de 64 Mo (`--disable-dev-shm-usage`).
+
+### Option A — Railway (interface web, sans serveur à administrer)
+
+1. New Project → Deploy from GitHub repo → `rocket111111152442/milou`.
+2. Service → Settings : **Root Directory = `waverti`** (le `Dockerfile` y est détecté automatiquement) ;
+   **Branch** = la branche dont le code correspond à la Production du site ; activer « Wait for CI ».
+   Aucun domaine public, aucun port : le worker n'en expose pas.
+3. Variables (copiées depuis les tableaux de bord des fournisseurs, jamais dans un fichier versionné) :
+   `NODE_ENV=production`, `WORKER_ID=railway-1`, `APP_URL=https://www.waverti.com`,
+   `EMAIL_FROM` (même valeur que sur Vercel), `DATABASE_URL` (Neon de production, connexion **directe**, sans
+   pooler, avec `sslmode=require`), `RESEND_API_KEY`, `BRAVE_SEARCH_API_KEY`.
+   `STRIPE_SECRET_KEY` facultative (rappels d'essai) ; si c'est une clé live, ajouter aussi
+   `WAVERTI_LIVE_PAYMENTS_ENABLED=true`, sinon le worker refuse de démarrer.
+4. Contrôle : journaux « worker started » sans erreur, puis `/admin` → carte « Workers » : `railway-1` en ligne.
+
+Attention : chaque poussée sur la branche suivie redéploie le worker. Le worker lit la même base que le site :
+ne pas suivre une branche contenant des migrations non appliquées en Production.
+Coût de la base : le worker interroge PostgreSQL en continu, la base Neon ne se met donc plus en veille
+(heures de calcul à vérifier sur l'offre Neon).
+
+### Option B — VPS (OVH, Hetzner…) avec Docker
 
 Recommandation de départ : VPS 2 vCPU / 4 Go RAM (Chromium inclus), Ubuntu 24.04, Docker.
 

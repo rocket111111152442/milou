@@ -5,7 +5,7 @@ services:
   worker:
     build:
       context: ../..
-      dockerfile: infra/docker/worker.Dockerfile
+      dockerfile: Dockerfile
     image: waverti-worker:latest
     env_file: ./worker.env
     environment:

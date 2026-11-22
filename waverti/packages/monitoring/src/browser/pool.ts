@@ -65,6 +65,8 @@ export class BrowserPool {
         "--disable-background-networking",
         "--disable-features=DnsOverHttps,InterestFeedContentSuggestions",
         "--disable-extensions",
+        // Hébergeurs à mémoire partagée réduite (/dev/shm de 64 Mo, ex. Railway) : évite les plantages de Chromium.
+        "--disable-dev-shm-usage",
         "--no-first-run",
         "--mute-audio",
       ],
