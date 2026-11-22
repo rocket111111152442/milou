@@ -76,8 +76,9 @@ export function Footer() {
           <p>
             Réalisé par{" "}
             <a href="https://lullin-web.com" target="_blank" rel="noopener" className="font-bold text-white underline decoration-mustard decoration-2 underline-offset-4 transition hover:text-mustard">
-              lullin-web.com
-            </a>
+              Lullin Web
+            </a>{" "}
+            · Six-Fours-les-Plages
           </p>
         </div>
       </div>
