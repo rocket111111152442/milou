@@ -1,0 +1,58 @@
+# Blueprint Render pour Antonio. À sélectionner explicitement (« antonio/render.yaml ») :
+# le render.yaml à la racine du dépôt concerne l'application Milou.
+# Non testé depuis cet environnement (pas d'accès Render) : à valider au premier déploiement.
+envVarGroups:
+  - name: antonio-secrets
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENCRYPTION_KEY
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: API_PUBLIC_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_PUBSUB_TOPIC
+        sync: false
+      - key: GOOGLE_PUBSUB_AUDIENCE
+        sync: false
+      - key: GOOGLE_PUBSUB_SERVICE_ACCOUNT
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+
+services:
+  - type: web
+    name: antonio-web
+    runtime: docker
+    rootDir: antonio
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: antonio-db, property: connectionString }
+      - key: RUN_WORKER_IN_WEB
+        value: "false"
+      - fromGroup: antonio-secrets
+  - type: worker
+    name: antonio-worker
+    runtime: docker
+    rootDir: antonio
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node dist/worker.js
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: antonio-db, property: connectionString }
+      - fromGroup: antonio-secrets
+
+databases:
+  - name: antonio-db
+    databaseName: antonio

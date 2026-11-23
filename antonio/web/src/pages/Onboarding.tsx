@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AUTONOMY_LABELS, CATEGORIES, CATEGORY_LABELS, type AutonomyLevel, type Category, type ProfessionPreset } from "@antonio/shared";
+import { AUTONOMY_LABELS, CATEGORIES, CATEGORY_LABELS, PROFESSION_PRESETS, type AutonomyLevel, type Category, type ProfessionPreset } from "@antonio/shared";
 import { api, queryClient } from "../lib/api";
 import { useMe } from "../lib/app-state";
 import { Dictation, speakLocally } from "../voice/dictation";
@@ -102,7 +102,7 @@ const STEPS: Step[] = [
         ))}
       </div>
     ),
-    summary: (p) => `Profil de départ : ${p.professionPreset}`,
+    summary: (p) => `Profil de départ : ${PROFESSION_PRESETS.find((x) => x.id === p.professionPreset)?.label ?? p.professionPreset}`,
   },
   {
     id: "company",
