@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": { "@antonio/shared": ["shared/src/index.ts"] },
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src", "test", "../shared/src"]
+}
