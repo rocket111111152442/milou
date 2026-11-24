@@ -104,6 +104,32 @@ export const profiles = pgTable("profiles", {
   updatedAt: updatedAt(),
 });
 
+export const subscriptions = pgTable("subscriptions", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  requestedPlan: text("requested_plan").notNull().default("essentiel"),
+  plan: text("plan"),
+  status: text("status").notNull().default("early_access"),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  stripeSubscriptionId: text("stripe_subscription_id").unique(),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  updatedAt: updatedAt(),
+});
+
+export const integrationTokens = pgTable("integration_tokens", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  createdAt: createdAt(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+});
+
+export const billingEvents = pgTable("billing_events", {
+  id: text("id").primaryKey(),
+  processedAt: timestamp("processed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const autonomy = pgTable(
   "autonomy",
   {

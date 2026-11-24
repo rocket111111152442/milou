@@ -14,6 +14,10 @@ const schema = z.object({
   /** Clé AES-256 (32 octets en base64) pour chiffrer les jetons OAuth au repos. */
   APP_ENCRYPTION_KEY: z.string().optional(),
   SESSION_TTL_DAYS: z.coerce.number().default(14),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  // Payments stay off until the operator has verified the real integrations.
+  BILLING_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
 
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),

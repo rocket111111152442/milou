@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { db, schema } from "../db/client.js";
 import { hashPassword, randomToken, sha256, verifyPassword } from "../lib/crypto.js";
 import { AppError, audit } from "../lib/audit.js";
+import { PLAN_IDS } from "@antonio/shared";
 
 export const registerSchema = z.object({
   email: z.string().email().transform((s) => s.toLowerCase().trim()),
@@ -11,6 +12,7 @@ export const registerSchema = z.object({
   displayName: z.string().min(1).max(100),
   organizationName: z.string().max(120).optional(),
   withDemo: z.boolean().default(false),
+  requestedPlan: z.enum(PLAN_IDS).optional(),
 });
 
 export const loginSchema = z.object({ email: z.string().email().transform((s) => s.toLowerCase().trim()), password: z.string().min(1) });
@@ -35,6 +37,7 @@ export async function register(input: z.infer<typeof registerSchema>) {
     const [user] = await tx.insert(schema.users).values({ email: input.email, passwordHash, displayName: input.displayName }).returning();
     await tx.insert(schema.memberships).values({ orgId: org.id, userId: user.id, role: "owner" });
     await tx.insert(schema.profiles).values({ userId: user.id, orgId: org.id, firstName: input.displayName.split(" ")[0], onboardingStep: "welcome" });
+    await tx.insert(schema.subscriptions).values({ userId: user.id, requestedPlan: input.requestedPlan ?? "essentiel" });
     return { user, org };
   });
 }

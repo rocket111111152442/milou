@@ -19,6 +19,8 @@ import { actionRoutes } from "./routes/actions.js";
 import { assistantRoutes } from "./routes/assistant.js";
 import { accountRoutes } from "./routes/account.js";
 import { webhookRoutes } from "./routes/webhooks.js";
+import { billingRoutes } from "./routes/billing.js";
+import { integrationRoutes } from "./routes/integrations.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -89,6 +91,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(assistantRoutes);
   await app.register(accountRoutes);
   await app.register(webhookRoutes);
+  await app.register(billingRoutes);
+  await app.register(integrationRoutes);
 
   // En production, le serveur sert aussi l'interface compilée (web/dist).
   const here = dirname(fileURLToPath(import.meta.url));

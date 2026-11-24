@@ -15,6 +15,13 @@
       "when": 1795464624274,
       "tag": "0001_waverti",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795507788290,
+      "tag": "0002_public_billing_integrations",
+      "breakpoints": true
     }
   ]
 }

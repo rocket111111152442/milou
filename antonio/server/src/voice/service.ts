@@ -7,6 +7,7 @@ import { getProfile } from "../lib/profile.js";
 import type { Actor } from "../connectors/service.js";
 import { budgetStatus, recordUsage, voiceCostMicros } from "../usage/service.js";
 import { getOrCreateConversation, recentTurns, runTurn } from "../agent/orchestrator.js";
+import { assertPlanUsage } from "../billing/service.js";
 
 /**
  * Voix : GPT-Live (gpt-live-1.1) gère la conversation orale (écoute pendant qu'il
@@ -24,6 +25,7 @@ Si l'utilisateur t'interrompt, arrête-toi et écoute. Une interruption n'annule
 }
 
 export async function createVoiceSession(actor: Actor, sdp: string) {
+  await assertPlanUsage(actor.userId, "voice");
   const c = config();
   if (!c.OPENAI_API_KEY) throw new AppError(503, "voice_unavailable", "La voix nécessite OPENAI_API_KEY côté serveur. Le mode écrit reste disponible.");
   if (!sdp || sdp.length > 64 * 1024) throw new AppError(400, "invalid_sdp", "Offre SDP invalide");

@@ -1,3 +1,4 @@
+export { OFFERS, PLAN_IDS, offerFor, type PlanId } from "./offers.js";
 /**
  * Types partagés entre le serveur et l'interface.
  * Toute donnée affichée comme « réalisée » doit provenir d'un état serveur

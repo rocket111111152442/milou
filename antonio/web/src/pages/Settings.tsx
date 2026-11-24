@@ -77,11 +77,7 @@ export function ConnectButtons() {
         <div className="warning-box small">
           {!s.google && "Google n'est pas encore configuré sur ce serveur. "}
           {!s.microsoft && "Microsoft n'est pas encore configuré sur ce serveur. "}
-          L'administrateur doit créer les applications OAuth et renseigner les identifiants côté serveur (voir docs/OAUTH.md). URI de redirection à déclarer :
-          <br />
-          <code>{s.redirectUris.google}</code>
-          <br />
-          <code>{s.redirectUris.microsoft}</code>
+          La connexion à ces services sera proposée ici dès son ouverture. Vous pouvez personnaliser votre assistant et explorer le compte de démonstration en attendant.
         </div>
       )}
     </div>

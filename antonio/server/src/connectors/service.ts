@@ -8,6 +8,7 @@ import { enqueue, JOBS } from "../jobs/queue.js";
 import { adapterFor } from "./registry.js";
 import { type ConnectionRow, type EventMeta, type MessageMeta, ProviderError } from "./types.js";
 import { providerConfigured } from "../config.js";
+import { assertPlanUsage } from "../billing/service.js";
 
 export interface Actor {
   userId: string;
@@ -47,6 +48,7 @@ export function toConnectionDTO(c: ConnectionRow): ConnectionDTO {
 // ---------------------------------------------------------------------------
 
 export async function startOAuth(actor: Actor, provider: "google" | "microsoft", requested: Capability[], connectionId?: string) {
+  if (!connectionId) await assertPlanUsage(actor.userId, "connection");
   if (!providerConfigured(provider)) {
     throw new AppError(
       503,

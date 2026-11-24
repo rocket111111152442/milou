@@ -1,4 +1,4 @@
-import { StrictMode, type ReactNode } from "react";
+import { StrictMode, useLayoutEffect, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -12,8 +12,11 @@ import { LoginPage, RegisterPage } from "./pages/Auth";
 import { Onboarding } from "./pages/Onboarding";
 import { AgendaPage, ApprovalsPage, BriefingPage, HistoryPage, InboxPage, TasksPage } from "./pages/Views";
 import { ConnectionsPage, ProfilePage, RulesPage, TemplatesPage, UsagePage } from "./pages/Settings";
+import { LandingPage } from "./pages/Landing";
+import { BillingPage, IntegrationsPage } from "./pages/Business";
 import "./styles.css";
 import "./studio.css";
+import "./marketing.css";
 
 function Guard({ children, allowOnboarding }: { children: ReactNode; allowOnboarding?: boolean }) {
   const me = useMe();
@@ -31,6 +34,8 @@ const inShell = (el: ReactNode) => (
 );
 
 function App() {
+  const location = useLocation();
+  useLayoutEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }, [location.pathname]);
   return (
     <Routes>
       <Route path="/connexion" element={<LoginPage />} />
@@ -43,7 +48,10 @@ function App() {
           </Guard>
         }
       />
-      <Route path="/" element={inShell(<Workspace />)} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/app" element={inShell(<Workspace />)} />
+      <Route path="/abonnement" element={inShell(<BillingPage />)} />
+      <Route path="/integrations" element={inShell(<IntegrationsPage />)} />
       <Route path="/point" element={inShell(<BriefingPage />)} />
       <Route path="/messages" element={inShell(<InboxPage />)} />
       <Route path="/agenda" element={inShell(<AgendaPage />)} />

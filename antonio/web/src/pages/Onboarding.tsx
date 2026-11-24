@@ -301,6 +301,7 @@ const STEPS: Step[] = [
 ];
 
 export function Onboarding() {
+  useEffect(() => { document.title = "Configurer mon assistant — Waverti"; }, []);
   const nav = useNavigate();
   const me = useMe();
   const presets = useQuery({ queryKey: ["presets"], queryFn: () => api<{ professions: ProfessionPreset[]; voices: { id: string; label: string }[] }>("/api/presets") });
@@ -343,14 +344,15 @@ export function Onboarding() {
       // Relire la session avant de naviguer, sinon le garde renverrait vers l'onboarding.
       await queryClient.refetchQueries({ queryKey: ["me"] });
       void queryClient.invalidateQueries();
-      nav("/");
+      nav("/app");
     },
   });
 
   if (!p || !presets.data || !autonomy) return <div className="onb muted">Chargement…</div>;
   const set = (patch: Partial<Profile>) => setP((cur) => ({ ...cur!, ...patch }));
   const next = async () => {
-    await save.mutateAsync({ ...cleanProfile(pick(p, step.id)), onboardingStep: steps[i + 1]?.id ?? "autonomy" } as Partial<Profile>).catch(() => undefined);
+    try { await save.mutateAsync({ ...cleanProfile(pick(p, step.id)), onboardingStep: steps[i + 1]?.id ?? "autonomy" } as Partial<Profile>); }
+    catch { return; }
     if (step.id === "profession" && preset && p.repetitiveTasks.length === 0) set({ repetitiveTasks: preset.repetitiveTasks.slice(0, 2), priorities: preset.priorities.slice(0, 2) });
     if (i + 1 < steps.length) setI(i + 1);
     else setPhase("autonomy");
@@ -392,6 +394,7 @@ export function Onboarding() {
           <input type="checkbox" checked={readAloud} onChange={(e) => setReadAloud(e.target.checked)} /> Lire les questions à voix haute
         </label>
       </div>
+      {(save.error || finish.error) && <div className="danger-box" role="alert">{((save.error || finish.error) as Error).message}</div>}
       <div className="progress" aria-label="Progression">
         <div style={{ width: `${phase === "questions" ? ((i + 1) / (steps.length + 3)) * 100 : phase === "autonomy" ? 85 : phase === "accounts" ? 92 : 100}%` }} />
       </div>
@@ -413,7 +416,7 @@ export function Onboarding() {
                   <Icon.Mic /> {dictating ? "Terminer la dictée" : "Répondre à la voix"}
                 </button>
               )}
-              <button className="btn primary" onClick={() => void next()}>
+              <button className="btn primary" disabled={save.isPending} onClick={() => void next()}>
                 Continuer
               </button>
             </div>

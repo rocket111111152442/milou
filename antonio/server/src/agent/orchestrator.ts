@@ -11,6 +11,7 @@ import { emailsIn } from "../mail/analysis.js";
 import { createResponse, ModelError, type InputItem } from "./openai.js";
 import { runTool, TOOL_DEFINITIONS, type ToolContext } from "./tools.js";
 import { demoBrain } from "./demo-brain.js";
+import { assertPlanUsage } from "../billing/service.js";
 
 export interface TurnTrace {
   actionIds: string[];
@@ -46,6 +47,7 @@ export async function recentTurns(conversationId: string, limit = 14) {
 }
 
 export async function runTurn(actor: Actor, opts: { text: string; conversationId?: string | null; channel: "chat" | "voice" }): Promise<AssistantReply> {
+  await assertPlanUsage(actor.userId, opts.channel === "voice" ? "voice" : "text");
   const text = opts.text.trim().slice(0, 4000);
   const conv = await getOrCreateConversation(actor, opts.conversationId, opts.channel);
   const history = await recentTurns(conv.id);

@@ -2,6 +2,7 @@ import { and, eq, gte, sql } from "drizzle-orm";
 import { config } from "../config.js";
 import { db, schema } from "../db/client.js";
 import { publish } from "../realtime/hub.js";
+import { billingEnabled, paidOffer } from "../billing/service.js";
 
 /**
  * Consommation mesurée séparément : modèle texte, minutes vocales, traitement
@@ -66,8 +67,9 @@ export async function getBudget(scopeType: "org" | "user", scopeId: string): Pro
 /** Limites effectives : la plus restrictive entre l'utilisateur et l'organisation. */
 export async function effectiveBudget(orgId: string, userId: string): Promise<BudgetRow & { orgMonthlyLimitMicros: number }> {
   const [org, user] = await Promise.all([getBudget("org", orgId), getBudget("user", userId)]);
+  const plan = billingEnabled() ? await paidOffer(userId) : null;
   return {
-    monthlyLimitMicros: Math.min(org.monthlyLimitMicros, user.monthlyLimitMicros),
+    monthlyLimitMicros: Math.min(org.monthlyLimitMicros, user.monthlyLimitMicros, plan?.aiBudgetMicros ?? Infinity),
     orgMonthlyLimitMicros: org.monthlyLimitMicros,
     voiceMinutesDaily: Math.min(org.voiceMinutesDaily, user.voiceMinutesDaily),
     voiceSessionMaxMinutes: Math.min(org.voiceSessionMaxMinutes, user.voiceSessionMaxMinutes),
