@@ -4,11 +4,14 @@ import { catalogMode, env } from "@/config/env";
 import { Logo } from "@/components/site/Logo";
 import { logout } from "../actions";
 import { AdminNav } from "@/components/admin/AdminNav";
+import { creditStatus } from "@/lib/ai/credits";
 
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const admin = await requireAdmin();
+  const credit = env.ai.creditsEnabled ? await creditStatus().catch(() => null) : null;
+  const low = credit && (credit.exhausted || credit.percentLeft <= 15);
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="border-b border-navy-100 bg-white lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r">
@@ -24,7 +27,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/" className="block text-center text-ink-muted hover:underline">Ver el sitio</Link>
         </div>
       </aside>
-      <main className="min-w-0 p-4 sm:p-6 lg:p-8">{children}</main>
+      <main className="min-w-0 p-4 sm:p-6 lg:p-8">
+        {low && (
+          <p role="status" className={`mb-6 rounded-xl p-3 text-sm ${credit.exhausted ? "bg-red-50 text-red-900" : "bg-amber-50 text-amber-950"}`}>
+            {credit.exhausted ? "Los tokens del asistente IA se han agotado: el asistente del sitio solo muestra tus datos de contacto." : `Quedan ${credit.percentLeft} % de tokens del asistente IA.`}{" "}
+            <Link href="/admin/asistente" className="font-semibold underline">Recargar tokens</Link>
+          </p>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

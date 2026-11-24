@@ -174,3 +174,24 @@ export async function retryNotification(fd: FormData) {
   await deliver(id);
   revalidatePath("/admin/notificaciones");
 }
+
+/* ---------------------------------------------------------------- account */
+
+export async function changePassword(_: ActionState, fd: FormData): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const current = String(fd.get("current") ?? "");
+  const next = String(fd.get("next") ?? "");
+  const confirm = String(fd.get("confirm") ?? "");
+  const rl = rateLimit(`pw-change:${admin.id}`, 5, 15 * 60_000);
+  if (!rl.ok) return { error: "Demasiados intentos. Espera 15 minutos." };
+  if (next.length < 12) return { error: "La nueva contraseña debe tener al menos 12 caracteres." };
+  if (next !== confirm) return { error: "Las dos contraseñas nuevas no coinciden." };
+  if (next === current) return { error: "La nueva contraseña debe ser distinta de la actual." };
+  const db = await getDb();
+  const [u] = await db.select().from(schema.adminUsers).where(eq(schema.adminUsers.id, admin.id));
+  if (!u || !(await verifyPassword(current, u.passwordHash))) return { error: "La contraseña actual no es correcta." };
+  const { hashPassword } = await import("@/lib/auth/password");
+  await db.update(schema.adminUsers).set({ passwordHash: await hashPassword(next) }).where(eq(schema.adminUsers.id, admin.id));
+  log.info("admin.password_changed", {});
+  return { ok: true };
+}

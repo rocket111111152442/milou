@@ -210,13 +210,13 @@ describe("hand-off, visits and safety", () => {
     expect(m.calls).toHaveLength(6);
   });
 
-  it("switches to fallback when the monthly budget is spent", async () => {
+  it("switches to fallback when the assistant tokens are spent", async () => {
     const db = await getDb();
     await db.insert(schema.aiUsage).values({ day: new Date().toISOString().slice(0, 10), model: "claude-opus-5-5", costUsd: 1000, outcome: "ok" });
     const r = await runTurn(await state(), "hola", "es", { type: "other" }, async () => {
       throw new Error("must not be called");
     });
-    expect(r).toMatchObject({ mode: "fallback", reason: "monthly_budget" });
+    expect(r).toMatchObject({ mode: "fallback", reason: "credits_exhausted" });
     await db.delete(schema.aiUsage).where(eq(schema.aiUsage.costUsd, 1000));
   });
 });

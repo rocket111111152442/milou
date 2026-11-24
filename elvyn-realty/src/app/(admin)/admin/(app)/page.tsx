@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { dashboardData } from "@/lib/crm/queries";
 import { usageSummary } from "@/lib/ai/usage";
+import { creditStatus } from "@/lib/ai/credits";
+import { TokenGauge } from "@/components/admin/TokenGauge";
 import { Card, ContactLink, Empty, PriorityBadge, TempBadge, fmtDate } from "@/components/admin/ui";
 
 export const metadata = { title: "Panel" };
 
 export default async function Dashboard() {
-  const [d, usage] = await Promise.all([dashboardData(), usageSummary()]);
+  const [d, usage, credit] = await Promise.all([dashboardData(), usageSummary(), creditStatus()]);
   const stats = [
     { label: "Nuevos (sin tratar)", value: d.counts.nuevos, href: "/admin/prospectos?status=nuevo" },
     { label: "Calientes activos", value: d.counts.calientes, href: "/admin/prospectos?temperature=caliente" },
@@ -77,10 +79,9 @@ export default async function Dashboard() {
             </ul>
           )}
         </Card>
-        <Card title="Asistente IA · consumo del mes">
-          <p className="text-sm">Coste estimado: <strong>US${usage.monthCostUsd.toFixed(2)}</strong> de US${usage.budgetUsd} de presupuesto mensual · Conversaciones hoy: {usage.todayTurns}/{usage.dailyTurnLimit} mensajes</p>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-navy-50"><div className="h-full bg-brand" style={{ width: `${Math.min(100, (usage.monthCostUsd / Math.max(usage.budgetUsd, 0.01)) * 100)}%` }} /></div>
-          <p className="mt-2 text-xs text-ink-muted">Estimación calculada con los tokens que devuelve la API y la tarifa pública del modelo. Al alcanzar el presupuesto, el asistente pasa a modo de contacto directo.</p>
+        <Card title="Asistente IA" action={<Link href="/admin/asistente" className="text-sm font-medium text-brand-dark hover:underline">Recargar</Link>}>
+          <TokenGauge s={credit} compact />
+          <p className="mt-2 text-xs text-ink-muted">Mensajes de visitantes hoy: {usage.todayTurns} (límite diario {usage.dailyTurnLimit}).</p>
         </Card>
       </div>
     </div>

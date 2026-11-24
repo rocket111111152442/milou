@@ -22,7 +22,10 @@ export interface UsageLike {
  * https://openai.com/api/pricing and override with AI_PRICE_INPUT/OUTPUT_PER_MTOK if they change.
  * Cached input is counted at 25 % of the input price.
  */
-const OPENAI_PRICES: Record<string, { input: number; output: number }> = {
+const OPENAI_PRICES: Record<string, { input: number; output: number; cachedFactor?: number }> = {
+  // GPT-5.4: $2.50 / $15 per 1M, cached input $0.25 (third-party listings, Nov 2026; confirm on openai.com/api/pricing)
+  "gpt-5.4": { input: 2.5, output: 15, cachedFactor: 0.1 },
+  "gpt-5.4-mini": { input: 0.75, output: 4.5, cachedFactor: 0.1 },
   "gpt-4.1-mini": { input: 0.4, output: 1.6 },
   "gpt-4.1": { input: 2, output: 8 },
   "gpt-4o-mini": { input: 0.15, output: 0.6 },
@@ -35,9 +38,10 @@ export function estimateCostUsd(model: string, u: UsageLike): number {
     return ((u.input_tokens ?? 0) * env.ai.priceInputPerMTok + read * env.ai.priceInputPerMTok * 0.25 + (u.output_tokens ?? 0) * env.ai.priceOutputPerMTok) / 1e6;
   }
   if (!model.startsWith("claude")) {
-    const op = OPENAI_PRICES[model] ?? { input: 2.5, output: 10 }; // unknown model: count conservatively
+    const known = OPENAI_PRICES[model] ?? Object.entries(OPENAI_PRICES).find(([k]) => model.startsWith(k + "-"))?.[1];
+    const op = known ?? { input: 2.5, output: 15 }; // unknown model: count conservatively
     const read = u.cache_read_input_tokens ?? 0;
-    return ((u.input_tokens ?? 0) * op.input + read * op.input * 0.25 + (u.output_tokens ?? 0) * op.output) / 1e6;
+    return ((u.input_tokens ?? 0) * op.input + read * op.input * (op.cachedFactor ?? 0.25) + (u.output_tokens ?? 0) * op.output) / 1e6;
   }
   const p = PRICES[model] ?? PRICES["claude-opus-5-5"]; // unknown model: count conservatively
   const inTok = u.input_tokens ?? 0;
@@ -92,7 +96,11 @@ export async function usageSummary() {
 /** Returns a reason string when the assistant must switch to fallback mode. */
 export async function budgetBlock(): Promise<string | null> {
   const s = await usageSummary();
-  if (s.monthCostUsd >= s.budgetUsd) return "monthly_budget";
+  if (s.budgetUsd > 0 && s.monthCostUsd >= s.budgetUsd) return "monthly_budget";
   if (s.todayTurns >= s.dailyTurnLimit) return "daily_limit";
+  if (env.ai.creditsEnabled) {
+    const { creditStatus } = await import("./credits");
+    if ((await creditStatus()).exhausted) return "credits_exhausted";
+  }
   return null;
 }

@@ -2,7 +2,8 @@ import { env, catalogMode, crmStorageConfigured } from "@/config/env";
 import { PIPELINE, QUALIFICATION } from "@/config/crm";
 import { catalogStatus } from "@/lib/catalog/service";
 import { assistantAvailable } from "@/lib/ai/agent";
-import { usageSummary } from "@/lib/ai/usage";
+import { creditStatus } from "@/lib/ai/credits";
+import { paymentsConfigured } from "@/lib/payments/stripe";
 import { getCalendar } from "@/lib/calendar";
 import { KNOWLEDGE_VERSION } from "@/lib/ai/knowledge";
 import { Card, fmtDate } from "@/components/admin/ui";
@@ -21,7 +22,7 @@ function Row({ k, v, ok }: { k: string; v: React.ReactNode; ok?: boolean }) {
 export default async function Settings() {
   const cs = catalogStatus();
   const ai = assistantAvailable();
-  const usage = await usageSummary();
+  const credit = await creditStatus();
   return (
     <div className="space-y-6">
       <h1 className="font-display text-3xl font-semibold">Configuración</h1>
@@ -37,11 +38,10 @@ export default async function Settings() {
         </Card>
         <Card title="Asistente IA">
           <dl>
-            <Row k="Estado" v={ai.ok ? "Activo" : ai.reason === "not_configured" ? `Sin clave ${env.ai.provider === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY"} (modo contacto directo)` : "Desactivado"} ok={ai.ok} />
-            <Row k="Proveedor" v={env.ai.provider === "openai" ? "OpenAI" : "Anthropic (Claude)"} />
-            <Row k="Modelo / esfuerzo" v={`${env.ai.model} · ${env.ai.effort}`} />
+            <Row k="Estado" v={ai.ok ? "Activo" : ai.reason === "not_configured" ? "Sin configurar (modo contacto directo)" : "Desactivado"} ok={ai.ok} />
             <Row k="Base de conocimiento" v={`Documento del ${KNOWLEDGE_VERSION}`} />
-            <Row k="Presupuesto mensual" v={`US$${usage.monthCostUsd.toFixed(2)} / US$${usage.budgetUsd}`} ok={usage.monthCostUsd < usage.budgetUsd} />
+            <Row k="Tokens restantes" v={`${credit.exhausted ? 0 : credit.percentLeft} %`} ok={!credit.exhausted && credit.percentLeft > 10} />
+            <Row k="Recarga en línea" v={paymentsConfigured() ? "Stripe configurado" : "Stripe no configurado"} ok={paymentsConfigured()} />
             <Row k="Límites" v={`${env.ai.maxTurnsPerSession} mensajes/conversación · ${env.ai.dailyMessageLimit}/día · ${env.ai.perIpPer10Min}/10 min por IP`} />
           </dl>
         </Card>

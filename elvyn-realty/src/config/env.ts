@@ -61,7 +61,16 @@ export const env = {
     maxTurnsPerSession: int("AI_MAX_TURNS_PER_SESSION", 30),
     maxToolRounds: int("AI_MAX_TOOL_ROUNDS", 5),
     dailyMessageLimit: int("AI_DAILY_MESSAGE_LIMIT", 400),
-    monthlyBudgetUsd: num("AI_MONTHLY_BUDGET_USD", 40) ?? 40,
+    /** Optional hard monthly cap in USD (0 = none; the credit balance is the main limit). */
+    monthlyBudgetUsd: num("AI_MONTHLY_BUDGET_USD", 0) ?? 0,
+    /** Credit system: the assistant stops (fallback mode) when the credit balance is used up. */
+    creditsEnabled: str("AI_CREDITS", "on") !== "off",
+    /** Initial credit in USD of AI usage, granted once. */
+    initialCreditUsd: num("AI_CREDIT_INITIAL_USD", 15) ?? 15,
+    /** Share of each top-up payment converted into AI credit (0.4 → 20 € buys 8 USD of usage). */
+    creditShare: num("AI_CREDIT_SHARE", 0.4) ?? 0.4,
+    /** Optional reasoning effort for GPT-5 models (none, minimal, low, medium, high). */
+    reasoningEffort: str("AI_REASONING_EFFORT", "low"),
     perIpPer10Min: int("AI_RATE_LIMIT_PER_IP_10MIN", 25),
   },
 
@@ -92,6 +101,16 @@ export const env = {
   },
 
   calendar: { provider: str("CALENDAR_PROVIDER", "none") },
+
+  stripe: {
+    secretKey: str("STRIPE_SECRET_KEY"),
+    webhookSecret: str("STRIPE_WEBHOOK_SECRET"),
+    currency: str("STRIPE_CURRENCY", "eur").toLowerCase(),
+    /** Top-up amounts offered (in STRIPE_CURRENCY units). */
+    packs: list("CREDIT_PACKS", ["20", "50", "100"]).map(Number).filter((n) => n > 0),
+    minAmount: num("CREDIT_MIN_AMOUNT", 10) ?? 10,
+    maxAmount: num("CREDIT_MAX_AMOUNT", 1000) ?? 1000,
+  },
   cronSecret: str("CRON_SECRET"),
 };
 

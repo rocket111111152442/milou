@@ -174,3 +174,17 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   sentAt: timestamp("sent_at", { withTimezone: true }),
 }, (t) => [uniqueIndex("notifications_key_idx").on(t.idempotencyKey)]);
+
+/**
+ * Assistant credit ledger (USD of AI usage). Balance = sum(credits) − sum(ai_usage.cost_usd).
+ * The client only ever sees a percentage, never these amounts.
+ */
+export const aiCredits = pgTable("ai_credits", {
+  id: serial("id").primaryKey(),
+  kind: text("kind").notNull(), // initial | purchase | adjustment
+  amountUsd: real("amount_usd").notNull(),
+  paidAmount: real("paid_amount"), // what the client paid (in paid_currency), purchases only
+  paidCurrency: text("paid_currency"),
+  externalId: text("external_id"), // Stripe Checkout Session id, or "initial"
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex("ai_credits_external_idx").on(t.externalId)]);

@@ -105,4 +105,30 @@ describe("OpenAI provider", () => {
     expect(choices.at(-1)).toBe("none");
     expect(r.text).toBe("Resumen");
   });
+
+  it("sends reasoning_effort to GPT-5 models and retries without it if refused", async () => {
+    const OpenAI = (await import("openai")).default;
+    const { env } = await import("@/config/env");
+    const { __resetOpenAIModelForTests } = await import("@/lib/ai/openai-agent");
+    __resetOpenAIModelForTests();
+    const prev = env.ai.model;
+    (env.ai as { model: string }).model = "gpt-5.4";
+    try {
+      const state = await store.createSession(randomUUID(), "es");
+      const seen: Record<string, unknown>[] = [];
+      const r = await mod.runTurn(state, "hola", "es", { type: "other" }, undefined, async (p: any) => {
+        seen.push({ ...p, messages: undefined });
+        if (seen.length === 1) throw new OpenAI.BadRequestError(400, { message: "Unsupported parameter: 'reasoning_effort'" }, undefined, new Headers());
+        return completion({ content: "¡Hola!" });
+      });
+      expect(r.text).toBe("¡Hola!");
+      expect(seen[0]).toMatchObject({ model: "gpt-5.4", reasoning_effort: "low" });
+      expect(seen[0].max_completion_tokens).toBeGreaterThanOrEqual(4000);
+      expect(seen[1].model).toBe("gpt-5.4");
+      expect(seen[1]).not.toHaveProperty("reasoning_effort");
+    } finally {
+      (env.ai as { model: string }).model = prev;
+      __resetOpenAIModelForTests();
+    }
+  });
 });

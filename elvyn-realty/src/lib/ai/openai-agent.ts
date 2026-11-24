@@ -26,9 +26,10 @@ export const OPENAI_TOOLS: ChatCompletionTool[] = TOOL_DEFINITIONS.map((t) => ({
 
 /** Models tried in order if the configured one is not available on the account. */
 function modelChain(): string[] {
-  return [...new Set([env.ai.model, "gpt-4.1-mini", "gpt-4o-mini"])];
+  return [...new Set([env.ai.model, "gpt-5.4-mini", "gpt-4.1-mini"])];
 }
 let workingModel: string | null = null;
+let reasoningSupported = true;
 
 /**
  * One visitor turn with OpenAI: append-only transcript (OpenAI message format), bounded tool loop,
@@ -71,20 +72,34 @@ export async function runTurnOpenAI(
       const lastRound = round === env.ai.maxToolRounds;
       let res: ChatCompletion | null = null;
       for (const model of workingModel ? [workingModel] : modelChain()) {
+        const reasoning = /^(gpt-5|o\d)/.test(model) && reasoningSupported && env.ai.reasoningEffort ? env.ai.reasoningEffort : null;
+        const params = {
+          model,
+          // Reasoning models spend part of this budget thinking: give them more room.
+          max_completion_tokens: reasoning ? Math.max(env.ai.maxOutputTokens, 4000) : env.ai.maxOutputTokens,
+          messages: [{ role: "system" as const, content: systemPrompt() }, ...replay, ...newMessages.map((m) => m.raw)],
+          tools: OPENAI_TOOLS,
+          tool_choice: lastRound ? ("none" as const) : ("auto" as const),
+          parallel_tool_calls: true,
+          ...(reasoning ? { reasoning_effort: reasoning as ChatCompletionCreateParamsNonStreaming["reasoning_effort"] } : {}),
+        } satisfies ChatCompletionCreateParamsNonStreaming;
         try {
-          res = await create({
-            model,
-            max_completion_tokens: env.ai.maxOutputTokens,
-            messages: [{ role: "system", content: systemPrompt() }, ...replay, ...newMessages.map((m) => m.raw)],
-            tools: OPENAI_TOOLS,
-            tool_choice: lastRound ? "none" : "auto",
-            parallel_tool_calls: true,
-          });
+          res = await create(params);
           workingModel = model;
           break;
         } catch (err) {
           const status = err instanceof OpenAI.APIError ? err.status : null;
-          if (status === 404 || (status === 400 && /model/i.test((err as Error).message))) {
+          const message = (err as Error).message ?? "";
+          if (status === 400 && reasoning && /reasoning/i.test(message)) {
+            // The model refuses this parameter: retry once without it.
+            reasoningSupported = false;
+            const { reasoning_effort: _drop, ...rest } = params as typeof params & { reasoning_effort?: unknown };
+            void _drop;
+            res = await create(rest);
+            workingModel = model;
+            break;
+          }
+          if (status === 404 || (status === 400 && /model/i.test(message) && !/reasoning|parameter/i.test(message))) {
             log.warn("ai.openai_model_unavailable", { model });
             continue;
           }
@@ -161,4 +176,5 @@ export async function runTurnOpenAI(
 
 export function __resetOpenAIModelForTests() {
   workingModel = null;
+  reasoningSupported = true;
 }

@@ -88,13 +88,21 @@ Autres hébergeurs Node.js : `npm run build && npm start`, et appeler `GET /api/
 ## Assistant IA
 
 - Deux fournisseurs possibles, appels uniquement côté serveur (`/api/chat`) :
-  - **OpenAI** si `OPENAI_API_KEY` est défini : modèle par défaut `gpt-4.1-mini` (si indisponible sur le compte, essai automatique de `gpt-4o-mini`).
+  - **OpenAI** si `OPENAI_API_KEY` est défini : modèle par défaut `gpt-4.1-mini`, `gpt-5.4` en production via `AI_MODEL` (si indisponible sur le compte, essai automatique de `gpt-5.4-mini` puis `gpt-4.1-mini`). Pour les modèles GPT-5, `reasoning_effort` = `AI_REASONING_EFFORT` (retiré automatiquement si l'API le refuse).
   - **Anthropic** si `ANTHROPIC_API_KEY` est défini : modèle par défaut `claude-opus-5-5`, effort `low`.
   - `AI_PROVIDER` force le choix, `AI_MODEL` change le modèle.
 - Connaissances : `data/knowledge/base-conocimiento.md` (copie du document de Drive du 23/11/2026). Mettre ce fichier à jour quand Elvyn modifie le document.
 - Outils serveur (validés par Zod) : `search_properties`, `get_property`, `show_properties` (n'accepte que des annonces renvoyées par le catalogue), `update_prospect_profile`, `propose_handoff`. Aucun outil n'accède au CRM, aux notes ni aux autres conversations.
 - Les coordonnées n'entrent dans le CRM que lorsque le visiteur clique « Enviar a Elvyn » (case de consentement) ; une visite reste « pendiente de confirmación ».
-- Garde-fous : 5 tours d'outils maximum par message (le dernier interdit les outils), 30 messages par conversation, 400 messages/jour, 25 messages/10 min par IP, budget mensuel (`AI_MONTHLY_BUDGET_USD`, coût estimé à partir des jetons renvoyés par l'API et suivi dans *CRM → Panel*).
+- Garde-fous : 5 tours d'outils maximum par message (le dernier interdit les outils), 30 messages par conversation, 400 messages/jour, 25 messages/10 min par IP, crédits de tokens (ci-dessous) et plafond mensuel optionnel `AI_MONTHLY_BUDGET_USD`.
+
+### Tokens et recharges (Stripe)
+
+- Coût de chaque appel estimé à partir des jetons renvoyés par l'API et du tarif public du modèle (`src/lib/ai/usage.ts`, surcharge possible par `AI_PRICE_*`).
+- Solde = crédit initial (`AI_CREDIT_INITIAL_USD`, 15 par défaut) + recharges − consommation. Le CRM n'affiche **qu'un pourcentage** (« Tokens restantes ») et une estimation du nombre de messages, jamais de montant en dollars.
+- À 0 %, l'assistant passe en mode « contact direct » (WhatsApp, téléphone, formulaire) ; bandeau d'alerte dans le CRM dès 15 %.
+- *CRM → Asistente IA* : recharge par Stripe Checkout (`CREDIT_PACKS`, montant libre entre `CREDIT_MIN_AMOUNT` et `CREDIT_MAX_AMOUNT`). Le webhook `POST /api/stripe/webhook` vérifie la signature et n'ajoute le crédit qu'une fois par session payée : `montant payé × AI_CREDIT_SHARE` (0,4 → 20 € = 8 de crédit IA). Le montant en euros est converti 1:1 en unités de crédit USD (pas de taux de change).
+- Configuration : `STRIPE_SECRET_KEY`, puis dans Stripe *Developers → Webhooks* un point de terminaison `https://<domaine>/api/stripe/webhook` pour `checkout.session.completed` et `checkout.session.async_payment_succeeded`, dont le secret va dans `STRIPE_WEBHOOK_SECRET`.
 - Historique transmis tel quel (ajout seulement) : préserve le cache de prompt et les blocs de réflexion du modèle.
 
 ## CRM (`/admin`)

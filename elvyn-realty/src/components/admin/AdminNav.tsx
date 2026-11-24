@@ -7,7 +7,9 @@ const items = [
   { href: "/admin/prospectos", label: "Prospectos" },
   { href: "/admin/citas", label: "Visitas" },
   { href: "/admin/notificaciones", label: "Notificaciones" },
+  { href: "/admin/asistente", label: "Asistente IA" },
   { href: "/admin/ajustes", label: "Configuración" },
+  { href: "/admin/cuenta", label: "Mi cuenta" },
 ];
 
 export function AdminNav() {
