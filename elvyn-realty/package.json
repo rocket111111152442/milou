@@ -12,7 +12,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/migrate.ts",
-    "admin:create": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/create-admin.ts"
+    "admin:create": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/create-admin.ts",
+    "admin:hash": "tsx scripts/hash-password.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.13.0",

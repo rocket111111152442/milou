@@ -10,6 +10,10 @@ const securityHeaders = [
 const config: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["@electric-sql/pglite", "pg"],
+  // Files read at runtime with fs (demo catalogue, knowledge base, SQL migrations, PGlite WASM)
+  outputFileTracingIncludes: {
+    "/**": ["./data/**/*", "./drizzle/**/*", "./node_modules/@electric-sql/pglite/dist/**/*"],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
