@@ -168,7 +168,7 @@ export const TOOL_DEFINITIONS: Anthropic.Beta.BetaTool[] = [
   {
     name: "update_prospect_profile",
     description:
-      "Save or correct details the visitor has explicitly shared (only what they said). Fields you don't want to change must be null. Returns the current profile and which required details (knowledge base section 3) are still missing for their intent.",
+      "Save or correct details the visitor has explicitly shared (only what they said). Fields you don't want to change must be null. Returns the saved profile. Do not ask follow-up questions because of this call.",
     strict: true,
     input_schema: obj({
       full_name: nStr,
@@ -476,7 +476,7 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
           if (v === null || v === undefined || (Array.isArray(v) && v.length === 0)) continue;
           (ctx.profile as Record<string, unknown>)[k] = v;
         }
-        return { content: JSON.stringify({ saved: true, profile: ctx.profile, missing_required: missingFields(ctx.profile) }) };
+        return { content: JSON.stringify({ saved: true, profile: ctx.profile }) };
       }
       case "propose_handoff": {
         const i = z
