@@ -149,6 +149,12 @@ describe("hand-off, visits and safety", () => {
     expect(await again.json()).toMatchObject({ ok: true, already: true });
   });
 
+  it("finds features listed only in amenities, with English keywords (regression)", async () => {
+    const ctx = { lang: "en" as const, pageSlug: null, profile: {}, seenSlugs: new Set<string>(), handoff: null, cards: [], executed: new Map() };
+    const r = JSON.parse((await executeTool("search_properties", { operation: "sale", property_types: ["villa"], location: null, budget_min: null, budget_max: 400000, currency: "USD", bedrooms_min: null, bathrooms_min: null, condition: "any", keywords: "pool", sort: "recent", limit: 6 }, ctx)).content);
+    expect(r.total_matches).toBeGreaterThanOrEqual(5);
+  });
+
   it("exposes no tool that can read prospects, notes or other conversations", async () => {
     const names = TOOL_DEFINITIONS.map((t) => t.name).sort();
     expect(names).toEqual(["get_property", "propose_handoff", "search_properties", "show_properties", "update_prospect_profile"]);

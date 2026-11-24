@@ -7,7 +7,7 @@ import { getInventory, getListing, CatalogUnavailable } from "@/lib/catalog/serv
 import { filterListings, fold, impliedUsdDopRate, sortListings } from "@/lib/catalog/local-search";
 import { formatArea, priceLabel, locationLabel, categoryLabel } from "@/lib/catalog/format";
 import { DEFAULT_FILTERS } from "@/lib/catalog/filters";
-import type { ListingSummary, SearchFilters } from "@/lib/catalog/types";
+import type { ListingDetail, ListingSummary, SearchFilters } from "@/lib/catalog/types";
 
 /* ------------------------------------------------------------------ session state */
 
@@ -133,14 +133,14 @@ export const TOOL_DEFINITIONS: Anthropic.Beta.BetaTool[] = [
     input_schema: obj({
       operation: { type: "string", enum: ["sale", "rent", "any"], description: "sale = to buy, rent = to rent" },
       property_types: nullable({ type: "array", items: { type: "string", enum: [...TYPE_KEYS] } }),
-      location: { ...nStr, description: "City, area, sector or development name, e.g. 'Cabrera', 'Río San Juan', 'Coco Bay'" },
+      location: { ...nStr, description: "City, area, sector or development name ONLY if the visitor named one, e.g. 'Cabrera', 'Río San Juan', 'Coco Bay'. Otherwise null." },
       budget_min: nNum,
       budget_max: nNum,
       currency: { type: "string", enum: ["USD", "DOP"], description: "Currency of the budget. USD if unspecified." },
       bedrooms_min: nInt,
       bathrooms_min: nInt,
       condition: { type: "string", enum: ["ready", "construction", "any"] },
-      keywords: { ...nStr, description: "Words to match in titles, e.g. 'vista al mar', 'frente al mar'" },
+      keywords: { ...nStr, description: "Features to require, matched in title, description and amenities, preferably in Spanish (listings are in Spanish), e.g. 'piscina', 'vista al mar', 'amueblado'" },
       sort: { type: "string", enum: ["recent", "price_asc", "price_desc"] },
       limit: { type: "integer", description: "1 to 6" },
     }),
@@ -294,7 +294,44 @@ function locationMatch(l: ListingSummary, loc: string): boolean {
   return q.split(/[\s,]+/).filter((w) => w.length > 2).every((w) => hay.includes(w));
 }
 
-function runSearch(items: ListingSummary[], i: z.infer<typeof searchInput>) {
+/**
+ * Keyword synonyms (listings are written in Spanish; visitors may write in English).
+ * Each keyword matches if any of its variants appears in the title, description or amenities.
+ */
+const SYNONYMS: Record<string, string[]> = {
+  pool: ["piscina", "pool"],
+  piscina: ["piscina", "pool"],
+  beach: ["playa", "beach"],
+  playa: ["playa", "beach"],
+  ocean: ["mar", "ocean", "oceano"],
+  sea: ["mar", "sea"],
+  view: ["vista", "view"],
+  garden: ["jardin", "garden"],
+  furnished: ["amueblad", "furnished"],
+  gated: ["cerrado", "privado", "gated", "seguridad", "vigilancia"],
+  security: ["seguridad", "vigilancia", "security"],
+  parking: ["parqueo", "estacionamiento", "parking"],
+  terrace: ["terraza", "terrace"],
+  gym: ["gimnasio", "gym"],
+  airbnb: ["airbnb"],
+};
+const STOP = new Set(["con", "and", "the", "with", "for", "una", "uno", "los", "las", "del", "que", "near", "cerca"]);
+
+function keywordGroups(keywords: string): string[][] {
+  return fold(keywords)
+    .split(/[\s,]+/)
+    .filter((w) => w.length > 2 && !STOP.has(w))
+    .map((w) => SYNONYMS[w] ?? [w.replace(/(es|s)$/, "")]);
+}
+
+async function haystackFor(l: ListingSummary): Promise<string> {
+  const base = `${l.title} ${l.shortDescription ?? ""}`;
+  const d = "amenities" in l ? (l as ListingDetail) : await getListing(l.slug).catch(() => null);
+  if (!d) return fold(base);
+  return fold(`${base} ${d.descriptionText.slice(0, 4000)} ${d.amenities.join(" ")}`);
+}
+
+async function runSearch(items: ListingSummary[], i: z.infer<typeof searchInput>): Promise<ListingSummary[]> {
   const rate = impliedUsdDopRate(items);
   const f: SearchFilters = {
     ...DEFAULT_FILTERS,
@@ -314,11 +351,20 @@ function runSearch(items: ListingSummary[], i: z.infer<typeof searchInput>) {
   }
   if (i.location) list = list.filter((l) => locationMatch(l, i.location!));
   if (i.keywords) {
-    const words = fold(i.keywords).split(/\s+/).filter((w) => w.length > 2);
-    list = list.filter((l) => {
-      const hay = fold(`${l.title} ${l.shortDescription ?? ""}`);
-      return words.every((w) => hay.includes(w));
-    });
+    const groups = keywordGroups(i.keywords);
+    if (groups.length) {
+      // Amenities and full descriptions come from the (cached) detail; limited to 60 candidates.
+      const candidates = sortListings(list, f, rate).slice(0, 60);
+      const kept: ListingSummary[] = [];
+      for (let k = 0; k < candidates.length; k += 6) {
+        const batch = candidates.slice(k, k + 6);
+        const hays = await Promise.all(batch.map(haystackFor));
+        batch.forEach((l, j) => {
+          if (groups.every((variants) => variants.some((v) => hays[j].includes(v)))) kept.push(l);
+        });
+      }
+      list = kept;
+    }
   }
   return sortListings(list, f, rate);
 }
@@ -338,7 +384,7 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
         const i = searchInput.parse(rawInput);
         const limit = Math.min(Math.max(i.limit || 4, 1), 6);
         const items = await getInventory();
-        const matches = runSearch(items, i);
+        const matches = await runSearch(items, i);
         const shown = matches.slice(0, limit);
         shown.forEach((l) => ctx.seenSlugs.add(l.slug));
         const result: Record<string, unknown> = {
@@ -353,7 +399,7 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
           if (i.property_types?.length) tries.push({ change: "any property type", input: { ...i, property_types: null } });
           if (i.bedrooms_min) tries.push({ change: `bedrooms_min ${Math.max(i.bedrooms_min - 1, 0)}`, input: { ...i, bedrooms_min: Math.max(i.bedrooms_min - 1, 0) } });
           if (i.keywords) tries.push({ change: "without keywords", input: { ...i, keywords: null } });
-          result.broader_options = tries.map((t) => ({ change: t.change, matches: runSearch(items, t.input).length }));
+          result.broader_options = await Promise.all(tries.map(async (t) => ({ change: t.change, matches: (await runSearch(items, t.input)).length })));
           result.instruction = "Tell the visitor nothing matches exactly and ask before broadening.";
         }
         return { content: JSON.stringify(result) };
