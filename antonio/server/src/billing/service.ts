@@ -5,6 +5,47 @@ import { config } from "../config.js";
 import { db, schema } from "../db/client.js";
 import { AppError } from "../lib/audit.js";
 
+export const CREDIT_TOPUPS = [
+  { euros: 20, creditMicros: 8_000_000 },
+  { euros: 50, creditMicros: 20_000_000 },
+  { euros: 100, creditMicros: 40_000_000 },
+] as const;
+
+export async function apiCreditBalance(userId: string) {
+  const [row] = await db().select({ balance: sql<string>`coalesce(sum(${schema.apiCreditLedger.amountMicros}), 0)` })
+    .from(schema.apiCreditLedger).where(eq(schema.apiCreditLedger.userId, userId));
+  return Number(row?.balance ?? 0);
+}
+
+export async function creditTopupFor(user: { userId: string; email: string }, euros: number, requestId: string, client?: Stripe) {
+  if (!billingEnabled()) throw new AppError(503, "billing_unavailable", "Les paiements ne sont pas encore ouverts.");
+  await paidOffer(user.userId);
+  const pack = CREDIT_TOPUPS.find((item) => item.euros === euros);
+  if (!pack) throw new AppError(400, "invalid_topup", "Choisissez une recharge proposée.");
+  const stripe = client ?? stripeClient();
+  const subscription = await subscriptionFor(user.userId);
+  const customer = subscription?.stripeCustomerId ?? (await stripe.customers.create({ email: user.email, metadata: { waverti_user_id: user.userId } }, { idempotencyKey: `waverti-customer:${user.userId}` })).id;
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment", locale: "fr", client_reference_id: user.userId, customer,
+    line_items: [{ quantity: 1, price_data: { currency: "eur", unit_amount: pack.euros * 100, product_data: { name: `Recharge Waverti ${pack.euros} €`, description: `${formatUsd(pack.creditMicros)} de crédit d’utilisation IA.` } } }],
+    metadata: { waverti_user_id: user.userId, waverti_topup_euros: String(pack.euros), waverti_credit_micros: String(pack.creditMicros) },
+    payment_intent_data: { metadata: { waverti_user_id: user.userId, waverti_topup_euros: String(pack.euros), waverti_credit_micros: String(pack.creditMicros) } },
+    success_url: `${config().APP_BASE_URL}/consommation?recharge_session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${config().APP_BASE_URL}/consommation?recharge_annule=1`,
+  }, { idempotencyKey: `waverti-topup:${user.userId}:${requestId}` });
+  return { url: session.url };
+}
+
+export async function grantTopupFromSession(session: Stripe.Checkout.Session, userId: string) {
+  if (session.mode !== "payment" || session.payment_status !== "paid" || session.client_reference_id !== userId || session.metadata?.waverti_user_id !== userId) return false;
+  const pack = CREDIT_TOPUPS.find((item) => item.euros === Number(session.metadata?.waverti_topup_euros));
+  if (!pack || Number(session.metadata?.waverti_credit_micros) !== pack.creditMicros || session.amount_total !== pack.euros * 100 || session.currency !== "eur") return false;
+  await db().insert(schema.apiCreditLedger).values({ userId, amountMicros: pack.creditMicros, kind: "purchase", stripeSessionId: session.id }).onConflictDoNothing({ target: schema.apiCreditLedger.stripeSessionId });
+  return true;
+}
+
+function formatUsd(micros: number) { return `$${(micros / 1_000_000).toFixed(2)} USD`; }
+
 export const billingEnabled = () => Boolean(config().BILLING_ENABLED && config().STRIPE_SECRET_KEY && config().STRIPE_WEBHOOK_SECRET);
 export function stripeClient() {
   if (!config().STRIPE_SECRET_KEY) throw new AppError(503, "billing_unavailable", "Les abonnements payants ne sont pas encore ouverts. Votre espace reste accessible.");

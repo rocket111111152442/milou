@@ -2,7 +2,7 @@ import { and, eq, gte, sql } from "drizzle-orm";
 import { config } from "../config.js";
 import { db, schema } from "../db/client.js";
 import { publish } from "../realtime/hub.js";
-import { billingEnabled, paidOffer } from "../billing/service.js";
+import { apiCreditBalance, billingEnabled, paidOffer } from "../billing/service.js";
 
 /**
  * Consommation mesurée séparément : modèle texte, minutes vocales, traitement
@@ -21,9 +21,26 @@ export async function recordUsage(r: {
   costMicros: number;
   meta?: Record<string, unknown>;
 }) {
-  await db()
-    .insert(schema.usageRecords)
-    .values({ ...r, model: r.model ?? null, meta: r.meta ?? {} });
+  const userId = r.userId;
+  if (userId && r.costMicros > 0 && billingEnabled()) {
+    await db().transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('waverti_credit'), hashtext(${userId}))`);
+      const start = monthStart();
+      const [spentRow] = await tx.select({ total: sql<string>`coalesce(sum(${schema.usageRecords.costMicros}), 0)` })
+        .from(schema.usageRecords).where(and(eq(schema.usageRecords.userId, userId), gte(schema.usageRecords.createdAt, start)));
+      const spentBefore = Number(spentRow.total);
+      const included = await includedMonthlyLimit(r.orgId, userId);
+      const [creditRow] = await tx.select({ balance: sql<string>`coalesce(sum(${schema.apiCreditLedger.amountMicros}), 0)` })
+        .from(schema.apiCreditLedger).where(eq(schema.apiCreditLedger.userId, userId));
+      const creditBalance = Math.max(0, Number(creditRow.balance));
+      await tx.insert(schema.usageRecords).values({ ...r, model: r.model ?? null, meta: r.meta ?? {} });
+      const overage = Math.max(0, spentBefore + r.costMicros - Math.max(spentBefore, included));
+      const debit = Math.min(creditBalance, overage);
+      if (debit > 0) await tx.insert(schema.apiCreditLedger).values({ userId, amountMicros: -debit, kind: "usage" });
+    });
+  } else {
+    await db().insert(schema.usageRecords).values({ ...r, model: r.model ?? null, meta: r.meta ?? {} });
+  }
   if (r.costMicros > 0) await maybeAlert(r.orgId, r.userId);
 }
 
@@ -48,7 +65,7 @@ export interface BudgetRow {
 }
 
 const DEFAULT_BUDGET: BudgetRow = {
-  monthlyLimitMicros: 20_000_000,
+  monthlyLimitMicros: 50_000_000,
   voiceMinutesDaily: 60,
   voiceSessionMaxMinutes: 15,
   actionsDaily: 100,
@@ -65,12 +82,19 @@ export async function getBudget(scopeType: "org" | "user", scopeId: string): Pro
 }
 
 /** Limites effectives : la plus restrictive entre l'utilisateur et l'organisation. */
-export async function effectiveBudget(orgId: string, userId: string): Promise<BudgetRow & { orgMonthlyLimitMicros: number }> {
+export async function effectiveBudget(orgId: string, userId: string): Promise<BudgetRow & { orgMonthlyLimitMicros: number; baseMonthlyLimitMicros: number; topupBalanceMicros: number }> {
   const [org, user] = await Promise.all([getBudget("org", orgId), getBudget("user", userId)]);
   const plan = billingEnabled() ? await paidOffer(userId) : null;
+  const included = Math.min(org.monthlyLimitMicros, user.monthlyLimitMicros, plan?.aiBudgetMicros ?? 20_000_000);
+  const [credits, spent] = await Promise.all([apiCreditBalance(userId), monthCost(orgId, userId)]);
+  const spentAboveIncluded = Math.max(0, spent - included);
+  const monthlyLimitMicros = included + Math.max(0, credits) + spentAboveIncluded;
+  const orgIncluded = Math.min(org.monthlyLimitMicros, plan?.aiBudgetMicros ?? 20_000_000);
   return {
-    monthlyLimitMicros: Math.min(org.monthlyLimitMicros, user.monthlyLimitMicros, plan?.aiBudgetMicros ?? Infinity),
-    orgMonthlyLimitMicros: org.monthlyLimitMicros,
+    monthlyLimitMicros,
+    orgMonthlyLimitMicros: orgIncluded + Math.max(0, credits) + spentAboveIncluded,
+    baseMonthlyLimitMicros: included,
+    topupBalanceMicros: Math.max(0, credits),
     voiceMinutesDaily: Math.min(org.voiceMinutesDaily, user.voiceMinutesDaily),
     voiceSessionMaxMinutes: Math.min(org.voiceSessionMaxMinutes, user.voiceSessionMaxMinutes),
     actionsDaily: Math.min(org.actionsDaily, user.actionsDaily),
@@ -85,6 +109,12 @@ export async function setBudget(scopeType: "org" | "user", scopeId: string, valu
     .insert(schema.budgets)
     .values({ scopeType, scopeId, ...current, ...values })
     .onConflictDoUpdate({ target: [schema.budgets.scopeType, schema.budgets.scopeId], set: { ...values, updatedAt: new Date() } });
+}
+
+async function includedMonthlyLimit(orgId: string, userId: string) {
+  const [org, user] = await Promise.all([getBudget("org", orgId), getBudget("user", userId)]);
+  const plan = billingEnabled() ? await paidOffer(userId) : null;
+  return Math.min(org.monthlyLimitMicros, user.monthlyLimitMicros, plan?.aiBudgetMicros ?? 20_000_000);
 }
 
 function monthStart() {

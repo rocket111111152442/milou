@@ -130,6 +130,22 @@ export const billingEvents = pgTable("billing_events", {
   processedAt: timestamp("processed_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const apiCreditLedger = pgTable(
+  "api_credit_ledger",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    amountMicros: bigint("amount_micros", { mode: "number" }).notNull(),
+    kind: text("kind").notNull(), // purchase | usage
+    stripeSessionId: text("stripe_session_id"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("api_credit_stripe_session_unique").on(t.stripeSessionId),
+    index("api_credit_user_created").on(t.userId, t.createdAt),
+  ],
+);
+
 export const autonomy = pgTable(
   "autonomy",
   {

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type Stripe from "stripe";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { PLAN_IDS, OFFERS } from "@antonio/shared";
@@ -6,14 +7,14 @@ import { actorOf } from "../app.js";
 import { config, providerConfigured } from "../config.js";
 import { db, schema } from "../db/client.js";
 import { AppError } from "../lib/audit.js";
-import { billingEnabled, checkoutFor, stripeClient, subscriptionFor, refreshSubscription } from "../billing/service.js";
+import { apiCreditBalance, billingEnabled, checkoutFor, creditTopupFor, grantTopupFromSession, stripeClient, subscriptionFor, refreshSubscription } from "../billing/service.js";
 
 export async function billingRoutes(app: FastifyInstance) {
   app.get("/api/public/status", async () => ({ billingEnabled: billingEnabled(), offers: OFFERS, services: { ai: providerConfigured("openai"), voice: providerConfigured("openai"), google: providerConfigured("google"), microsoft: providerConfigured("microsoft"), automationApi: true } }));
   app.get("/api/billing", async (req) => {
     const user = actorOf(req);
     const row = await subscriptionFor(user.userId);
-    return { enabled: billingEnabled(), offers: OFFERS, subscription: row ? { requestedPlan: row.requestedPlan, plan: row.plan, status: row.status, cancelAtPeriodEnd: row.cancelAtPeriodEnd, hasCustomer: Boolean(row.stripeCustomerId) } : null };
+    return { enabled: billingEnabled(), offers: OFFERS, creditBalanceMicros: await apiCreditBalance(user.userId), subscription: row ? { requestedPlan: row.requestedPlan, plan: row.plan, status: row.status, cancelAtPeriodEnd: row.cancelAtPeriodEnd, hasCustomer: Boolean(row.stripeCustomerId) } : null };
   });
   app.put("/api/billing/preference", async (req) => {
     const user = actorOf(req);
@@ -24,6 +25,19 @@ export async function billingRoutes(app: FastifyInstance) {
   app.post("/api/billing/checkout", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (req) => {
     const { plan, requestId } = z.object({ plan: z.enum(PLAN_IDS), requestId: z.string().uuid() }).parse(req.body);
     return checkoutFor(actorOf(req), plan, requestId);
+  });
+  app.post("/api/billing/topup-checkout", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (req) => {
+    const { euros, requestId } = z.object({ euros: z.union([z.literal(20), z.literal(50), z.literal(100)]), requestId: z.string().uuid() }).parse(req.body);
+    return creditTopupFor(actorOf(req), euros, requestId);
+  });
+  app.post("/api/billing/topup-confirm", async (req) => {
+    const user = actorOf(req);
+    if (!billingEnabled()) throw new AppError(503, "billing_unavailable", "La facturation n’est pas activée.");
+    const { sessionId } = z.object({ sessionId: z.string().startsWith("cs_").max(250) }).parse(req.body);
+    const session = await stripeClient().checkout.sessions.retrieve(sessionId);
+    if (session.client_reference_id !== user.userId) throw new AppError(404, "not_found", "Recharge inconnue.");
+    const confirmed = await grantTopupFromSession(session, user.userId);
+    return { confirmed, creditBalanceMicros: await apiCreditBalance(user.userId) };
   });
   app.post("/api/billing/confirm", async (req) => {
     const user = actorOf(req);
@@ -55,8 +69,9 @@ export async function billingRoutes(app: FastifyInstance) {
       if (seen) return reply.send({ received: true });
       if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(event.type)) await refreshSubscription((event.data.object as { id: string }).id);
       if (event.type === "checkout.session.completed") {
-        const object = event.data.object as { subscription: string | { id: string } | null };
+        const object = event.data.object as Stripe.Checkout.Session;
         if (object.subscription) await refreshSubscription(typeof object.subscription === "string" ? object.subscription : object.subscription.id);
+        else if (object.mode === "payment" && object.metadata?.waverti_user_id) await grantTopupFromSession(object, object.metadata.waverti_user_id);
       }
       await db().insert(schema.billingEvents).values({ id: event.id }).onConflictDoNothing();
       return { received: true };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -13,7 +13,7 @@ import {
   type ConnectionDTO,
   type ConnectorDescriptor,
 } from "@antonio/shared";
-import { api, queryClient } from "../lib/api";
+import { api, queryClient, uid } from "../lib/api";
 import { fmtDateTime, fmtRelative } from "../lib/format";
 import { useApp } from "../lib/app-state";
 import { Card, DemoBadge, Disclosure, Empty, Loading, PageHead } from "../components/ui";
@@ -456,7 +456,7 @@ export function RulesPage() {
 interface UsageResp {
   month: string;
   byKind: { kind: string; unit: string; quantity: number; costMicros: number }[];
-  budget: { monthlyLimitMicros: number; voiceMinutesDaily: number; voiceSessionMaxMinutes: number; actionsDaily: number; agentStepsPerTurn: number; alertThresholdPct: number; orgMonthlyLimitMicros: number };
+  budget: { monthlyLimitMicros: number; baseMonthlyLimitMicros: number; topupBalanceMicros: number; voiceMinutesDaily: number; voiceSessionMaxMinutes: number; actionsDaily: number; agentStepsPerTurn: number; alertThresholdPct: number; orgMonthlyLimitMicros: number };
   userMonthMicros: number;
   orgMonthMicros: number;
   voiceSecondsToday: number;
@@ -469,7 +469,25 @@ const KIND_LABELS: Record<string, string> = { text_model: "Assistant écrit", vo
 
 export function UsagePage() {
   const { toast } = useApp();
+  const [params, setParams] = useSearchParams();
   const q = useQuery({ queryKey: ["usage"], queryFn: () => api<UsageResp>("/api/usage") });
+  const billing = useQuery({ queryKey: ["billing"], queryFn: () => api<{ enabled: boolean; subscription: { plan: string | null; status: string } | null }>("/api/billing") });
+  const confirmedSession = useRef<string | null>(null);
+  const topup = useMutation({
+    mutationFn: (euros: 20 | 50 | 100) => api<{ url: string }>("/api/billing/topup-checkout", { body: { euros, requestId: uid() } }),
+    onSuccess: (result) => { window.location.href = result.url; },
+    onError: (error: Error) => toast(error.message),
+  });
+  useEffect(() => {
+    const sessionId = params.get("recharge_session_id");
+    if (!billing.data?.enabled || !sessionId || confirmedSession.current === sessionId) return;
+    confirmedSession.current = sessionId;
+    void api<{ confirmed: boolean }>("/api/billing/topup-confirm", { body: { sessionId } }).then((result) => {
+      toast(result.confirmed ? "Recharge confirmée. Votre crédit est ajouté." : "Paiement en cours de confirmation.");
+      void queryClient.invalidateQueries({ queryKey: ["usage"] });
+      setParams({}, { replace: true });
+    }).catch((error: Error) => toast(error.message));
+  }, [billing.data?.enabled, params, setParams, toast]);
   const [limit, setLimit] = useState<string>("");
   const [voiceMin, setVoiceMin] = useState<string>("");
   const save = useMutation({
@@ -484,20 +502,47 @@ export function UsagePage() {
   if (!q.data) return <div className="page"><Loading /></div>;
   const u = q.data;
   const pct = Math.min(100, Math.round(u.ratio * 100));
+  const textUsage = u.byKind
+    .filter((item) => item.kind === "text_model" && item.unit === "tokens")
+    .reduce((total, item) => ({ tokens: total.tokens + item.quantity, costMicros: total.costMicros + item.costMicros }), { tokens: 0, costMicros: 0 });
+  const tokenCreditPct = u.budget.baseMonthlyLimitMicros > 0
+    ? Math.min(100, Math.round((textUsage.costMicros / u.budget.baseMonthlyLimitMicros) * 100))
+    : 0;
+  const canTopUp = billing.data?.enabled && billing.data.subscription && ["active", "trialing"].includes(billing.data.subscription.status);
   return (
     <div className="page stack-16">
       <PageHead title="Votre consommation" subtitle={`Mois ${u.month} · coûts estimés en dollars.`} />
       <Card title="Budget du mois">
         <div className="card-body stack-12">
           <div className="spread small">
-            <strong>{pct}% utilisés</strong>
+            <strong>{pct}% du budget utilisé</strong>
             <span className="muted">{formatUsdFromMicros(u.userMonthMicros)} sur {formatUsdFromMicros(u.budget.monthlyLimitMicros)}</span>
           </div>
           <div className={`progress ${pct >= 100 ? "bad" : pct >= u.budget.alertThresholdPct ? "warn" : ""}`}><div style={{ width: `${pct}%` }} /></div>
-          <div className="small muted">Limite mensuelle prévue selon votre offre</div>
+          <div className="small muted">Plafond mensuel prévu selon votre offre</div>
+          <div className="stack-8">
+            <div className="spread small">
+              <strong>Tokens IA utilisés</strong>
+              <span className="muted">{textUsage.tokens.toLocaleString("fr-FR")} tokens · {tokenCreditPct}% du plafond mensuel</span>
+            </div>
+            <div className={`progress ${tokenCreditPct >= 100 ? "bad" : tokenCreditPct >= u.budget.alertThresholdPct ? "warn" : ""}`}><div style={{ width: `${tokenCreditPct}%` }} /></div>
+            <div className="tiny muted">Part du plafond API consommée par les tokens des demandes écrites.</div>
+          </div>
+          <div className="small muted">Crédit de recharge restant : {formatUsdFromMicros(u.budget.topupBalanceMicros)}</div>
           {u.exceeded && <div className="danger-box">Budget atteint. L’IA et la voix sont en pause.</div>}
           <p className="small muted">Voix aujourd’hui : {Math.round(u.voiceSecondsToday / 60)} / {u.budget.voiceMinutesDaily} min</p>
           <Disclosure title="Voir les plafonds"><div className="stack-8 small muted"><span>{u.budget.voiceSessionMaxMinutes} min par conversation vocale</span><span>{u.budget.actionsDaily} actions par jour</span><span>{u.budget.agentStepsPerTurn} étapes par demande</span></div></Disclosure>
+        </div>
+      </Card>
+      <Card title="Ajouter du crédit IA">
+        <div className="card-body stack-12">
+          <p className="small muted">Recharge ponctuelle. 40 % du montant devient du crédit API, utilisable après le plafond inclus et conservé jusqu’à épuisement.</p>
+          <div className="row">
+            {([20, 50, 100] as const).map((euros) => <button key={euros} className="btn primary" disabled={!canTopUp || topup.isPending} onClick={() => topup.mutate(euros)}>
+              Ajouter {euros} € · +{euros * 0.4} $ IA
+            </button>)}
+          </div>
+          {!canTopUp && <p className="tiny muted">Les recharges seront disponibles avec un abonnement Stripe actif.</p>}
         </div>
       </Card>
       <Card title="Détail des coûts" collapsible>
