@@ -2,7 +2,7 @@
 
 ## Prérequis
 
-- Un hébergement capable d'exécuter un **processus Node permanent** (SSE, webhooks, worker). Un hébergement purement serverless (Vercel Functions seules) ne suffit pas.
+- Un hébergement Node avec PostgreSQL. Le serveur web peut être exécuté sur Vercel Container Runtime (bêta). Le travail continu hors requêtes exige un worker permanent distinct.
 - PostgreSQL ≥ 14 (Neon, Supabase, Render, RDS…).
 - Un nom de domaine en **HTTPS** pour les webhooks Google/Microsoft et la voix (micro et WebRTC exigent un contexte sécurisé).
 
@@ -43,6 +43,20 @@ L'image n'a pas pu être construite dans l'environnement de développement (pas 
 ## Render
 
 `antonio/render.yaml` décrit le service web, le worker et la base. Dans Render : **New → Blueprint**, choisir ce fichier (le `render.yaml` de la racine concerne Milou), puis renseigner les secrets du groupe `antonio-secrets`. Non testé faute d'accès Render.
+
+## Vercel
+
+Projet `waverti`, répertoire racine `antonio`, preset `Container`, région `fra1`.
+`vercel.json` utilise le Dockerfile existant, qui compile et sert l'interface et l'API ensemble.
+Une base Neon séparée est connectée au projet via l'intégration Vercel, formule Free.
+Le serveur privilégie `DATABASE_URL_UNPOOLED` ou `POSTGRES_URL_NON_POOLING` afin que LISTEN/NOTIFY et les verrous PostgreSQL disposent d'une session directe.
+
+Configurer `APP_BASE_URL` et `API_PUBLIC_URL` avec le domaine de production, `PORT=8787`, `NODE_ENV=production`, une clé `APP_ENCRYPTION_KEY` de 32 octets encodés en base64, et `RUN_WORKER_IN_WEB=true` pour la démonstration.
+Les migrations s'appliquent au démarrage. Les secrets ne doivent jamais être ajoutés au dépôt ni inclus dans l'image.
+
+Cette configuration est une démonstration hébergée : les instances web peuvent s'arrêter lorsqu'elles ne reçoivent plus de trafic.
+Avant d'activer de vrais comptes et le travail 24 h/24, déployer un worker permanent (par exemple Vercel Daemons, bêta, ou un hébergeur Node permanent), puis désactiver le worker intégré au web. Vérifier les quotas de calcul Vercel et Neon avant cette activation.
+Les clés OpenAI et OAuth Google/Microsoft sont à configurer séparément. Aucun envoi réel n'est possible tant que ces connexions ne sont pas configurées.
 
 ## Mise à l'échelle
 

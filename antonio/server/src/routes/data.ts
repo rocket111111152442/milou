@@ -88,7 +88,7 @@ export async function dataRoutes(app: FastifyInstance) {
   app.get("/api/tasks/export.csv", async (req, reply) => {
     const tasks = await listTasks(actorOf(req));
     const lines = ["titre,echeance,statut,notes,origine", ...tasks.map((t) => [csvCell(t.title), csvCell(t.dueAt), csvCell(t.status), csvCell(t.notes), csvCell(t.createdBy)].join(","))];
-    reply.header("Content-Type", "text/csv; charset=utf-8").header("Content-Disposition", 'attachment; filename="antonio-taches-export.csv"');
+    reply.header("Content-Type", "text/csv; charset=utf-8").header("Content-Disposition", 'attachment; filename="waverti-taches-export.csv"');
     return `﻿${lines.join("\n")}`;
   });
 

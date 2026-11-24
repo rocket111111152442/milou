@@ -77,7 +77,7 @@ export async function runTurn(actor: Actor, opts: { text: string; conversationId
   let reply: string;
 
   if (!config().OPENAI_API_KEY) {
-    limited = "Mode sans IA : OPENAI_API_KEY n'est pas configurée, Antonio comprend un ensemble limité de commandes.";
+    limited = "Mode sans IA : OPENAI_API_KEY n'est pas configurée, Waverti comprend un ensemble limité de commandes.";
     reply = await demoBrain(text, ctx, prevTrace, trace, ui);
   } else if (status.exceeded) {
     limited = "Budget mensuel atteint : l'IA est suspendue, seules les commandes simples restent disponibles.";

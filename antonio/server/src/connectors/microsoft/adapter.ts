@@ -34,7 +34,7 @@ const CAPABILITY_SCOPES: Record<Capability, string[]> = {
   "mail.draft": ["Mail.ReadWrite"],
   "mail.send": ["Mail.Send"],
   "mail.modify": ["Mail.ReadWrite"],
-  // Graph permet la suppression définitive avec Mail.ReadWrite : Antonio la traite comme une action à part, jamais automatique.
+  // Graph permet la suppression définitive avec Mail.ReadWrite : Waverti la traite comme une action à part, jamais automatique.
   "mail.delete_permanent": ["Mail.ReadWrite"],
   "calendar.read": ["Calendars.Read"],
   "calendar.write": ["Calendars.ReadWrite"],

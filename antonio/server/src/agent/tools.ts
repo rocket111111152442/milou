@@ -524,7 +524,7 @@ export async function runTool(name: string, args: Json, ctx: ToolContext): Promi
       if (!m) return res({ error: "Message introuvable" });
       const op = args.operation as string;
       const kind: ActionKind = op === "archive" ? "email.archive" : op === "trash" ? "email.trash" : op === "restore" ? "email.untrash" : "email.label";
-      return propose(kind, { connectionId: m.connectionId, messageId: m.id, ...(op === "label" ? { label: args.label ?? "Antonio" } : {}) });
+      return propose(kind, { connectionId: m.connectionId, messageId: m.id, ...(op === "label" ? { label: args.label ?? "Waverti" } : {}) });
     }
     case "create_task": {
       const due = args.due_date ? localToUtc(`${args.due_date}T18:00`, tz) : null;

@@ -49,7 +49,12 @@ export type Config = z.infer<typeof schema>;
 
 let cached: Config | null = null;
 export function config(): Config {
-  if (!cached) cached = schema.parse(process.env);
+  // LISTEN/NOTIFY and job locks require a direct PostgreSQL session, not
+  // Neon's transaction pooler. These names are supplied by its Vercel integration.
+  if (!cached) cached = schema.parse({
+    ...process.env,
+    DATABASE_URL: process.env.DATABASE_URL_UNPOOLED || process.env.POSTGRES_URL_NON_POOLING || process.env.DATABASE_URL,
+  });
   return cached;
 }
 export function resetConfigForTests() {

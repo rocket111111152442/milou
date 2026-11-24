@@ -13,6 +13,7 @@ import { Onboarding } from "./pages/Onboarding";
 import { AgendaPage, ApprovalsPage, BriefingPage, HistoryPage, InboxPage, TasksPage } from "./pages/Views";
 import { ConnectionsPage, ProfilePage, RulesPage, TemplatesPage, UsagePage } from "./pages/Settings";
 import "./styles.css";
+import "./studio.css";
 
 function Guard({ children, allowOnboarding }: { children: ReactNode; allowOnboarding?: boolean }) {
   const me = useMe();

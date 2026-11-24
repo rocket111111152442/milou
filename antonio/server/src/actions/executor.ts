@@ -113,7 +113,7 @@ async function handleFailure(action: ActionRow, e: unknown) {
   return transition(action.id, ["executing"], "failed", "worker", `Échec : ${err.message}`, { error: err.message });
 }
 
-/** Vérifie un envoi incertain grâce au Message-ID généré par Antonio. */
+/** Vérifie un envoi incertain grâce au Message-ID généré par Waverti. */
 export async function verifyAction(actionId: string, attempt: number) {
   const [action] = await db().select().from(schema.actions).where(eq(schema.actions.id, actionId));
   if (!action || action.status !== "uncertain") return;

@@ -60,7 +60,7 @@ export function ConnectButtons() {
             </button>
           ))}
         </div>
-        {caps.includes("mail.draft") && <p className="tiny muted">Google accorde l'envoi avec la création de brouillons : Antonio n'enverra pourtant rien sans votre validation ou une règle confirmée.</p>}
+        {caps.includes("mail.draft") && <p className="tiny muted">Google accorde l'envoi avec la création de brouillons : Waverti n'enverra pourtant rien sans votre validation ou une règle confirmée.</p>}
       </div>
       <div className="row wrap">
         <button className="btn primary" disabled={!s.google || authorize.isPending} onClick={() => authorize.mutate("google")}>
@@ -337,7 +337,7 @@ export function ProfilePage() {
       </Card>
       <Card title="Données et confidentialité">
         <div className="card-body stack-12">
-          <p className="small">Antonio conserve les métadonnées des messages (expéditeur, objet, extrait) et lit leur contenu à la demande chez le fournisseur ; il n'en garde pas de copie intégrale. Les jetons d'accès sont chiffrés.</p>
+          <p className="small">Waverti conserve les métadonnées des messages (expéditeur, objet, extrait) et lit leur contenu à la demande chez le fournisseur ; il n'en garde pas de copie intégrale. Les jetons d'accès sont chiffrés.</p>
           <div className="row wrap">
             <a className="btn" href="/api/account/export">Exporter mes données</a>
             <button className="btn" onClick={() => clearTranscripts.mutate()}>Effacer les transcriptions</button>
@@ -451,7 +451,7 @@ export function RulesPage() {
           : d.action === "propose_slots"
             ? { type: "propose_slots", durationMin: 30, daysAhead: 7, count: 3 }
             : d.action === "label"
-              ? { type: "label", label: d.label || "Antonio" }
+              ? { type: "label", label: d.label || "Waverti" }
               : { type: d.action };
       return api<{ rule: Rule }>("/api/rules", { body: { name: d.name, conditions, action } });
     },

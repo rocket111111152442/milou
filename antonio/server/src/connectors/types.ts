@@ -57,7 +57,7 @@ export interface OutgoingMail {
   cc: Address[];
   subject: string;
   body: string;
-  /** Message-ID RFC 5322 généré par Antonio pour vérifier un envoi incertain. */
+  /** Message-ID RFC 5322 généré par Waverti pour vérifier un envoi incertain. */
   internetMessageId: string;
   inReplyTo?: { providerMessageId: string; providerThreadId: string; internetMessageId: string | null } | null;
 }

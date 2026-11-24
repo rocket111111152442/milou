@@ -94,7 +94,7 @@ export const profiles = pgTable("profiles", {
     .notNull()
     .default({ messages: true, actions: true, approvals: true, agenda: true, priorities: true, errors: true }),
   briefingAutoSpeak: boolean("briefing_auto_speak").notNull().default(false),
-  assistantName: text("assistant_name").notNull().default("Antonio"),
+  assistantName: text("assistant_name").notNull().default("Waverti"),
   assistantVoice: text("assistant_voice").notNull().default("sillage"),
   wakeWordEnabled: boolean("wake_word_enabled").notNull().default(false),
   transcriptRetentionDays: integer("transcript_retention_days").notNull().default(30),

@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" ALTER COLUMN "assistant_name" SET DEFAULT 'Waverti';

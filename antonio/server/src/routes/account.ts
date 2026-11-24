@@ -40,7 +40,7 @@ export async function accountRoutes(app: FastifyInstance) {
       usage: await db().select().from(schema.usageRecords).where(eq(schema.usageRecords.userId, u.userId)),
     };
     await audit("account.exported", { orgId: u.orgId, userId: u.userId });
-    reply.header("Content-Disposition", 'attachment; filename="antonio-export.json"');
+    reply.header("Content-Disposition", 'attachment; filename="waverti-export.json"');
     return data;
   });
 

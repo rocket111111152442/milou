@@ -1,32 +1,33 @@
-/* Antonio — direction visuelle : lumineuse, calme, hiérarchie nette. */
+/* Waverti — studio conversationnel, inspiré de la référence vidéo. */
 :root {
-  --bg: #f7f6f3;
-  --surface: #ffffff;
-  --surface-2: #f2f0eb;
-  --surface-3: #ebe8e1;
-  --border: #e4e0d8;
-  --border-strong: #d3cec4;
-  --text: #1e2227;
-  --text-2: #4a4f57;
-  --muted: #737780;
-  --accent: #3c5a99;
-  --accent-strong: #2f4a82;
-  --accent-soft: #e9eef8;
-  --accent-ring: rgba(60, 90, 153, 0.28);
+  color-scheme: dark;
+  --bg: #0b0b0f;
+  --surface: #121117;
+  --surface-2: #19171f;
+  --surface-3: #25212e;
+  --border: #29252f;
+  --border-strong: #45394f;
+  --text: #f2eef7;
+  --text-2: #c7c1d0;
+  --muted: #96909f;
+  --accent: #b490ee;
+  --accent-strong: #c9a4ff;
+  --accent-soft: #241933;
+  --accent-ring: rgba(164, 112, 233, 0.18);
 
-  --ok: #2e7d5b;
-  --ok-soft: #e5f3eb;
-  --wait: #9a6a12;
-  --wait-soft: #fbf0d9;
-  --bad: #b4443c;
-  --bad-soft: #fbe8e6;
-  --unsure: #6e55a8;
-  --unsure-soft: #efeaf8;
-  --run: #3c5a99;
-  --run-soft: #e9eef8;
-  --neutral-soft: #efede8;
-  --demo: #7a5c22;
-  --demo-soft: #f6ecd6;
+  --ok: #8bc7aa;
+  --ok-soft: #14271f;
+  --wait: #d8b675;
+  --wait-soft: #30271a;
+  --bad: #ec979e;
+  --bad-soft: #321d25;
+  --unsure: #baa1de;
+  --unsure-soft: #281d37;
+  --run: #a7b9e9;
+  --run-soft: #1d2437;
+  --neutral-soft: #24212b;
+  --demo: #b3a2c8;
+  --demo-soft: #271e32;
 
   --radius-s: 8px;
   --radius: 12px;

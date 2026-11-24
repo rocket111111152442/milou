@@ -386,7 +386,7 @@ export function Onboarding() {
       <div className="spread">
         <div className="row">
           <span className="orb" style={{ width: 36, height: 36 }} aria-hidden />
-          <strong>{p.assistantName || "Antonio"}</strong>
+          <strong>{p.assistantName || "Waverti"}</strong>
         </div>
         <label className="check small">
           <input type="checkbox" checked={readAloud} onChange={(e) => setReadAloud(e.target.checked)} /> Lire les questions à voix haute

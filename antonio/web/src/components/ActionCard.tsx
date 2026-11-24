@@ -161,7 +161,7 @@ export function ActionCard({ id, compact, onClose }: Props) {
             {(a.providerResult as { verifiedAfterInterruption?: boolean }).verifiedAfterInterruption && " Envoi confirmé après vérification suite à une interruption."}
           </div>
         )}
-        {a.status === "uncertain" && <div className="warning-box">Coupure pendant l'envoi : Antonio vérifie chez le fournisseur avant toute nouvelle tentative. Rien ne sera renvoyé automatiquement.</div>}
+        {a.status === "uncertain" && <div className="warning-box">Coupure pendant l'envoi : Waverti vérifie chez le fournisseur avant toute nouvelle tentative. Rien ne sera renvoyé automatiquement.</div>}
         {a.error && a.status === "failed" && <div className="danger-box">{a.error}</div>}
         {a.status === "succeeded" && a.reversibility === "irreversible" && (a.kind === "email.send" || a.kind === "email.reply") && (
           <p className="tiny muted">Un e-mail envoyé ne peut pas être annulé.</p>

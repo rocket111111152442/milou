@@ -120,7 +120,7 @@ export function MessageDetail({ id, onClose, compact }: { id: string; onClose?: 
         </dl>
         {suspicious && (
           <div className="danger-box">
-            Ce message contient des instructions adressées à un assistant. Antonio ne les suit jamais : un e-mail ne peut ni donner de droits, ni changer un destinataire, ni créer une règle.
+            Ce message contient des instructions adressées à un assistant. Waverti ne les suit jamais : un e-mail ne peut ni donner de droits, ni changer un destinataire, ni créer une règle.
           </div>
         )}
         <div className="mail-body">{m.body}</div>
@@ -393,7 +393,7 @@ export function BriefingView({ b, compact }: { b: BriefingDTO; compact?: boolean
     else if (item.source.type === "task") navigate("tasks");
   };
   return (
-    <div className="card-body stack-16">
+    <div className="card-body stack-16 briefing-details">
       <p className="small muted">
         Période couverte : du {fmtDateTime(b.periodStart)} au {fmtDateTime(b.periodEnd)}
         {b.simulatedData && (
@@ -407,7 +407,7 @@ export function BriefingView({ b, compact }: { b: BriefingDTO; compact?: boolean
         const items = b.sections[key];
         if (!items.length || (compact && key !== "priorities" && key !== "toValidate")) return null;
         return (
-          <div key={key}>
+          <div key={key} className="briefing-section" data-section={key}>
             <div className="section-title spread">
               <span>{label}</span>
               <span className="badge">{kind}</span>

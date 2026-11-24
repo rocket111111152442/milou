@@ -28,7 +28,7 @@ const PLANNED: ConnectorDescriptor[] = [
     reads: [],
     writes: [],
     unsupported: ["Aucune lecture ni écriture tant que le connecteur n'est pas développé"],
-    notes: ["En attendant : Antonio peut préparer un export CSV des contacts et tâches de suivi (Tâches → Exporter)."],
+    notes: ["En attendant : Waverti peut préparer un export CSV des contacts et tâches de suivi (Tâches → Exporter)."],
   },
   {
     id: "tasks_tools",
@@ -37,7 +37,7 @@ const PLANNED: ConnectorDescriptor[] = [
     reads: [],
     writes: [],
     unsupported: ["Pas de synchronisation"],
-    notes: ["Les tâches sont gérées dans Antonio et exportables (CSV, iCalendar pour les échéances)."],
+    notes: ["Les tâches sont gérées dans Waverti et exportables (CSV, iCalendar pour les échéances)."],
   },
   {
     id: "documents",
@@ -55,7 +55,7 @@ const PLANNED: ConnectorDescriptor[] = [
     reads: [],
     writes: [],
     unsupported: ["Aucune synchronisation"],
-    notes: ["Antonio prépare des données (CSV) clairement identifiées comme exports, à importer manuellement."],
+    notes: ["Waverti prépare des données (CSV) clairement identifiées comme exports, à importer manuellement."],
   },
 ];
 

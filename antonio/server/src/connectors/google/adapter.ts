@@ -46,7 +46,7 @@ const S = {
 
 const CAPABILITY_SCOPES: Record<Capability, string[]> = {
   "mail.read": [S.readonly],
-  // gmail.compose permet aussi l'envoi : Antonio n'envoie pourtant rien sans règle ou validation.
+  // gmail.compose permet aussi l'envoi : Waverti n'envoie pourtant rien sans règle ou validation.
   "mail.draft": [S.compose],
   "mail.send": [S.send],
   "mail.modify": [S.modify],
