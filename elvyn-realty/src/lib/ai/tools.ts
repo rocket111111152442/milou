@@ -685,6 +685,8 @@ const BUDGET_Q = {
   fr: "Pour trouver ta propriété idéale, quel est ton budget maximum ?",
 } as const;
 const MENTIONS_BUDGET = /presupuesto|budget|cu[aá]nto (quieres|deseas|puedes) (invertir|pagar|gastar)|how much .* (spend|invest|pay)/i;
+/** True only when a sentence actually ASKS for the budget (mentioning it in passing does not count). */
+const asksBudget = (t: string) => t.split(/(?<=[.!?\n])/).some((sentence) => sentence.includes("?") && MENTIONS_BUDGET.test(sentence));
 
 /**
  * Funnel guard (Elvyn): once the type of property is known, the budget must be asked. If the visitor
@@ -698,6 +700,6 @@ export function ensureBudgetQuestion(text: string, ctx: ToolContext, userText: s
   if (/\d[\d.,\s]*(k|mil|000|usd|us\$|\$|dólares|dolares|dollars|pesos|rd\$|€)/i.test(userText)) return text; // a figure was just given
   const typeKnown = Boolean(p.property_types?.length || ctx.requestedTypes?.length || LAND_WORDS.test(userText) || BUILT_WORDS.test(userText));
   if (!typeKnown) return text;
-  if (MENTIONS_BUDGET.test(text) || MENTIONS_BUDGET.test(previousReply)) return text;
+  if (asksBudget(text) || asksBudget(previousReply)) return text;
   return `${text.trim()}\n\n**${BUDGET_Q[ctx.replyLang ?? ctx.lang]}**`;
 }
