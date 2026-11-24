@@ -4,7 +4,7 @@ import { env, catalogMode } from "@/config/env";
 import type { Lang } from "@/i18n/config";
 import { log } from "@/lib/log";
 import { systemPrompt } from "./prompt";
-import { executeTool, TOOL_DEFINITIONS, type Card, type Handoff, type ToolContext } from "./tools";
+import { ensureCards, ensureHandoff, executeTool, TOOL_DEFINITIONS, type Card, type Handoff, type ToolContext } from "./tools";
 import { recordUsage, budgetBlock } from "./usage";
 import { loadTranscript, saveTurn, type ChatSessionState } from "./store";
 import { runTurnOpenAI, type OpenAICreateFn } from "./openai-agent";
@@ -162,6 +162,10 @@ export async function runTurn(
       ? "No puedo ayudar con esa solicitud. Si lo deseas, puedes hablar directamente con Elvyn."
       : "I can't help with that request. If you wish, you can talk to Elvyn directly."
     : texts[texts.length - 1] ?? "";
+  if (!refused) {
+    await ensureCards(ctx, text);
+    ensureHandoff(userText, ctx);
+  }
   const handoffChanged = JSON.stringify(ctx.handoff) !== handoffBefore && ctx.handoff?.status === "proposed";
   const display = { text, cards: ctx.cards, handoff: handoffChanged ? ctx.handoff : null };
   newMessages[newMessages.length - 1].display = display;

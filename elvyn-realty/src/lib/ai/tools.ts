@@ -95,6 +95,8 @@ export interface ToolContext {
   handoff: Handoff | null;
   cards: Card[];
   executed: Map<string, number>;
+  /** Slugs returned by the last search of this turn (for automatic cards). */
+  lastSearch?: string[];
 }
 
 /* ------------------------------------------------------------------ definitions */
@@ -387,6 +389,7 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
         const matches = await runSearch(items, i);
         const shown = matches.slice(0, limit);
         shown.forEach((l) => ctx.seenSlugs.add(l.slug));
+        ctx.lastSearch = shown.map((l) => l.slug);
         const result: Record<string, unknown> = {
           total_matches: matches.length,
           listings: shown.map((l) => compact(l, ctx.lang)),
@@ -496,3 +499,50 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
 }
 
 export const __test = { runSearch, searchInput, envPriority: () => env.crm.priorityBudgetUsd };
+
+/* ------------------------------------------------------------------ deterministic safety nets */
+
+const VISIT_RE = /\b(visit\w*|ver (la|el|esa|ese) (propiedad|solar|casa|villa|apartamento)|agend\w*|cita|videollamada|video ?call|tour|recorrido)\b/i;
+const HUMAN_RE = /\b(hablar con (una persona|alguien|elvyn|un humano|un agente)|talk to (a person|someone|elvyn|a human|an agent)|llamad\w*|ll[aá]m(a|e)me|call me|reserv\w*|ofert\w*|make an offer|negoci\w*)\b/i;
+
+/**
+ * If the visitor asked for a visit, a person, a reservation, an offer or a negotiation and the model
+ * did not show the hand-off card, the server shows it (knowledge base, section 4).
+ */
+export function ensureHandoff(userText: string, ctx: ToolContext): void {
+  if (ctx.handoff && ctx.handoff.status === "proposed") return;
+  if (ctx.handoff?.status === "sent") return;
+  const visit = VISIT_RE.test(userText);
+  const human = HUMAN_RE.test(userText);
+  if (!visit && !human) return;
+  const p = ctx.profile;
+  const reason = visit ? "visit" : /reserv|ofert|offer/i.test(userText) ? "reserve_offer_payment" : /negoci/i.test(userText) ? "negotiation" : "human_request";
+  const slug = ctx.pageSlug ?? (ctx.cards.length === 1 ? ctx.cards[0].slug : null);
+  const fmt = (v: unknown) => (Array.isArray(v) ? v.join("/") : v ? String(v) : "no indicado");
+  ctx.handoff = {
+    reason,
+    summary: [
+      fmt(p.full_name), fmt(p.whatsapp), fmt(p.country),
+      p.intent === "sell" ? "Venta" : p.intent === "rent" ? "Alquiler" : "Compra",
+      `${fmt(p.property_types)} en ${fmt(p.zones)}`,
+      p.budget_max ? `${p.currency ?? "USD"} ${p.budget_max}` : "Presupuesto no indicado",
+      fmt(p.payment_method), fmt(p.timeline),
+      slug ? `Propiedad: ${slug}` : "Sin propiedad concreta",
+      `Próximo paso: ${visit ? "coordinar visita" : "contacto con Elvyn"}`,
+    ].join(" · "),
+    nextStep: visit ? "Coordinar visita" : "Contacto con Elvyn",
+    includeVisitForm: visit,
+    propertySlug: slug,
+    status: "proposed",
+  };
+}
+
+/** If the model described search results without calling show_properties, show them as cards. */
+export async function ensureCards(ctx: ToolContext, text: string): Promise<void> {
+  if (ctx.cards.length || !ctx.lastSearch?.length || !text) return;
+  const inv = await getInventory().catch(() => []);
+  for (const slug of ctx.lastSearch.slice(0, 4)) {
+    const l = inv.find((x) => x.slug === slug);
+    if (l) ctx.cards.push(toCard(l, ctx.lang, ""));
+  }
+}

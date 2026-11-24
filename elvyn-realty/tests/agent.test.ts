@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { runTurn } from "@/lib/ai/agent";
 import { createSession, loadSession, loadTranscript } from "@/lib/ai/store";
-import { TOOL_DEFINITIONS, executeTool } from "@/lib/ai/tools";
+import { TOOL_DEFINITIONS, executeTool, ensureHandoff, ensureCards } from "@/lib/ai/tools";
 import { loadDemoDetails } from "@/lib/catalog/demo";
 import { getDb, schema } from "@/lib/db";
 import { reply, scripted, text, tool, lastToolResult } from "./helpers/fake-model";
@@ -153,6 +153,26 @@ describe("hand-off, visits and safety", () => {
     const ctx = { lang: "en" as const, pageSlug: null, profile: {}, seenSlugs: new Set<string>(), handoff: null, cards: [], executed: new Map() };
     const r = JSON.parse((await executeTool("search_properties", { operation: "sale", property_types: ["villa"], location: null, budget_min: null, budget_max: 400000, currency: "USD", bedrooms_min: null, bathrooms_min: null, condition: "any", keywords: "pool", sort: "recent", limit: 6 }, ctx)).content);
     expect(r.total_matches).toBeGreaterThanOrEqual(5);
+  });
+
+  it("shows the hand-off card for visit/human requests even if the model forgot (safety net)", () => {
+    const mk = () => ({ lang: "es" as const, pageSlug: "lote-x-1", profile: { full_name: "Ana" }, seenSlugs: new Set<string>(), handoff: null, cards: [], executed: new Map() });
+    const a = mk();
+    ensureHandoff("Quiero visitarlo el sábado", a);
+    expect(a.handoff).toMatchObject({ reason: "visit", includeVisitForm: true, propertySlug: "lote-x-1", status: "proposed" });
+    const b = mk();
+    ensureHandoff("I'd like to talk to a person", b);
+    expect(b.handoff).toMatchObject({ reason: "human_request", includeVisitForm: false });
+    const c = mk();
+    ensureHandoff("¿Cuál es la forma de pago y qué tan cerca está de la playa?", c);
+    expect(c.handoff).toBeNull();
+  });
+
+  it("attaches cards when the model describes search results without showing them", async () => {
+    const inv = await loadDemoDetails();
+    const ctx = { lang: "en" as const, pageSlug: null, profile: {}, seenSlugs: new Set<string>(), handoff: null, cards: [] as never[], executed: new Map(), lastSearch: inv.slice(0, 5).map((l) => l.slug) };
+    await ensureCards(ctx, "Here are some options");
+    expect((ctx.cards as { slug: string }[]).map((c) => c.slug)).toEqual(inv.slice(0, 4).map((l) => l.slug));
   });
 
   it("exposes no tool that can read prospects, notes or other conversations", async () => {
