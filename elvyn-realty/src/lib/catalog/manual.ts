@@ -106,9 +106,9 @@ async function imagesFor(ids: number[]): Promise<Map<number, number[]>> {
 }
 
 let cached: { at: number; value: ListingSummary[] } | null = null;
-const TTL = 60_000;
+const TTL = 5_000; // short: other server instances must see CRM changes before pages are regenerated
 
-/** Published manual listings (cached 60 s per server instance; the CRM clears it on save). */
+/** Published manual listings (cached 5 s per server instance; the CRM clears it on save). */
 export async function manualSummaries(): Promise<ListingSummary[]> {
   if (cached && Date.now() - cached.at < TTL) return cached.value;
   try {
