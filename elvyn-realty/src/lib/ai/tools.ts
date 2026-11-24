@@ -161,7 +161,7 @@ export const TOOL_DEFINITIONS: Anthropic.Beta.BetaTool[] = [
   {
     name: "show_properties",
     description:
-      "Display up to 4 listings to the visitor as clickable cards with their real photo, price and features. Only slugs returned by search_properties or get_property in this conversation are accepted. Give a one-line reason per listing explaining why it fits the visitor's criteria (or how it differs).",
+      "Only needed to show a DIFFERENT selection than the first search results (those are shown automatically). Displays up to 4 listings as clickable cards. Only slugs returned by search_properties or get_property in this conversation are accepted. Give a one-line reason per listing explaining why it fits the visitor's criteria (or how it differs).",
     strict: true,
     input_schema: obj({
       items: { type: "array", items: obj({ slug: { type: "string" }, reason: { type: "string" } }) },
@@ -417,7 +417,7 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
             if (!ctx.alternatives) ctx.alternatives = { change: best.change, slugs: alt.map((l) => l.slug) };
             result.closest_alternatives = { change: best.change, listings: alt.map((l) => compact(l, ctx.lang)) };
           }
-          result.instruction = "No exact match: in this same reply, search again with the broader option that has matches and show the closest listings, clearly labelled as alternatives (say how they differ). Keep it positive and end with a proposal.";
+          result.instruction = "No exact match: the closest_alternatives are shown to the visitor as cards automatically. Present them positively, say clearly how they differ, and end with a proposal.";
         }
         return { content: JSON.stringify(result) };
       }

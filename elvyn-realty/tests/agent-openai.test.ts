@@ -63,7 +63,14 @@ describe("OpenAI provider", () => {
       return completion({ content: "Déjame buscar." });
     });
     expect(r2.mode).toBe("ok");
-    expect(calls2[0].messages.slice(1, 1 + before.length)).toEqual(before.map((b) => b.content));
+    // Past turns are replayed compacted: same order, no old context messages, shortened tool results.
+    const { compactHistory } = await import("@/lib/ai/openai-agent");
+    const expected = compactHistory(before.map((b) => b.content) as never);
+    expect(calls2[0].messages.slice(1, 1 + expected.length)).toEqual(expected);
+    expect(expected.some((m) => m.role === "system")).toBe(false);
+    const pastTool = expected.find((m) => m.role === "tool") as { content: string };
+    expect(JSON.parse(pastTool.content).listings[0]).toHaveProperty("slug");
+    expect(pastTool.content.length).toBeLessThan((before.find((b) => b.role === "tool")!.content as { content: string }).content.length);
   });
 
   it("falls back to another model if the configured one is unavailable", async () => {

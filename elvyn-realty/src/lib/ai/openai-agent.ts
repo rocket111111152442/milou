@@ -64,7 +64,7 @@ export async function runTurnOpenAI(
   if (ctx.pageSlug) ctx.seenSlugs.add(ctx.pageSlug);
   const handoffBefore = JSON.stringify(state.handoff);
   // Stored rows hold the OpenAI message itself in `content`.
-  const replay = history.map((h) => ((h as unknown as { content: unknown }).content ?? h) as ChatCompletionMessageParam);
+  const replay = compactHistory(history.map((h) => ((h as unknown as { content: unknown }).content ?? h) as ChatCompletionMessageParam));
   let finalText = "";
   let refused = false;
 
@@ -82,6 +82,8 @@ export async function runTurnOpenAI(
           tools: OPENAI_TOOLS,
           tool_choice: lastRound ? ("none" as const) : ("auto" as const),
           parallel_tool_calls: true,
+          // Same key for every visitor: the long, identical prefix (rules + knowledge base + tools) is billed at the cached rate.
+          prompt_cache_key: "elvyn-assistant",
           ...(reasoning ? { reasoning_effort: reasoning as ChatCompletionCreateParamsNonStreaming["reasoning_effort"] } : {}),
         } satisfies ChatCompletionCreateParamsNonStreaming;
         try {
@@ -183,6 +185,39 @@ export async function runTurnOpenAI(
   await saveTurn(state, newMessages.map(({ role, content, display }) => ({ role, content, display })));
   await recordUsage(state.id, env.ai.model, {}, "turn");
   return { mode: refused ? "refusal" : "ok", text, cards: ctx.cards, handoff: display.handoff };
+}
+
+const HISTORY_MAX_MESSAGES = 40;
+
+/** Shortens a past tool result: listings keep only what the model needs to refer back to them. */
+function compactToolContent(content: string): string {
+  try {
+    const data = JSON.parse(content) as Record<string, unknown>;
+    if (Array.isArray(data.listings)) {
+      const listings = (data.listings as Record<string, unknown>[]).map((l) => ({ slug: l.slug, title: l.title, price: l.price, location: l.location }));
+      return JSON.stringify({ total_matches: data.total_matches, listings });
+    }
+    if (data.found === true && typeof data.slug === "string") {
+      return JSON.stringify({ found: true, slug: data.slug, title: data.title, price: data.price, location: data.location, note: "details shortened; call get_property again if needed" });
+    }
+  } catch {
+    /* not JSON */
+  }
+  return content.length > 600 ? content.slice(0, 600) + "…" : content;
+}
+
+/**
+ * Past turns cost tokens on every call. Keep the last messages only (starting on a visitor message,
+ * so tool calls stay paired), drop old per-turn context messages and shorten old tool results.
+ * Deterministic, so the cached prefix stays identical from one call to the next.
+ */
+export function compactHistory(msgs: ChatCompletionMessageParam[]): ChatCompletionMessageParam[] {
+  let start = Math.max(0, msgs.length - HISTORY_MAX_MESSAGES);
+  while (start > 0 && start < msgs.length && msgs[start].role !== "user") start++;
+  return msgs
+    .slice(start)
+    .filter((m) => m.role !== "system")
+    .map((m) => (m.role === "tool" && typeof m.content === "string" ? { ...m, content: compactToolContent(m.content) } : m));
 }
 
 export function __resetOpenAIModelForTests() {
