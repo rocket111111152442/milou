@@ -7,7 +7,10 @@ import { site } from "@/config/site";
 import { getFacets, getHighlights, getInventory, CatalogUnavailable } from "@/lib/catalog/service";
 import type { ListingSummary, Facets } from "@/lib/catalog/types";
 import { pageMetadata } from "@/lib/seo/metadata";
-import { HeroSearch } from "@/components/site/HeroSearch";
+import { SentenceSearch } from "@/components/site/SentenceSearch";
+import { Carousel } from "@/components/site/Carousel";
+import { SpinBadge } from "@/components/site/SpinBadge";
+import { priceLabel } from "@/lib/catalog/format";
 import { ListingCard } from "@/components/site/ListingCard";
 import { AeImage } from "@/components/site/AeImage";
 import { CountUp } from "@/components/site/Motion";
@@ -27,7 +30,7 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
 
 async function loadHome() {
   try {
-    const [highlights, facets, inventory] = await Promise.all([getHighlights(6), getFacets(), getInventory()]);
+    const [highlights, facets, inventory] = await Promise.all([getHighlights(10), getFacets(), getInventory()]);
     return { highlights, facets, inventory, error: false };
   } catch (e) {
     if (e instanceof CatalogUnavailable) return { highlights: null, facets: null, inventory: [] as ListingSummary[], error: true };
@@ -59,37 +62,60 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
     { n: facets?.cities.length ?? 0, label: lang === "es" ? "ciudades y zonas" : "towns and areas" },
     { n: facets?.categories.length ?? 0, label: lang === "es" ? "tipos de propiedad" : "property types" },
   ].filter((x) => x.n > 0);
+  // Arch photo: the most valuable published sale listing with a photo (usually the most striking one).
+  const heroListing = [...inventory].filter((l) => l.image && l.usd.sale).sort((a, b) => (b.usd.sale ?? 0) - (a.usd.sale ?? 0))[0] ?? highlights?.items.find((l) => l.image) ?? null;
+  const heroPrice = heroListing ? priceLabel(heroListing, lang) : null;
   const ticker = [...(facets?.cities.map((c) => c.name) ?? []), ...(facets?.categories.map((c) => (lang === "en" ? c.nameEn : null) || c.name) ?? [])].slice(0, 14);
 
   return (
     <>
-      {/* Hero: full screen, slow zoom, words rising one by one */}
-      <section className="grain relative isolate flex min-h-[100svh] flex-col overflow-hidden bg-navy-900">
-        <div className="absolute inset-0 -z-20 animate-kenburns motion-reduce:animate-none">
-          <Image src={heroImg} alt={t.home.heroAlt} fill priority placeholder="blur" sizes="100vw" className="object-cover" />
-        </div>
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_20%_30%,rgba(16,38,50,.35),rgba(10,26,35,.88)_70%)]" />
-        <div className="absolute inset-x-0 bottom-0 -z-10 h-1/2 bg-gradient-to-t from-navy-900 to-transparent" />
-        <div aria-hidden className="pointer-events-none absolute -right-32 top-24 -z-10 h-[28rem] w-[28rem] animate-blob bg-brand/25 blur-3xl motion-reduce:animate-none" />
-        <div aria-hidden className="pointer-events-none absolute -left-40 bottom-10 -z-10 h-80 w-80 animate-blob bg-brand-200/10 blur-3xl [animation-delay:-6s] motion-reduce:animate-none" />
+      {/* Hero: editorial split — giant type on the left, arched photo of a real listing on the right */}
+      <section className="relative isolate -mt-[88px] overflow-hidden bg-sand pt-[88px] sm:-mt-[96px] sm:pt-[96px]">
+        <div aria-hidden className="pointer-events-none absolute -left-24 top-32 -z-10 h-[26rem] w-[26rem] animate-blob bg-brand-100 motion-reduce:animate-none" />
+        <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(#10263212_1px,transparent_1px)] [background-size:22px_22px]" />
+        <div className="container grid items-center gap-12 pb-16 pt-10 sm:pt-14 lg:grid-cols-[1.12fr_.88fr] lg:gap-10 lg:pb-24 lg:pt-16">
+          <div>
+            <p className="inline-flex animate-pop-in items-center gap-2 rounded-full bg-navy px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white sm:text-xs sm:tracking-[0.2em]">
+              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75 motion-reduce:animate-none" /><span className="relative inline-flex h-2 w-2 rounded-full bg-brand" /></span>
+              {site.address.locality} · {lang === "es" ? "Costa norte" : "North coast"}
+            </p>
+            <h1 className="mt-7 font-display text-[3rem] font-semibold leading-[.95] tracking-[-0.03em] text-navy sm:text-7xl lg:text-[6.2rem]">
+              <Words text={t.home.title} delay={120} step={60} accentLast={2} accentClass="italic text-brand" />
+            </h1>
+            <p className="mt-7 max-w-xl animate-fade-up text-lg leading-relaxed text-ink-muted [animation-delay:650ms]">{t.home.subtitle}</p>
+            <div className="mt-9 max-w-2xl animate-pop-in pr-0 [animation-delay:850ms] sm:pr-6">
+              <h2 className="sr-only">{t.home.searchTitle}</h2>
+              <SentenceSearch lang={lang} types={typeOptions} cities={cityOptions} />
+            </div>
+          </div>
 
-        <div className="container flex flex-1 flex-col justify-center pb-16 pt-32 sm:pt-36 lg:pb-24 lg:pt-40">
-          <p className="inline-flex w-fit animate-pop-in items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-100 backdrop-blur-md sm:text-xs sm:tracking-[0.2em]">
-            <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75 motion-reduce:animate-none" /><span className="relative inline-flex h-2 w-2 rounded-full bg-brand" /></span>
-            {t.home.eyebrow}
-          </p>
-          <h1 className="mt-6 max-w-5xl font-display text-[2.6rem] font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-[5.2rem]">
-            <Words text={t.home.title} delay={150} accentLast={2} />
-          </h1>
-          <p className="mt-6 max-w-2xl animate-fade-up text-base leading-relaxed text-white/85 [animation-delay:700ms] sm:text-lg">{t.home.subtitle}</p>
-          <div className="mt-10 max-w-5xl animate-pop-in [animation-delay:900ms]">
-            <h2 className="sr-only">{t.home.searchTitle}</h2>
-            <HeroSearch lang={lang} types={typeOptions} cities={cityOptions} />
+          <div className="relative mx-auto w-full max-w-[30rem] animate-pop-in [animation-delay:300ms] lg:max-w-none">
+            <div className="relative aspect-[4/5] overflow-hidden rounded-t-full rounded-b-[2.5rem] bg-navy shadow-[0_50px_90px_-40px_rgba(16,38,50,.6)]">
+              {heroListing?.image ? (
+                <div className="absolute inset-0 animate-kenburns motion-reduce:animate-none">
+                  <AeImage src={heroListing.image} alt={heroListing.title} fill priority sizes="(min-width:1024px) 520px, 90vw" ratio={1.25} className="object-cover" />
+                </div>
+              ) : (
+                <Image src={heroImg} alt={t.home.heroAlt} fill priority placeholder="blur" sizes="(min-width:1024px) 520px, 90vw" className="object-cover" />
+              )}
+              <span className="absolute inset-0 bg-gradient-to-t from-navy-900/70 via-transparent to-transparent" />
+            </div>
+            <SpinBadge text={lang === "es" ? "CABRERA · RÍO SAN JUAN · COSTA NORTE · " : "CABRERA · RÍO SAN JUAN · NORTH COAST · "} className="absolute -left-4 bottom-24 sm:-left-12" />
+            {heroListing && (
+              <Link href={href(lang, "listing", heroListing.slug)} className="group absolute -right-2 bottom-8 w-[15.5rem] animate-float rounded-3xl bg-white/95 p-4 shadow-lift backdrop-blur transition-transform hover:scale-[1.03] motion-reduce:animate-none sm:-right-8">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-600">{lang === "es" ? "En el catálogo" : "In the catalogue"}</p>
+                <p className="mt-1 line-clamp-2 font-display text-[15px] font-semibold leading-snug text-navy group-hover:text-brand-700">{heroListing.title}</p>
+                {heroPrice && <p className="mt-2 text-lg font-bold text-navy">{heroPrice.prefix ? <span className="mr-1 text-xs font-medium text-ink-muted">{heroPrice.prefix}</span> : null}{heroPrice.main}{heroPrice.suffix ? <span className="text-xs font-medium text-ink-muted">{heroPrice.suffix}</span> : null}</p>}
+              </Link>
+            )}
+            {stats[0] && (
+              <div className="absolute -top-4 right-6 rounded-2xl bg-brand px-5 py-3 text-white shadow-lift sm:right-10">
+                <p className="font-display text-3xl font-semibold leading-none"><CountUp to={stats[0].n} /></p>
+                <p className="mt-1 text-xs font-medium text-white/90">{stats[0].label}</p>
+              </div>
+            )}
           </div>
         </div>
-        <a href="#descubrir" aria-label={lang === "es" ? "Descubrir" : "Discover"} className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-white/70 transition-colors hover:text-white sm:flex">
-          <span className="flex h-10 w-6 justify-center rounded-full border-2 border-white/40 pt-2"><span className="h-2 w-1 animate-scroll-dot rounded-full bg-white motion-reduce:animate-none" /></span>
-        </a>
       </section>
 
       {/* Moving strip of towns and types */}
@@ -138,32 +164,36 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         </div>
       </section>
 
-      {/* Selection */}
-      <section className="container py-20 sm:py-28" aria-labelledby="featured-title">
-        <div className="flex flex-wrap items-end justify-between gap-6" data-reveal>
-          <div className="max-w-2xl">
-            <p className="eyebrow">{lang === "es" ? "Selección" : "Selection"}</p>
-            <h2 id="featured-title" className="mt-3 font-display text-4xl font-semibold leading-tight sm:text-6xl">
-              {highlights?.basis === "featured" ? t.home.featuredTitle : t.home.recentTitle}
-            </h2>
-            <p className="mt-4 text-lg text-ink-muted">{t.home.featuredSubtitle}</p>
+      {/* Selection: horizontal carousel */}
+      <section className="overflow-hidden py-20 sm:py-28" aria-labelledby="featured-title">
+        <div className="container">
+          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end" data-reveal>
+            <div className="max-w-3xl">
+              <p className="eyebrow">{lang === "es" ? "Selección" : "Selection"}</p>
+              <h2 id="featured-title" className="mt-3 font-display text-5xl font-semibold leading-[.95] tracking-[-0.02em] sm:text-7xl">
+                {highlights?.basis === "featured" ? t.home.featuredTitle : t.home.recentTitle}
+              </h2>
+              <p className="mt-5 text-lg text-ink-muted">{t.home.featuredSubtitle}</p>
+            </div>
+            <Link href={href(lang, "catalog")} className="link-underline w-fit pb-1 text-base font-semibold text-navy">{t.common.seeAll} →</Link>
           </div>
-          <Link href={href(lang, "catalog")} className="btn-dark group">{t.common.seeAll} <IconArrowRight size={16} className="transition-transform group-hover:translate-x-1" /></Link>
+          {error ? (
+            <div className="mt-10 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-950" role="status">
+              <p className="font-semibold">{t.search.errorTitle}</p>
+              <p className="mt-1 text-sm">{t.search.errorText}</p>
+            </div>
+          ) : (
+            <div className="mt-8" data-reveal="right">
+              <Carousel label={highlights?.basis === "featured" ? t.home.featuredTitle : t.home.recentTitle} prevLabel={lang === "es" ? "Anteriores" : "Previous"} nextLabel={lang === "es" ? "Siguientes" : "Next"}>
+                {highlights?.items.map((l, i) => (
+                  <li key={l.uid} className="w-[82vw] shrink-0 snap-start sm:w-[360px]">
+                    <ListingCard l={l} lang={lang} priority={i < 2} />
+                  </li>
+                ))}
+              </Carousel>
+            </div>
+          )}
         </div>
-        {error ? (
-          <div className="mt-10 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-950" role="status">
-            <p className="font-semibold">{t.search.errorTitle}</p>
-            <p className="mt-1 text-sm">{t.search.errorText}</p>
-          </div>
-        ) : (
-          <ul className="mt-12 grid gap-7 sm:grid-cols-2 lg:grid-cols-3 lg:pb-10">
-            {highlights?.items.map((l, i) => (
-              <li key={l.uid} data-reveal style={{ ["--d" as string]: `${(i % 3) * 120}ms` }}>
-                <div className={i % 3 === 1 ? "h-full lg:translate-y-10" : "h-full"}><ListingCard l={l} lang={lang} priority={i < 3} /></div>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       {/* Zones and types */}
