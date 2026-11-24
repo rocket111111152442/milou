@@ -88,7 +88,7 @@ Autres hébergeurs Node.js : `npm run build && npm start`, et appeler `GET /api/
 ## Assistant IA
 
 - Deux fournisseurs possibles, appels uniquement côté serveur (`/api/chat`) :
-  - **OpenAI** si `OPENAI_API_KEY` est défini : modèle par défaut `gpt-4.1-mini`, `gpt-5.4` en production via `AI_MODEL` (si indisponible sur le compte, essai automatique de `gpt-5.4-mini` puis `gpt-4.1-mini`). Pour les modèles GPT-5, `reasoning_effort` = `AI_REASONING_EFFORT` (retiré automatiquement si l'API le refuse).
+  - **OpenAI** si `OPENAI_API_KEY` est défini : modèle par défaut `gpt-4.1-mini`, `gpt-5.4-mini` en production via `AI_MODEL` (si indisponible sur le compte, essai automatique de `gpt-5.4-mini` puis `gpt-4.1-mini`). Pour les modèles GPT-5, `reasoning_effort` = `AI_REASONING_EFFORT` (retiré automatiquement si l'API le refuse).
   - **Anthropic** si `ANTHROPIC_API_KEY` est défini : modèle par défaut `claude-opus-5-5`, effort `low`.
   - `AI_PROVIDER` force le choix, `AI_MODEL` change le modèle.
 - Connaissances : `data/knowledge/base-conocimiento.md` (copie du document de Drive du 23/11/2026). Mettre ce fichier à jour quand Elvyn modifie le document.
