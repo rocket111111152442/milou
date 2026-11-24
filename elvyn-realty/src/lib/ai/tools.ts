@@ -99,6 +99,8 @@ export interface ToolContext {
   lastSearch?: string[];
   /** Property types the visitor asked for in this turn's searches (cards of other types are refused). */
   requestedTypes?: string[];
+  /** Language the visitor actually writes in (for the site's own sentences). */
+  replyLang?: "es" | "en" | "fr";
   /** Closest listings found by a broader search when a search had no exact match. */
   alternatives?: { change: string; slugs: string[] };
 }
@@ -573,7 +575,7 @@ export async function ensureCards(ctx: ToolContext, text: string): Promise<void>
   }
   // No exact match: never a dead end — show the closest listings, labelled with how they differ.
   if (ctx.alternatives) {
-    const label = altLabel(ctx.alternatives.change, ctx.lang);
+    const label = altLabel(ctx.alternatives.change, ctx.replyLang ?? ctx.lang);
     for (const slug of ctx.alternatives.slugs) {
       const l = inv.find((x) => x.slug === slug);
       if (l) ctx.cards.push(toCard(l, ctx.lang, label));
@@ -581,16 +583,34 @@ export async function ensureCards(ctx: ToolContext, text: string): Promise<void>
   }
 }
 
-function altLabel(change: string, lang: Lang): string {
-  const es = lang === "es";
-  if (change.startsWith("budget_max")) return es ? "Alternativa: un poco por encima de tu presupuesto" : "Alternative: slightly above your budget";
-  if (change === "closest price above budget") return es ? "Alternativa: la opción más cercana a tu presupuesto" : "Alternative: the closest option to your budget";
-  if (change === "any location") return es ? "Alternativa: en otra zona" : "Alternative: in another area";
-  if (change === "any property type") return es ? "Alternativa: otro tipo de propiedad" : "Alternative: a different property type";
-  if (change.startsWith("bedrooms_min")) return es ? "Alternativa: una habitación menos" : "Alternative: one bedroom fewer";
-  if (change === "without keywords") return es ? "Alternativa: sin todas las características pedidas" : "Alternative: without every requested feature";
-  return es ? "Alternativa cercana" : "Close alternative";
+function altLabel(change: string, lang: "es" | "en" | "fr"): string {
+  const L: Record<string, [string, string, string]> = {
+    budget: ["Alternativa: un poco por encima de tu presupuesto", "Alternative: slightly above your budget", "Alternative : un peu au-dessus de ton budget"],
+    closest: ["Alternativa: la opción más cercana a tu presupuesto", "Alternative: the closest option to your budget", "Alternative : l'option la plus proche de ton budget"],
+    location: ["Alternativa: en otra zona", "Alternative: in another area", "Alternative : dans une autre zone"],
+    type: ["Alternativa: otro tipo de propiedad", "Alternative: a different property type", "Alternative : un autre type de bien"],
+    bedrooms: ["Alternativa: una habitación menos", "Alternative: one bedroom fewer", "Alternative : une chambre de moins"],
+    keywords: ["Alternativa: sin todas las características pedidas", "Alternative: without every requested feature", "Alternative : sans toutes les caractéristiques demandées"],
+    other: ["Alternativa cercana", "Close alternative", "Alternative proche"],
+  };
+  const key = change.startsWith("budget_max") ? "budget" : change === "closest price above budget" ? "closest" : change === "any location" ? "location" : change === "any property type" ? "type" : change.startsWith("bedrooms_min") ? "bedrooms" : change === "without keywords" ? "keywords" : "other";
+  return L[key][lang === "es" ? 0 : lang === "en" ? 1 : 2];
 }
+
+/** Rough detection of the visitor's language from their own message (falls back to the page language). */
+export function visitorLang(text: string, fallback: Lang): "es" | "en" | "fr" {
+  const t = ` ${text.toLowerCase()} `;
+  const score = (re: RegExp) => (t.match(re) ?? []).length;
+  const fr = score(/(?<![\p{L}])(je|j'|vous|tu|bonjour|merci|voudrais|cherche|maison|propriété|terrain|avec|pour|est|une|des|svp|visiter|samedi)(?![\p{L}])/giu);
+  const en = score(/(?<![\p{L}])(i|i'm|you|the|want|looking|have|with|for|is|a|an|please|visit|saturday|how|what|does)(?![\p{L}])/giu);
+  const es = score(/(?<![\p{L}])(yo|busco|quiero|hola|gracias|casa|con|para|una|el|la|los|las|por|sábado|cómo|qué|tienen)(?![\p{L}])/giu);
+  const best = Math.max(fr, en, es);
+  if (best === 0) return fallback;
+  return fr === best ? "fr" : en === best && en > es ? "en" : es === best ? "es" : fallback;
+}
+
+/** The visitor talks about a property: the first model call must use a tool (no answer from memory). */
+export const PROPERTY_TALK = /(?<![\p{L}])(villas?|casas?|houses?|homes?|maisons?|apartamentos?|apartments?|appartements?|aptos?|condos?|penthouses?|solar(es)?|terrenos?|terrains?|lotes?|land|lots?|plots?|fincas?|farms?|locales?|propiedad(es)?|propert(y|ies)|propriétés?|comprar|alquilar|buy|rent|acheter|louer)(?![\p{L}])/iu;
 
 const LAND_WORDS = /(?<![\p{L}])(terrenos?|solar(es)?|lotes?|land|plots?)(?![\p{L}])/iu;
 const BUILT_WORDS = /(?<![\p{L}])(villas?|casas?|houses?|homes?|apartamentos?|apartments?|aptos?|condos?|penthouses?|locales?|hotel(es)?|fincas?|farms?|edificios?|buildings?|oficinas?|offices?)(?![\p{L}])/iu;
@@ -636,20 +656,22 @@ export function correctFalseClaims(text: string, ctx: ToolContext, cardShown = f
   if (kept.length === parts.length) {
     // Whatever the wording, when the card appears the visitor reads the real next step.
     if (!cardShown) return text;
+    const lang = ctx.replyLang ?? ctx.lang;
     const step =
-      ctx.lang === "es"
+      lang === "es"
         ? "Para que Elvyn reciba tu solicitud, completa tus datos en la tarjeta de abajo y pulsa el botón de envío: hasta entonces no se le envía nada."
-        : "For Elvyn to receive your request, fill in your details on the card below and press the send button: nothing is sent until then.";
+        : lang === "fr"
+          ? "Pour qu'Elvyn reçoive ta demande, complète tes coordonnées sur la carte ci-dessous et appuie sur le bouton d'envoi : rien ne lui est envoyé avant."
+          : "For Elvyn to receive your request, fill in your details on the card below and press the send button: nothing is sent until then.";
     return `${text.trim()}\n\n${step}`;
   }
-  const notice =
-    ctx.lang === "es"
-      ? ctx.handoff
-        ? "Todavía no se ha enviado nada: para que Elvyn reciba tu solicitud, completa tus datos y pulsa el botón de la tarjeta de abajo. La visita quedará pendiente de su confirmación."
-        : "Todavía no se ha enviado nada a Elvyn. Puedes escribirle directamente por WhatsApp o dejar tus datos para que te contacte."
-      : ctx.handoff
-        ? "Nothing has been sent yet: for Elvyn to receive your request, fill in your details and press the button on the card below. The visit will then be pending his confirmation."
-        : "Nothing has been sent to Elvyn yet. You can message him directly on WhatsApp or leave your details so he can contact you.";
+  const lang = ctx.replyLang ?? ctx.lang;
+  const N = {
+    es: ["Todavía no se ha enviado nada: para que Elvyn reciba tu solicitud, completa tus datos y pulsa el botón de la tarjeta de abajo. La visita quedará pendiente de su confirmación.", "Todavía no se ha enviado nada a Elvyn. Puedes escribirle directamente por WhatsApp o dejar tus datos para que te contacte."],
+    en: ["Nothing has been sent yet: for Elvyn to receive your request, fill in your details and press the button on the card below. The visit will then be pending his confirmation.", "Nothing has been sent to Elvyn yet. You can message him directly on WhatsApp or leave your details so he can contact you."],
+    fr: ["Rien n'a encore été envoyé : pour qu'Elvyn reçoive ta demande, complète tes coordonnées et appuie sur le bouton de la carte ci-dessous. La visite restera en attente de sa confirmation.", "Rien n'a encore été envoyé à Elvyn. Tu peux lui écrire directement sur WhatsApp ou laisser tes coordonnées pour qu'il te contacte."],
+  } as const;
+  const notice = N[lang][ctx.handoff ? 0 : 1];
   const body = kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   return body ? `${notice}\n\n${body}` : notice;
 }

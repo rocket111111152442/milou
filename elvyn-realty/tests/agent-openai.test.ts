@@ -187,4 +187,16 @@ describe("OpenAI provider", () => {
     expect(r.cards.length).toBeGreaterThan(0);
     expect(r.cards.every((c) => c.reason.startsWith("Alternativa"))).toBe(true);
   });
+
+  it("forces a tool call on the first round when the visitor talks about a property", async () => {
+    const state = await store.createSession(randomUUID(), "es");
+    const choices: unknown[] = [];
+    await mod.runTurn(state, "Busco un apartamento en Punta Cana", "es", { type: "other" }, undefined, async (p: any) => {
+      choices.push(p.tool_choice);
+      if (choices.length === 1) return completion({ tool_calls: [call("search_properties", { operation: "sale", property_types: ["apartment"], location: "Punta Cana", budget_min: null, budget_max: null, currency: "USD", bedrooms_min: null, bathrooms_min: null, condition: "any", keywords: null, sort: "recent", limit: 3 })] }, "tool_calls");
+      return completion({ content: "Te muestro opciones." });
+    });
+    expect(choices[0]).toBe("required");
+    expect(choices[1]).toBe("auto");
+  });
 });

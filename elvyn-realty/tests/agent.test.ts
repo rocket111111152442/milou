@@ -255,3 +255,18 @@ describe("types from the visitor's words", () => {
     expect(typesFromText("Busco algo en Cabrera")).toBeUndefined();
   });
 });
+
+describe("visitor language and forced search", () => {
+  it("detects the visitor's language and writes the site's sentences in it", async () => {
+    const { visitorLang, correctFalseClaims, PROPERTY_TALK } = await import("@/lib/ai/tools");
+    expect(visitorLang("Je voudrais visiter la villa samedi", "es")).toBe("fr");
+    expect(visitorLang("Bonjour, je cherche une villa à Las Terrenas", "es")).toBe("fr");
+    expect(visitorLang("Do you have land for sale near Río San Juan?", "es")).toBe("en");
+    expect(visitorLang("Busco un apartamento en Punta Cana", "en")).toBe("es");
+    expect(visitorLang("300000", "es")).toBe("es");
+    const ctx = { lang: "es" as const, replyLang: "fr" as const, pageSlug: null, profile: {}, seenSlugs: new Set<string>(), handoff: { status: "proposed" } as never, cards: [], executed: new Map() };
+    expect(correctFalseClaims("Parfait.", ctx, true)).toMatch(/appuie sur le bouton d'envoi/);
+    expect(PROPERTY_TALK.test("Busco un apartamento en Punta Cana")).toBe(true);
+    expect(PROPERTY_TALK.test("How does buying work for a foreigner?")).toBe(false);
+  });
+});
