@@ -678,3 +678,26 @@ export function correctFalseClaims(text: string, ctx: ToolContext, cardShown = f
   const body = kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   return body ? `${notice}\n\n${body}` : notice;
 }
+
+const BUDGET_Q = {
+  es: "Para encontrar tu propiedad ideal, ¿cuál es tu presupuesto máximo?",
+  en: "To find your ideal property, what is your maximum budget?",
+  fr: "Pour trouver ta propriété idéale, quel est ton budget maximum ?",
+} as const;
+const MENTIONS_BUDGET = /presupuesto|budget|cu[aá]nto (quieres|deseas|puedes) (invertir|pagar|gastar)|how much .* (spend|invest|pay)/i;
+
+/**
+ * Funnel guard (Elvyn): once the type of property is known, the budget must be asked. If the visitor
+ * has not given one and the reply does not ask for it, the site adds the question — unless the
+ * previous reply already asked it (no back-to-back repetition).
+ */
+export function ensureBudgetQuestion(text: string, ctx: ToolContext, userText: string, previousReply: string): string {
+  if (!text || ctx.handoff?.status === "sent") return text;
+  const p = ctx.profile;
+  if (p.budget_max || p.budget_min || p.expected_price || p.intent === "sell") return text;
+  if (/\d[\d.,\s]*(k|mil|000|usd|us\$|\$|dólares|dolares|dollars|pesos|rd\$|€)/i.test(userText)) return text; // a figure was just given
+  const typeKnown = Boolean(p.property_types?.length || ctx.requestedTypes?.length || LAND_WORDS.test(userText) || BUILT_WORDS.test(userText));
+  if (!typeKnown) return text;
+  if (MENTIONS_BUDGET.test(text) || MENTIONS_BUDGET.test(previousReply)) return text;
+  return `${text.trim()}\n\n**${BUDGET_Q[ctx.replyLang ?? ctx.lang]}**`;
+}

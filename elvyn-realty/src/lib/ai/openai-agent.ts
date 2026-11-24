@@ -5,7 +5,7 @@ import { env } from "@/config/env";
 import type { Lang } from "@/i18n/config";
 import { log } from "@/lib/log";
 import { systemPrompt } from "./prompt";
-import { correctFalseClaims, PROPERTY_TALK, typesFromText, visitorLang, ensureCards, ensureHandoff, executeTool, TOOL_DEFINITIONS, type ToolContext } from "./tools";
+import { correctFalseClaims, ensureBudgetQuestion, PROPERTY_TALK, typesFromText, visitorLang, ensureCards, ensureHandoff, executeTool, TOOL_DEFINITIONS, type ToolContext } from "./tools";
 import { recordUsage } from "./usage";
 import { loadTranscript, saveTurn, type ChatSessionState } from "./store";
 import type { PageContext, TurnResult } from "./agent";
@@ -164,9 +164,12 @@ export async function runTurnOpenAI(
   if (!refused) {
     await ensureCards(ctx, text);
     ensureHandoff(userText, ctx);
+    const previousReply = [...replay].reverse().find((m) => m.role === "assistant" && typeof m.content === "string" && m.content)?.content as string | undefined;
+    const original = text;
+    text = ensureBudgetQuestion(text, ctx, userText, previousReply ?? "");
     const corrected = correctFalseClaims(text, ctx, JSON.stringify(ctx.handoff) !== handoffBefore && ctx.handoff?.status === "proposed");
-    if (corrected !== text) {
-      // Keep the corrected wording in the history too, so the model does not repeat the false claim.
+    if (corrected !== original) {
+      // Keep the final wording in the history too (no repeated false claim, no repeated budget question).
       const lastMsg = newMessages[newMessages.length - 1];
       if (lastMsg.raw.role === "assistant") {
         lastMsg.raw = { ...lastMsg.raw, content: corrected } as ChatCompletionMessageParam;

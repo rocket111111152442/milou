@@ -270,3 +270,19 @@ describe("visitor language and forced search", () => {
     expect(PROPERTY_TALK.test("How does buying work for a foreigner?")).toBe(false);
   });
 });
+
+describe("funnel: budget question", () => {
+  it("adds the budget question once the type is known and no budget was given", async () => {
+    const { ensureBudgetQuestion } = await import("@/lib/ai/tools");
+    const ctx = (profile = {}) => ({ lang: "es" as const, replyLang: "es" as const, pageSlug: null, profile, seenSlugs: new Set<string>(), handoff: null, cards: [], executed: new Map() });
+    const r = ensureBudgetQuestion("Tengo estas casas en Cabrera.", ctx(), "Busco una casa de 4 habitaciones en Cabrera", "");
+    expect(r).toMatch(/¿cuál es tu presupuesto máximo\?/);
+    // not when the budget is known, was just given, already asked, or asked in the previous reply
+    expect(ensureBudgetQuestion("Ok.", ctx({ budget_max: 200000 }), "casa en Cabrera", "")).toBe("Ok.");
+    expect(ensureBudgetQuestion("Ok.", ctx(), "casa en Cabrera hasta 200.000 dólares", "")).toBe("Ok.");
+    expect(ensureBudgetQuestion("¿Cuál es tu presupuesto?", ctx(), "casa en Cabrera", "")).toBe("¿Cuál es tu presupuesto?");
+    expect(ensureBudgetQuestion("Ok.", ctx(), "casa en Cabrera", "Para encontrar tu propiedad ideal, ¿cuál es tu presupuesto máximo?")).toBe("Ok.");
+    // not before the type is known
+    expect(ensureBudgetQuestion("Hola.", ctx(), "Hola", "")).toBe("Hola.");
+  });
+});
