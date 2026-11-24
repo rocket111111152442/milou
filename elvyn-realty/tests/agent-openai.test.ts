@@ -167,4 +167,17 @@ describe("OpenAI provider", () => {
     expect(r.cards.some((c) => c.slug === other.slug)).toBe(false);
     expect(lastTool).toMatch(/property type differs/);
   });
+
+  it("never leaves a dead end: shows labelled closest alternatives when nothing matches", async () => {
+    const state = await store.createSession(randomUUID(), "es");
+    let i = 0;
+    const r = await mod.runTurn(state, "Busco algo por menos de 1 dólar", "es", { type: "other" }, undefined, async () => {
+      i++;
+      if (i === 1) return completion({ tool_calls: [call("search_properties", { operation: "sale", property_types: null, location: null, budget_min: null, budget_max: 1, currency: "USD", bedrooms_min: null, bathrooms_min: null, condition: "any", keywords: null, sort: "price_asc", limit: 3 })] }, "tool_calls");
+      return completion({ content: "No encontré nada exacto, pero tengo opciones cercanas." });
+    });
+    // budget +20 % of 1 still finds nothing; the next broader option that has results is used
+    expect(r.cards.length).toBeGreaterThan(0);
+    expect(r.cards.every((c) => c.reason.startsWith("Alternativa"))).toBe(true);
+  });
 });

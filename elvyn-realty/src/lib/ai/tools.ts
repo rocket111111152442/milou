@@ -99,6 +99,8 @@ export interface ToolContext {
   lastSearch?: string[];
   /** Property types the visitor asked for in this turn's searches (cards of other types are refused). */
   requestedTypes?: string[];
+  /** Closest listings found by a broader search when a search had no exact match. */
+  alternatives?: { change: string; slugs: string[] };
 }
 
 /* ------------------------------------------------------------------ definitions */
@@ -401,11 +403,20 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
         if (matches.length === 0) {
           const tries: { change: string; input: z.infer<typeof searchInput> }[] = [];
           if (i.budget_max) tries.push({ change: "budget_max +20%", input: { ...i, budget_max: Math.round(i.budget_max * 1.2) } });
+          if (i.budget_max) tries.push({ change: "closest price above budget", input: { ...i, budget_max: null, sort: "price_asc" } });
           if (i.location) tries.push({ change: "any location", input: { ...i, location: null } });
           if (i.property_types?.length) tries.push({ change: "any property type", input: { ...i, property_types: null } });
           if (i.bedrooms_min) tries.push({ change: `bedrooms_min ${Math.max(i.bedrooms_min - 1, 0)}`, input: { ...i, bedrooms_min: Math.max(i.bedrooms_min - 1, 0) } });
           if (i.keywords) tries.push({ change: "without keywords", input: { ...i, keywords: null } });
-          result.broader_options = await Promise.all(tries.map(async (t) => ({ change: t.change, matches: (await runSearch(items, t.input)).length })));
+          const broader = await Promise.all(tries.map(async (t) => ({ change: t.change, found: await runSearch(items, t.input) })));
+          result.broader_options = broader.map((b) => ({ change: b.change, matches: b.found.length }));
+          const best = broader.find((b) => b.found.length > 0);
+          if (best) {
+            const alt = best.found.slice(0, 3);
+            alt.forEach((l) => ctx.seenSlugs.add(l.slug));
+            if (!ctx.alternatives) ctx.alternatives = { change: best.change, slugs: alt.map((l) => l.slug) };
+            result.closest_alternatives = { change: best.change, listings: alt.map((l) => compact(l, ctx.lang)) };
+          }
           result.instruction = "No exact match: in this same reply, search again with the broader option that has matches and show the closest listings, clearly labelled as alternatives (say how they differ). Keep it positive and end with a proposal.";
         }
         return { content: JSON.stringify(result) };
@@ -551,12 +562,34 @@ export function ensureHandoff(userText: string, ctx: ToolContext): void {
 
 /** If the model described search results without calling show_properties, show them as cards. */
 export async function ensureCards(ctx: ToolContext, text: string): Promise<void> {
-  if (ctx.cards.length || !ctx.lastSearch?.length || !text) return;
+  if (ctx.cards.length || !text) return;
   const inv = await getInventory().catch(() => []);
-  for (const slug of ctx.lastSearch.slice(0, 4)) {
-    const l = inv.find((x) => x.slug === slug);
-    if (l && matchesRequestedType(l, ctx)) ctx.cards.push(toCard(l, ctx.lang, ""));
+  if (ctx.lastSearch?.length) {
+    for (const slug of ctx.lastSearch.slice(0, 4)) {
+      const l = inv.find((x) => x.slug === slug);
+      if (l && matchesRequestedType(l, ctx)) ctx.cards.push(toCard(l, ctx.lang, ""));
+    }
+    if (ctx.cards.length) return;
   }
+  // No exact match: never a dead end — show the closest listings, labelled with how they differ.
+  if (ctx.alternatives) {
+    const label = altLabel(ctx.alternatives.change, ctx.lang);
+    for (const slug of ctx.alternatives.slugs) {
+      const l = inv.find((x) => x.slug === slug);
+      if (l) ctx.cards.push(toCard(l, ctx.lang, label));
+    }
+  }
+}
+
+function altLabel(change: string, lang: Lang): string {
+  const es = lang === "es";
+  if (change.startsWith("budget_max")) return es ? "Alternativa: un poco por encima de tu presupuesto" : "Alternative: slightly above your budget";
+  if (change === "closest price above budget") return es ? "Alternativa: la opción más cercana a tu presupuesto" : "Alternative: the closest option to your budget";
+  if (change === "any location") return es ? "Alternativa: en otra zona" : "Alternative: in another area";
+  if (change === "any property type") return es ? "Alternativa: otro tipo de propiedad" : "Alternative: a different property type";
+  if (change.startsWith("bedrooms_min")) return es ? "Alternativa: una habitación menos" : "Alternative: one bedroom fewer";
+  if (change === "without keywords") return es ? "Alternativa: sin todas las características pedidas" : "Alternative: without every requested feature";
+  return es ? "Alternativa cercana" : "Close alternative";
 }
 
 const LAND_WORDS = /(?<![\p{L}])(terrenos?|solar(es)?|lotes?|land|plots?)(?![\p{L}])/iu;
