@@ -20,7 +20,12 @@ export function CategoryBadge({ category }: { category: MailCategory }) {
   return <span className={`badge ${tone}`}>{MAIL_CATEGORY_LABELS[category]}</span>;
 }
 
-export function Card({ title, actions, children, compact, className }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; compact?: boolean; className?: string }) {
+export function Disclosure({ title, children }: { title: string; children: ReactNode }) {
+  return <details className="simple-disclosure"><summary>{title}<span aria-hidden="true">+</span></summary><div className="disclosure-body">{children}</div></details>;
+}
+
+export function Card({ title, actions, children, compact, className, collapsible }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; compact?: boolean; className?: string; collapsible?: boolean }) {
+  if (collapsible) return <details className={`card panel-card simple-disclosure section-disclosure ${className ?? ""}`}><summary>{title}<span aria-hidden="true">+</span></summary>{children}</details>;
   return (
     <section className={`card panel-card ${compact ? "compact" : ""} ${className ?? ""}`}>
       {(title || actions) && (

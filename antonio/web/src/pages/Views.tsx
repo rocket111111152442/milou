@@ -21,7 +21,7 @@ export function BriefingPage() {
     <div className="page stack-16">
       <PageHead
         title="Point du jour"
-        subtitle="Préparé automatiquement à l'heure choisie, même page fermée. Chaque élément renvoie à sa source."
+        subtitle="L’essentiel de votre journée."
         actions={
           <button className="btn primary" onClick={() => gen.mutate()} disabled={gen.isPending}>
             Faire le point maintenant
@@ -63,7 +63,7 @@ export function InboxPage() {
   const q = useQuery({ queryKey: ["messages", "inbox", params.toString()], queryFn: () => api<{ messages: MessageDTO[] }>(`/api/messages?${params}`) });
   return (
     <div className="page stack-16">
-      <PageHead title="Boîte de réception" subtitle="Messages synchronisés, classés avec une explication. Corrigez une catégorie depuis le message." />
+      <PageHead title="Boîte de réception" subtitle="Vos e-mails, au même endroit." />
       <div className="row wrap">
         <select className="select" style={{ width: "auto" }} value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Filtre">
           <option value="to_handle">À traiter</option>
@@ -129,7 +129,7 @@ export function AgendaPage() {
     <div className="page stack-16">
       <PageHead
         title="Agenda"
-        subtitle="Calendrier principal des comptes connectés. Distinction : créneau proposé, invitation envoyée, participation acceptée."
+        subtitle="Vos rendez-vous et disponibilités."
         actions={
           <>
             <Seg label="Période" value={range} onChange={(v) => { setRange(v); setOffset(0); }} options={[{ value: "day", label: "Jour" }, { value: "week", label: "Semaine" }]} />
@@ -178,7 +178,7 @@ export function TasksPage() {
     <div className="page stack-16">
       <PageHead
         title="Tâches"
-        subtitle="Suivis créés par vous, par l'assistant ou par une règle."
+        subtitle="Ce qu’il vous reste à faire."
         actions={<a className="btn" href="/api/tasks/export.csv">Exporter (CSV)</a>}
       />
       <form className="row" onSubmit={(e) => { e.preventDefault(); if (title.trim()) add.mutate(); }}>
@@ -186,7 +186,7 @@ export function TasksPage() {
         <button className="btn primary" type="submit">Ajouter</button>
       </form>
       <Card>{q.isLoading ? <Loading /> : q.data!.tasks.length === 0 ? <Empty>Aucune tâche.</Empty> : <div className="list">{q.data!.tasks.map((t) => <TaskRow key={t.id} t={t} />)}</div>}</Card>
-      <p className="tiny muted">L'export CSV est une préparation de données à importer manuellement dans un autre outil : ce n'est pas une synchronisation.</p>
+      <p className="tiny muted">Export à importer dans votre autre outil.</p>
     </div>
   );
 }
@@ -195,7 +195,7 @@ export function ApprovalsPage() {
   const q = useQuery({ queryKey: ["actions", "awaiting"], queryFn: () => api<{ actions: ActionDTO[] }>("/api/actions?status=awaiting_approval,uncertain") });
   return (
     <div className="page stack-16">
-      <PageHead title="Validations" subtitle="Chaque validation porte sur une action précise et sur son contenu actuel : modifier le contenu demande une nouvelle validation." />
+      <PageHead title="Validations" subtitle="Vérifiez chaque action avant de l’autoriser." />
       {q.isLoading ? <Loading /> : q.data!.actions.length === 0 ? <Card><Empty>Rien n'attend votre validation.</Empty></Card> : q.data!.actions.map((a) => <ActionCard key={a.id} id={a.id} />)}
     </div>
   );
@@ -209,7 +209,7 @@ export function HistoryPage() {
     <div className="page stack-16">
       <PageHead
         title="Historique des actions"
-        subtitle="Chaque action garde sa demande d'origine, la règle ou la validation qui l'a autorisée, le résultat du fournisseur et ses possibilités réelles de retour en arrière."
+        subtitle="Les actions de votre assistant, en un coup d’œil."
         actions={
           <select className="select" style={{ width: "auto" }} value={status} onChange={(e) => setStatus(e.target.value as ActionStatus | "")} aria-label="Filtrer par état">
             <option value="">Tous les états</option>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   CAPABILITIES,
@@ -16,7 +16,7 @@ import {
 import { api, queryClient } from "../lib/api";
 import { fmtDateTime, fmtRelative } from "../lib/format";
 import { useApp } from "../lib/app-state";
-import { Card, DemoBadge, Empty, Loading, PageHead } from "../components/ui";
+import { Card, DemoBadge, Disclosure, Empty, Loading, PageHead } from "../components/ui";
 import { RuleProposal } from "../components/panels";
 import { AutonomyEditor } from "./Onboarding";
 
@@ -47,41 +47,25 @@ export function ConnectButtons() {
       toast("Compte de démonstration connecté (données fictives).");
     },
   });
+  if (q.isError) return <p role="alert">Connexion indisponible. <button className="btn small" onClick={() => void q.refetch()}>Réessayer</button></p>;
   if (!q.data) return <Loading />;
   const s = q.data.setup;
-  return (
-    <div className="stack-12">
-      <div className="field">
-        <span className="label">Autorisations demandées (vous pourrez en ajouter plus tard)</span>
-        <div className="chips">
-          {CAPABILITIES.filter((c) => c !== "mail.delete_permanent").map((c) => (
-            <button key={c} type="button" className="chip" aria-pressed={caps.includes(c)} onClick={() => setCaps((x) => (x.includes(c) ? x.filter((y) => y !== c) : [...x, c]))}>
-              {CAPABILITY_LABELS[c]}
-            </button>
-          ))}
-        </div>
-        {caps.includes("mail.draft") && <p className="tiny muted">Google accorde l'envoi avec la création de brouillons : Waverti n'enverra pourtant rien sans votre validation ou une règle confirmée.</p>}
-      </div>
-      <div className="row wrap">
-        <button className="btn primary" disabled={!s.google || authorize.isPending} onClick={() => authorize.mutate("google")}>
-          Connecter Gmail et Google Agenda
-        </button>
-        <button className="btn primary" disabled={!s.microsoft || authorize.isPending} onClick={() => authorize.mutate("microsoft")}>
-          Connecter Outlook et Calendrier
-        </button>
-        <button className="btn" onClick={() => demo.mutate()} disabled={demo.isPending}>
-          Essayer avec un compte de démonstration
-        </button>
-      </div>
-      {(!s.google || !s.microsoft) && (
-        <div className="warning-box small">
-          {!s.google && "Google n'est pas encore configuré sur ce serveur. "}
-          {!s.microsoft && "Microsoft n'est pas encore configuré sur ce serveur. "}
-          La connexion à ces services sera proposée ici dès son ouverture. Vous pouvez personnaliser votre assistant et explorer le compte de démonstration en attendant.
-        </div>
-      )}
+  return <div className="stack-16">
+    <div className="provider-grid">
+      {(["google", "microsoft"] as const).map(provider => <div className="provider-tile" key={provider}>
+        <span className={`provider-mark ${provider}`} aria-hidden="true">{provider === "google" ? "G" : "▦"}</span>
+        <div className="grow"><strong>{provider === "google" ? "Google" : "Outlook"}</strong><p className="small muted">E-mails et agenda</p></div>
+        <button className="btn primary small" disabled={!s[provider] || authorize.isPending || caps.length === 0} onClick={() => authorize.mutate(provider)}>{s[provider] ? "Connecter" : "Bientôt"}<span className="sr-only"> {provider === "google" ? "Google" : "Outlook"}</span></button>
+      </div>)}
     </div>
-  );
+    <Disclosure title="Choisir les autorisations">
+      <p className="small muted">Modifiables à tout moment.</p>
+      <div className="permission-list">{CAPABILITIES.filter(c => c !== "mail.delete_permanent").map(c => <label className="check" key={c}><input type="checkbox" checked={caps.includes(c)} onChange={() => setCaps(x => x.includes(c) ? x.filter(y => y !== c) : [...x, c])} />{CAPABILITY_LABELS[c]}</label>)}</div>
+      {caps.includes("mail.draft") && <p className="tiny muted">Chez Google, les brouillons incluent aussi le droit d’envoi. Waverti exige votre validation ou une règle confirmée pour envoyer.</p>}
+    </Disclosure>
+    <button className="btn ghost small demo-link" onClick={() => demo.mutate()} disabled={demo.isPending}>Essayer avec des données fictives</button>
+    {demo.isError && <p role="alert" className="small">La démonstration n’a pas pu être chargée. Réessayez.</p>}
+  </div>;
 }
 
 export function ConnectionsPage() {
@@ -93,7 +77,6 @@ export function ConnectionsPage() {
     if (params.get("connected") || params.get("error")) setParams({}, { replace: true });
   }, [params, setParams, toast]);
   const conns = useQuery({ queryKey: ["connections"], queryFn: () => api<{ connections: ConnectionDTO[] }>("/api/connections") });
-  const desc = useQuery({ queryKey: ["connectors"], queryFn: () => api<ConnectorsResp>("/api/connectors") });
   const sync = useMutation({
     mutationFn: (id: string) => api(`/api/connections/${id}/sync-now`, { method: "POST" }),
     onSuccess: () => void queryClient.invalidateQueries(),
@@ -111,114 +94,34 @@ export function ConnectionsPage() {
     onSuccess: (r) => (window.location.href = r.url),
     onError: (e: Error) => toast(e.message),
   });
-  return (
-    <div className="page stack-16">
-      <PageHead title="Connexions" subtitle="Comptes connectés, autorisations réellement accordées et état de synchronisation." />
-      {conns.isLoading ? (
-        <Loading />
-      ) : conns.data!.connections.length === 0 ? (
-        <Card>
-          <Empty>Aucun compte connecté.</Empty>
-        </Card>
-      ) : (
-        conns.data!.connections.map((c) => (
-          <Card
-            key={c.id}
-            title={
-              <span className="row">
-                {c.accountEmail} {c.isDemo && <DemoBadge />}
-              </span>
-            }
-            actions={
-              <span className={`badge ${c.status === "active" ? "ok" : "bad"}`}>
-                {c.status === "active" ? "Active" : c.status === "expired" ? "Autorisation expirée" : c.status === "error" ? "Erreur" : c.status}
-              </span>
-            }
-          >
-            <div className="card-body stack-12">
-              <dl className="kv small">
-                <dt>Fournisseur</dt>
-                <dd>{c.providerLabel}</dd>
-                <dt>Dernière synchronisation</dt>
-                <dd>{c.lastSyncAt ? `${fmtDateTime(c.lastSyncAt)} (${fmtRelative(c.lastSyncAt)})` : "jamais"}</dd>
-                <dt>Notifications</dt>
-                <dd>{c.webhook === "active" ? "Temps réel (webhooks)" : c.webhook === "polling" ? "Synchronisation périodique (10 min)" : "—"}</dd>
-                {c.lastError && (
-                  <>
-                    <dt>Erreur</dt>
-                    <dd style={{ color: "var(--bad)" }}>{c.lastError}</dd>
-                  </>
-                )}
-              </dl>
-              <div>
-                <div className="section-title">Capacités accordées</div>
-                <div className="chips">
-                  {CAPABILITIES.map((cap) => {
-                    const has = c.capabilities.includes(cap);
-                    return (
-                      <span key={cap} className={`badge ${has ? "ok" : ""}`} title={has ? "Accordée" : "Non accordée"}>
-                        {has ? "✓" : "—"} {CAPABILITY_LABELS[cap]}
-                        {!has && !c.isDemo && cap !== "mail.delete_permanent" && (
-                          <button className="btn ghost small" style={{ height: 20, padding: "0 6px", marginLeft: 4 }} onClick={() => extend.mutate({ c, cap })}>
-                            Ajouter
-                          </button>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="row wrap">
-                {c.status !== "active" && !c.isDemo && (
-                  <button className="btn primary small" onClick={() => extend.mutate({ c, cap: c.capabilities[0] ?? "mail.read" })}>
-                    Reconnecter
-                  </button>
-                )}
-                <button className="btn small" onClick={() => sync.mutate(c.id)} disabled={sync.isPending}>
-                  Synchroniser maintenant
-                </button>
-                <button
-                  className="btn ghost danger small"
-                  onClick={() => {
-                    if (confirm(`Déconnecter ${c.accountEmail} ? Les autorisations seront révoquées et les données locales de ce compte supprimées.`)) remove.mutate(c.id);
-                  }}
-                >
-                  Déconnecter
-                </button>
-              </div>
-            </div>
-          </Card>
-        ))
-      )}
-      <Card title="Ajouter un compte">
-        <div className="card-body">
-          <ConnectButtons />
+  return <div className="page connections-page stack-16">
+    <PageHead title="Vos connexions" subtitle="Retrouvez vos e-mails et agendas ici." />
+    {conns.isLoading ? <Loading /> : conns.isError ? <Card><div className="card-body row wrap" role="alert">Vos comptes n’ont pas pu être chargés.<button className="btn small" onClick={() => void conns.refetch()}>Réessayer</button></div></Card> : conns.data?.connections.map(c => <Card key={c.id}>
+      <div className="card-body stack-16">
+        <div className="connected-heading">
+          <span className={`provider-mark ${c.provider}`} aria-hidden="true">{c.isDemo ? "✦" : c.provider === "google" ? "G" : "▦"}</span>
+          <div className="grow account-identity"><strong>{c.accountEmail}</strong><p className="small muted">{c.providerLabel}{c.lastSyncAt ? ` · Mis à jour ${fmtRelative(c.lastSyncAt)}` : " · Synchronisation en attente"}</p></div>
+          {c.isDemo && <DemoBadge />}
+          <span className={`badge ${c.status === "active" ? "ok" : "wait"}`}>{c.status === "active" ? "Connecté" : c.status === "expired" ? "À reconnecter" : "À vérifier"}</span>
         </div>
-      </Card>
-      <Card title="Ce que chaque connecteur sait faire">
-        <div className="card-body stack-16">
-          {desc.data?.connectors.map((d) => (
-            <div key={d.id} className="stack-8">
-              <div className="row">
-                <strong>{d.label}</strong>
-                <span className={`badge ${d.status === "available" ? "ok" : d.status === "needs_configuration" ? "wait" : ""}`}>
-                  {d.status === "available" ? "Disponible" : d.status === "needs_configuration" ? "À configurer sur le serveur" : d.status === "planned" ? "Prévu" : "Export uniquement"}
-                </span>
-              </div>
-              {d.reads.length > 0 && <p className="small">Lit : {d.reads.join(" ; ")}</p>}
-              {d.writes.length > 0 && <p className="small">Modifie : {d.writes.join(" ; ")}</p>}
-              {d.unsupported.length > 0 && <p className="small muted">Ne fait pas : {d.unsupported.join(" ; ")}</p>}
-              {d.notes.map((n, i) => (
-                <p key={i} className="tiny muted">
-                  {n}
-                </p>
-              ))}
-            </div>
-          ))}
+        {c.lastError && <p className="small" role="alert">La synchronisation a rencontré un problème. Réessayez ou reconnectez ce compte.</p>}
+        <div className="row wrap">
+          {c.status !== "active" && !c.isDemo && <button className="btn primary small" disabled={extend.isPending} onClick={() => extend.mutate({ c, cap: c.capabilities[0] ?? "mail.read" })}>Reconnecter</button>}
+          <button className="btn small" onClick={() => sync.mutate(c.id)} disabled={sync.isPending}>{sync.isPending ? "Actualisation…" : "Actualiser"}</button>
         </div>
-      </Card>
-    </div>
-  );
+        <Disclosure title="Gérer les accès">
+          <div className="permission-list">{CAPABILITIES.map(cap => {
+            const has = c.capabilities.includes(cap);
+            return <div key={cap} className="spread permission-row"><span className="small">{CAPABILITY_LABELS[cap]}</span>{has ? <span className="badge ok">Autorisé</span> : !c.isDemo && cap !== "mail.delete_permanent" ? <button className="btn small" disabled={extend.isPending} onClick={() => extend.mutate({ c, cap })}>Autoriser<span className="sr-only"> {CAPABILITY_LABELS[cap]}</span></button> : <span className="small muted">Non autorisé</span>}</div>;
+          })}</div>
+          {c.lastError && <Disclosure title="Détail du problème"><p className="small connection-error">{c.lastError}</p></Disclosure>}
+          <button className="btn ghost danger small" disabled={remove.isPending} onClick={() => { if (confirm(`Déconnecter ${c.accountEmail} ? Les autorisations seront révoquées et les données locales de ce compte supprimées.`)) remove.mutate(c.id); }}>Déconnecter ce compte</button>
+        </Disclosure>
+      </div>
+    </Card>)}
+    <Card title="Ajouter un compte"><div className="card-body"><ConnectButtons /></div></Card>
+    <Link to="/integrations" className="connections-more">Voir les autres intégrations <span aria-hidden="true">→</span></Link>
+  </div>;
 }
 
 // ---------------------------------------------------------------------------
@@ -280,7 +183,7 @@ export function ProfilePage() {
   const f = (k: string) => ({ value: (form[k] as string) ?? "", onChange: (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value }) });
   return (
     <div className="page stack-16">
-      <PageHead title="Profil et préférences" subtitle="Préférences durables, autonomie, mémoire et confidentialité." />
+      <PageHead title="Vos préférences" subtitle="Un assistant à votre façon." />
       <Card title="Identité et style">
         <div className="card-body stack-12">
           <div className="grid-2">
@@ -288,28 +191,31 @@ export function ProfilePage() {
             <div className="field"><label htmlFor="an">Prénom de l'assistant</label><input id="an" className="input" {...f("assistantName")} /></div>
             <div className="field"><label htmlFor="co">Entreprise</label><input id="co" className="input" {...f("company")} /></div>
             <div className="field"><label htmlFor="jr">Rôle</label><input id="jr" className="input" {...f("jobRole")} /></div>
-            <div className="field"><label htmlFor="tz">Fuseau horaire</label><input id="tz" className="input" {...f("timezone")} /></div>
-            <div className="field"><label htmlFor="to">Ton</label><input id="to" className="input" {...f("tone")} /></div>
-            <div className="field"><label htmlFor="ws">Début de journée</label><input id="ws" type="time" className="input" {...f("workStart")} /></div>
-            <div className="field"><label htmlFor="we">Fin de journée</label><input id="we" type="time" className="input" {...f("workEnd")} /></div>
-            <div className="field"><label htmlFor="bt">Heure du point quotidien</label><input id="bt" type="time" className="input" {...f("briefingTime")} /></div>
-            <div className="field"><label htmlFor="rt">Conservation des transcriptions (jours, 0 = aucune)</label><input id="rt" type="number" min={0} max={365} className="input" {...f("transcriptRetentionDays")} /></div>
+            <div className="field"><label htmlFor="to">Ton des réponses</label><input id="to" className="input" {...f("tone")} /></div>
           </div>
-          <div className="field"><label htmlFor="sig">Signature</label><textarea id="sig" className="textarea" {...f("signature")} /></div>
-          <label className="check"><input type="checkbox" checked={Boolean(form.tutoiement)} onChange={(e) => setForm({ ...form, tutoiement: e.target.checked })} /> Tutoiement</label>
-          <p className="tiny muted">Enregistrement audio durable : désactivé (non proposé dans cette version).</p>
+          <label className="check"><input type="checkbox" checked={Boolean(form.tutoiement)} onChange={(e) => setForm({ ...form, tutoiement: e.target.checked })} /> Me tutoyer</label>
+          <Disclosure title="Signature et horaires">
+            <div className="field"><label htmlFor="sig">Signature des e-mails</label><textarea id="sig" className="textarea" {...f("signature")} /></div>
+            <div className="grid-2">
+              <div className="field"><label htmlFor="tz">Fuseau horaire</label><input id="tz" className="input" {...f("timezone")} /></div>
+              <div className="field"><label htmlFor="bt">Heure du point quotidien</label><input id="bt" type="time" className="input" {...f("briefingTime")} /></div>
+              <div className="field"><label htmlFor="ws">Début de journée</label><input id="ws" type="time" className="input" {...f("workStart")} /></div>
+              <div className="field"><label htmlFor="we">Fin de journée</label><input id="we" type="time" className="input" {...f("workEnd")} /></div>
+              <div className="field"><label htmlFor="rt">Historique vocal : jours conservés</label><input id="rt" type="number" min={0} max={365} className="input" {...f("transcriptRetentionDays")} /><span className="tiny muted">0 pour ne rien conserver.</span></div>
+            </div>
+          </Disclosure>
           <button className="btn primary" onClick={() => save.mutate()} disabled={save.isPending}>Enregistrer</button>
         </div>
       </Card>
-      <Card title="Autonomie par catégorie">
+      <Card title="Ce que l’assistant peut faire seul" collapsible>
         <div className="card-body stack-12">
-          <p className="small muted">L'exécution automatique ne s'applique qu'aux règles confirmées, et jamais quand une exception est détectée.</p>
+          <p className="small muted">Une règle confirmée est nécessaire. En cas d’exception, l’assistant attend votre validation.</p>
           <AutonomyEditor value={q.data.autonomy} onChange={(v) => setAut.mutate(v)} />
         </div>
       </Card>
-      <Card title="Ce que je retiens de vous">
+      <Card title="Ce que l’assistant retient de vous" collapsible>
         <div className="card-body stack-12">
-          <p className="small muted">Préférences durables. Une correction ponctuelle n'est jamais ajoutée ici sans votre accord.</p>
+          <p className="small muted">Les préférences à garder pour la prochaine fois.</p>
           {mem.data?.memories.length ? (
             <ul className="list">
               {mem.data.memories.map((m) => (
@@ -331,7 +237,7 @@ export function ProfilePage() {
           </form>
         </div>
       </Card>
-      <Card title="Données et confidentialité">
+      <Card title="Vos données" collapsible>
         <div className="card-body stack-12">
           <p className="small">Waverti conserve les métadonnées des messages (expéditeur, objet, extrait) et lit leur contenu à la demande chez le fournisseur ; il n'en garde pas de copie intégrale. Les jetons d'accès sont chiffrés.</p>
           <div className="row wrap">
@@ -381,7 +287,7 @@ export function TemplatesPage() {
     <div className="page stack-16">
       <PageHead
         title="Modèles de messages"
-        subtitle="Seuls les modèles approuvés peuvent servir aux réponses automatiques. Variables : {{prenom}}, {{signature}}, {{mon_prenom}}."
+        subtitle="Vos réponses types, prêtes à réutiliser."
         actions={<button className="btn primary" onClick={() => setEdit({ name: "", body: "Bonjour {{prenom}},\n\n\n\n{{signature}}" })}>Nouveau modèle</button>}
       />
       {edit && (
@@ -389,6 +295,7 @@ export function TemplatesPage() {
           <div className="card-body stack-12">
             <div className="field"><label htmlFor="tn">Nom</label><input id="tn" className="input" value={edit.name ?? ""} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></div>
             <div className="field"><label htmlFor="tb">Texte</label><textarea id="tb" className="textarea" rows={8} value={edit.body ?? ""} onChange={(e) => setEdit({ ...edit, body: e.target.value })} /></div>
+            <p className="tiny muted">Variables : {"{{prenom}}, {{signature}}, {{mon_prenom}}"}. Approuvez un modèle pour l’utiliser dans les réponses automatiques.</p>
             {edit.id && <p className="tiny muted">Modifier un modèle retire son approbation : il faudra le relire.</p>}
             <div className="row">
               <button className="btn primary" onClick={() => save.mutate(edit)} disabled={!edit.name || !edit.body}>Enregistrer</button>
@@ -468,7 +375,7 @@ export function RulesPage() {
     <div className="page stack-16">
       <PageHead
         title="Règles d'automatisation"
-        subtitle="Une règle s'applique sans redemander de validation à chaque fois, uniquement si sa catégorie est en exécution automatique et qu'aucune exception n'est détectée."
+        subtitle="Vos règles pour automatiser les tâches répétitives."
         actions={<button className="btn primary" onClick={() => setDraft({ name: "", field: "fromDomains", value: "", category: "", meeting: false, action: "label", templateId: "", label: "" })}>Nouvelle règle</button>}
       />
       {draft && (
@@ -579,7 +486,7 @@ export function UsagePage() {
   const pct = Math.min(100, Math.round(u.ratio * 100));
   return (
     <div className="page stack-16">
-      <PageHead title="Consommation et facturation technique" subtitle={`Mois ${u.month}. Coûts estimés à partir des tarifs publics OpenAI configurés (USD).`} />
+      <PageHead title="Votre consommation" subtitle={`Mois ${u.month} · coûts estimés en dollars.`} />
       <Card title="Budget du mois">
         <div className="card-body stack-12">
           <div className="spread small">
@@ -587,11 +494,12 @@ export function UsagePage() {
             <span className="muted">Organisation : {formatUsdFromMicros(u.orgMonthMicros)} / {formatUsdFromMicros(u.budget.orgMonthlyLimitMicros)}</span>
           </div>
           <div className={`progress ${pct >= 100 ? "bad" : pct >= u.budget.alertThresholdPct ? "warn" : ""}`}><div style={{ width: `${pct}%` }} /></div>
-          {u.exceeded && <div className="danger-box">Budget atteint : l'IA et la voix sont suspendues. Les commandes simples sans IA et les règles déterministes continuent.</div>}
-          <p className="small muted">Voix aujourd'hui : {Math.round(u.voiceSecondsToday / 60)} min sur {u.budget.voiceMinutesDaily} · session vocale max {u.budget.voiceSessionMaxMinutes} min · {u.budget.actionsDaily} actions/jour · {u.budget.agentStepsPerTurn} étapes max par demande.</p>
+          {u.exceeded && <div className="danger-box">Budget atteint. L’IA et la voix sont en pause.</div>}
+          <p className="small muted">Voix aujourd’hui : {Math.round(u.voiceSecondsToday / 60)} / {u.budget.voiceMinutesDaily} min</p>
+          <Disclosure title="Voir les plafonds"><div className="stack-8 small muted"><span>{u.budget.voiceSessionMaxMinutes} min par conversation vocale</span><span>{u.budget.actionsDaily} actions par jour</span><span>{u.budget.agentStepsPerTurn} étapes par demande</span></div></Disclosure>
         </div>
       </Card>
-      <Card title="Détail par poste">
+      <Card title="Détail des coûts" collapsible>
         <table className="table">
           <thead><tr><th>Poste</th><th>Quantité</th><th>Coût estimé</th></tr></thead>
           <tbody>
@@ -602,7 +510,7 @@ export function UsagePage() {
           </tbody>
         </table>
       </Card>
-      <Card title="Limites">
+      <Card title="Modifier mes limites" collapsible>
         <div className="card-body stack-12">
           <div className="grid-2">
             <div className="field"><label htmlFor="lm">Budget mensuel (USD)</label><input id="lm" className="input" type="number" min={0} step={1} value={limit} onChange={(e) => setLimit(e.target.value)} placeholder={String(u.budget.monthlyLimitMicros / 1_000_000)} /></div>
@@ -612,7 +520,7 @@ export function UsagePage() {
             <button className="btn" onClick={() => save.mutate("user")}>Appliquer à mon compte</button>
             {["owner", "admin"].includes(u.role) && <button className="btn" onClick={() => save.mutate("org")}>Appliquer à l'organisation</button>}
           </div>
-          <p className="tiny muted">La veille par le prénom est locale et gratuite : une session vocale facturée ne s'ouvre qu'après le prénom, le bouton micro ou le raccourci, et se ferme après 2 minutes d'inactivité.</p>
+          <p className="tiny muted">Seules les conversations vocales actives sont facturées. La veille locale est gratuite.</p>
         </div>
       </Card>
     </div>
