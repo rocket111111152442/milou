@@ -13,6 +13,7 @@
 | `DATABASE_URL` | oui | Connexion PostgreSQL |
 | `APP_ENCRYPTION_KEY` | oui en production | 32 octets en base64 (`openssl rand -base64 32`) ; chiffre les jetons OAuth. **La changer rend les connexions existantes illisibles** |
 | `APP_BASE_URL` | oui | URL de l'interface (cookies, redirections, contrôle d'origine) |
+| `APP_ALLOWED_ORIGINS` | non | Autres origines de l'interface, séparées par des virgules, sans chemin ni joker ; ne jamais les déduire de l'en-tête Host envoyé par le client |
 | `API_PUBLIC_URL` | oui | URL publique de l'API (callbacks OAuth, webhooks). Identique à `APP_BASE_URL` si un seul service sert les deux |
 | `NODE_ENV` | oui | `production` (cookies `Secure`) |
 | `RUN_WORKER_IN_WEB` | non | `true` pour un déploiement mono-instance |
@@ -52,6 +53,7 @@ Une base Neon séparée est connectée au projet via l'intégration Vercel, form
 Le serveur privilégie `DATABASE_URL_UNPOOLED` ou `POSTGRES_URL_NON_POOLING` afin que LISTEN/NOTIFY et les verrous PostgreSQL disposent d'une session directe.
 
 Configurer `APP_BASE_URL` et `API_PUBLIC_URL` avec le domaine de production, `PORT=8787`, `NODE_ENV=production`, une clé `APP_ENCRYPTION_KEY` de 32 octets encodés en base64, et `RUN_WORKER_IN_WEB=true` pour la démonstration.
+Si plusieurs domaines servent l'interface, ajouter explicitement leurs origines dans `APP_ALLOWED_ORIGINS`. Pour les domaines personnalisés actuels : `https://waverti.com,https://www.waverti.com`. L'origine déjà définie dans `APP_BASE_URL` reste autorisée. Redéployer après toute modification ; vérifier inscription, connexion et rejet d'une origine étrangère sur chacun des domaines.
 Les migrations s'appliquent au démarrage. Les secrets ne doivent jamais être ajoutés au dépôt ni inclus dans l'image.
 
 Cette configuration est une démonstration hébergée : les instances web peuvent s'arrêter lorsqu'elles ne reçoivent plus de trafic.

@@ -8,6 +8,15 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(8787),
   APP_BASE_URL: z.string().url().default("http://localhost:5173"),
+  /** Origines supplémentaires explicites, séparées par des virgules (sans chemin ni joker). */
+  APP_ALLOWED_ORIGINS: z.string().default("").transform((raw) => raw.split(",").map((s) => s.trim()).filter(Boolean)).pipe(
+    z.array(z.string().url().refine((value) => {
+      try {
+        const url = new URL(value);
+        return ["http:", "https:"].includes(url.protocol) && url.origin === value;
+      } catch { return false; }
+    }, "Une origine HTTP(S) exacte est requise, sans chemin ni joker")),
+  ),
   /** URL publique du serveur (callbacks OAuth et webhooks). */
   API_PUBLIC_URL: z.string().url().optional(),
   DATABASE_URL: z.string().default("postgresql://antonio:antonio@localhost:5432/antonio_dev"),

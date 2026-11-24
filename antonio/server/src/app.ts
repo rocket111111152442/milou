@@ -64,12 +64,15 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // Protection CSRF : les requêtes modifiantes authentifiées par cookie doivent venir de l'application.
+  const allowedOrigins = new Set([new URL(c.APP_BASE_URL).origin, ...(c.API_PUBLIC_URL ? [new URL(c.API_PUBLIC_URL).origin] : []), ...c.APP_ALLOWED_ORIGINS]);
   app.addHook("preHandler", async (req) => {
     if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return;
     if (req.url.startsWith("/api/webhooks/") || req.url.startsWith("/api/oauth/")) return;
-    const origin = req.headers.origin ?? (req.headers.referer ? new URL(req.headers.referer).origin : null);
-    const allowed = new Set([new URL(c.APP_BASE_URL).origin, ...(c.API_PUBLIC_URL ? [new URL(c.API_PUBLIC_URL).origin] : [])]);
-    if (c.NODE_ENV !== "test" && (!origin || !allowed.has(origin))) throw new AppError(403, "bad_origin", "Origine de la requête non autorisée");
+    let origin = req.headers.origin;
+    if (!origin && req.headers.referer) {
+      try { origin = new URL(req.headers.referer).origin; } catch { /* Référent invalide : origine non autorisée. */ }
+    }
+    if (c.NODE_ENV !== "test" && (!origin || !allowedOrigins.has(origin))) throw new AppError(403, "bad_origin", "Origine de la requête non autorisée");
   });
 
   app.setErrorHandler((err: unknown, req: FastifyRequest, reply: FastifyReply) => {
