@@ -26,6 +26,7 @@ const OPENAI_PRICES: Record<string, { input: number; output: number; cachedFacto
   // GPT-5.4: $2.50 / $15 per 1M, cached input $0.25 (third-party listings, Nov 2026; confirm on openai.com/api/pricing)
   "gpt-5.4": { input: 2.5, output: 15, cachedFactor: 0.1 },
   "gpt-5.4-mini": { input: 0.75, output: 4.5, cachedFactor: 0.1 },
+  "gpt-5.4-nano": { input: 0.2, output: 1.25, cachedFactor: 0.1 },
   "gpt-4.1-mini": { input: 0.4, output: 1.6 },
   "gpt-4.1": { input: 2, output: 8 },
   "gpt-4o-mini": { input: 0.15, output: 0.6 },
@@ -38,7 +39,12 @@ export function estimateCostUsd(model: string, u: UsageLike): number {
     return ((u.input_tokens ?? 0) * env.ai.priceInputPerMTok + read * env.ai.priceInputPerMTok * 0.25 + (u.output_tokens ?? 0) * env.ai.priceOutputPerMTok) / 1e6;
   }
   if (!model.startsWith("claude")) {
-    const known = OPENAI_PRICES[model] ?? Object.entries(OPENAI_PRICES).find(([k]) => model.startsWith(k + "-"))?.[1];
+    // Dated snapshots ("gpt-5.4-mini-2026-03-17") map to the LONGEST matching name, never to a shorter, pricier one.
+    const known =
+      OPENAI_PRICES[model] ??
+      Object.entries(OPENAI_PRICES)
+        .filter(([k]) => model.startsWith(k + "-"))
+        .sort((a, b) => b[0].length - a[0].length)[0]?.[1];
     const op = known ?? { input: 2.5, output: 15 }; // unknown model: count conservatively
     const read = u.cache_read_input_tokens ?? 0;
     return ((u.input_tokens ?? 0) * op.input + read * op.input * (op.cachedFactor ?? 0.25) + (u.output_tokens ?? 0) * op.output) / 1e6;

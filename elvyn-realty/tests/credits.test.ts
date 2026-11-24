@@ -109,4 +109,12 @@ describe("assistant credits", () => {
     expect(res.status).toBe(401);
     vi.doUnmock("@/lib/auth/server");
   });
+
+  it("prices dated model snapshots with the right (longest) model name", () => {
+    const u = { input_tokens: 1_000_000, output_tokens: 0 };
+    expect(usage.estimateCostUsd("gpt-5.4-nano-2026-03-17", u)).toBeCloseTo(0.2);
+    expect(usage.estimateCostUsd("gpt-5.4-mini-2026-03-17", u)).toBeCloseTo(0.75);
+    expect(usage.estimateCostUsd("gpt-5.4-2026-03-05", u)).toBeCloseTo(2.5);
+    expect(usage.estimateCostUsd("gpt-5.4-nano", { output_tokens: 1_000_000 })).toBeCloseTo(1.25);
+  });
 });

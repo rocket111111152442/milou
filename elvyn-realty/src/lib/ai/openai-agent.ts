@@ -26,7 +26,7 @@ export const OPENAI_TOOLS: ChatCompletionTool[] = TOOL_DEFINITIONS.map((t) => ({
 
 /** Models tried in order if the configured one is not available on the account. */
 function modelChain(): string[] {
-  return [...new Set([env.ai.model, "gpt-5.4-mini", "gpt-4.1-mini"])];
+  return [...new Set([env.ai.model, "gpt-5.4-nano", "gpt-5.4-mini", "gpt-4.1-mini"])];
 }
 let workingModel: string | null = null;
 let reasoningSupported = true;
