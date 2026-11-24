@@ -65,7 +65,9 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
   // Arch photo: the most valuable published sale listing with a photo (usually the most striking one).
   const heroListing = [...inventory].filter((l) => l.image && l.usd.sale).sort((a, b) => (b.usd.sale ?? 0) - (a.usd.sale ?? 0))[0] ?? highlights?.items.find((l) => l.image) ?? null;
   const heroPrice = heroListing ? priceLabel(heroListing, lang) : null;
-  const ticker = [...(facets?.cities.map((c) => c.name) ?? []), ...(facets?.categories.map((c) => (lang === "en" ? c.nameEn : null) || c.name) ?? [])].slice(0, 14);
+  // Main tourist destinations of the Dominican Republic, then the towns of the catalogue.
+  const TOURIST = ["Punta Cana", "Santo Domingo", "Puerto Plata", "Las Terrenas", "Samaná", "Sosúa", "Cabarete", "La Romana", "Bávaro", "Cap Cana", "Bayahíbe", "Juan Dolio", "Las Galeras", "Jarabacoa", "Constanza", "Cabrera", "Río San Juan"];
+  const ticker = [...new Set([...TOURIST, ...(facets?.cities.map((c) => c.name) ?? [])])];
 
   return (
     <>
@@ -119,7 +121,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       </section>
 
       {/* Moving strip of towns and types */}
-      {ticker.length > 3 && (
+      {ticker.length > 0 && (
         <div className="overflow-hidden border-y border-brand-600/30 bg-brand py-4 text-white" aria-hidden>
           <div className="flex w-max animate-marquee gap-10 whitespace-nowrap font-display text-2xl italic motion-reduce:animate-none sm:text-3xl">
             {[...ticker, ...ticker].map((x, i) => (
