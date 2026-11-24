@@ -30,7 +30,7 @@ const schema = z.object({
 
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
-  OPENAI_TEXT_MODEL: z.string().default("gpt-6-luna"),
+  OPENAI_TEXT_MODEL: z.string().default("gpt-5.4-sol"),
   OPENAI_TEXT_REASONING: z.enum(["none", "low", "medium", "high"]).default("low"),
   OPENAI_LIVE_MODEL: z.string().default("gpt-live-1.1"),
   /** Prix utilisés pour l'estimation (USD). Vérifiés sur la page tarifaire OpenAI le 2026-11-23. */

@@ -465,7 +465,7 @@ interface UsageResp {
   role: string;
 }
 
-const KIND_LABELS: Record<string, string> = { text_model: "Modèle texte (gpt-6-luna)", voice: "Voix (GPT-Live, dictée)", documents: "Traitement documentaire", paid_tool: "Outils payants", background: "Tâches de fond" };
+const KIND_LABELS: Record<string, string> = { text_model: "Assistant écrit", voice: "Voix et dictée", documents: "Documents", paid_tool: "Outils", background: "Tâches de fond" };
 
 export function UsagePage() {
   const { toast } = useApp();
@@ -490,10 +490,11 @@ export function UsagePage() {
       <Card title="Budget du mois">
         <div className="card-body stack-12">
           <div className="spread small">
-            <span>{formatUsdFromMicros(u.userMonthMicros)} utilisés sur {formatUsdFromMicros(u.budget.monthlyLimitMicros)}</span>
-            <span className="muted">Organisation : {formatUsdFromMicros(u.orgMonthMicros)} / {formatUsdFromMicros(u.budget.orgMonthlyLimitMicros)}</span>
+            <strong>{pct}% utilisés</strong>
+            <span className="muted">{formatUsdFromMicros(u.userMonthMicros)} sur {formatUsdFromMicros(u.budget.monthlyLimitMicros)}</span>
           </div>
           <div className={`progress ${pct >= 100 ? "bad" : pct >= u.budget.alertThresholdPct ? "warn" : ""}`}><div style={{ width: `${pct}%` }} /></div>
+          <div className="small muted">Limite mensuelle prévue selon votre offre</div>
           {u.exceeded && <div className="danger-box">Budget atteint. L’IA et la voix sont en pause.</div>}
           <p className="small muted">Voix aujourd’hui : {Math.round(u.voiceSecondsToday / 60)} / {u.budget.voiceMinutesDaily} min</p>
           <Disclosure title="Voir les plafonds"><div className="stack-8 small muted"><span>{u.budget.voiceSessionMaxMinutes} min par conversation vocale</span><span>{u.budget.actionsDaily} actions par jour</span><span>{u.budget.agentStepsPerTurn} étapes par demande</span></div></Disclosure>
