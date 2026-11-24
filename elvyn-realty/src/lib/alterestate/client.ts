@@ -82,7 +82,16 @@ export async function aeGet(path: string, query: Query = {}, opts: { attempts?: 
     }
 
     if (res.ok) {
-      const text = await res.text();
+      let text: string;
+      try {
+        text = await res.text();
+      } catch {
+        // The timeout also covers reading the body: retry like a network error.
+        lastErr = new AlterEstateError("network_error", null, true);
+        log.warn("alterestate.body_timeout", { path, attempt });
+        await sleep(Math.min(500 * 2 ** attempt, 4000));
+        continue;
+      }
       if (!text) throw new AlterEstateNotFound();
       try {
         return JSON.parse(text);

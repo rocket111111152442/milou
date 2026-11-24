@@ -188,3 +188,10 @@ export const aiCredits = pgTable("ai_credits", {
   externalId: text("external_id"), // Stripe Checkout Session id, or "initial"
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [uniqueIndex("ai_credits_external_idx").on(t.externalId)]);
+
+/** Shared copy of the AlterEstate inventory, so a cold server instance does not refetch every page. */
+export const catalogSnapshots = pgTable("catalog_snapshots", {
+  key: text("key").primaryKey(),
+  data: jsonb("data").notNull(),
+  storedAt: timestamp("stored_at", { withTimezone: true }).notNull(),
+});

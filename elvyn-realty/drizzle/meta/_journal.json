@@ -15,6 +15,13 @@
       "when": 1795549888876,
       "tag": "0001_ai_credits",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795554202397,
+      "tag": "0002_catalog_snapshots",
+      "breakpoints": true
     }
   ]
 }

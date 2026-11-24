@@ -99,12 +99,67 @@ async function liveDetail(slug: string): Promise<ListingDetail | null> {
 
 /* ------------------------------------------------------------------ public API */
 
+/* Shared snapshot in the database: a cold instance reads it instead of walking every AlterEstate page. */
+async function readSnapshot(): Promise<{ value: ListingSummary[]; age: number } | null> {
+  if (!env.database.url) return null;
+  try {
+    const { getDb, schema } = await import("@/lib/db");
+    const { eq } = await import("drizzle-orm");
+    const [row] = await (await getDb()).select().from(schema.catalogSnapshots).where(eq(schema.catalogSnapshots.key, "inventory"));
+    if (!row || !Array.isArray(row.data)) return null;
+    return { value: row.data as ListingSummary[], age: Date.now() - new Date(row.storedAt).getTime() };
+  } catch (err) {
+    log.warn("catalog.snapshot_read_failed", { kind: (err as Error).name });
+    return null;
+  }
+}
+
+async function writeSnapshot(value: ListingSummary[]) {
+  if (!env.database.url) return;
+  try {
+    const { getDb, schema } = await import("@/lib/db");
+    const storedAt = new Date();
+    await (await getDb())
+      .insert(schema.catalogSnapshots)
+      .values({ key: "inventory", data: value, storedAt })
+      .onConflictDoUpdate({ target: schema.catalogSnapshots.key, set: { data: value, storedAt } });
+  } catch (err) {
+    log.warn("catalog.snapshot_write_failed", { kind: (err as Error).name });
+  }
+}
+
+let servedFromSnapshotFallback = false;
+async function loadInventory(): Promise<ListingSummary[]> {
+  servedFromSnapshotFallback = false;
+  const snap = await readSnapshot();
+  if (snap && snap.age < ttl()) return snap.value;
+  try {
+    const value = await liveInventory();
+    await writeSnapshot(value);
+    return value;
+  } catch (err) {
+    // AlterEstate slow or down: the last complete inventory (within the stale window) is better than nothing.
+    if (snap && snap.age < ttl() + maxStale()) {
+      servedFromSnapshotFallback = true;
+      lastError = (err as Error).message;
+      log.warn("catalog.inventory_from_snapshot", { ageMin: Math.round(snap.age / 60000), reason: lastError });
+      return snap.value;
+    }
+    throw err;
+  }
+}
+
 export async function getInventory(): Promise<ListingSummary[]> {
   if (catalogMode() === "demo") {
     return (await loadDemoDetails()).map((d) => d as ListingSummary);
   }
   try {
-    const { value, stale } = await cache.get("inventory", liveInventory, ttl(), maxStale());
+    const { value, stale } = await cache.get("inventory", loadInventory, ttl(), maxStale());
+    if (servedFromSnapshotFallback) {
+      // Retry AlterEstate on the next request instead of trusting the fallback for a full TTL.
+      cache.delete("inventory");
+      return value;
+    }
     if (!stale) {
       lastInventory = { at: new Date().toISOString(), count: value.length };
       lastError = null;
