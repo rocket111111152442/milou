@@ -85,6 +85,7 @@ export function Header({ lang }: { lang: Lang }) {
             href={switchLangPath(internal, otherLang)}
             hrefLang={otherLang}
             lang={otherLang}
+            translate="no"
             className="hidden min-h-[44px] items-center rounded-full px-3 text-sm font-semibold text-navy-700 hover:bg-navy-50 sm:inline-flex"
             aria-label={t.nav.language}
           >

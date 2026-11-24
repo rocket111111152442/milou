@@ -43,6 +43,15 @@ describe("AlterEstate live integration (mocked API)", () => {
     expect(r.count).toBe(2);
   });
 
+  it("accepts list results whose agents are strings and skips malformed items", async () => {
+    const svc = await load();
+    fetchMock.mockResolvedValueOnce(json(page([item(1, { agents: ["IZHIZ6C3Z6"] }), item(2, { agents: [{ company: 2040, full_name: "Elvyn Arnaud" }] }), { uid: "BROKEN" }], null, 3)));
+    const inv = await svc.getInventory();
+    expect(inv.map((l) => l.uid)).toEqual(["U1", "U2"]);
+    expect(inv[0].agencyOwned).toBeNull();
+    expect(inv[1].agencyOwned).toBe(true);
+  });
+
   it("retries on 429 honouring Retry-After", async () => {
     const svc = await load();
     fetchMock.mockResolvedValueOnce(json({ detail: "slow down" }, 429, { "retry-after": "0" })).mockResolvedValueOnce(json(page([item(3)], null, 1)));

@@ -31,6 +31,16 @@ export const aeAgent = z.looseObject({
   position: strish.optional(),
   avatar: strish.optional(),
 });
+/**
+ * Agents: the detail endpoint returns objects; the list endpoint was observed (24/11/2026,
+ * live account) returning plain strings. Strings are dropped (no usable contact data).
+ */
+const aeAgents = z
+  .array(z.union([aeAgent, z.string(), z.number(), z.null()]))
+  .nullable()
+  .optional()
+  .transform((arr) => (arr ? arr.filter((a): a is z.infer<typeof aeAgent> => typeof a === "object" && a !== null) : arr));
+
 export const aeGalleryImage = z.looseObject({ image: strish, priority: numish.optional() });
 export const aeLatLong = z.union([
   z.literal(false),
@@ -114,7 +124,7 @@ export const aeListingBase = z.looseObject({
   exclusive: boolish.optional(),
   featured: boolish.optional(),
   timestamp: strish.optional(),
-  agents: z.array(aeAgent).nullable().optional(),
+  agents: aeAgents,
 });
 
 export const aeListingDetail = aeListingBase.extend({
@@ -135,16 +145,37 @@ export const aeListingDetail = aeListingBase.extend({
   related_properties: z.array(aeListingBase).nullable().optional(),
 });
 
-export const aeListPage = z.looseObject({
+const aeListEnvelope = z.looseObject({
   count: numish,
   next: strish.optional(),
   previous: strish.optional(),
-  results: z.array(aeListingBase),
+  results: z.array(z.unknown()),
 });
+
+/**
+ * Parses a list page item by item: one unexpected listing is skipped (and counted) instead of
+ * making the whole catalogue unavailable.
+ */
+export function parseListPage(raw: unknown) {
+  const env = aeListEnvelope.parse(raw);
+  const results: AeListingBase[] = [];
+  let skipped = 0;
+  let firstIssue: string | null = null;
+  for (const item of env.results) {
+    const r = aeListingBase.safeParse(item);
+    if (r.success) results.push(r.data);
+    else {
+      skipped++;
+      firstIssue ??= r.error.issues.slice(0, 2).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    }
+  }
+  return { count: env.count, next: env.next ?? null, results, skipped, firstIssue };
+}
+export const aeListPage = { parse: parseListPage };
 
 export const aeAgentsList = z.array(aeAgent.extend({ bio: strish.optional(), properties: numish.optional() }));
 
 export type AeListingBase = z.infer<typeof aeListingBase>;
 export type AeListingDetail = z.infer<typeof aeListingDetail>;
-export type AeListPage = z.infer<typeof aeListPage>;
+export type AeListPage = ReturnType<typeof parseListPage>;
 export type AeAgent = z.infer<typeof aeAgent>;

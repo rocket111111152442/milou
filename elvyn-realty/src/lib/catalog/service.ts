@@ -50,8 +50,13 @@ function liveQuery(f: SearchFilters) {
   };
 }
 
+function reportSkipped(where: string, data: { skipped: number; firstIssue: string | null }) {
+  if (data.skipped) log.warn("alterestate.items_skipped", { where, skipped: data.skipped, issue: data.firstIssue?.slice(0, 200) });
+}
+
 async function liveSearch(f: SearchFilters): Promise<SearchResult> {
   const data = aeListPage.parse(await aeGet("/properties/filter/", liveQuery(f)));
+  reportSkipped("search", data);
   const seen = new Set<string>();
   const results = data.results
     .filter((r) => (seen.has(r.uid) ? false : (seen.add(r.uid), true)))
@@ -70,6 +75,7 @@ async function liveInventory(): Promise<ListingSummary[]> {
   const seen = new Set<string>();
   for (let page = 1; page <= 60; page++) {
     const data = aeListPage.parse(await aeGet("/properties/filter/", { page, page_size: 30, sort: "-timestamp" }));
+    reportSkipped("inventory", data);
     for (const r of data.results) {
       if (seen.has(r.uid)) continue;
       seen.add(r.uid);

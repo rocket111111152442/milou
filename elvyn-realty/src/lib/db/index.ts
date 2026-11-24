@@ -32,9 +32,22 @@ async function bootstrapAdmin(db: DB) {
 async function create(): Promise<DB> {
   if (env.database.url) {
     const { Pool } = await import("pg");
-    const pool = new Pool({ connectionString: env.database.url, max: 5, ssl: env.database.url.includes("sslmode=disable") ? false : { rejectUnauthorized: false } });
+    // TLS with certificate verification (Neon/Supabase use public certificates).
+    const ssl = env.database.url.includes("sslmode=disable") ? false : { rejectUnauthorized: true };
+    const pool = new Pool({ connectionString: env.database.url, max: 5, ssl });
     const db = drizzlePg(pool, { schema });
-    if (process.env.DB_AUTO_MIGRATE !== "false") await migratePg(db, { migrationsFolder: MIGRATIONS });
+    if (process.env.DB_AUTO_MIGRATE !== "false") {
+      // Migrations go through the direct (unpooled) connection when the provider offers one.
+      const direct = process.env.DATABASE_URL_UNPOOLED?.trim();
+      if (direct) {
+        const mPool = new Pool({ connectionString: direct, max: 1, ssl });
+        try {
+          await migratePg(drizzlePg(mPool, { schema }), { migrationsFolder: MIGRATIONS });
+        } finally {
+          await mPool.end();
+        }
+      } else await migratePg(db, { migrationsFolder: MIGRATIONS });
+    }
     await bootstrapAdmin(db);
     return db;
   }
