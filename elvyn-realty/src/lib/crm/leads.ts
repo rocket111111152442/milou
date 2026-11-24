@@ -9,7 +9,7 @@ import { notify, type NotifyEvent } from "@/lib/notify";
 import type { LeadInput } from "./lead-input";
 import { budgetInUsd, qualify } from "./qualification";
 
-const ACTION_REASONS = new Set(["visit", "reserve_offer_payment", "negotiation", "human_request", "existing_client", "seller_listing"]);
+const ACTION_REASONS = new Set(["visit", "reserve_offer_payment", "negotiation", "human_request", "existing_client", "seller_listing", "property_search"]);
 
 export interface LeadResult {
   contactId: number;

@@ -322,7 +322,7 @@ export function ChatWidget({ lang, enabled }: { lang: Lang; enabled: boolean }) 
                       onDone={(visit) =>
                         setMessages((all) => [
                           ...all.map((x, j) => (j === i ? { ...x, handoff: { ...x.handoff!, status: "sent" } } : x)),
-                          { role: "notice", text: visit ? t.visitDone : t.handoffDone, kind: "done" },
+                          { role: "notice", text: visit ? t.visitDone : m.handoff?.reason === "property_search" ? t.searchDone : t.handoffDone, kind: "done" },
                         ])
                       }
                     />

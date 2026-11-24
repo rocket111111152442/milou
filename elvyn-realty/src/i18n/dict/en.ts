@@ -413,6 +413,7 @@ const en: Dict = {
     handoffTitle: "Send your request to Elvyn",
     handoffText: "Check your details. They will only be sent if you press “Send to Elvyn”.",
     handoffSend: "Send to Elvyn",
+    searchDone: "I've taken note of your request and will be sending you options that match it.",
     handoffDone: "Done: your request has been recorded. Elvyn will contact you personally.",
     visitDone: "Visit request recorded, pending confirmation. Elvyn will contact you to confirm the time.",
     whatsappSummary: "Continue on WhatsApp",

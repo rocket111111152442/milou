@@ -58,6 +58,7 @@ export const HANDOFF_REASONS = [
   "unknown_info",
   "partnership",
   "suspicious",
+  "property_search",
 ] as const;
 
 export interface Handoff {

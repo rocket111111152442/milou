@@ -411,6 +411,7 @@ const es = {
     handoffTitle: "Enviar tu solicitud a Elvyn",
     handoffText: "Revisa tus datos. Solo se enviarán si pulsas «Enviar a Elvyn».",
     handoffSend: "Enviar a Elvyn",
+    searchDone: "He tomado nota de tu solicitud y te estaré enviando opciones referentes a tu solicitud.",
     handoffDone: "Listo: tu solicitud quedó registrada. Elvyn te contactará personalmente.",
     visitDone: "Solicitud de visita registrada, pendiente de confirmación. Elvyn te contactará para confirmar el horario.",
     whatsappSummary: "Continuar por WhatsApp",
