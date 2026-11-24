@@ -6,7 +6,7 @@ import { log } from "@/lib/log";
 import { site } from "@/config/site";
 import { isOfficeOpen } from "@/lib/hours";
 import { systemPrompt } from "./prompt";
-import { correctFalseClaims, ensureCards, ensureHandoff, executeTool, TOOL_DEFINITIONS, type Card, type Handoff, type ToolContext } from "./tools";
+import { correctFalseClaims, typesFromText, ensureCards, ensureHandoff, executeTool, TOOL_DEFINITIONS, type Card, type Handoff, type ToolContext } from "./tools";
 import { recordUsage, budgetBlock } from "./usage";
 import { loadTranscript, saveTurn, type ChatSessionState } from "./store";
 import { runTurnOpenAI, type OpenAICreateFn } from "./openai-agent";
@@ -101,6 +101,7 @@ export async function runTurn(
     handoff: state.handoff,
     cards: [],
     executed: new Map(),
+    requestedTypes: typesFromText(userText),
   };
   if (ctx.pageSlug) ctx.seenSlugs.add(ctx.pageSlug);
   const handoffBefore = JSON.stringify(state.handoff);

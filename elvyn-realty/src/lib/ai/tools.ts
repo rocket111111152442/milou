@@ -559,6 +559,14 @@ export async function ensureCards(ctx: ToolContext, text: string): Promise<void>
   }
 }
 
+const LAND_WORDS = /(?<![\p{L}])(terrenos?|solar(es)?|lotes?|land|plots?)(?![\p{L}])/iu;
+const BUILT_WORDS = /(?<![\p{L}])(villas?|casas?|houses?|homes?|apartamentos?|apartments?|aptos?|condos?|penthouses?|locales?|hotel(es)?|fincas?|farms?|edificios?|buildings?|oficinas?|offices?)(?![\p{L}])/iu;
+
+/** Types stated in the visitor's own words (only the unambiguous "land, nothing built" case). */
+export function typesFromText(text: string): string[] | undefined {
+  return LAND_WORDS.test(text) && !BUILT_WORDS.test(text) ? ["land"] : undefined;
+}
+
 /** A listing matches when no type was requested in this turn, or its category is one of the requested types. */
 function matchesRequestedType(l: ListingSummary, ctx: ToolContext): boolean {
   const types = (ctx.requestedTypes ?? []).filter((t): t is keyof typeof TYPE_PATTERNS => t in TYPE_PATTERNS);
@@ -569,11 +577,17 @@ function matchesRequestedType(l: ListingSummary, ctx: ToolContext): boolean {
 
 /* Sentences claiming the request was already sent, booked or confirmed. */
 const END = "(?![\\p{L}\\p{N}])"; // word end that also works after accented letters (\b does not)
+// Verbs that only mean "sent to Elvyn" when the object is the request (not "te dejé las opciones abajo").
+const OBJ_ES = String.raw`[^.!?\n]{0,40}(?<![\p{L}])(visita|cita|solicitud|reserva|petición|datos|información|mensaje|a\s+Elvyn|con\s+Elvyn)`;
+const OBJ_EN = String.raw`[^.!?\n]{0,40}(?<![\p{L}])(visit|viewing|request|booking|appointment|details|information|message|to\s+Elvyn|with\s+Elvyn)`;
 const CLAIM_RES = [
-  String.raw`(?<![\p{L}])(ya\s+)?(te\s+|le\s+)?(lo\s+|la\s+|los\s+|las\s+)?(dejé|envié|registré|agendé|reservé|programé|confirmé|transmití|mandé|notifiqué|avisé|coordiné|solicité)` + END,
-  String.raw`(?<![\p{L}])(he|hemos)\s+(ya\s+)?(enviado|agendado|registrado|reservado|confirmado|programado|dejado|transmitido|mandado|notificado|avisado|solicitado)` + END,
+  String.raw`(?<![\p{L}])(agendé|reservé|confirmé|programé|coordiné|notifiqué|avisé|transmití)` + END,
+  String.raw`(?<![\p{L}])(dejé|envié|mandé|pasé|registré|solicité)` + END + OBJ_ES,
+  String.raw`(?<![\p{L}])(he|hemos)\s+(ya\s+)?(agendado|reservado|confirmado|programado|coordinado|notificado|avisado|transmitido)` + END,
+  String.raw`(?<![\p{L}])(he|hemos)\s+(ya\s+)?(dejado|enviado|mandado|pasado|registrado|solicitado)` + END + OBJ_ES,
   String.raw`(?<![\p{L}])(visita|cita|solicitud|reserva|petición)[^.!?\n]{0,40}(?<![\p{L}])(está|quedó|ha quedado|ha sido|fue)\s+(ya\s+)?(confirmad|agendad|reservad|enviad|registrad|programad)[ao]s?` + END,
-  String.raw`(?<![\p{L}])I(?:'ve|’ve|\s+have)?\s+(?:already\s+|just\s+)?(?:sent|booked|scheduled|confirmed|forwarded|submitted|passed|notified|reserved|registered|arranged|requested)` + END,
+  String.raw`(?<![\p{L}])I(?:'ve|’ve|\s+have)?\s+(?:already\s+|just\s+)?(?:booked|scheduled|confirmed|reserved|arranged|notified)` + END,
+  String.raw`(?<![\p{L}])I(?:'ve|’ve|\s+have)?\s+(?:already\s+|just\s+)?(?:sent|forwarded|passed|submitted|registered|requested)` + END + OBJ_EN,
   String.raw`(?<![\p{L}])(visit|viewing|request|appointment|booking|tour)[^.!?\n]{0,40}(?<![\p{L}])(is|has been|was)\s+(now\s+)?(booked|confirmed|scheduled|sent|submitted|registered|arranged|reserved)` + END,
 ].map((src) => new RegExp(src, "iu"));
 

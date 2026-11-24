@@ -5,7 +5,7 @@ import { env } from "@/config/env";
 import type { Lang } from "@/i18n/config";
 import { log } from "@/lib/log";
 import { systemPrompt } from "./prompt";
-import { correctFalseClaims, ensureCards, ensureHandoff, executeTool, TOOL_DEFINITIONS, type ToolContext } from "./tools";
+import { correctFalseClaims, typesFromText, ensureCards, ensureHandoff, executeTool, TOOL_DEFINITIONS, type ToolContext } from "./tools";
 import { recordUsage } from "./usage";
 import { loadTranscript, saveTurn, type ChatSessionState } from "./store";
 import type { PageContext, TurnResult } from "./agent";
@@ -59,6 +59,7 @@ export async function runTurnOpenAI(
     handoff: state.handoff,
     cards: [],
     executed: new Map(),
+    requestedTypes: typesFromText(userText),
   };
   if (ctx.pageSlug) ctx.seenSlugs.add(ctx.pageSlug);
   const handoffBefore = JSON.stringify(state.handoff);
