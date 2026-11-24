@@ -4,11 +4,11 @@ import { aeGet, AlterEstateNotFound } from "@/lib/alterestate/client";
 import { aeListingDetail, aeListPage, type AeListingDetail } from "@/lib/alterestate/schemas";
 import { log } from "@/lib/log";
 import { TtlCache } from "./cache";
-import { cacheKey } from "./filters";
-import { facetsOf, searchLocal, PAGE_SIZE } from "./local-search";
+import { facetsOf, searchLocal } from "./local-search";
 import { normalizeDetail, normalizeSummary } from "./normalize";
 import type { Facets, ListingDetail, ListingSummary, SearchFilters, SearchResult } from "./types";
 import { loadDemoDetails } from "./demo";
+import { isManualSlug, manualDetail, manualSummaries } from "./manual";
 
 export class CatalogUnavailable extends Error {
   constructor() {
@@ -28,41 +28,8 @@ let lastError: string | null = null;
 
 /* ---------------------------------------------------------------- live mode */
 
-function liveQuery(f: SearchFilters) {
-  const listingType = f.operation === "sale" ? 1 : f.operation === "rent" ? 2 : f.priceMin || f.priceMax ? 1 : null;
-  const priceField = listingType === 2 ? "us_rentprice" : "us_saleprice";
-  const sort = { recent: "-timestamp", price_asc: priceField, price_desc: `-${priceField}`, bedrooms_desc: "-room" }[f.sort];
-  return {
-    page: f.page,
-    page_size: PAGE_SIZE,
-    listing_type: listingType,
-    category: f.categories,
-    city_name: f.city,
-    search: f.q,
-    currency: f.priceMin || f.priceMax ? f.currency : null,
-    value_min: f.priceMin,
-    value_max: f.priceMax,
-    rooms_min: f.bedroomsMin,
-    bath_min: f.bathroomsMin,
-    parking_min: f.parkingMin,
-    condition: f.condition === "ready" ? 9 : f.condition === "construction" ? 5 : null,
-    sort,
-  };
-}
-
 function reportSkipped(where: string, data: { skipped: number; firstIssue: string | null }) {
   if (data.skipped) log.warn("alterestate.items_skipped", { where, skipped: data.skipped, issue: data.firstIssue?.slice(0, 200) });
-}
-
-async function liveSearch(f: SearchFilters): Promise<SearchResult> {
-  const data = aeListPage.parse(await aeGet("/properties/filter/", liveQuery(f)));
-  reportSkipped("search", data);
-  const seen = new Set<string>();
-  const results = data.results
-    .filter((r) => (seen.has(r.uid) ? false : (seen.add(r.uid), true)))
-    .map((r) => normalizeSummary(r, env.alterestate.companyId));
-  const count = data.count ?? results.length;
-  return { count, page: f.page, pageSize: PAGE_SIZE, totalPages: Math.max(1, Math.ceil(count / PAGE_SIZE)), results };
 }
 
 /**
@@ -149,7 +116,8 @@ async function loadInventory(): Promise<ListingSummary[]> {
   }
 }
 
-export async function getInventory(): Promise<ListingSummary[]> {
+/** AlterEstate (or demo) inventory only. */
+async function sourceInventory(): Promise<ListingSummary[]> {
   if (catalogMode() === "demo") {
     return (await loadDemoDetails()).map((d) => d as ListingSummary);
   }
@@ -172,20 +140,31 @@ export async function getInventory(): Promise<ListingSummary[]> {
   }
 }
 
+/** Full inventory shown on the site: listings added in the CRM first, then AlterEstate. */
+export async function getInventory(): Promise<ListingSummary[]> {
+  const [manual, source] = await Promise.all([manualSummaries(), sourceInventory()]);
+  return manual.length ? [...manual, ...source] : source;
+}
+
+/**
+ * Catalogue search runs on the reconciled inventory (same data as the assistant, includes the
+ * listings added in the CRM, and no extra AlterEstate call per filter combination).
+ */
 export async function searchListings(f: SearchFilters): Promise<SearchResult> {
-  if (catalogMode() === "demo") return searchLocal(await getInventory(), f);
-  try {
-    const { value } = await cache.get(`search:${cacheKey(f)}`, () => liveSearch(f), Math.min(ttl(), 300_000), maxStale());
-    return value;
-  } catch (err) {
-    log.error("catalog.search_failed", { reason: (err as Error).message });
-    throw new CatalogUnavailable();
-  }
+  return searchLocal(await getInventory(), f);
 }
 
 /** Returns null when the listing does not exist or is no longer published. */
 export async function getListing(slug: string): Promise<ListingDetail | null> {
   if (!SLUG_RE.test(slug)) return null;
+  if (isManualSlug(slug)) {
+    try {
+      return await manualDetail(slug);
+    } catch (err) {
+      log.error("catalog.manual_detail_failed", { kind: (err as Error).name });
+      throw new CatalogUnavailable();
+    }
+  }
   if (catalogMode() === "demo") return (await loadDemoDetails()).find((d) => d.slug === slug) ?? null;
   try {
     const { value } = await cache.get(`detail:${slug}`, () => liveDetail(slug), ttl(), maxStale());

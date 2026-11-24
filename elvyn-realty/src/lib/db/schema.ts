@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, boolean, jsonb, uuid, serial, index, uniqueIndex, date, real } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, boolean, jsonb, uuid, serial, index, uniqueIndex, date, real, doublePrecision } from "drizzle-orm/pg-core";
 
 export const adminUsers = pgTable("admin_users", {
   id: serial("id").primaryKey(),
@@ -195,3 +195,43 @@ export const catalogSnapshots = pgTable("catalog_snapshots", {
   data: jsonb("data").notNull(),
   storedAt: timestamp("stored_at", { withTimezone: true }).notNull(),
 });
+
+/** Listings added by hand in the CRM (not in AlterEstate). Shown on the site like the others. */
+export const manualListings = pgTable("manual_listings", {
+  id: serial("id").primaryKey(),
+  slug: text("slug"),
+  published: boolean("published").notNull().default(false),
+  featured: boolean("featured").notNull().default(false),
+  operation: text("operation").notNull(), // sale | rent
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  categoryId: integer("category_id"),
+  categoryName: text("category_name"),
+  categoryNameEn: text("category_name_en"),
+  province: text("province"),
+  city: text("city"),
+  sector: text("sector"),
+  price: doublePrecision("price"),
+  currency: text("currency").notNull().default("USD"),
+  bedrooms: integer("bedrooms"),
+  bathrooms: real("bathrooms"),
+  parking: integer("parking"),
+  area: real("area"),
+  landArea: real("land_area"),
+  furnished: boolean("furnished"),
+  condition: text("condition"), // ready | construction | null
+  amenities: jsonb("amenities").$type<string[]>().notNull().default([]),
+  videoUrl: text("video_url"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex("manual_listings_slug_idx").on(t.slug)]);
+
+/** Photos of manual listings, stored in the database (resized in the browser before upload). */
+export const manualListingImages = pgTable("manual_listing_images", {
+  id: serial("id").primaryKey(),
+  listingId: integer("listing_id").notNull().references(() => manualListings.id, { onDelete: "cascade" }),
+  position: integer("position").notNull().default(0),
+  mime: text("mime").notNull(),
+  dataB64: text("data_b64").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("manual_listing_images_listing_idx").on(t.listingId)]);

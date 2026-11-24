@@ -29,18 +29,19 @@ afterEach(() => {
 });
 
 describe("AlterEstate live integration (mocked API)", () => {
-  it("sends aetoken, maps filters to documented parameters and de-duplicates", async () => {
+  it("sends aetoken, de-duplicates, and filters the synced inventory locally", async () => {
     const svc = await load();
-    fetchMock.mockResolvedValueOnce(json(page([item(1), item(1), item(2)], null, 2)));
+    fetchMock.mockResolvedValueOnce(json(page([item(1), item(1), item(2), item(200, { city: "Río San Juan" })], null, 3)));
     const { parseFilters } = await import("@/lib/catalog/filters");
-    const r = await svc.searchListings(parseFilters({ operacion: "venta", tipo: "12", ciudad: "Cabrera", precio_max: "90000", moneda: "USD", habitaciones: "2", orden: "precio_asc", pagina: "2" }));
+    const r = await svc.searchListings(parseFilters({ operacion: "venta", tipo: "12", ciudad: "Cabrera", precio_max: "90000", moneda: "USD", orden: "precio_asc" }));
     const [url, init] = fetchMock.mock.calls[0];
     const u = new URL(url);
     expect(u.origin + u.pathname).toBe("https://secure.alterestate.com/api/v1/properties/filter/");
-    expect(Object.fromEntries(u.searchParams)).toMatchObject({ page: "2", page_size: "24", listing_type: "1", category: "12", city_name: "Cabrera", currency: "USD", value_max: "90000", rooms_min: "2", sort: "us_saleprice" });
+    expect(Object.fromEntries(u.searchParams)).toMatchObject({ page: "1", page_size: "30" });
     expect(init.headers.aetoken).toBe(TOKEN);
     expect(r.results.map((x) => x.uid)).toEqual(["U1", "U2"]);
     expect(r.count).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("accepts list results whose agents are strings and skips malformed items", async () => {
@@ -55,10 +56,9 @@ describe("AlterEstate live integration (mocked API)", () => {
   it("retries on 429 honouring Retry-After", async () => {
     const svc = await load();
     fetchMock.mockResolvedValueOnce(json({ detail: "slow down" }, 429, { "retry-after": "0" })).mockResolvedValueOnce(json(page([item(3)], null, 1)));
-    const { DEFAULT_FILTERS } = await import("@/lib/catalog/filters");
-    const r = await svc.searchListings({ ...DEFAULT_FILTERS, q: "x" });
+    const inv = await svc.getInventory();
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(r.results[0].uid).toBe("U3");
+    expect(inv[0].uid).toBe("U3");
   });
 
   it("walks all pages for the full inventory and drops withdrawn listings only after a complete fetch", async () => {

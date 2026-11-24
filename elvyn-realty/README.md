@@ -113,6 +113,8 @@ Tableau de bord, liste filtrable (statut, projet, niveau, priorité, dates), fic
 - Niveau chaud / tiède / froid : règles par points dans `src/config/crm.ts`, justification affichée et modifiable ; une modification manuelle bloque le recalcul automatique.
 - Priorité : budget ≥ `PRIORITY_BUDGET_USD` (150 000 USD, règle du document métier) ou plusieurs unités.
 - Dédoublonnage par e-mail ou téléphone normalisé (jamais par le nom) ; une nouvelle demande d'un contact existant s'ajoute à son historique sans écraser ses données.
+- **Propriétés propres** (*CRM → Propiedades*) : biens ajoutés à la main, sans AlterEstate (titre, opération, type, lieu, prix USD/DOP, pièces, surfaces, description, caractéristiques, vidéo, photos). Brouillon ou publié. Les biens publiés sont fusionnés avec l'inventaire AlterEstate : accueil, catalogue, recherche, fiche `/propiedad/ea-<id>-…`, plan du site et assistant IA. Photos redimensionnées dans le navigateur (1600 px max, JPEG) et stockées dans PostgreSQL (`/api/listing-images/<id>`), 40 max par bien.
+- Le catalogue public filtre l'inventaire synchronisé (plus d'appel AlterEstate par combinaison de filtres) ; une copie de l'inventaire est partagée en base (`catalog_snapshots`) pour les instances froides et les pannes d'AlterEstate.
 - Conservation : conversations supprimées après `CHAT_RETENTION_DAYS`, prospects inactifs après `INACTIVE_CONTACT_RETENTION_MONTHS`, journal des notifications après 180 jours.
 
 ## Notifications

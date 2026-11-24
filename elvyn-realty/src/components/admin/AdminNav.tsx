@@ -6,6 +6,7 @@ const items = [
   { href: "/admin", label: "Panel" },
   { href: "/admin/prospectos", label: "Prospectos" },
   { href: "/admin/citas", label: "Visitas" },
+  { href: "/admin/propiedades", label: "Propiedades" },
   { href: "/admin/notificaciones", label: "Notificaciones" },
   { href: "/admin/asistente", label: "Asistente IA" },
   { href: "/admin/ajustes", label: "Configuración" },

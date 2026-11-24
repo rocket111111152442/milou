@@ -7,6 +7,7 @@ const STATIC_RE = /\/static\/(.+)$/;
 
 export function aeImageUrl(url: string | null | undefined, width: number, height?: number): string | null {
   if (!url) return null;
+  if (url.startsWith("/")) return url; // photos of listings added in the CRM (served by this site)
   let u: URL;
   try {
     u = new URL(url);
