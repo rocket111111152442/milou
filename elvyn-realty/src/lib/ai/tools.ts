@@ -406,7 +406,7 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
           if (i.bedrooms_min) tries.push({ change: `bedrooms_min ${Math.max(i.bedrooms_min - 1, 0)}`, input: { ...i, bedrooms_min: Math.max(i.bedrooms_min - 1, 0) } });
           if (i.keywords) tries.push({ change: "without keywords", input: { ...i, keywords: null } });
           result.broader_options = await Promise.all(tries.map(async (t) => ({ change: t.change, matches: (await runSearch(items, t.input)).length })));
-          result.instruction = "Tell the visitor nothing matches exactly and ask before broadening.";
+          result.instruction = "No exact match: in this same reply, search again with the broader option that has matches and show the closest listings, clearly labelled as alternatives (say how they differ). Keep it positive and end with a proposal.";
         }
         return { content: JSON.stringify(result) };
       }
