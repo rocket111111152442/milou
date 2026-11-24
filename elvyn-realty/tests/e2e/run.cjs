@@ -20,6 +20,8 @@ const PAGES = ["/", "/propiedades", "/venta", "/alquiler", "/nosotros", "/agente
   /* ---------- Mobile ---------- */
   const m = await browser.newContext({ ...devices["iPhone 13"] });
   const mp = await m.newPage();
+  // Protected deployments (Vercel Authentication): a share link sets the access cookie.
+  if (process.env.SHARE_URL) await mp.goto(process.env.SHARE_URL);
   mp.on("pageerror", (e) => errors.push(`mobile: ${e.message}`));
   for (const path of PAGES) {
     const res = await mp.goto(BASE + path, { waitUntil: "networkidle" });
@@ -61,6 +63,7 @@ const PAGES = ["/", "/propiedades", "/venta", "/alquiler", "/nosotros", "/agente
   /* ---------- Desktop ---------- */
   const d = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const p = await d.newPage();
+  if (process.env.SHARE_URL) await p.goto(process.env.SHARE_URL);
   p.on("pageerror", (e) => errors.push(`desktop: ${e.message}`));
   for (const path of PAGES) {
     await p.goto(BASE + path, { waitUntil: "networkidle" });
