@@ -28,14 +28,15 @@ export function HeroSearch({ lang, types, cities }: { lang: Lang; types: FacetOp
   }
 
   return (
-    <form onSubmit={submit} className="rounded-2xl bg-white p-3 shadow-lift sm:p-4" role="search" aria-label={t.submit}>
+    <form onSubmit={submit} className="rounded-[1.75rem] border border-white/25 bg-white/15 p-2 shadow-[0_30px_80px_-30px_rgba(0,0,0,.6)] backdrop-blur-xl sm:p-2.5" role="search" aria-label={t.submit}>
+      <div className="rounded-[1.35rem] bg-white p-3 sm:p-4">
       <fieldset>
         <legend className="sr-only">{t.operation}</legend>
         <div className="mb-3 inline-flex rounded-full bg-navy-50 p-1">
           {(["venta", "alquiler"] as const).map((v) => (
             <label key={v} className="relative">
               <input type="radio" name="op" value={v} checked={op === v} onChange={() => setOp(v)} className="peer sr-only" />
-              <span className="inline-flex min-h-[40px] cursor-pointer items-center rounded-full px-5 text-sm font-semibold text-navy-700 transition-colors peer-checked:bg-navy peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-brand">
+              <span className="inline-flex min-h-[40px] cursor-pointer items-center rounded-full px-5 text-sm font-semibold text-navy-700 transition-all duration-300 peer-checked:bg-navy peer-checked:text-white peer-checked:shadow-md peer-focus-visible:ring-2 peer-focus-visible:ring-brand">
                 {v === "venta" ? t.buy : t.rent}
               </span>
             </label>
@@ -62,8 +63,9 @@ export function HeroSearch({ lang, types, cities }: { lang: Lang; types: FacetOp
           <input id="hs-max" className="field" inputMode="numeric" placeholder="200000" value={max} onChange={(e) => setMax(e.target.value.replace(/[^\d]/g, ""))} />
         </div>
         <div className="flex items-end">
-          <button type="submit" className="btn-primary h-[46px] w-full px-7 lg:w-auto"><IconSearch size={18} /> {t.submit}</button>
+          <button type="submit" className="btn-primary group h-[46px] w-full px-7 lg:w-auto"><IconSearch size={18} className="transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" /> {t.submit}</button>
         </div>
+      </div>
       </div>
     </form>
   );

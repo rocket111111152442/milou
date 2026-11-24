@@ -16,9 +16,13 @@
 }
 
 @layer components {
-  .btn { @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60; }
-  .btn-primary { @apply btn bg-brand text-white hover:bg-brand-600; }
-  .btn-dark { @apply btn bg-navy text-white hover:bg-navy-700; }
+  .btn { @apply relative inline-flex min-h-[44px] items-center justify-center gap-2 overflow-hidden rounded-full px-5 text-sm font-semibold transition-all duration-300 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-60; }
+  /* Light sweep on hover */
+  .btn::after { content: ""; @apply pointer-events-none absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/35 to-transparent transition-[left] duration-700 ease-out; }
+  .btn:hover::after { left: 130%; }
+  .btn-primary { @apply btn bg-brand text-white shadow-[0_10px_30px_-10px_rgba(235,101,0,.7)] hover:-translate-y-0.5 hover:bg-brand-600 hover:shadow-[0_16px_36px_-12px_rgba(235,101,0,.8)]; }
+  .btn-dark { @apply btn bg-navy text-white hover:-translate-y-0.5 hover:bg-navy-700 hover:shadow-lift; }
+  .btn-glass { @apply btn border border-white/30 bg-white/10 text-white backdrop-blur-md hover:bg-white/20; }
   .btn-outline { @apply btn border border-navy-200 bg-white text-navy hover:border-navy hover:bg-navy-50; }
   .btn-ghost { @apply btn text-navy hover:bg-navy-50; }
   .btn-whatsapp { @apply btn bg-[#1F8F4E] text-white hover:bg-[#187540]; }
@@ -32,4 +36,41 @@
   .prose-listing strong { @apply font-semibold text-navy-800; }
   .skeleton { @apply relative overflow-hidden bg-navy-50; }
   .skeleton::after { content: ""; @apply absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/60 to-transparent; }
+}
+
+/* ------------------------------------------------------------------ motion */
+
+/* Scroll reveal: hidden only when JS runs (no-JS and reduced-motion users always see content). */
+.js [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  transition: opacity .9s cubic-bezier(.2,.7,.1,1), transform .9s cubic-bezier(.2,.7,.1,1);
+  transition-delay: var(--d, 0ms);
+  will-change: opacity, transform;
+}
+.js [data-reveal="left"] { transform: translate3d(-36px, 0, 0); }
+.js [data-reveal="right"] { transform: translate3d(36px, 0, 0); }
+.js [data-reveal="zoom"] { transform: scale(.94); }
+.js [data-reveal].is-in { opacity: 1; transform: none; }
+
+/* Words of big titles rise one by one */
+.word { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .08em; margin-bottom: -.08em; }
+.word > span { display: inline-block; animation: word-in .9s cubic-bezier(.2,.7,.1,1) both; animation-delay: var(--d, 0ms); }
+
+/* Animated underline for links */
+.link-underline { background: linear-gradient(currentColor, currentColor) 0 100% / 0 2px no-repeat; transition: background-size .35s ease; }
+.link-underline:hover, .link-underline[aria-current="page"] { background-size: 100% 2px; }
+
+/* Subtle film grain on dark sections */
+.grain::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .07; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Reading progress */
+.scroll-progress { transform-origin: 0 50%; transform: scaleX(var(--p, 0)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .js [data-reveal] { opacity: 1 !important; transform: none !important; }
+  .word > span { animation: none !important; }
 }

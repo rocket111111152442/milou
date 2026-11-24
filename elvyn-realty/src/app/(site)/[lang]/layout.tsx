@@ -11,6 +11,7 @@ import { Footer } from "@/components/site/Footer";
 import { DemoBanner } from "@/components/site/DemoBanner";
 import { ChatWidget } from "@/components/site/chat/ChatWidget";
 import { JsonLd } from "@/components/site/JsonLd";
+import { RevealObserver, ScrollProgress } from "@/components/site/Motion";
 import { indexable } from "@/lib/seo/metadata";
 import { assistantAvailable } from "@/lib/ai/agent";
 
@@ -65,6 +66,8 @@ export default async function SiteLayout({ children, params }: { children: React
         <a href="#main" className="sr-only z-[60] rounded-full bg-navy px-4 py-2 text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
           {t.nav.skip}
         </a>
+        <ScrollProgress />
+        <RevealObserver />
         {catalogMode() === "demo" && <DemoBanner lang={lang} />}
         <Header lang={lang} />
         <main id="main" className="flex-1">

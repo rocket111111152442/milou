@@ -15,15 +15,25 @@ export function Footer({ lang }: { lang: Lang }) {
     { url: site.social.linkedin.url, label: "LinkedIn", Icon: IconLinkedin },
   ];
   return (
-    <footer className="mt-auto bg-navy text-navy-100">
-      <div className="container grid gap-10 py-14 md:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1.3fr]">
+    <footer className="grain relative mt-auto overflow-hidden rounded-t-[2.5rem] bg-navy-900 text-navy-100">
+      <div aria-hidden className="pointer-events-none absolute -left-32 top-10 h-80 w-80 animate-blob bg-brand/15 blur-3xl motion-reduce:animate-none" />
+      <div className="container relative border-b border-white/10 py-14 sm:py-20" data-reveal>
+        <p className="eyebrow text-brand-200">{lang === "es" ? "¿Hablamos?" : "Let's talk"}</p>
+        <a href={`https://wa.me/${site.whatsapp}`} target="_blank" rel="noopener noreferrer" className="group mt-3 inline-flex flex-wrap items-center gap-x-5 gap-y-2 font-display text-4xl font-semibold leading-tight text-white sm:text-6xl lg:text-7xl">
+          <span className="link-underline">{lang === "es" ? "Encuentra tu lugar en el Caribe" : "Find your place in the Caribbean"}</span>
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white transition-transform duration-500 group-hover:rotate-45 sm:h-20 sm:w-20">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M7 17 17 7M8 7h9v9" /></svg>
+          </span>
+        </a>
+      </div>
+      <div className="container relative grid gap-10 py-14 md:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1.3fr]">
         <div>
           <Logo variant="white" className="max-h-14" />
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-navy-200">{t.footer.about}</p>
           <ul className="mt-5 flex gap-2" aria-label={lang === "es" ? "Redes sociales" : "Social media"}>
             {socials.map(({ url, label, Icon }) => (
               <li key={url}>
-                <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-brand" aria-label={label}>
+                <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 hover:-translate-y-1 hover:rotate-6 hover:bg-brand" aria-label={label}>
                   <Icon size={18} />
                 </a>
               </li>
@@ -33,19 +43,19 @@ export function Footer({ lang }: { lang: Lang }) {
         <nav aria-label={t.footer.explore}>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-white">{t.footer.explore}</h2>
           <ul className="mt-4 space-y-2.5 text-sm">
-            <li><Link className="hover:text-white" href={href(lang, "catalog")}>{t.nav.catalog}</Link></li>
-            <li><Link className="hover:text-white" href={href(lang, "sale")}>{t.nav.buy}</Link></li>
-            <li><Link className="hover:text-white" href={href(lang, "rent")}>{t.nav.rent}</Link></li>
-            <li><Link className="hover:text-white" href={href(lang, "sell")}>{t.nav.sell}</Link></li>
+            <li><Link className="link-underline hover:text-white" href={href(lang, "catalog")}>{t.nav.catalog}</Link></li>
+            <li><Link className="link-underline hover:text-white" href={href(lang, "sale")}>{t.nav.buy}</Link></li>
+            <li><Link className="link-underline hover:text-white" href={href(lang, "rent")}>{t.nav.rent}</Link></li>
+            <li><Link className="link-underline hover:text-white" href={href(lang, "sell")}>{t.nav.sell}</Link></li>
           </ul>
         </nav>
         <nav aria-label={t.footer.company}>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-white">{t.footer.company}</h2>
           <ul className="mt-4 space-y-2.5 text-sm">
-            <li><Link className="hover:text-white" href={href(lang, "about")}>{t.nav.about}</Link></li>
-            <li><Link className="hover:text-white" href={href(lang, "team")}>{t.nav.team}</Link></li>
-            <li><Link className="hover:text-white" href={href(lang, "services")}>{t.nav.services}</Link></li>
-            <li><Link className="hover:text-white" href={href(lang, "contact")}>{t.nav.contact}</Link></li>
+            <li><Link className="link-underline hover:text-white" href={href(lang, "about")}>{t.nav.about}</Link></li>
+            <li><Link className="link-underline hover:text-white" href={href(lang, "team")}>{t.nav.team}</Link></li>
+            <li><Link className="link-underline hover:text-white" href={href(lang, "services")}>{t.nav.services}</Link></li>
+            <li><Link className="link-underline hover:text-white" href={href(lang, "contact")}>{t.nav.contact}</Link></li>
           </ul>
         </nav>
         <div>
@@ -63,7 +73,7 @@ export function Footer({ lang }: { lang: Lang }) {
         <div className="container flex flex-col gap-2 py-5 text-xs text-navy-200 sm:flex-row sm:items-center sm:justify-between">
           <p>© {year} {t.footer.legal(`${site.name} · ${site.legalName}`)}</p>
           <p className="flex gap-4">
-            <Link className="hover:text-white" href={href(lang, "privacy")}>{t.footer.privacy}</Link>
+            <Link className="link-underline hover:text-white" href={href(lang, "privacy")}>{t.footer.privacy}</Link>
             <span>{t.footer.catalogSource}</span>
           </p>
         </div>
