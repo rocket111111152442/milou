@@ -175,7 +175,10 @@ export async function runTurnOpenAI(
       text = corrected;
     }
   }
-  const handoffChanged = JSON.stringify(ctx.handoff) !== handoffBefore && ctx.handoff?.status === "proposed";
+  const contactKeys = ["full_name", "whatsapp", "email", "country"] as const;
+  const contactGiven = contactKeys.some((k) => ctx.profile[k] && ctx.profile[k] !== state.profile[k]);
+  // New card, or the same card again pre-filled when the visitor typed their details in the chat after it appeared.
+  const handoffChanged = ctx.handoff?.status === "proposed" && (JSON.stringify(ctx.handoff) !== handoffBefore || contactGiven);
   const display = { text, cards: ctx.cards, handoff: handoffChanged ? ctx.handoff : null };
   newMessages[newMessages.length - 1].display = display;
 

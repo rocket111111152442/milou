@@ -397,7 +397,9 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
         if (i.property_types?.length) ctx.requestedTypes = [...new Set([...(ctx.requestedTypes ?? []), ...i.property_types])];
         const shown = matches.slice(0, limit);
         shown.forEach((l) => ctx.seenSlugs.add(l.slug));
-        ctx.lastSearch = shown.map((l) => l.slug);
+        // A search without any criterion (no type, place, budget, size or feature) shows no automatic cards.
+        const hasCriteria = Boolean(i.property_types?.length || i.location || i.budget_min || i.budget_max || i.keywords || i.bedrooms_min || i.bathrooms_min);
+        if (hasCriteria) ctx.lastSearch = shown.map((l) => l.slug);
         const result: Record<string, unknown> = {
           total_matches: matches.length,
           listings: shown.map((l) => compact(l, ctx.lang)),

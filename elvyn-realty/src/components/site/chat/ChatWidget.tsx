@@ -172,6 +172,8 @@ export function ChatWidget({ lang, enabled }: { lang: Lang; enabled: boolean }) 
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
+  // Only the most recent hand-off card is shown (an updated, pre-filled card replaces the older one).
+  const lastCardIndex = messages.reduce((last, m, idx) => (m.role === "assistant" && m.handoff ? idx : last), -1);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState<ChatPageContext>({ type: "other" });
@@ -314,7 +316,7 @@ export function ChatWidget({ lang, enabled }: { lang: Lang; enabled: boolean }) 
                 <div key={i} className="max-w-[92%]">
                   {m.text && <div className="rounded-2xl rounded-tl-md bg-navy-50 px-3.5 py-2.5 text-[14px] leading-relaxed text-ink"><RichText text={m.text} /></div>}
                   {m.cards && m.cards.length > 0 && <ul className="mt-2 space-y-2">{m.cards.map((c) => <PropertyCard key={c.slug} c={c} why={t.cardWhy} />)}</ul>}
-                  {m.handoff && m.handoff.status !== "sent" && (
+                  {m.handoff && m.handoff.status !== "sent" && i === lastCardIndex && (
                     <HandoffCard
                       lang={lang}
                       h={m.handoff}
