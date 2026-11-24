@@ -131,4 +131,40 @@ describe("OpenAI provider", () => {
       __resetOpenAIModelForTests();
     }
   });
+
+  it("removes a false 'request sent' claim when the visitor has not pressed the card button", async () => {
+    const state = await store.createSession(randomUUID(), "es");
+    const r = await mod.runTurn(state, "Quiero visitar la villa este sábado", "es", { type: "listing", slug: "x" }, undefined, async () =>
+      completion({ content: "Perfecto. Ya dejé la visita pendiente de confirmación con Elvyn para la primera villa.\n\nSi quieres, dime tu nombre y WhatsApp." }),
+    );
+    expect(r.handoff?.reason).toBe("visit");
+    expect(r.text).not.toMatch(/Ya dejé/);
+    expect(r.text).toMatch(/Todavía no se ha enviado nada/);
+    expect(r.text).toMatch(/dime tu nombre/);
+    const t = await store.loadTranscript(state.id);
+    expect(JSON.stringify(t.at(-1))).not.toMatch(/Ya dejé/);
+  });
+
+  it("does not show cards of another property type than the one searched", async () => {
+    const { getInventory } = await import("@/lib/catalog/service");
+    const inv = await getInventory();
+    const isLand = (l: (typeof inv)[number]) => /solar|terreno|lote|land/i.test(`${l.category?.name ?? ""} ${l.category?.nameEn ?? ""}`);
+    const other = inv.find((l) => !isLand(l))!;
+    const state = await store.createSession(randomUUID(), "en");
+    let i = 0;
+    let lastTool = "";
+    const r = await mod.runTurn(state, "Do you have land for sale?", "en", { type: "other" }, undefined, async (p: any) => {
+      i++;
+      if (i === 1) return completion({ tool_calls: [call("search_properties", { operation: "sale", property_types: ["land"], location: null, budget_min: null, budget_max: null, currency: "USD", bedrooms_min: null, bathrooms_min: null, condition: "any", keywords: null, sort: "recent", limit: 3 })] }, "tool_calls");
+      if (i === 2) {
+        const land = (JSON.parse(p.messages.at(-1).content) as { listings: { slug: string }[] }).listings.map((l) => l.slug);
+        return completion({ tool_calls: [call("get_property", { slug_or_ref: other.slug }), call("show_properties", { items: [...land.slice(0, 2), other.slug].map((slug) => ({ slug, reason: "r" })) })] }, "tool_calls");
+      }
+      lastTool = p.messages.at(-1).content;
+      return completion({ content: "Here are some lots." });
+    });
+    expect(r.cards.length).toBeGreaterThan(0);
+    expect(r.cards.some((c) => c.slug === other.slug)).toBe(false);
+    expect(lastTool).toMatch(/property type differs/);
+  });
 });

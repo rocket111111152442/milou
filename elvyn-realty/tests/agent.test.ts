@@ -220,3 +220,20 @@ describe("hand-off, visits and safety", () => {
     await db.delete(schema.aiUsage).where(eq(schema.aiUsage.costUsd, 1000));
   });
 });
+
+describe("false claim correction", () => {
+  it("keeps honest sentences and removes claims in Spanish and English", async () => {
+    const { correctFalseClaims } = await import("@/lib/ai/tools");
+    const ctx = (lang: "es" | "en", status?: "proposed" | "sent") => ({ lang, pageSlug: null, profile: {}, seenSlugs: new Set<string>(), handoff: status ? ({ status } as never) : null, cards: [], executed: new Map() });
+    // Honest wording is untouched
+    for (const t of ["Elvyn confirmará la disponibilidad.", "Para que Elvyn confirme la visita, pulsa el botón de la tarjeta.", "Elvyn will confirm availability.", "La visita queda pendiente de confirmación cuando envíes la tarjeta."])
+      expect(correctFalseClaims(t, ctx("es", "proposed"))).toBe(t);
+    // False claims are removed
+    expect(correctFalseClaims("Listo. Tu visita ha sido confirmada para el sábado. ¿Algo más?", ctx("es", "proposed"))).toMatch(/^Todavía no se ha enviado nada[\s\S]*¿Algo más\?$/);
+    expect(correctFalseClaims("He enviado tu solicitud a Elvyn.", ctx("es", "proposed"))).not.toMatch(/He enviado/);
+    expect(correctFalseClaims("I've booked your visit for Saturday.", ctx("en", "proposed"))).toMatch(/^Nothing has been sent yet/);
+    expect(correctFalseClaims("Your viewing is now confirmed.", ctx("en", "proposed"))).not.toMatch(/confirmed\./);
+    // After the visitor really sent it, nothing changes
+    expect(correctFalseClaims("He enviado tu solicitud a Elvyn.", ctx("es", "sent"))).toBe("He enviado tu solicitud a Elvyn.");
+  });
+});

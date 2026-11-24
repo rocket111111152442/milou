@@ -5,7 +5,7 @@ import { env } from "@/config/env";
 import type { Lang } from "@/i18n/config";
 import { log } from "@/lib/log";
 import { systemPrompt } from "./prompt";
-import { ensureCards, ensureHandoff, executeTool, TOOL_DEFINITIONS, type ToolContext } from "./tools";
+import { correctFalseClaims, ensureCards, ensureHandoff, executeTool, TOOL_DEFINITIONS, type ToolContext } from "./tools";
 import { recordUsage } from "./usage";
 import { loadTranscript, saveTurn, type ChatSessionState } from "./store";
 import type { PageContext, TurnResult } from "./agent";
@@ -151,7 +151,7 @@ export async function runTurnOpenAI(
     return { mode: "fallback", reason: "loop_guard", text: "", ...empty };
   }
 
-  const text = refused
+  let text = refused
     ? lang === "es"
       ? "No puedo ayudar con esa solicitud. Si lo deseas, puedes hablar directamente con Elvyn."
       : "I can't help with that request. If you wish, you can talk to Elvyn directly."
@@ -159,6 +159,16 @@ export async function runTurnOpenAI(
   if (!refused) {
     await ensureCards(ctx, text);
     ensureHandoff(userText, ctx);
+    const corrected = correctFalseClaims(text, ctx);
+    if (corrected !== text) {
+      // Keep the corrected wording in the history too, so the model does not repeat the false claim.
+      const lastMsg = newMessages[newMessages.length - 1];
+      if (lastMsg.raw.role === "assistant") {
+        lastMsg.raw = { ...lastMsg.raw, content: corrected } as ChatCompletionMessageParam;
+        lastMsg.content = lastMsg.raw;
+      }
+      text = corrected;
+    }
   }
   const handoffChanged = JSON.stringify(ctx.handoff) !== handoffBefore && ctx.handoff?.status === "proposed";
   const display = { text, cards: ctx.cards, handoff: handoffChanged ? ctx.handoff : null };

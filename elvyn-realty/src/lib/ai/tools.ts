@@ -97,6 +97,8 @@ export interface ToolContext {
   executed: Map<string, number>;
   /** Slugs returned by the last search of this turn (for automatic cards). */
   lastSearch?: string[];
+  /** Property types the visitor asked for in this turn's searches (cards of other types are refused). */
+  requestedTypes?: string[];
 }
 
 /* ------------------------------------------------------------------ definitions */
@@ -387,6 +389,7 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
         const limit = Math.min(Math.max(i.limit || 4, 1), 6);
         const items = await getInventory();
         const matches = await runSearch(items, i);
+        if (i.property_types?.length) ctx.requestedTypes = [...new Set([...(ctx.requestedTypes ?? []), ...i.property_types])];
         const shown = matches.slice(0, limit);
         shown.forEach((l) => ctx.seenSlugs.add(l.slug));
         ctx.lastSearch = shown.map((l) => l.slug);
@@ -447,16 +450,25 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
         const inv = await getInventory();
         const shown: string[] = [];
         const rejected: string[] = [];
+        const wrongType: string[] = [];
         for (const it of items.slice(0, 4)) {
           const l = ctx.seenSlugs.has(it.slug) ? inv.find((x) => x.slug === it.slug) : undefined;
           if (!l) {
             rejected.push(it.slug);
             continue;
           }
+          if (!matchesRequestedType(l, ctx)) {
+            wrongType.push(it.slug);
+            continue;
+          }
           if (!ctx.cards.some((c) => c.slug === l.slug)) ctx.cards.push(toCard(l, ctx.lang, it.reason));
           shown.push(l.slug);
         }
-        return { content: JSON.stringify({ shown, rejected, note: rejected.length ? "Rejected slugs were not returned by a tool in this conversation." : undefined }), isError: shown.length === 0 };
+        const notes = [
+          rejected.length ? "Rejected slugs were not returned by a tool in this conversation." : null,
+          wrongType.length ? `Not shown: ${wrongType.join(", ")} (property type differs from what the visitor asked for: ${ctx.requestedTypes?.join("/")}). Do not mention them as matches.` : null,
+        ].filter(Boolean);
+        return { content: JSON.stringify({ shown, rejected: [...rejected, ...wrongType], note: notes.length ? notes.join(" ") : undefined }), isError: shown.length === 0 };
       }
       case "update_prospect_profile": {
         const parsed = profileSchema.parse(rawInput);
@@ -543,6 +555,46 @@ export async function ensureCards(ctx: ToolContext, text: string): Promise<void>
   const inv = await getInventory().catch(() => []);
   for (const slug of ctx.lastSearch.slice(0, 4)) {
     const l = inv.find((x) => x.slug === slug);
-    if (l) ctx.cards.push(toCard(l, ctx.lang, ""));
+    if (l && matchesRequestedType(l, ctx)) ctx.cards.push(toCard(l, ctx.lang, ""));
   }
+}
+
+/** A listing matches when no type was requested in this turn, or its category is one of the requested types. */
+function matchesRequestedType(l: ListingSummary, ctx: ToolContext): boolean {
+  const types = (ctx.requestedTypes ?? []).filter((t): t is keyof typeof TYPE_PATTERNS => t in TYPE_PATTERNS);
+  if (!types.length) return true;
+  const cat = fold(`${l.category?.name ?? ""} ${l.category?.nameEn ?? ""}`);
+  return types.some((t) => TYPE_PATTERNS[t].test(cat));
+}
+
+/* Sentences claiming the request was already sent, booked or confirmed. */
+const END = "(?![\\p{L}\\p{N}])"; // word end that also works after accented letters (\b does not)
+const CLAIM_RES = [
+  String.raw`(?<![\p{L}])(ya\s+)?(te\s+|le\s+)?(lo\s+|la\s+|los\s+|las\s+)?(dejé|envié|registré|agendé|reservé|programé|confirmé|transmití|mandé|notifiqué|avisé|coordiné|solicité)` + END,
+  String.raw`(?<![\p{L}])(he|hemos)\s+(ya\s+)?(enviado|agendado|registrado|reservado|confirmado|programado|dejado|transmitido|mandado|notificado|avisado|solicitado)` + END,
+  String.raw`(?<![\p{L}])(visita|cita|solicitud|reserva|petición)[^.!?\n]{0,40}(?<![\p{L}])(está|quedó|ha quedado|ha sido|fue)\s+(ya\s+)?(confirmad|agendad|reservad|enviad|registrad|programad)[ao]s?` + END,
+  String.raw`(?<![\p{L}])I(?:'ve|’ve|\s+have)?\s+(?:already\s+|just\s+)?(?:sent|booked|scheduled|confirmed|forwarded|submitted|passed|notified|reserved|registered|arranged|requested)` + END,
+  String.raw`(?<![\p{L}])(visit|viewing|request|appointment|booking|tour)[^.!?\n]{0,40}(?<![\p{L}])(is|has been|was)\s+(now\s+)?(booked|confirmed|scheduled|sent|submitted|registered|arranged|reserved)` + END,
+].map((src) => new RegExp(src, "iu"));
+
+/**
+ * Nothing reaches Elvyn until the visitor presses the button on the hand-off card. If the model
+ * claims otherwise, the false sentences are removed and replaced by the real next step.
+ * Returns the (possibly corrected) text.
+ */
+export function correctFalseClaims(text: string, ctx: ToolContext): string {
+  if (!text || ctx.handoff?.status === "sent") return text;
+  const parts = text.split(/(?<=[.!?])\s+|\n/);
+  const kept = parts.filter((p) => !CLAIM_RES.some((re) => re.test(p)));
+  if (kept.length === parts.length) return text;
+  const notice =
+    ctx.lang === "es"
+      ? ctx.handoff
+        ? "Todavía no se ha enviado nada: para que Elvyn reciba tu solicitud, completa tus datos y pulsa el botón de la tarjeta de abajo. La visita quedará pendiente de su confirmación."
+        : "Todavía no se ha enviado nada a Elvyn. Puedes escribirle directamente por WhatsApp o dejar tus datos para que te contacte."
+      : ctx.handoff
+        ? "Nothing has been sent yet: for Elvyn to receive your request, fill in your details and press the button on the card below. The visit will then be pending his confirmation."
+        : "Nothing has been sent to Elvyn yet. You can message him directly on WhatsApp or leave your details so he can contact you.";
+  const body = kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return body ? `${notice}\n\n${body}` : notice;
 }
