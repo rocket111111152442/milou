@@ -175,7 +175,7 @@ describe("hand-off, visits and safety", () => {
   });
 
   it("stops tool loops: the last round forbids tools", async () => {
-    const steps = Array.from({ length: 6 }, (_, i) => (p: Parameters<typeof reply>[0] extends never ? never : any) =>
+    const steps = Array.from({ length: 6 }, (_, i) => (p: any) =>
       i < 5 ? reply([tool("search_properties", { operation: "sale", property_types: null, location: `loop${i}`, budget_min: null, budget_max: null, currency: "USD", bedrooms_min: null, bathrooms_min: null, condition: "any", keywords: null, sort: "recent", limit: 1 })]) : (expect(p.tool_choice).toEqual({ type: "none" }), reply([text("Resumen final")])),
     );
     const m = scripted(steps);

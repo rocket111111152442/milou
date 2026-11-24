@@ -7,6 +7,7 @@ import { systemPrompt } from "./prompt";
 import { executeTool, TOOL_DEFINITIONS, type Card, type Handoff, type ToolContext } from "./tools";
 import { recordUsage, budgetBlock } from "./usage";
 import { loadTranscript, saveTurn, type ChatSessionState } from "./store";
+import { runTurnOpenAI, type OpenAICreateFn } from "./openai-agent";
 
 type Params = Anthropic.Beta.MessageCreateParamsNonStreaming;
 type Message = Anthropic.Beta.BetaMessage;
@@ -75,6 +76,7 @@ export async function runTurn(
   lang: Lang,
   page: PageContext,
   create: CreateMessageFn = defaultCreate,
+  openaiCreate?: OpenAICreateFn,
 ): Promise<TurnResult> {
   const empty = { cards: [], handoff: null };
   const avail = assistantAvailable();
@@ -82,6 +84,7 @@ export async function runTurn(
   if (state.userTurns >= env.ai.maxTurnsPerSession) return { mode: "limit", reason: "session_turns", text: "", ...empty };
   const blocked = await budgetBlock();
   if (blocked) return { mode: "fallback", reason: blocked, text: "", ...empty };
+  if (env.ai.provider === "openai") return runTurnOpenAI(state, userText, lang, page, contextMessage(state, lang, page), openaiCreate);
 
   const history = (await loadTranscript(state.id)) as Anthropic.Beta.BetaMessageParam[] & { role: string }[];
   const newMessages: { role: string; content: unknown; display?: Record<string, unknown> | null }[] = [

@@ -17,7 +17,28 @@ export interface UsageLike {
   cache_creation_input_tokens?: number | null;
 }
 
+/**
+ * OpenAI prices (USD per million tokens) as published for these models; check
+ * https://openai.com/api/pricing and override with AI_PRICE_INPUT/OUTPUT_PER_MTOK if they change.
+ * Cached input is counted at 25 % of the input price.
+ */
+const OPENAI_PRICES: Record<string, { input: number; output: number }> = {
+  "gpt-4.1-mini": { input: 0.4, output: 1.6 },
+  "gpt-4.1": { input: 2, output: 8 },
+  "gpt-4o-mini": { input: 0.15, output: 0.6 },
+  "gpt-4o": { input: 2.5, output: 10 },
+};
+
 export function estimateCostUsd(model: string, u: UsageLike): number {
+  if (env.ai.priceInputPerMTok !== null && env.ai.priceOutputPerMTok !== null) {
+    const read = u.cache_read_input_tokens ?? 0;
+    return ((u.input_tokens ?? 0) * env.ai.priceInputPerMTok + read * env.ai.priceInputPerMTok * 0.25 + (u.output_tokens ?? 0) * env.ai.priceOutputPerMTok) / 1e6;
+  }
+  if (!model.startsWith("claude")) {
+    const op = OPENAI_PRICES[model] ?? { input: 2.5, output: 10 }; // unknown model: count conservatively
+    const read = u.cache_read_input_tokens ?? 0;
+    return ((u.input_tokens ?? 0) * op.input + read * op.input * 0.25 + (u.output_tokens ?? 0) * op.output) / 1e6;
+  }
   const p = PRICES[model] ?? PRICES["claude-opus-5-5"]; // unknown model: count conservatively
   const inTok = u.input_tokens ?? 0;
   const outTok = u.output_tokens ?? 0;

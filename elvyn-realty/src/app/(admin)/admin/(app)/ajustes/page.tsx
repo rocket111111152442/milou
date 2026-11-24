@@ -37,7 +37,8 @@ export default async function Settings() {
         </Card>
         <Card title="Asistente IA">
           <dl>
-            <Row k="Estado" v={ai.ok ? "Activo" : ai.reason === "not_configured" ? "Sin clave ANTHROPIC_API_KEY (modo contacto directo)" : "Desactivado"} ok={ai.ok} />
+            <Row k="Estado" v={ai.ok ? "Activo" : ai.reason === "not_configured" ? `Sin clave ${env.ai.provider === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY"} (modo contacto directo)` : "Desactivado"} ok={ai.ok} />
+            <Row k="Proveedor" v={env.ai.provider === "openai" ? "OpenAI" : "Anthropic (Claude)"} />
             <Row k="Modelo / esfuerzo" v={`${env.ai.model} · ${env.ai.effort}`} />
             <Row k="Base de conocimiento" v={`Documento del ${KNOWLEDGE_VERSION}`} />
             <Row k="Presupuesto mensual" v={`US$${usage.monthCostUsd.toFixed(2)} / US$${usage.budgetUsd}`} ok={usage.monthCostUsd < usage.budgetUsd} />

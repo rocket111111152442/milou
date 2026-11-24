@@ -4,8 +4,8 @@ import "server-only";
  * Secrets are never exported to the client and never logged.
  */
 function str(name: string, fallback = ""): string {
-  const v = process.env[name];
-  return v === undefined || v === null ? fallback : v.trim();
+  const v = process.env[name]?.trim();
+  return v ? v : fallback; // empty values count as unset
 }
 function int(name: string, fallback: number): number {
   const n = Number.parseInt(str(name), 10);
@@ -20,6 +20,12 @@ function num(name: string, fallback: number | null): number | null {
 function list(name: string, fallback: string[]): string[] {
   const raw = str(name);
   return raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : fallback;
+}
+
+function aiProvider(): "openai" | "anthropic" {
+  const p = str("AI_PROVIDER").toLowerCase();
+  if (p === "openai" || p === "anthropic") return p;
+  return str("OPENAI_API_KEY") ? "openai" : "anthropic";
 }
 
 export const env = {
@@ -42,9 +48,14 @@ export const env = {
   auth: { sessionSecret: str("SESSION_SECRET"), sessionHours: int("SESSION_HOURS", 8) },
 
   ai: {
-    apiKeyConfigured: Boolean(str("ANTHROPIC_API_KEY") || str("ANTHROPIC_AUTH_TOKEN")),
+    /** "openai" or "anthropic". Default: OpenAI when OPENAI_API_KEY is set, otherwise Anthropic. */
+    provider: aiProvider(),
+    apiKeyConfigured: aiProvider() === "openai" ? Boolean(str("OPENAI_API_KEY")) : Boolean(str("ANTHROPIC_API_KEY") || str("ANTHROPIC_AUTH_TOKEN")),
     enabled: str("AI_ENABLED", "true") !== "false",
-    model: str("AI_MODEL", "claude-opus-5-5"),
+    model: str("AI_MODEL", aiProvider() === "openai" ? "gpt-4.1-mini" : "claude-opus-5-5"),
+    /** Optional price override for cost tracking, USD per million tokens. */
+    priceInputPerMTok: num("AI_PRICE_INPUT_PER_MTOK", null),
+    priceOutputPerMTok: num("AI_PRICE_OUTPUT_PER_MTOK", null),
     effort: (str("AI_EFFORT", "low") as "low" | "medium" | "high"),
     maxOutputTokens: int("AI_MAX_OUTPUT_TOKENS", 1500),
     maxTurnsPerSession: int("AI_MAX_TURNS_PER_SESSION", 30),

@@ -59,7 +59,7 @@ Toutes sont documentées dans `.env.example`. Les indispensables en production :
 | `SESSION_SECRET` | Sessions de l'espace privé |
 | `ALLOW_INDEXING=true` | Seulement sur la production finale, une fois le catalogue réel branché |
 | `CRON_SECRET` | Purge quotidienne et nouvelles tentatives de notifications (`vercel.json`) |
-| `ANTHROPIC_API_KEY` | Assistant IA (sinon mode contact direct) |
+| `OPENAI_API_KEY` ou `ANTHROPIC_API_KEY` | Assistant IA (sinon mode contact direct) |
 | `NOTIFY_MODE=live`, `NOTIFY_EMAIL_TO`, `EMAIL_FROM`, `RESEND_API_KEY` | E-mails réels à Elvyn |
 
 ## Déploiement (Vercel recommandé)
@@ -87,7 +87,10 @@ Autres hébergeurs Node.js : `npm run build && npm start`, et appeler `GET /api/
 
 ## Assistant IA
 
-- Modèle par défaut `claude-opus-5-5`, effort `low`, appels uniquement côté serveur (`/api/chat`). Changer de modèle : `AI_MODEL` (ex. `claude-haiku-5-5`, nettement moins cher).
+- Deux fournisseurs possibles, appels uniquement côté serveur (`/api/chat`) :
+  - **OpenAI** si `OPENAI_API_KEY` est défini : modèle par défaut `gpt-4.1-mini` (si indisponible sur le compte, essai automatique de `gpt-4o-mini`).
+  - **Anthropic** si `ANTHROPIC_API_KEY` est défini : modèle par défaut `claude-opus-5-5`, effort `low`.
+  - `AI_PROVIDER` force le choix, `AI_MODEL` change le modèle.
 - Connaissances : `data/knowledge/base-conocimiento.md` (copie du document de Drive du 23/11/2026). Mettre ce fichier à jour quand Elvyn modifie le document.
 - Outils serveur (validés par Zod) : `search_properties`, `get_property`, `show_properties` (n'accepte que des annonces renvoyées par le catalogue), `update_prospect_profile`, `propose_handoff`. Aucun outil n'accède au CRM, aux notes ni aux autres conversations.
 - Les coordonnées n'entrent dans le CRM que lorsque le visiteur clique « Enviar a Elvyn » (case de consentement) ; une visite reste « pendiente de confirmación ».
@@ -111,7 +114,7 @@ Tableau de bord, liste filtrable (statut, projet, niveau, priorité, dates), fic
 ## Tests
 
 ```bash
-npm test                 # 48 tests unitaires/intégration (BD en mémoire, catalogue démo, API simulées)
+npm test                 # 54 tests unitaires/intégration (BD en mémoire, catalogue démo, API simulées)
 npm run build && npm start
 ADMIN_EMAIL=… ADMIN_PASSWORD=… node tests/e2e/run.cjs   # 68 vérifications navigateur (Playwright)
 ```
