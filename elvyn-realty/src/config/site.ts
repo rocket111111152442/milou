@@ -24,18 +24,26 @@ export const site = {
    * Office. Two addresses are published:
    *  - [KB] (23/11/2026, "Dirección para visitas"): Carretera Cabrera – Río San Juan, Local 15, Segundo Nivel, Plaza DF060
    *  - [SITE] contact page (last edited 2023-10-13) and business card: C. Lorenzo Álvarez No. 67, Cabrera 33200
-   * The most recent one is used; the other is kept for confirmation. See README → "Datos a confirmar".
+   * Confirmed by Elvyn on 24/11/2026: Plaza DF-060.
    */
   address: {
-    street: { es: "Carretera Cabrera – Río San Juan, Local 15, Segundo Nivel, Plaza DF060", en: "Carretera Cabrera – Río San Juan, Unit 15, Second Floor, Plaza DF060" },
+    street: { es: "Plaza DF-060, Local 15, Segundo Nivel, Carretera Cabrera – Río San Juan", en: "Plaza DF-060, Unit 15, Second Floor, Carretera Cabrera – Río San Juan" },
     locality: "Cabrera",
     region: "María Trinidad Sánchez",
     country: "República Dominicana",
     countryCode: "DO",
     previous: "C. Lorenzo Álvarez No. 67, Cabrera 33200",
   },
-  /** Office hours are not published anywhere ([KB] section 4 leaves them blank). Keep null until Elvyn provides them. */
-  hours: null as null | { es: string; en: string },
+  /** Office hours, confirmed by Elvyn on 24/11/2026 (Dominican Republic time, UTC-4). */
+  hours: {
+    es: "Lunes a viernes de 9:00 a. m. a 6:00 p. m. · Sábados de 9:00 a. m. a 1:00 p. m. · Domingos solo con cita",
+    en: "Monday to Friday 9 am – 6 pm · Saturday 9 am – 1 pm · Sunday by appointment only",
+  } as null | { es: string; en: string },
+  /** Same hours, machine-readable (0 = Sunday). Used for schema.org and the assistant's out-of-hours notice. */
+  openingHours: [
+    { days: [1, 2, 3, 4, 5], opens: "09:00", closes: "18:00" },
+    { days: [6], opens: "09:00", closes: "13:00" },
+  ],
   social: {
     instagram: { handle: "@elvynarnaud", url: "https://www.instagram.com/elvynarnaud/" },
     facebook: { handle: "elvyn.drspacefinders", url: "https://www.facebook.com/elvyn.drspacefinders" },

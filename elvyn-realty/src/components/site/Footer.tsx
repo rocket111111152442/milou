@@ -3,7 +3,7 @@ import { href, type Lang } from "@/i18n/config";
 import { getDict } from "@/i18n/dictionaries";
 import { site } from "@/config/site";
 import { Logo } from "./Logo";
-import { IconFacebook, IconInstagram, IconLinkedin, IconMail, IconPhone, IconPin, IconWhatsApp, IconYoutube } from "./Icons";
+import { IconCalendar, IconFacebook, IconInstagram, IconLinkedin, IconMail, IconPhone, IconPin, IconWhatsApp, IconYoutube } from "./Icons";
 
 export function Footer({ lang }: { lang: Lang }) {
   const t = getDict(lang);
@@ -55,6 +55,7 @@ export function Footer({ lang }: { lang: Lang }) {
             <li><a className="flex items-start gap-2.5 hover:text-white" href={`https://wa.me/${site.whatsapp}`} target="_blank" rel="noopener noreferrer"><IconWhatsApp size={18} className="mt-0.5 shrink-0 text-brand-200" />WhatsApp</a></li>
             <li><a className="flex items-start gap-2.5 break-all hover:text-white" href={`mailto:${site.email}`}><IconMail size={18} className="mt-0.5 shrink-0 text-brand-200" />{site.email}</a></li>
             <li className="flex items-start gap-2.5"><IconPin size={18} className="mt-0.5 shrink-0 text-brand-200" /><span>{site.address.street[lang]}, {site.address.locality}, {site.address.region}</span></li>
+            {site.hours && <li className="flex items-start gap-2.5"><IconCalendar size={18} className="mt-0.5 shrink-0 text-brand-200" /><span>{site.hours[lang]}</span></li>}
           </ul>
         </div>
       </div>

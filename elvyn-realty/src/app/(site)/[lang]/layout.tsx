@@ -52,6 +52,12 @@ export default async function SiteLayout({ children, params }: { children: React
     areaServed: site.areas.map((a) => ({ "@type": "Place", name: a })),
     sameAs: Object.values(site.social).map((s) => s.url),
     knowsLanguage: ["es", "en"],
+    openingHoursSpecification: site.openingHours.map((o) => ({
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: (o.days as readonly number[]).map((d) => ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d]),
+      opens: o.opens,
+      closes: o.closes,
+    })),
   };
   return (
     <html lang={lang} className={`${fontSans.variable} ${fontDisplay.variable}`}>

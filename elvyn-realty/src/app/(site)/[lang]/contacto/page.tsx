@@ -52,7 +52,14 @@ export default async function Contact({ params }: Props) {
           </ul>
           <h2 className="mt-10 font-display text-2xl font-semibold">{t.contact.office}</h2>
           <p className="mt-3 flex items-start gap-2.5 text-ink"><IconPin size={20} className="mt-0.5 shrink-0 text-brand" /> {site.address.street[lang]}, {site.address.locality}, {site.address.region}, {site.address.country}</p>
-          <p className="mt-2 text-sm text-ink-muted">{site.hours ? site.hours[lang] : t.contact.hoursUnknown}</p>
+          {site.hours ? (
+            <div className="mt-4 rounded-xl bg-sand p-4 text-sm">
+              <p className="font-semibold text-navy">{lang === "es" ? "Horario de atención" : "Office hours"}</p>
+              <ul className="mt-1 space-y-0.5 text-ink">{site.hours[lang].split(" · ").map((h) => <li key={h}>{h}</li>)}</ul>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-ink-muted">{t.contact.hoursUnknown}</p>
+          )}
           <h2 className="mt-10 font-display text-2xl font-semibold">{t.contact.social}</h2>
           <ul className="mt-4 grid grid-cols-2 gap-3">
             {socials.map(({ url, label, handle, Icon }) => (

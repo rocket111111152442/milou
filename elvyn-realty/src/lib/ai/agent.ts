@@ -3,6 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { env, catalogMode } from "@/config/env";
 import type { Lang } from "@/i18n/config";
 import { log } from "@/lib/log";
+import { site } from "@/config/site";
+import { isOfficeOpen } from "@/lib/hours";
 import { systemPrompt } from "./prompt";
 import { ensureCards, ensureHandoff, executeTool, TOOL_DEFINITIONS, type Card, type Handoff, type ToolContext } from "./tools";
 import { recordUsage, budgetBlock } from "./usage";
@@ -53,7 +55,7 @@ function contextMessage(state: ChatSessionState, lang: Lang, page: PageContext):
     `Current page: ${pageLine}`,
     `Request to Elvyn: ${handoff}`,
     "Calendar connected: no (visit requests stay pending confirmation by Elvyn)",
-    "Office hours: not published (if outside usual hours, say Elvyn replies on the next business day)",
+    `Office hours: ${site.hours?.en ?? "not published"}. The office is ${isOfficeOpen() ? "OPEN now" : "CLOSED now: when handing over, say Elvyn will reply on the next business day"}.`,
     `Catalogue: ${catalogMode() === "demo" ? "DEMO snapshot of 2026-11-24, not live" : "live"}`,
   ].join("\n");
 }

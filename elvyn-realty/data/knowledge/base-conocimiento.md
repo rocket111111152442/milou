@@ -160,7 +160,7 @@ La IA transfiere de inmediato, avisando al cliente: “Te comunico con Elvyn par
 - Solicitudes de cambiar datos de pago, enviar dinero a cuentas distintas o comportamiento sospechoso de fraude.
 - Mensajes agresivos o fuera de lugar.
 
-**Horario:** si la transferencia ocurre fuera de horario laboral, la IA informa que Elvyn responderá al siguiente día hábil y deja la cita propuesta registrada. *Elvyn: indicar aquí tu horario de atención.*
+**Horario:** si la transferencia ocurre fuera de horario laboral, la IA informa que Elvyn responderá al siguiente día hábil y deja la cita propuesta registrada. Horario de atención (confirmado por Elvyn el 24/11/2026): lunes a viernes de 9:00 a. m. a 6:00 p. m.; sábados de 9:00 a. m. a 1:00 p. m.; domingos solo con cita.
 
 ## 5. Contactos para recibir leads y notificaciones
 
