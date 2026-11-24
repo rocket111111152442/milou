@@ -237,6 +237,9 @@ describe("false claim correction", () => {
     expect(correctFalseClaims("He enviado tu solicitud a Elvyn.", ctx("es", "proposed"))).not.toMatch(/He enviado/);
     expect(correctFalseClaims("I've booked your visit for Saturday.", ctx("en", "proposed"))).toMatch(/^Nothing has been sent yet/);
     expect(correctFalseClaims("Your viewing is now confirmed.", ctx("en", "proposed"))).not.toMatch(/confirmed\./);
+    // When the card appears, the real next step is always added
+    expect(correctFalseClaims("Ya preparé la solicitud para la primera villa.", ctx("es", "proposed"), true)).toMatch(/pulsa el botón de envío/);
+    expect(correctFalseClaims("Ya preparé la solicitud para la primera villa.", ctx("es", "proposed"), false)).toBe("Ya preparé la solicitud para la primera villa.");
     // After the visitor really sent it, nothing changes
     expect(correctFalseClaims("He enviado tu solicitud a Elvyn.", ctx("es", "sent"))).toBe("He enviado tu solicitud a Elvyn.");
   });

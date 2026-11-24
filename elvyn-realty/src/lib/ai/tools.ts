@@ -596,11 +596,19 @@ const CLAIM_RES = [
  * claims otherwise, the false sentences are removed and replaced by the real next step.
  * Returns the (possibly corrected) text.
  */
-export function correctFalseClaims(text: string, ctx: ToolContext): string {
+export function correctFalseClaims(text: string, ctx: ToolContext, cardShown = false): string {
   if (!text || ctx.handoff?.status === "sent") return text;
   const parts = text.split(/(?<=[.!?])\s+|\n/);
   const kept = parts.filter((p) => !CLAIM_RES.some((re) => re.test(p)));
-  if (kept.length === parts.length) return text;
+  if (kept.length === parts.length) {
+    // Whatever the wording, when the card appears the visitor reads the real next step.
+    if (!cardShown) return text;
+    const step =
+      ctx.lang === "es"
+        ? "Para que Elvyn reciba tu solicitud, completa tus datos en la tarjeta de abajo y pulsa el botón de envío: hasta entonces no se le envía nada."
+        : "For Elvyn to receive your request, fill in your details on the card below and press the send button: nothing is sent until then.";
+    return `${text.trim()}\n\n${step}`;
+  }
   const notice =
     ctx.lang === "es"
       ? ctx.handoff

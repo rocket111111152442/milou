@@ -168,7 +168,7 @@ export async function runTurn(
   if (!refused) {
     await ensureCards(ctx, text);
     ensureHandoff(userText, ctx);
-    text = correctFalseClaims(text, ctx);
+    text = correctFalseClaims(text, ctx, JSON.stringify(ctx.handoff) !== handoffBefore && ctx.handoff?.status === "proposed");
   }
   const handoffChanged = JSON.stringify(ctx.handoff) !== handoffBefore && ctx.handoff?.status === "proposed";
   const display = { text, cards: ctx.cards, handoff: handoffChanged ? ctx.handoff : null };

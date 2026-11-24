@@ -160,7 +160,7 @@ export async function runTurnOpenAI(
   if (!refused) {
     await ensureCards(ctx, text);
     ensureHandoff(userText, ctx);
-    const corrected = correctFalseClaims(text, ctx);
+    const corrected = correctFalseClaims(text, ctx, JSON.stringify(ctx.handoff) !== handoffBefore && ctx.handoff?.status === "proposed");
     if (corrected !== text) {
       // Keep the corrected wording in the history too, so the model does not repeat the false claim.
       const lastMsg = newMessages[newMessages.length - 1];
