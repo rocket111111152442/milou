@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { OFFERS, formatUsdFromMicros, offerFor, type PlanId } from "@antonio/shared";
+import { OFFERS, formatCreditsFromMicros, offerFor, type PlanId } from "@antonio/shared";
 import { api, queryClient, uid } from "../lib/api";
 import { useApp, useMe } from "../lib/app-state";
 import { Card, Disclosure, Loading, PageHead } from "../components/ui";
@@ -62,7 +62,7 @@ export function BillingPage() {
     </div>}
     <Card title="Mon compte"><div className="card-body stack-12"><div><strong>{me.data?.user.displayName ?? "Votre compte"}</strong><p className="small muted">{me.data?.user.email}</p></div><div className="row wrap"><Link className="btn" to="/profil">Profil, préférences et données</Link><Link className="btn" to="/connexions">Boîtes mail et agendas</Link><Link className="btn" to="/integrations">Intégrations</Link></div></div></Card>
     <div className="grid-2">
-      <Card title="Crédit IA disponible"><div className="card-body stack-8"><strong className="credit-balance-value">{formatUsdFromMicros(q.data.creditBalanceMicros)}</strong><p className="small muted">Ce solde sert après la limite comprise dans votre offre.</p><Link className="btn small" to="/consommation">Voir l’utilisation et ajouter du crédit →</Link></div></Card>
+      <Card title="Crédit IA disponible"><div className="card-body stack-8"><strong className="credit-balance-value">{formatCreditsFromMicros(q.data.creditBalanceMicros)}</strong><p className="small muted">Votre solde complémentaire s’ajoute aux crédits compris dans l’offre.</p><Link className="btn small" to="/consommation">Voir l’utilisation et ajouter du crédit →</Link></div></Card>
       <Card title="Paiements et factures"><div className="card-body stack-8"><p className="small muted">Dans l’espace sécurisé Stripe, vous pouvez gérer votre carte, consulter vos factures et vos reçus, ou annuler votre abonnement.</p>{q.data.enabled && q.data.subscription?.hasCustomer ? <button className="btn primary" disabled={portal.isPending} onClick={() => portal.mutate()}>{portal.isPending ? "Ouverture…" : "Gérer les paiements et les factures ↗"}</button> : <p className="tiny muted">La gestion des paiements sera disponible après le premier abonnement.</p>}</div></Card>
     </div>
     {q.data.subscription?.hasCustomer && <div className="billing-current"><div><h2>{active ? `Waverti ${offerFor(q.data.subscription.plan).name}` : "Votre offre"}</h2><p>{active ? (q.data.subscription.cancelAtPeriodEnd ? "Résiliation prévue à la fin de la période." : "Abonnement actif.") : `Offre souhaitée : ${selected.name}. Aucun abonnement actif.`}</p></div>{!active && <Link className="m-button primary" to="/consommation">Voir vos crédits →</Link>}</div>}

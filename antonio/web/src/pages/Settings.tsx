@@ -6,7 +6,9 @@ import {
   CAPABILITY_LABELS,
   MAIL_CATEGORIES,
   MAIL_CATEGORY_LABELS,
-  formatUsdFromMicros,
+  creditsFromMicros,
+  formatCreditsFromMicros,
+  MICRODOLLARS_PER_CREDIT,
   type AutonomyLevel,
   type Capability,
   type Category,
@@ -513,7 +515,7 @@ export function UsagePage() {
   const [voiceMin, setVoiceMin] = useState<string>("");
   const save = useMutation({
     mutationFn: (scope: "user" | "org") =>
-      api("/api/budgets", { method: "PUT", body: { scope, ...(limit ? { monthlyLimitMicros: Math.round(Number(limit) * 1_000_000) } : {}), ...(voiceMin ? { voiceMinutesDaily: Number(voiceMin) } : {}) } }),
+      api("/api/budgets", { method: "PUT", body: { scope, ...(limit ? { monthlyLimitMicros: Math.round(Number(limit) * MICRODOLLARS_PER_CREDIT) } : {}), ...(voiceMin ? { voiceMinutesDaily: Number(voiceMin) } : {}) } }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["usage"] });
       toast("Budget mis à jour.");
@@ -532,8 +534,8 @@ export function UsagePage() {
         <Link className="m-button primary" to="/abonnement">Voir mon abonnement</Link>
         {q.error && !("status" in q.error && q.error.status === 402) && <button className="m-button secondary" onClick={() => void q.refetch()}>Réessayer</button>}
       </div>
-      <Card title="Crédit IA disponible"><div className="card-body stack-8"><strong className="credit-balance-value">{formatUsdFromMicros(billing.data?.creditBalanceMicros ?? 0)}</strong><p className="small muted">Votre solde reste visible ici, même avant l’activation d’un abonnement.</p></div></Card>
-      {q.error instanceof Error && "status" in q.error && q.error.status === 402 && <Card title="Ajouter du crédit IA"><div className="card-body stack-12"><p className="small muted">Recharge ponctuelle. Ajoutez-en quand vous en avez besoin.</p><div className="row">{([20, 50, 100] as const).map((euros) => <button key={euros} className="btn primary" disabled={!canTopUp || topup.isPending} onClick={() => topup.mutate(euros)}>Ajouter {euros} €</button>)}</div>{!canTopUp && <p className="tiny muted">Les paiements ne sont pas encore ouverts.</p>}</div></Card>}
+      <Card title="Crédit IA disponible"><div className="card-body stack-8"><strong className="credit-balance-value">{formatCreditsFromMicros(billing.data?.creditBalanceMicros ?? 0)}</strong><p className="small muted">Votre solde reste visible ici, même avant l’activation d’un abonnement.</p></div></Card>
+      {q.error instanceof Error && "status" in q.error && q.error.status === 402 && <Card title="Ajouter du crédit IA"><div className="card-body stack-12"><p className="small muted">1 € rechargé ajoute 1 crédit à votre solde.</p><div className="row">{([20, 50, 100] as const).map((euros) => <button key={euros} className="btn primary" disabled={!canTopUp || topup.isPending} onClick={() => topup.mutate(euros)}>Ajouter {euros} € · {euros} crédits</button>)}</div>{!canTopUp && <p className="tiny muted">Les paiements ne sont pas encore ouverts.</p>}</div></Card>}
     </div>
   );
   const u = q.data;
@@ -546,24 +548,24 @@ export function UsagePage() {
     : 0;
   return (
     <div className="page stack-16">
-      <PageHead title="Votre consommation" subtitle={`Mois ${u.month} · coûts estimés en dollars.`} />
+      <PageHead title="Votre consommation" subtitle={`Mois ${u.month} · votre utilisation en crédits IA.`} />
       {topupStatus && <div className={topupStatus === "confirmed" ? "success-box" : "warning-box"} role="status" aria-live="polite">{topupStatus === "confirming" ? "Paiement reçu. Stripe confirme la recharge…" : topupStatus === "confirmed" ? "Recharge confirmée. Votre crédit IA est à jour." : <>La confirmation prend plus de temps que prévu. <button className="btn small" onClick={() => window.location.reload()}>Vérifier à nouveau</button></>}</div>}
-      <Card title="Crédit IA disponible"><div className="card-body stack-8"><strong className="credit-balance-value">{formatUsdFromMicros(billing.data?.creditBalanceMicros ?? u.budget.topupBalanceMicros)}</strong><p className="small muted">Ce crédit s’utilise après la limite comprise dans votre offre.</p></div></Card>
+      <Card title="Crédit IA disponible"><div className="card-body stack-8"><strong className="credit-balance-value">{formatCreditsFromMicros(billing.data?.creditBalanceMicros ?? u.budget.topupBalanceMicros)}</strong><p className="small muted">1 € rechargé ajoute 1 crédit. Les crédits achetés s’ajoutent à ceux de votre offre.</p></div></Card>
       <Card title="Budget du mois">
         <div className="card-body stack-12">
           <div className="spread small">
             <strong>{pct}% du budget utilisé</strong>
-            <span className="muted">{formatUsdFromMicros(u.userMonthMicros)} sur {formatUsdFromMicros(u.budget.monthlyLimitMicros)}</span>
+            <span className="muted">{formatCreditsFromMicros(u.userMonthMicros)} sur {formatCreditsFromMicros(u.budget.monthlyLimitMicros)}</span>
           </div>
           <div className={`progress ${pct >= 100 ? "bad" : pct >= u.budget.alertThresholdPct ? "warn" : ""}`}><div style={{ width: `${pct}%` }} /></div>
           <div className="small muted">Plafond mensuel prévu selon votre offre</div>
           <div className="stack-8">
             <div className="spread small">
               <strong>Tokens IA utilisés</strong>
-              <span className="muted">{textUsage.tokens.toLocaleString("fr-FR")} tokens · {tokenCreditPct}% du plafond mensuel</span>
+              <span className="muted">{textUsage.tokens.toLocaleString("fr-FR")} tokens · {tokenCreditPct}% des crédits inclus ({formatCreditsFromMicros(textUsage.costMicros)})</span>
             </div>
             <div className={`progress ${tokenCreditPct >= 100 ? "bad" : tokenCreditPct >= u.budget.alertThresholdPct ? "warn" : ""}`}><div style={{ width: `${tokenCreditPct}%` }} /></div>
-            <div className="tiny muted">Part du plafond API consommée par les tokens des demandes écrites.</div>
+            <div className="tiny muted">Le pourcentage montre la part des crédits mensuels consommée par les demandes écrites.</div>
           </div>
           {u.budget.topupBalanceMicros > 0 && <div className="small muted">Vous avez du crédit supplémentaire disponible.</div>}
           {u.exceeded && <div className="danger-box">Budget atteint. L’IA et la voix sont en pause.</div>}
@@ -576,7 +578,7 @@ export function UsagePage() {
           <p className="small muted">Ajoutez du crédit à tout moment pour continuer à utiliser votre assistant.</p>
           <div className="row">
             {([20, 50, 100] as const).map((euros) => <button key={euros} className="btn primary" disabled={!canTopUp || topup.isPending} onClick={() => topup.mutate(euros)}>
-              Ajouter {euros} €
+              Ajouter {euros} € · {euros} crédits
             </button>)}
           </div>
           {!canTopUp && <p className="tiny muted">Les paiements ne sont pas encore ouverts.</p>}
@@ -588,7 +590,7 @@ export function UsagePage() {
           <tbody>
             {u.byKind.length === 0 && <tr><td colSpan={3} className="muted">Aucune consommation ce mois-ci.</td></tr>}
             {u.byKind.map((k, i) => (
-              <tr key={i}><td>{KIND_LABELS[k.kind] ?? k.kind}</td><td>{k.unit === "seconds" ? `${Math.round(k.quantity / 60)} min` : `${k.quantity.toLocaleString("fr-FR")} ${k.unit}`}</td><td>{formatUsdFromMicros(k.costMicros)}</td></tr>
+              <tr key={i}><td>{KIND_LABELS[k.kind] ?? k.kind}</td><td>{k.unit === "seconds" ? `${Math.round(k.quantity / 60)} min` : `${k.quantity.toLocaleString("fr-FR")} ${k.unit}`}</td><td>{formatCreditsFromMicros(k.costMicros)}</td></tr>
             ))}
           </tbody>
         </table>
@@ -596,7 +598,7 @@ export function UsagePage() {
       <Card title="Modifier mes limites" collapsible>
         <div className="card-body stack-12">
           <div className="grid-2">
-            <div className="field"><label htmlFor="lm">Budget mensuel (USD)</label><input id="lm" className="input" type="number" min={0} step={1} value={limit} onChange={(e) => setLimit(e.target.value)} placeholder={String(u.budget.monthlyLimitMicros / 1_000_000)} /></div>
+            <div className="field"><label htmlFor="lm">Plafond mensuel (crédits)</label><input id="lm" className="input" type="number" min={0} step={1} value={limit} onChange={(e) => setLimit(e.target.value)} placeholder={String(creditsFromMicros(u.budget.monthlyLimitMicros))} /></div>
             <div className="field"><label htmlFor="vm">Minutes de voix par jour</label><input id="vm" className="input" type="number" min={0} value={voiceMin} onChange={(e) => setVoiceMin(e.target.value)} placeholder={String(u.budget.voiceMinutesDaily)} /></div>
           </div>
           <div className="row">

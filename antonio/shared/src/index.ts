@@ -443,6 +443,17 @@ export const PROFESSION_PRESETS: ProfessionPreset[] = [
 ];
 
 /** Les fournisseurs (OpenAI) facturent en dollars : les coûts sont suivis en micro-dollars. */
+export const MICRODOLLARS_PER_CREDIT = 400_000;
+
+/** 1 crédit Waverti représente 0,40 USD de consommation API. */
+export function creditsFromMicros(micros: number): number {
+  return Math.max(0, micros) / MICRODOLLARS_PER_CREDIT;
+}
+
+export function formatCreditsFromMicros(micros: number): string {
+  return `${creditsFromMicros(micros).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} crédits`;
+}
+
 export function formatUsdFromMicros(micros: number): string {
   return (micros / 1_000_000).toLocaleString("fr-FR", { style: "currency", currency: "USD", maximumFractionDigits: 4 });
 }
