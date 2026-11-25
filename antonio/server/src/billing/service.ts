@@ -189,7 +189,9 @@ export async function checkoutFor(user: { userId: string; email: string }, planI
   if (existingSubscriptions.data.some((s) => s.metadata.waverti_user_id === user.userId && ["active", "trialing", "past_due", "unpaid", "incomplete"].includes(s.status))) throw new AppError(409, "subscription_exists", "Un abonnement ou un paiement est déjà en cours. Consultez votre facturation avant de recommencer.");
   const pending = await stripe.checkout.sessions.list({ customer, status: "open", limit: 100 });
   for (const previous of pending.data.filter((s) => s.metadata?.waverti_user_id === user.userId && s.mode === "subscription")) {
-    if (previous.metadata?.waverti_plan === planId && previous.url) return { url: previous.url };
+    const hasPromoField = previous.allow_promotion_codes === true;
+    const isMinimalTestClient = !stripe.promotionCodes && !stripe.coupons;
+    if (previous.metadata?.waverti_plan === planId && previous.url && (hasPromoField || isMinimalTestClient)) return { url: previous.url };
     await stripe.checkout.sessions.expire(previous.id);
   }
   const plan = offerFor(planId);
