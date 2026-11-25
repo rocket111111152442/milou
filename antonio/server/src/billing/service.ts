@@ -11,6 +11,49 @@ export const CREDIT_TOPUPS = [
   { euros: 100, creditMicros: 40_000_000 },
 ] as const;
 
+const SUBSCRIPTION_PROMO_CODE = "paffpaffouiouipaff";
+const SUBSCRIPTION_PROMO_COUPON_ID = "waverti-first-month-100";
+
+/** Ensure the launch code exists in the Stripe account/mode used by this checkout. */
+async function ensureSubscriptionPromoCode(stripe: Stripe) {
+  // Keep minimal Stripe test doubles usable; the real SDK always exposes these resources.
+  if (!stripe.promotionCodes || !stripe.coupons) return;
+  const matches = await stripe.promotionCodes.list({ code: SUBSCRIPTION_PROMO_CODE, limit: 100 });
+  const existing = matches.data.find((item) => item.code.toLowerCase() === SUBSCRIPTION_PROMO_CODE);
+  if (existing) {
+    const couponRef = existing.promotion.type === "coupon" ? existing.promotion.coupon : null;
+    const coupon = typeof couponRef === "string" ? await stripe.coupons.retrieve(couponRef) : couponRef;
+    if (!coupon || coupon.deleted || coupon.percent_off !== 100 || coupon.duration !== "once") {
+      throw new AppError(503, "promo_code_conflict", "Le code promotionnel existe déjà avec une réduction différente.");
+    }
+    if (!existing.active) await stripe.promotionCodes.update(existing.id, { active: true });
+    return;
+  }
+
+  let coupon: Stripe.Coupon;
+  try {
+    coupon = await stripe.coupons.retrieve(SUBSCRIPTION_PROMO_COUPON_ID);
+  } catch (error) {
+    const stripeError = error as { code?: string; statusCode?: number };
+    if (stripeError.code !== "resource_missing" && stripeError.statusCode !== 404) throw error;
+    coupon = await stripe.coupons.create({
+      id: SUBSCRIPTION_PROMO_COUPON_ID,
+      name: "Waverti — premier mois offert",
+      percent_off: 100,
+      duration: "once",
+      metadata: { waverti_promo_code: SUBSCRIPTION_PROMO_CODE },
+    }, { idempotencyKey: "waverti:coupon:first-month-100" });
+  }
+  if (coupon.deleted || coupon.percent_off !== 100 || coupon.duration !== "once") {
+    throw new AppError(503, "promo_coupon_conflict", "La réduction configurée pour le code n’est pas valide.");
+  }
+  await stripe.promotionCodes.create({
+    code: SUBSCRIPTION_PROMO_CODE,
+    promotion: { type: "coupon", coupon: coupon.id },
+    metadata: { waverti_promo: "first-month-free" },
+  }, { idempotencyKey: "waverti:promotion-code:first-month-100" });
+}
+
 export async function apiCreditBalance(userId: string) {
   const [row] = await db().select({ balance: sql<string>`coalesce(sum(${schema.apiCreditLedger.amountMicros}), 0)` })
     .from(schema.apiCreditLedger).where(eq(schema.apiCreditLedger.userId, userId));
@@ -139,6 +182,7 @@ export async function checkoutFor(user: { userId: string; email: string }, planI
   const [row] = await tx.select().from(schema.subscriptions).where(eq(schema.subscriptions.userId, user.userId));
   if (row && ["active", "trialing", "past_due", "unpaid"].includes(row.status)) throw new AppError(409, "subscription_exists", "Gérez votre abonnement existant depuis le portail de facturation.");
   const stripe = client ?? stripeClient();
+  await ensureSubscriptionPromoCode(stripe);
   const customer = row?.stripeCustomerId ?? (await stripe.customers.create({ email: user.email, metadata: { waverti_user_id: user.userId } }, { idempotencyKey: `waverti-customer:${user.userId}` })).id;
   await tx.insert(schema.subscriptions).values({ userId: user.userId, requestedPlan: planId, stripeCustomerId: customer }).onConflictDoUpdate({ target: schema.subscriptions.userId, set: { requestedPlan: planId, stripeCustomerId: customer, updatedAt: new Date() } });
   const existingSubscriptions = await stripe.subscriptions.list({ customer, status: "all", limit: 100 });
@@ -151,6 +195,7 @@ export async function checkoutFor(user: { userId: string; email: string }, planI
   const plan = offerFor(planId);
   const session = await stripe.checkout.sessions.create({
     mode: "subscription", locale: "fr", client_reference_id: user.userId,
+    allow_promotion_codes: true,
     customer,
     line_items: [{ quantity: 1, price_data: { currency: "eur", unit_amount: plan.euros * 100, recurring: { interval: "month" }, product_data: { name: `Waverti ${plan.name}` } } }],
     subscription_data: { metadata: { waverti_user_id: user.userId, waverti_plan: planId } },
