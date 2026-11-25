@@ -499,7 +499,19 @@ export function UsagePage() {
     },
     onError: (e: Error) => toast(e.message),
   });
-  if (!q.data) return <div className="page"><Loading /></div>;
+  if (q.isPending) return <div className="page"><Loading /></div>;
+  if (q.error || !q.data) return (
+    <div className="page stack-16">
+      <PageHead title="Votre consommation" subtitle="Suivez vos crédits et les limites de votre offre." />
+      <div className="warning-box stack-8" role="alert">
+        <p>{q.error instanceof Error && "status" in q.error && q.error.status === 402
+          ? "Activez une offre dans Mon abonnement pour consulter votre consommation."
+          : "La consommation n’a pas pu être chargée."}</p>
+        <Link className="m-button primary" to="/abonnement">Voir mon abonnement</Link>
+        {q.error && !("status" in q.error && q.error.status === 402) && <button className="m-button secondary" onClick={() => void q.refetch()}>Réessayer</button>}
+      </div>
+    </div>
+  );
   const u = q.data;
   const pct = Math.min(100, Math.round(u.ratio * 100));
   const textUsage = u.byKind
