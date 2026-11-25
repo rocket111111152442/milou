@@ -488,6 +488,7 @@ export function UsagePage() {
       setParams({}, { replace: true });
     }).catch((error: Error) => toast(error.message));
   }, [billing.data?.enabled, params, setParams, toast]);
+  const canTopUp = billing.data?.enabled ?? false;
   const [limit, setLimit] = useState<string>("");
   const [voiceMin, setVoiceMin] = useState<string>("");
   const save = useMutation({
@@ -505,11 +506,12 @@ export function UsagePage() {
       <PageHead title="Votre consommation" subtitle="Suivez vos crédits et les limites de votre offre." />
       <div className="warning-box stack-8" role="alert">
         <p>{q.error instanceof Error && "status" in q.error && q.error.status === 402
-          ? "Activez une offre dans Mon abonnement pour consulter votre consommation."
+          ? "Aucune offre active. Choisissez-en une pour utiliser l’assistant. Vous pouvez ajouter du crédit quand vous le souhaitez."
           : "La consommation n’a pas pu être chargée."}</p>
         <Link className="m-button primary" to="/abonnement">Voir mon abonnement</Link>
         {q.error && !("status" in q.error && q.error.status === 402) && <button className="m-button secondary" onClick={() => void q.refetch()}>Réessayer</button>}
       </div>
+      {q.error instanceof Error && "status" in q.error && q.error.status === 402 && <Card title="Ajouter du crédit IA"><div className="card-body stack-12"><p className="small muted">Recharge ponctuelle. Ajoutez-en quand vous en avez besoin.</p><div className="row">{([20, 50, 100] as const).map((euros) => <button key={euros} className="btn primary" disabled={!canTopUp || topup.isPending} onClick={() => topup.mutate(euros)}>Ajouter {euros} €</button>)}</div>{!canTopUp && <p className="tiny muted">Les paiements ne sont pas encore ouverts.</p>}</div></Card>}
     </div>
   );
   const u = q.data;
@@ -520,7 +522,6 @@ export function UsagePage() {
   const tokenCreditPct = u.budget.baseMonthlyLimitMicros > 0
     ? Math.min(100, Math.round((textUsage.costMicros / u.budget.baseMonthlyLimitMicros) * 100))
     : 0;
-  const canTopUp = billing.data?.enabled;
   return (
     <div className="page stack-16">
       <PageHead title="Votre consommation" subtitle={`Mois ${u.month} · coûts estimés en dollars.`} />
