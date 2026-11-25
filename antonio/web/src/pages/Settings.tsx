@@ -539,7 +539,7 @@ export function UsagePage() {
           <p className="small muted">Recharge ponctuelle. 40 % du montant devient du crédit API, utilisable après le plafond inclus et conservé jusqu’à épuisement.</p>
           <div className="row">
             {([20, 50, 100] as const).map((euros) => <button key={euros} className="btn primary" disabled={!canTopUp || topup.isPending} onClick={() => topup.mutate(euros)}>
-              Ajouter {euros} € · +{euros * 0.4} $ IA
+              Ajouter {euros} €
             </button>)}
           </div>
           {!canTopUp && <p className="tiny muted">Les recharges seront disponibles avec un abonnement Stripe actif.</p>}
