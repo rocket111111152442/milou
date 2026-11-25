@@ -471,8 +471,9 @@ export function UsagePage() {
   const { toast } = useApp();
   const [params, setParams] = useSearchParams();
   const q = useQuery({ queryKey: ["usage"], queryFn: () => api<UsageResp>("/api/usage") });
-  const billing = useQuery({ queryKey: ["billing"], queryFn: () => api<{ enabled: boolean; subscription: { plan: string | null; status: string } | null }>("/api/billing") });
+  const billing = useQuery({ queryKey: ["billing"], queryFn: () => api<{ enabled: boolean; creditBalanceMicros: number; subscription: { plan: string | null; status: string } | null }>("/api/billing") });
   const confirmedSession = useRef<string | null>(null);
+  const [topupStatus, setTopupStatus] = useState<"confirming" | "confirmed" | "pending" | null>(null);
   const topup = useMutation({
     mutationFn: (euros: 20 | 50 | 100) => api<{ url: string }>("/api/billing/topup-checkout", { body: { euros, requestId: uid() } }),
     onSuccess: (result) => { window.location.href = result.url; },
@@ -482,11 +483,30 @@ export function UsagePage() {
     const sessionId = params.get("recharge_session_id");
     if (!billing.data?.enabled || !sessionId || confirmedSession.current === sessionId) return;
     confirmedSession.current = sessionId;
-    void api<{ confirmed: boolean }>("/api/billing/topup-confirm", { body: { sessionId } }).then((result) => {
-      toast(result.confirmed ? "Recharge confirmée. Votre crédit est ajouté." : "Paiement en cours de confirmation.");
-      void queryClient.invalidateQueries({ queryKey: ["usage"] });
-      setParams({}, { replace: true });
-    }).catch((error: Error) => toast(error.message));
+    let cancelled = false;
+    let timer: number | undefined;
+    let attempts = 0;
+    setTopupStatus("confirming");
+    const check = async () => {
+      try {
+        const result = await api<{ confirmed: boolean }>("/api/billing/topup-confirm", { body: { sessionId } });
+        if (cancelled) return;
+        if (result.confirmed) {
+          setTopupStatus("confirmed");
+          toast("Recharge confirmée. Votre crédit est disponible.");
+          void queryClient.invalidateQueries({ queryKey: ["billing"] });
+          void queryClient.invalidateQueries({ queryKey: ["usage"] });
+          setParams({}, { replace: true });
+        } else if (attempts++ < 14) timer = window.setTimeout(() => void check(), 1500);
+        else setTopupStatus("pending");
+      } catch {
+        if (cancelled) return;
+        if (attempts++ < 14) timer = window.setTimeout(() => void check(), 1500);
+        else setTopupStatus("pending");
+      }
+    };
+    void check();
+    return () => { cancelled = true; if (timer) window.clearTimeout(timer); };
   }, [billing.data?.enabled, params, setParams, toast]);
   const canTopUp = billing.data?.enabled ?? false;
   const [limit, setLimit] = useState<string>("");
@@ -500,10 +520,11 @@ export function UsagePage() {
     },
     onError: (e: Error) => toast(e.message),
   });
-  if (q.isPending) return <div className="page"><Loading /></div>;
+  if (q.isPending) return <div className="page stack-16"><PageHead title="Votre consommation" subtitle="Suivez vos crédits et les limites de votre offre." />{params.get("recharge_session_id") && <div className="warning-box" role="status" aria-live="polite">Paiement reçu. Stripe confirme votre recharge…</div>}<Loading /></div>;
   if (q.error || !q.data) return (
     <div className="page stack-16">
       <PageHead title="Votre consommation" subtitle="Suivez vos crédits et les limites de votre offre." />
+      {topupStatus && <div className={topupStatus === "confirmed" ? "success-box" : "warning-box"} role="status" aria-live="polite">{topupStatus === "confirming" ? "Paiement reçu. Stripe confirme la recharge…" : topupStatus === "confirmed" ? "Recharge confirmée. Votre crédit IA est à jour." : <>La confirmation prend plus de temps que prévu. <button className="btn small" onClick={() => window.location.reload()}>Vérifier à nouveau</button></>}</div>}
       <div className="warning-box stack-8" role="alert">
         <p>{q.error instanceof Error && "status" in q.error && q.error.status === 402
           ? "Aucune offre active. Choisissez-en une pour utiliser l’assistant. Vous pouvez ajouter du crédit quand vous le souhaitez."
@@ -511,6 +532,7 @@ export function UsagePage() {
         <Link className="m-button primary" to="/abonnement">Voir mon abonnement</Link>
         {q.error && !("status" in q.error && q.error.status === 402) && <button className="m-button secondary" onClick={() => void q.refetch()}>Réessayer</button>}
       </div>
+      <Card title="Crédit IA disponible"><div className="card-body stack-8"><strong className="credit-balance-value">{formatUsdFromMicros(billing.data?.creditBalanceMicros ?? 0)}</strong><p className="small muted">Votre solde reste visible ici, même avant l’activation d’un abonnement.</p></div></Card>
       {q.error instanceof Error && "status" in q.error && q.error.status === 402 && <Card title="Ajouter du crédit IA"><div className="card-body stack-12"><p className="small muted">Recharge ponctuelle. Ajoutez-en quand vous en avez besoin.</p><div className="row">{([20, 50, 100] as const).map((euros) => <button key={euros} className="btn primary" disabled={!canTopUp || topup.isPending} onClick={() => topup.mutate(euros)}>Ajouter {euros} €</button>)}</div>{!canTopUp && <p className="tiny muted">Les paiements ne sont pas encore ouverts.</p>}</div></Card>}
     </div>
   );
@@ -525,6 +547,8 @@ export function UsagePage() {
   return (
     <div className="page stack-16">
       <PageHead title="Votre consommation" subtitle={`Mois ${u.month} · coûts estimés en dollars.`} />
+      {topupStatus && <div className={topupStatus === "confirmed" ? "success-box" : "warning-box"} role="status" aria-live="polite">{topupStatus === "confirming" ? "Paiement reçu. Stripe confirme la recharge…" : topupStatus === "confirmed" ? "Recharge confirmée. Votre crédit IA est à jour." : <>La confirmation prend plus de temps que prévu. <button className="btn small" onClick={() => window.location.reload()}>Vérifier à nouveau</button></>}</div>}
+      <Card title="Crédit IA disponible"><div className="card-body stack-8"><strong className="credit-balance-value">{formatUsdFromMicros(billing.data?.creditBalanceMicros ?? u.budget.topupBalanceMicros)}</strong><p className="small muted">Ce crédit s’utilise après la limite comprise dans votre offre.</p></div></Card>
       <Card title="Budget du mois">
         <div className="card-body stack-12">
           <div className="spread small">

@@ -244,6 +244,8 @@ kbd { font-family: inherit; font-size: 11px; border: 1px solid var(--border-stro
 .warning-box { background: var(--wait-soft); color: #6d4b0d; border-radius: var(--radius); padding: 10px 14px; font-size: 13.5px; }
 .danger-box { background: var(--bad-soft); color: #7c2b25; border-radius: var(--radius); padding: 10px 14px; font-size: 13.5px; }
 .info-box { background: var(--accent-soft); color: var(--accent-strong); border-radius: var(--radius); padding: 10px 14px; font-size: 13.5px; }
+.success-box { background: #e7f6ee; color: #185c38; border: 1px solid #9ed5b5; border-radius: var(--radius); padding: 12px 14px; font-size: 13.5px; }
+.credit-balance-value { display: block; color: var(--text); font-size: 25px; line-height: 1.2; letter-spacing: -.6px; }
 .toast-zone { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 50; max-width: 380px; }
 .toast { background: var(--text); color: #fff; padding: 10px 14px; border-radius: 12px; box-shadow: var(--shadow-l); font-size: 14px; }
 .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; margin-bottom: 8px; }

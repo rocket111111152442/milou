@@ -17,6 +17,10 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .nav-pending { padding: 1px 6px; font-size: 10px; color: #eac88c; }
 .studio-header-right { justify-self: end; display: flex; align-items: center; gap: 19px; }
 .studio-date { color: #756e7f; font-size: 11px; text-transform: capitalize; }
+.studio-credit-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #604b70; border-radius: 999px; padding: 7px 10px; color: #dec6ff; background: #b68ae912; font-size: 10px; text-decoration: none !important; white-space: nowrap; transition: background 160ms, border-color 160ms; }
+.studio-credit-pill:hover { background: #b68ae922; border-color: #8a6ba5; }
+.studio-credit-pill svg { width: 13px; height: 13px; }
+.studio-credit-pill > span { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
 .studio-menu-button { width: 30px; height: 30px; border: 0; padding: 4px; background: none; color: #9b92a6; cursor: pointer; border-radius: 7px; }
 .studio-menu-button:hover { background: #ffffff08; color: white; }
 .studio-avatar { width: 31px; height: 31px; border-radius: 50%; background: #211b2b; border: 1px solid #3b2e48; color: #bd9ed9; font-size: 11px; display: grid; place-items: center; text-decoration: none !important; }
@@ -195,6 +199,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
   .studio-navigation .studio-nav-link > span { display: none; }
   .studio-navigation .studio-nav-link svg { width: 15px; height: 15px; }
   .studio-avatar { display: none; }
+  .studio-credit-pill { padding: 6px 8px; font-size: 9px; }
   .studio-header-right { gap: 0; }
   .studio-menu { right: 14px; top: 62px; width: 280px; }
   .studio-menu-backdrop { top: 70px; }

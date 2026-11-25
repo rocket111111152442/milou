@@ -24,6 +24,7 @@ export async function creditTopupFor(user: { userId: string; email: string }, eu
   const stripe = client ?? stripeClient();
   const subscription = await subscriptionFor(user.userId);
   const customer = subscription?.stripeCustomerId ?? (await stripe.customers.create({ email: user.email, metadata: { waverti_user_id: user.userId } }, { idempotencyKey: `waverti-customer:${user.userId}` })).id;
+  await db().insert(schema.subscriptions).values({ userId: user.userId, stripeCustomerId: customer }).onConflictDoUpdate({ target: schema.subscriptions.userId, set: { stripeCustomerId: customer, updatedAt: new Date() } });
   const session = await stripe.checkout.sessions.create({
     mode: "payment", locale: "fr", client_reference_id: user.userId, customer,
     line_items: [{ quantity: 1, price_data: { currency: "eur", unit_amount: pack.euros * 100, product_data: { name: `Recharge Waverti ${pack.euros} €`, description: "Recharge ponctuelle Waverti." } } }],
