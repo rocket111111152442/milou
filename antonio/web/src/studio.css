@@ -127,7 +127,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 
 /* The composer remains the quiet, persistent entry point. */
 .studio-composer-wrap { flex-shrink: 0; width: min(100%, 680px); margin: 22px auto 0; padding: 0 0 2px; }
-.studio-shortcuts { display: flex; align-items: center; justify-content: center; gap: 19px; margin-bottom: 14px; }
+.studio-shortcuts { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 19px; margin-bottom: 14px; }
 .studio-shortcuts > button { display: flex; align-items: center; gap: 7px; color: #9985a8; padding: 0; border: 0; background: transparent; cursor: pointer; font-size: 10px; }
 .studio-shortcuts > button:hover { color: #d8c1e9; }
 .shortcut-count { font-size: 8px; padding: 0 4px; background: #b789df0d; color: #9c7baf; border-radius: 4px; }

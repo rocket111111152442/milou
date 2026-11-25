@@ -78,7 +78,12 @@ export function Workspace() {
       </div>
 
       <div className="studio-composer-wrap">
-        <div className="studio-shortcuts"><button onClick={() => void send("Fais-moi le point sur ma journée")} disabled={busy}><Icon.Sun width={13} height={13} />Faire le point <span>↗</span></button><button onClick={() => setHistoryOpen(true)}><Icon.History width={13} height={13} />Notre conversation{bubbles.length > 0 && <span className="shortcut-count">{bubbles.length}</span>}</button></div>
+        <div className="studio-shortcuts">
+          <button onClick={() => void send("Fais-moi le point sur ma journée")} disabled={busy}><Icon.Sun width={13} height={13} />Faire le point</button>
+          <button onClick={() => void send("Quels messages attendent une réponse ?")} disabled={busy}><Icon.Inbox width={13} height={13} />Réponses à préparer</button>
+          <button onClick={() => void send("Quelles sont mes tâches ouvertes ?")} disabled={busy}><Icon.Tasks width={13} height={13} />Mes tâches</button>
+          <button onClick={() => setHistoryOpen(true)}><Icon.History width={13} height={13} />Conversation{bubbles.length > 0 && <span className="shortcut-count">{bubbles.length}</span>}</button>
+        </div>
         <form className={`studio-composer ${busy ? "is-busy" : ""}`} onSubmit={(e) => { e.preventDefault(); void send(text); }}>
           <span className="composer-spark" aria-hidden>✳</span><label htmlFor="composer" className="sr-only">Écrire à {name}</label><textarea id="composer" rows={1} value={text} placeholder={`Demandez à ${name}…`} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(text); } }} />
           {(voice.sessionActive || voice.wakeEnabled) && <button type="button" className="composer-microphone" onClick={voice.muteAll} aria-label="Couper le micro immédiatement"><Icon.MicOff /></button>}

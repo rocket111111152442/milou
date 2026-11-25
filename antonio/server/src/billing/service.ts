@@ -19,7 +19,6 @@ export async function apiCreditBalance(userId: string) {
 
 export async function creditTopupFor(user: { userId: string; email: string }, euros: number, requestId: string, client?: Stripe) {
   if (!billingEnabled()) throw new AppError(503, "billing_unavailable", "Les paiements ne sont pas encore ouverts.");
-  await paidOffer(user.userId);
   const pack = CREDIT_TOPUPS.find((item) => item.euros === euros);
   if (!pack) throw new AppError(400, "invalid_topup", "Choisissez une recharge proposée.");
   const stripe = client ?? stripeClient();
@@ -27,13 +26,51 @@ export async function creditTopupFor(user: { userId: string; email: string }, eu
   const customer = subscription?.stripeCustomerId ?? (await stripe.customers.create({ email: user.email, metadata: { waverti_user_id: user.userId } }, { idempotencyKey: `waverti-customer:${user.userId}` })).id;
   const session = await stripe.checkout.sessions.create({
     mode: "payment", locale: "fr", client_reference_id: user.userId, customer,
-    line_items: [{ quantity: 1, price_data: { currency: "eur", unit_amount: pack.euros * 100, product_data: { name: `Recharge Waverti ${pack.euros} €`, description: `${formatUsd(pack.creditMicros)} de crédit d’utilisation IA.` } } }],
+    line_items: [{ quantity: 1, price_data: { currency: "eur", unit_amount: pack.euros * 100, product_data: { name: `Recharge Waverti ${pack.euros} €`, description: "Recharge ponctuelle Waverti." } } }],
     metadata: { waverti_user_id: user.userId, waverti_topup_euros: String(pack.euros), waverti_credit_micros: String(pack.creditMicros) },
     payment_intent_data: { metadata: { waverti_user_id: user.userId, waverti_topup_euros: String(pack.euros), waverti_credit_micros: String(pack.creditMicros) } },
     success_url: `${config().APP_BASE_URL}/consommation?recharge_session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${config().APP_BASE_URL}/consommation?recharge_annule=1`,
   }, { idempotencyKey: `waverti-topup:${user.userId}:${requestId}` });
   return { url: session.url };
+}
+
+export async function upgradeSubscriptionFor(user: { userId: string }, planId: PlanId, requestId: string, client?: Stripe) {
+  if (!billingEnabled()) throw new AppError(503, "billing_unavailable", "Les abonnements ne sont pas encore ouverts.");
+  const row = await subscriptionFor(user.userId);
+  if (!row?.stripeSubscriptionId || !["active", "trialing"].includes(row.status)) {
+    throw new AppError(400, "subscription_required", "Activez d’abord un abonnement pour le modifier.");
+  }
+
+  const stripe = client ?? stripeClient();
+  const current = await stripe.subscriptions.retrieve(row.stripeSubscriptionId);
+  if (!["active", "trialing"].includes(current.status)) throw new AppError(400, "subscription_not_active", "Cet abonnement ne peut pas être modifié pour le moment.");
+  const currentPlan = offerFor(current.metadata.waverti_plan ?? row.plan);
+  const nextPlan = offerFor(planId);
+  if (nextPlan.euros <= currentPlan.euros) throw new AppError(400, "upgrade_only", "Choisissez une offre supérieure à votre offre actuelle.");
+  const item = current.items.data[0];
+  if (!item) throw new AppError(400, "subscription_item_missing", "Aucune offre modifiable n’a été trouvée.");
+
+  const lookupKey = `waverti_${planId}_monthly`;
+  const existingPrice = await stripe.prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 });
+  const price = existingPrice.data[0] ?? await stripe.prices.create({
+    currency: "eur",
+    unit_amount: nextPlan.euros * 100,
+    recurring: { interval: "month" },
+    product_data: { name: `Waverti ${nextPlan.name}`, metadata: { waverti_plan: planId } },
+    lookup_key: lookupKey,
+    metadata: { waverti_plan: planId },
+  }, { idempotencyKey: `waverti-price:${planId}` });
+
+  const updated = await stripe.subscriptions.update(current.id, {
+    items: [{ id: item.id, price: price.id }],
+    metadata: { ...current.metadata, waverti_user_id: user.userId, waverti_plan: planId },
+    proration_behavior: "always_invoice",
+    payment_behavior: "pending_if_incomplete",
+    cancel_at_period_end: false,
+  }, { idempotencyKey: `waverti-upgrade:${current.id}:${planId}:${requestId}` });
+  if (["active", "trialing"].includes(updated.status)) await refreshSubscription(updated.id, stripe);
+  return { ok: true, status: updated.status, plan: planId };
 }
 
 export async function grantTopupFromSession(session: Stripe.Checkout.Session, userId: string) {
@@ -43,8 +80,6 @@ export async function grantTopupFromSession(session: Stripe.Checkout.Session, us
   await db().insert(schema.apiCreditLedger).values({ userId, amountMicros: pack.creditMicros, kind: "purchase", stripeSessionId: session.id }).onConflictDoNothing({ target: schema.apiCreditLedger.stripeSessionId });
   return true;
 }
-
-function formatUsd(micros: number) { return `$${(micros / 1_000_000).toFixed(2)} USD`; }
 
 export const billingEnabled = () => Boolean(config().BILLING_ENABLED && config().STRIPE_SECRET_KEY && config().STRIPE_WEBHOOK_SECRET);
 export function stripeClient() {

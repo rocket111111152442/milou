@@ -7,7 +7,7 @@ import { actorOf } from "../app.js";
 import { config, providerConfigured } from "../config.js";
 import { db, schema } from "../db/client.js";
 import { AppError } from "../lib/audit.js";
-import { apiCreditBalance, billingEnabled, checkoutFor, creditTopupFor, grantTopupFromSession, stripeClient, subscriptionFor, refreshSubscription } from "../billing/service.js";
+import { apiCreditBalance, billingEnabled, checkoutFor, creditTopupFor, grantTopupFromSession, stripeClient, subscriptionFor, refreshSubscription, upgradeSubscriptionFor } from "../billing/service.js";
 
 export async function billingRoutes(app: FastifyInstance) {
   app.get("/api/public/status", async () => ({ billingEnabled: billingEnabled(), offers: OFFERS, services: { ai: providerConfigured("openai"), voice: providerConfigured("openai"), google: providerConfigured("google"), microsoft: providerConfigured("microsoft"), automationApi: true } }));
@@ -25,6 +25,10 @@ export async function billingRoutes(app: FastifyInstance) {
   app.post("/api/billing/checkout", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (req) => {
     const { plan, requestId } = z.object({ plan: z.enum(PLAN_IDS), requestId: z.string().uuid() }).parse(req.body);
     return checkoutFor(actorOf(req), plan, requestId);
+  });
+  app.post("/api/billing/upgrade", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (req) => {
+    const { plan, requestId } = z.object({ plan: z.enum(PLAN_IDS), requestId: z.string().uuid() }).parse(req.body);
+    return upgradeSubscriptionFor(actorOf(req), plan, requestId);
   });
   app.post("/api/billing/topup-checkout", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (req) => {
     const { euros, requestId } = z.object({ euros: z.union([z.literal(20), z.literal(50), z.literal(100)]), requestId: z.string().uuid() }).parse(req.body);
