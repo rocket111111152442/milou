@@ -684,9 +684,10 @@ const BUDGET_Q = {
   en: "To find your ideal property, what is your maximum budget?",
   fr: "Pour trouver ta propriété idéale, quel est ton budget maximum ?",
 } as const;
-const MENTIONS_BUDGET = /presupuesto|budget|cu[aá]nto (quieres|deseas|puedes) (invertir|pagar|gastar)|how much .* (spend|invest|pay)/i;
-/** True only when a sentence actually ASKS for the budget (mentioning it in passing does not count). */
-const asksBudget = (t: string) => t.split(/(?<=[.!?\n])/).some((sentence) => sentence.includes("?") && MENTIONS_BUDGET.test(sentence));
+// Phrasings that actually ASK the visitor for their budget (a passing mention of "presupuesto" does not count).
+const ASKS_BUDGET =
+  /(cu[aá]l|qu[eé]) (es |ser[ií]a )?(tu|su) presupuesto|presupuesto m[aá]ximo|(tu|su) presupuesto\s*\?|cu[aá]nto (quieres|deseas|puedes|piensas|planeas) (invertir|pagar|gastar)|what('?s| is| would be) your (maximum |max |total )?budget|your (maximum |max )?budget\s*\?|how much (do|would|can|are) you (want|plan|willing|looking)|quel (est|serait) (ton|votre) budget|(ton|votre) budget (maximum|max)/i;
+const asksBudget = (t: string) => t.split(/(?<=[.!?\n])/).some((sentence) => sentence.includes("?") && ASKS_BUDGET.test(sentence));
 
 /**
  * Funnel guard (Elvyn): once the type of property is known, the budget must be asked. If the visitor

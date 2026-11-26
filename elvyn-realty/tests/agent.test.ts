@@ -284,6 +284,8 @@ describe("funnel: budget question", () => {
     expect(ensureBudgetQuestion("Ok.", ctx(), "casa en Cabrera", "Para encontrar tu propiedad ideal, ¿cuál es tu presupuesto máximo?")).toBe("Ok.");
     // mentioning the budget in passing is not asking for it
     expect(ensureBudgetQuestion("Puedo filtrar por piscina, vista o presupuesto.", ctx(), "casa de 4 habitaciones en Cabrera", "")).toMatch(/¿cuál es tu presupuesto máximo\?/);
+    expect(ensureBudgetQuestion("¿Quieres que te muestre solo las opciones de presupuesto más bajo?", ctx(), "casa de 4 habitaciones en Cabrera", "")).toMatch(/¿cuál es tu presupuesto máximo\?/);
+    expect(ensureBudgetQuestion("Ok.", ctx(), "que tenga piscina", "¿Quieres ver opciones de presupuesto más bajo?")).toBe("Ok."); // type unknown in this message and profile
     // not before the type is known
     expect(ensureBudgetQuestion("Hola.", ctx(), "Hola", "")).toBe("Hola.");
   });
