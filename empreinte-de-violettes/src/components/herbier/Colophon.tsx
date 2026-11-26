@@ -63,11 +63,6 @@ export function Colophon({ settings, categories }: { settings: Settings; categor
                   </li>
                 ))}
                 <li>
-                  <Link href="/atelier" className="ulink">
-                    Composer un bouquet
-                  </Link>
-                </li>
-                <li>
                   <Link href="/livraison" className="ulink">
                     Livraison &amp; retrait
                   </Link>

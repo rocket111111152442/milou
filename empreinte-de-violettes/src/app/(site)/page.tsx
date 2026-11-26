@@ -56,7 +56,6 @@ export default async function HomePage() {
     plate: plateFor({ plate: c.plate, name: c.name, id: c.id }),
   }));
   rayons.push(
-    { href: "/atelier", name: "L'atelier", note: "composer son bouquet tige par tige", count: "sur mesure", image: content.manifesto.image, plate: "renoncule" },
     { href: "/mariage", name: "Mariages", note: "bouquet, cérémonie, réception", count: "sur devis", image: content.wedding.image, plate: "lys" },
   );
 

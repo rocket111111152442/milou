@@ -25,7 +25,6 @@ export type MenuData = {
 
 const NAV = [
   { href: "/boutique", label: "Boutique" },
-  { href: "/atelier", label: "Atelier" },
   { href: "/mariage", label: "Mariages" },
 ];
 

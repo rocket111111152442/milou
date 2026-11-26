@@ -50,8 +50,6 @@ export function Bloom({ progress, start }: { progress: MotionValue<number>; star
 
   return (
     <div className="pointer-events-none absolute inset-0" aria-hidden>
-      {/* napperons de dentelle, derrière les fleurs */}
-      <Lace progress={progress} start={start} />
       {FLOWERS.map((f, i) => (
         <Flower key={f[0]} f={f} i={i} sx={sx} sy={sy} progress={progress} start={start} />
       ))}
@@ -97,35 +95,3 @@ function Flower({ f, i, sx, sy, progress, start }: { f: Flower; i: number; sx: M
     </motion.div>
   );
 }
-
-function Lace({ progress, start }: { progress: MotionValue<number>; start: number }) {
-  const s = useTransform(progress, [0, 1], [1, 1.35]);
-  const DOILIES: [string, string, number, number][] = [
-    // [position, taille, vitesse de rotation (s/tour), délai]
-    ["inset-0 flex items-center justify-center", "", 160, 0.2],
-    ["-left-[12vw] -top-[14vh]", "w-[46vw] min-w-[260px]", 120, 0.5],
-    ["-right-[14vw] -bottom-[18vh]", "w-[50vw] min-w-[280px]", 140, 0.7],
-  ];
-  return (
-    <>
-      {DOILIES.map(([pos, size, speed, d], i) => (
-        <motion.div key={i} className={`absolute ${pos} ${size}`} style={{ scale: s }}>
-          {i === 0 ? (
-            <motion.div className="w-[min(112vw,1050px)] -translate-y-[3vh]" initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 0.85, scale: 1 }} transition={{ duration: 2, delay: start + d, ease: [0.16, 1, 0.3, 1] }}>
-              <motion.div className="will-change-transform" animate={{ rotate: 360 }} transition={{ duration: speed, repeat: Infinity, ease: "linear" }}>
-                <img src="/planches/tinted/dentelle-grande.webp" alt="" draggable={false} className="block w-full select-none" />
-              </motion.div>
-            </motion.div>
-          ) : (
-          <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: i === 0 ? 0.9 : 0.75, scale: 1 }} transition={{ duration: 2, delay: start + d, ease: [0.16, 1, 0.3, 1] }}>
-            <motion.div className="will-change-transform" animate={{ rotate: i % 2 ? -360 : 360 }} transition={{ duration: speed, repeat: Infinity, ease: "linear" }}>
-              <img src="/planches/tinted/dentelle.webp" alt="" draggable={false} className="block w-full select-none" />
-            </motion.div>
-          </motion.div>
-          )}
-        </motion.div>
-      ))}
-    </>
-  );
-}
-

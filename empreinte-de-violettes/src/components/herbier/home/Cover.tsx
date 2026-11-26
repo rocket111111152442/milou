@@ -88,9 +88,6 @@ export function Cover({ introEnabled, oncePerSession, coords, founded, tagline, 
               <Link href="/boutique" className="btn-line">
                 {cta} <span className="arrow">→</span>
               </Link>
-              <Link href="/atelier" className="ulink font-text text-[1rem] italic text-ink-soft">
-                ou composer votre bouquet
-              </Link>
             </div>
           </motion.div>
         )}

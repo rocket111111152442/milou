@@ -34,7 +34,6 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const menu: MenuData = {
     links: [
       { href: "/boutique", label: "La boutique", note: "bouquets, plantes, séchées", plate: "bouquet-ancien" },
-      { href: "/atelier", label: "L'atelier", note: "composer tige par tige", plate: "renoncule" },
       { href: "/mariage", label: "Mariages", note: "sur rendez-vous", plate: "lys" },
       { href: "/deuil", label: "Deuil & hommage", note: "livré aux funérariums", plate: "anemone-lys" },
       { href: "/la-maison", label: "La Maison", note: "depuis 2022", plate: "violette" },
