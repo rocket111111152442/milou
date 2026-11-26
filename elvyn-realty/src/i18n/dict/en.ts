@@ -397,7 +397,7 @@ const en: Dict = {
     placeholder: "Type your message…",
     send: "Send",
     intro:
-      "Hello, I'm the virtual assistant of Elvyn Arnaud Realty Group. I can help you search for properties, answer general questions and pass your request on to Elvyn. What are you looking for?",
+      "Hi, I'm the virtual assistant of Elvyn Arnaud Realty (DRSPACE Finders EIRL). To help you, I'll ask for some contact details and what kind of property you're looking for. We use them only to send you information and follow up on your request, under our Privacy Policy: elvynarnaudrealty.com/privacidad. By continuing, you accept this use. You can ask us to correct or delete your data anytime at elvyn@drspacefinders.com. How can I help you today?",
     introProperty: (t: string) => `Hello, I'm the virtual assistant of Elvyn Arnaud Realty Group. What would you like to know about "${t}"?`,
     notice:
       "AI-powered assistant: it can make mistakes. Elvyn confirms prices and availability. Do not share documents, bank details or passwords.",
@@ -412,6 +412,7 @@ const en: Dict = {
     browse: "Browse the catalogue",
     handoffTitle: "Send your request to Elvyn",
     handoffText: "Check your details. They will only be sent if you press “Send to Elvyn”.",
+    promotions: "I agree to receive news and promotions from Elvyn Arnaud Realty (optional).",
     handoffSend: "Send to Elvyn",
     searchDone: "I've taken note of your request and will be sending you options that match it.",
     handoffDone: "Done: your request has been recorded. Elvyn will contact you personally.",

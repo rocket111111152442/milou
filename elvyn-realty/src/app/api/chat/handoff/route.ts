@@ -18,6 +18,7 @@ const body = z.object({
   phone: z.string().trim().max(40).optional().nullable(),
   country: z.string().trim().max(80).optional().nullable(),
   consent: z.literal(true),
+  promotions: z.boolean().optional(),
   visit: z.object({ type: z.enum(["physical", "virtual"]), timezone: z.string().max(60), slots: z.array(z.string().trim().min(3).max(80)).min(1).max(3) }).optional().nullable(),
 });
 
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
     howFound: p.how_found ?? null,
     criteria: criteriaFrom(p),
     reason: state.handoff.reason,
-    summary: `${state.handoff.summary}${state.handoff.nextStep ? `\nPróximo paso: ${state.handoff.nextStep}` : ""}`,
+    summary: `${state.handoff.summary}${state.handoff.nextStep ? `\nPróximo paso: ${state.handoff.nextStep}` : ""}\nAcepta promociones: ${b.data.promotions ? "Sí" : "No"}\nCanal: Web`,
     property,
     visit: b.data.visit ?? null,
     consent: true,

@@ -467,7 +467,7 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
         const shown: string[] = [];
         const rejected: string[] = [];
         const wrongType: string[] = [];
-        for (const it of items.slice(0, 4)) {
+        for (const it of items.slice(0, 3)) {
           const l = ctx.seenSlugs.has(it.slug) ? inv.find((x) => x.slug === it.slug) : undefined;
           if (!l) {
             rejected.push(it.slug);
@@ -570,7 +570,7 @@ export async function ensureCards(ctx: ToolContext, text: string): Promise<void>
   if (ctx.cards.length || !text) return;
   const inv = await getInventory().catch(() => []);
   if (ctx.lastSearch?.length) {
-    for (const slug of ctx.lastSearch.slice(0, 4)) {
+    for (const slug of ctx.lastSearch.slice(0, 3)) {
       const l = inv.find((x) => x.slug === slug);
       if (l && matchesRequestedType(l, ctx)) ctx.cards.push(toCard(l, ctx.lang, ""));
     }

@@ -395,7 +395,7 @@ const es = {
     placeholder: "Escribe tu mensaje…",
     send: "Enviar",
     intro:
-      "Hola, soy el asistente virtual de Elvyn Arnaud Realty Group. Puedo ayudarte a buscar propiedades, responder preguntas generales y pasar tu solicitud a Elvyn. ¿Qué estás buscando?",
+      "Hola, soy el asistente virtual de Elvyn Arnaud Realty (DRSPACE Finders EIRL). Para ayudarte, te pediré algunos datos de contacto y sobre la propiedad que buscas. Los usamos solo para darte información y dar seguimiento a tu solicitud, según nuestra Política de Privacidad: elvynarnaudrealty.com/privacidad. Al continuar, aceptas este uso. Puedes pedir que corrijamos o borremos tus datos cuando quieras escribiendo a elvyn@drspacefinders.com. ¿En qué te puedo ayudar hoy?",
     introProperty: (t: string) => `Hola, soy el asistente virtual de Elvyn Arnaud Realty Group. ¿Qué te gustaría saber sobre «${t}»?`,
     notice:
       "Asistente con inteligencia artificial: puede equivocarse. Precios y disponibilidad los confirma Elvyn. No compartas documentos, datos bancarios ni contraseñas.",
@@ -410,6 +410,7 @@ const es = {
     browse: "Ver el catálogo",
     handoffTitle: "Enviar tu solicitud a Elvyn",
     handoffText: "Revisa tus datos. Solo se enviarán si pulsas «Enviar a Elvyn».",
+    promotions: "Acepto recibir novedades y promociones de Elvyn Arnaud Realty (opcional).",
     handoffSend: "Enviar a Elvyn",
     searchDone: "He tomado nota de tu solicitud y te estaré enviando opciones referentes a tu solicitud.",
     handoffDone: "Listo: tu solicitud quedó registrada. Elvyn te contactará personalmente.",

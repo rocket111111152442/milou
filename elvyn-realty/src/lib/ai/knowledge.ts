@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /** Version of data/knowledge/base-conocimiento.md (date of the source document). */
-export const KNOWLEDGE_VERSION = "2026-11-23";
+export const KNOWLEDGE_VERSION = "2026-11-26";
 
 let cached: string | null = null;
 export function knowledgeBase(): string {

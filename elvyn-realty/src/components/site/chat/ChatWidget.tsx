@@ -98,6 +98,7 @@ function HandoffCard({ lang, h, prefill, onDone }: { lang: Lang; h: HandoffView;
         email: g("email") || null,
         country: g("country") || null,
         consent: true,
+        promotions: Boolean(fd.get("promotions")),
         visit: h.includeVisitForm ? { type: g("visitType") || "physical", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, slots } : null,
       }),
     }).catch(() => null);
@@ -158,6 +159,10 @@ function HandoffCard({ lang, h, prefill, onDone }: { lang: Lang; h: HandoffView;
       <label className="flex items-start gap-2 text-[11px] leading-snug text-ink-muted">
         <input type="checkbox" name="consent" className="mt-0.5 h-4 w-4 shrink-0 accent-[#EB6500]" />
         <span>{t.forms.consent} <Link href={href(lang, "privacy")} className="underline">{t.footer.privacy}</Link></span>
+      </label>
+      <label className="flex items-start gap-2 text-[11px] leading-snug text-ink-muted">
+        <input type="checkbox" name="promotions" className="mt-0.5 h-4 w-4 shrink-0 accent-[#EB6500]" />
+        <span>{t.chat.promotions}</span>
       </label>
       <div className="flex flex-wrap gap-2">
         <button type="submit" className="btn-primary min-h-[40px] px-4" disabled={state === "sending"}>{state === "sending" ? t.forms.sending : t.chat.handoffSend}</button>

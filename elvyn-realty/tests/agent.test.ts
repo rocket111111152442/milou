@@ -172,7 +172,7 @@ describe("hand-off, visits and safety", () => {
     const inv = await loadDemoDetails();
     const ctx = { lang: "en" as const, pageSlug: null, profile: {}, seenSlugs: new Set<string>(), handoff: null, cards: [] as never[], executed: new Map(), lastSearch: inv.slice(0, 5).map((l) => l.slug) };
     await ensureCards(ctx, "Here are some options");
-    expect((ctx.cards as { slug: string }[]).map((c) => c.slug)).toEqual(inv.slice(0, 4).map((l) => l.slug));
+    expect((ctx.cards as { slug: string }[]).map((c) => c.slug)).toEqual(inv.slice(0, 3).map((l) => l.slug));
   });
 
   it("exposes no tool that can read prospects, notes or other conversations", async () => {
