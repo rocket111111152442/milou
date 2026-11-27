@@ -5,7 +5,8 @@ import { href, type Lang } from "@/i18n/config";
 import { getDict } from "@/i18n/dictionaries";
 import { site, whatsappLink } from "@/config/site";
 import { AeImage } from "../AeImage";
-import { IconChat, IconClose, IconPhone, IconSend, IconWhatsApp, IconBed, IconBath, IconArea, IconPin } from "../Icons";
+import { RealtyAvatar } from "./RealtyAvatar";
+import { IconClose, IconPhone, IconSend, IconWhatsApp, IconBed, IconBath, IconArea, IconPin } from "../Icons";
 import type { ChatPageContext } from "./PageContext";
 
 interface Card {
@@ -279,17 +280,21 @@ export function ChatWidget({ lang, enabled }: { lang: Lang; enabled: boolean }) 
           ref={buttonRef}
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-4 right-4 z-40 inline-flex h-14 w-14 items-center justify-center gap-2 rounded-full bg-navy sm:w-auto sm:pl-4 sm:pr-5 text-sm font-semibold text-white shadow-lift transition-transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 sm:bottom-6 sm:right-6 [body.has-actionbar_&]:bottom-[84px] lg:[body.has-actionbar_&]:bottom-6"
+          className="group fixed bottom-4 right-4 z-40 inline-flex h-16 w-16 items-center justify-center gap-2 rounded-full bg-navy text-sm font-semibold text-white shadow-lift transition-transform hover:-translate-y-1 motion-reduce:hover:translate-y-0 sm:bottom-6 sm:right-6 sm:h-14 sm:w-auto sm:pl-1.5 sm:pr-5 [body.has-actionbar_&]:bottom-[84px] lg:[body.has-actionbar_&]:bottom-6"
           aria-haspopup="dialog"
+          aria-label={t.open}
         >
-          <IconChat size={22} />
-          <span className="sr-only sm:not-sr-only">{t.title}</span>
+          <span className="relative inline-flex">
+            <RealtyAvatar size={46} ring className="transition-transform duration-300 group-hover:rotate-[-6deg] group-hover:scale-110" />
+            <span aria-hidden className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-navy bg-emerald-400" />
+          </span>
+          <span className="sr-only sm:not-sr-only">{t.launcher}</span>
         </button>
       )}
       {open && (
         <div role="dialog" aria-modal="false" aria-labelledby="chat-title" className="fixed inset-0 z-[55] flex flex-col bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(680px,calc(100vh-48px))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-navy-100 sm:shadow-lift">
           <div className="flex items-center gap-3 border-b border-navy-100 bg-navy px-4 py-3 text-white sm:rounded-t-2xl">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand"><IconChat size={18} /></span>
+            <RealtyAvatar size={42} ring />
             <div className="min-w-0 flex-1">
               <h2 id="chat-title" className="text-sm font-semibold text-white">{t.title}</h2>
               <p className="truncate text-xs text-navy-100">{t.subtitle}</p>
@@ -319,7 +324,12 @@ export function ChatWidget({ lang, enabled }: { lang: Lang; enabled: boolean }) 
                 <div key={i} className="ml-auto max-w-[85%] whitespace-pre-line rounded-2xl rounded-tr-md bg-navy px-3.5 py-2.5 text-[14px] leading-relaxed text-white">{m.text}</div>
               ) : m.role === "assistant" ? (
                 <div key={i} className="max-w-[92%]">
-                  {m.text && <div className="rounded-2xl rounded-tl-md bg-navy-50 px-3.5 py-2.5 text-[14px] leading-relaxed text-ink"><RichText text={m.text} /></div>}
+                  {m.text && (
+                    <div className="flex items-start gap-2">
+                      <RealtyAvatar size={28} className="mt-0.5 shrink-0" />
+                      <div className="min-w-0 rounded-2xl rounded-tl-md bg-navy-50 px-3.5 py-2.5 text-[14px] leading-relaxed text-ink"><RichText text={m.text} /></div>
+                    </div>
+                  )}
                   {m.cards && m.cards.length > 0 && <ul className="mt-2 space-y-2">{m.cards.map((c) => <PropertyCard key={c.slug} c={c} why={t.cardWhy} />)}</ul>}
                   {m.handoff && m.handoff.status !== "sent" && i === lastCardIndex && (
                     <HandoffCard

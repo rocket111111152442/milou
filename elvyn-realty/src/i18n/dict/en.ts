@@ -366,7 +366,7 @@ const en: Dict = {
   },
   privacy: {
     title: "Privacy and use of data",
-    updated: "Last updated: 24/11/2026",
+    updated: "In force since 27/11/2026",
   },
   footer: {
     about: "Real estate firm based in Cabrera, María Trinidad Sánchez, specialised in the Cabrera – Río San Juan corridor.",
@@ -389,16 +389,17 @@ const en: Dict = {
   },
   chat: {
     open: "Open the assistant",
-    title: "AI assistant",
-    subtitle: "Elvyn Arnaud Realty Group",
+    title: "Realty",
+    launcher: "Chat with Realty",
+    subtitle: "Virtual assistant · Elvyn Arnaud Realty",
     close: "Close the assistant",
     minimize: "Minimise",
     newChat: "New conversation",
     placeholder: "Type your message…",
     send: "Send",
     intro:
-      "Hi, I'm the virtual assistant of Elvyn Arnaud Realty (DRSPACE Finders EIRL). To help you, I'll ask for some contact details and what kind of property you're looking for. We use them only to send you information and follow up on your request, under our Privacy Policy: elvynarnaudrealty.com/privacidad. By continuing, you accept this use. You can ask us to correct or delete your data anytime at elvyn@drspacefinders.com. How can I help you today?",
-    introProperty: (t: string) => `Hello, I'm the virtual assistant of Elvyn Arnaud Realty Group. What would you like to know about "${t}"?`,
+      "Hi, I'm Realty, the virtual assistant of Elvyn Arnaud Realty (DRSPACE Finders EIRL). To help you, I'll ask for some contact details and what kind of property you're looking for. We use them only to send you information and follow up on your request, under our Privacy Policy: elvynarnaudrealty.com/privacidad. By continuing, you accept this use. You can ask us to correct or delete your data anytime at elvyn@drspacefinders.com. How can I help you today?",
+    introProperty: (t: string) => `Hi, I'm Realty, the virtual assistant of Elvyn Arnaud Realty. What would you like to know about "${t}"?`,
     notice:
       "AI-powered assistant: it can make mistakes. Elvyn confirms prices and availability. Do not share documents, bank details or passwords.",
     privacyLink: "Privacy",

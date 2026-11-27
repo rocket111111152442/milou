@@ -364,7 +364,7 @@ const es = {
   },
   privacy: {
     title: "Privacidad y uso de datos",
-    updated: "Última actualización: 24/11/2026",
+    updated: "Vigente desde el 27/11/2026",
   },
   footer: {
     about: "Firma inmobiliaria de Cabrera, María Trinidad Sánchez, especializada en el corredor Cabrera – Río San Juan.",
@@ -387,16 +387,17 @@ const es = {
   },
   chat: {
     open: "Abrir el asistente",
-    title: "Asistente IA",
-    subtitle: "Elvyn Arnaud Realty Group",
+    title: "Realty",
+    launcher: "Habla con Realty",
+    subtitle: "Asistente virtual · Elvyn Arnaud Realty",
     close: "Cerrar el asistente",
     minimize: "Minimizar",
     newChat: "Nueva conversación",
     placeholder: "Escribe tu mensaje…",
     send: "Enviar",
     intro:
-      "Hola, soy el asistente virtual de Elvyn Arnaud Realty (DRSPACE Finders EIRL). Para ayudarte, te pediré algunos datos de contacto y sobre la propiedad que buscas. Los usamos solo para darte información y dar seguimiento a tu solicitud, según nuestra Política de Privacidad: elvynarnaudrealty.com/privacidad. Al continuar, aceptas este uso. Puedes pedir que corrijamos o borremos tus datos cuando quieras escribiendo a elvyn@drspacefinders.com. ¿En qué te puedo ayudar hoy?",
-    introProperty: (t: string) => `Hola, soy el asistente virtual de Elvyn Arnaud Realty Group. ¿Qué te gustaría saber sobre «${t}»?`,
+      "Hola, soy Realty, el asistente virtual de Elvyn Arnaud Realty (DRSPACE Finders EIRL). Para ayudarte, te pediré algunos datos de contacto y sobre la propiedad que buscas. Los usamos solo para darte información y dar seguimiento a tu solicitud, según nuestra Política de Privacidad: elvynarnaudrealty.com/privacidad. Al continuar, aceptas este uso. Puedes pedir que corrijamos o borremos tus datos cuando quieras escribiendo a elvyn@drspacefinders.com. ¿En qué te puedo ayudar hoy?",
+    introProperty: (t: string) => `Hola, soy Realty, el asistente virtual de Elvyn Arnaud Realty. ¿Qué te gustaría saber sobre «${t}»?`,
     notice:
       "Asistente con inteligencia artificial: puede equivocarse. Precios y disponibilidad los confirma Elvyn. No compartas documentos, datos bancarios ni contraseñas.",
     privacyLink: "Privacidad",
