@@ -32,38 +32,38 @@ export function HeroSearch({ lang, types, cities }: { lang: Lang; types: FacetOp
       <div className="rounded-[1.35rem] bg-white p-3 sm:p-4">
       <fieldset>
         <legend className="sr-only">{t.operation}</legend>
-        <div className="mb-3 inline-flex rounded-full bg-navy-50 p-1">
+        <div className="mb-2.5 inline-flex rounded-full bg-navy-50 p-1 sm:mb-3">
           {(["venta", "alquiler"] as const).map((v) => (
             <label key={v} className="relative">
               <input type="radio" name="op" value={v} checked={op === v} onChange={() => setOp(v)} className="peer sr-only" />
-              <span className="inline-flex min-h-[40px] cursor-pointer items-center rounded-full px-5 text-sm font-semibold text-navy-700 transition-all duration-300 peer-checked:bg-navy peer-checked:text-white peer-checked:shadow-md peer-focus-visible:ring-2 peer-focus-visible:ring-brand">
+              <span className="inline-flex min-h-[36px] cursor-pointer items-center rounded-full px-4 text-sm sm:min-h-[40px] sm:px-5 font-semibold text-navy-700 transition-all duration-300 peer-checked:bg-navy peer-checked:text-white peer-checked:shadow-md peer-focus-visible:ring-2 peer-focus-visible:ring-brand">
                 {v === "venta" ? t.buy : t.rent}
               </span>
             </label>
           ))}
         </div>
       </fieldset>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-[1fr_1fr_1fr_auto]">
         <div>
-          <label htmlFor="hs-type" className="field-label">{t.type}</label>
+          <label htmlFor="hs-type" className="field-label text-xs sm:text-sm">{t.type}</label>
           <select id="hs-type" className="field" value={tipo} onChange={(e) => setTipo(e.target.value)}>
             <option value="">{t.anyType}</option>
             {types.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <div>
-          <label htmlFor="hs-city" className="field-label">{t.city}</label>
+          <label htmlFor="hs-city" className="field-label text-xs sm:text-sm">{t.city}</label>
           <select id="hs-city" className="field" value={ciudad} onChange={(e) => setCiudad(e.target.value)}>
             <option value="">{t.anyCity}</option>
             {cities.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
-        <div>
+        <div className="hidden sm:block">
           <label htmlFor="hs-max" className="field-label">{t.budget} (USD)</label>
           <input id="hs-max" className="field" inputMode="numeric" placeholder="200000" value={max} onChange={(e) => setMax(e.target.value.replace(/[^\d]/g, ""))} />
         </div>
-        <div className="flex items-end">
-          <button type="submit" className="btn-primary group h-[46px] w-full px-7 lg:w-auto"><IconSearch size={18} className="transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" /> {t.submit}</button>
+        <div className="col-span-2 flex items-end sm:col-span-1">
+          <button type="submit" className="btn-primary group h-12 w-full px-7 lg:h-[46px] lg:w-auto"><IconSearch size={18} className="transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" /> {t.submit}</button>
         </div>
       </div>
       </div>

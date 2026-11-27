@@ -49,7 +49,7 @@ export async function CatalogView({ lang, filters, title, intro }: { lang: Lang;
         <p className="mt-2 text-ink-muted">{intro}</p>
       </header>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[300px_1fr]">
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[300px_1fr]">
         <FiltersPanel lang={lang} filters={filters} types={types} cities={cities} resultCount={result?.count ?? null} />
 
         <section aria-labelledby="results-heading">
@@ -93,9 +93,9 @@ export async function CatalogView({ lang, filters, title, intro }: { lang: Lang;
             </div>
           ) : result ? (
             <>
-              <ul className="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              <ul className="mt-4 grid grid-cols-1 gap-3 sm:mt-6 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
                 {result.results.map((l, i) => (
-                  <li key={l.uid}><ListingCard l={l} lang={lang} preferred={filters.operation} priority={i < 2} /></li>
+                  <li key={l.uid}><ListingCard l={l} lang={lang} preferred={filters.operation} priority={i < 2} compact /></li>
                 ))}
               </ul>
               {result.totalPages > 1 && <Pagination lang={lang} filters={filters} page={result.page} total={result.totalPages} />}

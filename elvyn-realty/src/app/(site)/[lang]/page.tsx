@@ -75,7 +75,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         <div aria-hidden className="pointer-events-none absolute -right-32 top-24 -z-10 h-[28rem] w-[28rem] animate-blob bg-brand/25 blur-3xl motion-reduce:animate-none" />
         <div aria-hidden className="pointer-events-none absolute -left-40 bottom-10 -z-10 h-80 w-80 animate-blob bg-brand-200/10 blur-3xl [animation-delay:-6s] motion-reduce:animate-none" />
 
-        <div className="container flex flex-1 flex-col justify-center pb-16 pt-32 sm:pt-36 lg:pb-24 lg:pt-40">
+        <div className="container flex flex-1 flex-col justify-center pb-10 pt-24 sm:pb-16 sm:pt-36 lg:pb-24 lg:pt-40">
           <p className="inline-flex w-fit animate-pop-in items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-100 backdrop-blur-md sm:text-xs sm:tracking-[0.2em]">
             <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75 motion-reduce:animate-none" /><span className="relative inline-flex h-2 w-2 rounded-full bg-brand" /></span>
             {t.home.eyebrow}
@@ -107,7 +107,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
 
       {/* Quick access + counters */}
       <section id="descubrir" className="relative bg-sand" aria-labelledby="quick-title">
-        <div className="container py-16 sm:py-24">
+        <div className="container py-10 sm:py-24">
           <div className="grid gap-12 lg:grid-cols-[1fr_1.4fr] lg:items-center">
             <div data-reveal="left">
               <p className="eyebrow">{lang === "es" ? "Empieza aquí" : "Start here"}</p>
@@ -127,11 +127,11 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             <ul className="grid grid-cols-2 gap-3 sm:gap-5">
               {quick.map(({ href: h, Icon, title, text }, i) => (
                 <li key={title} data-reveal style={{ ["--d" as string]: `${i * 110}ms` }}>
-                  <Link href={h} className="group relative flex h-full flex-col overflow-hidden rounded-3xl border border-navy-100 bg-white p-5 transition-all duration-500 hover:-translate-y-1.5 hover:border-transparent hover:shadow-lift sm:p-7">
+                  <Link href={h} className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-navy-100 bg-white p-3.5 transition-all sm:rounded-3xl duration-500 hover:-translate-y-1.5 hover:border-transparent hover:shadow-lift sm:p-7">
                     <span aria-hidden className="absolute inset-0 -z-0 origin-bottom scale-y-0 bg-navy transition-transform duration-500 ease-out group-hover:scale-y-100" />
-                    <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 transition-all duration-500 group-hover:rotate-[-8deg] group-hover:scale-110 group-hover:bg-brand group-hover:text-white"><Icon size={24} /></span>
-                    <span className="relative mt-5 flex items-center gap-1.5 font-display text-xl font-semibold text-navy transition-colors duration-500 group-hover:text-white">{title}<IconArrowRight size={18} className="transition-transform duration-500 group-hover:translate-x-1.5" /></span>
-                    <span className="relative mt-1.5 text-sm leading-snug text-ink-muted transition-colors duration-500 group-hover:text-navy-100">{text}</span>
+                    <span className="relative inline-flex h-10 w-10 items-center sm:h-12 sm:w-12 justify-center rounded-2xl bg-brand-50 text-brand-600 transition-all duration-500 group-hover:rotate-[-8deg] group-hover:scale-110 group-hover:bg-brand group-hover:text-white"><Icon size={24} /></span>
+                    <span className="relative mt-3 flex items-center gap-1.5 font-display text-base font-semibold sm:mt-5 sm:text-xl text-navy transition-colors duration-500 group-hover:text-white">{title}<IconArrowRight size={18} className="transition-transform duration-500 group-hover:translate-x-1.5" /></span>
+                    <span className="relative mt-1.5 hidden text-sm leading-snug text-ink-muted sm:block transition-colors duration-500 group-hover:text-navy-100">{text}</span>
                   </Link>
                 </li>
               ))}
@@ -141,7 +141,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       </section>
 
       {/* Selection */}
-      <section className="container py-20 sm:py-28" aria-labelledby="featured-title">
+      <section className="container py-12 sm:py-28" aria-labelledby="featured-title">
         <div className="flex flex-wrap items-end justify-between gap-6" data-reveal>
           <div className="max-w-2xl">
             <p className="eyebrow">{lang === "es" ? "Selección" : "Selection"}</p>
@@ -158,9 +158,9 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             <p className="mt-1 text-sm">{t.search.errorText}</p>
           </div>
         ) : (
-          <ul className="mt-12 grid gap-7 sm:grid-cols-2 lg:grid-cols-3 lg:pb-10">
+          <ul className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 [scrollbar-width:none] sm:mx-0 sm:mt-12 sm:grid sm:grid-cols-2 sm:gap-7 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3 lg:pb-10 [&::-webkit-scrollbar]:hidden">
             {highlights?.items.map((l, i) => (
-              <li key={l.uid} data-reveal style={{ ["--d" as string]: `${(i % 3) * 120}ms` }}>
+              <li key={l.uid} data-reveal style={{ ["--d" as string]: `${(i % 3) * 120}ms` }} className="w-[78vw] max-w-[340px] shrink-0 snap-start sm:w-auto sm:max-w-none">
                 <div className={i % 3 === 1 ? "h-full lg:translate-y-10" : "h-full"}><ListingCard l={l} lang={lang} priority={i < 3} /></div>
               </li>
             ))}
@@ -172,9 +172,9 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       {facets && facets.cities.length > 0 && <Zones lang={lang} facets={facets} inventory={inventory} />}
 
       {/* About */}
-      <section className="relative overflow-hidden py-20 sm:py-28" aria-labelledby="about-title">
+      <section className="relative overflow-hidden py-12 sm:py-28" aria-labelledby="about-title">
         <div className="container grid items-center gap-14 lg:grid-cols-[0.95fr_1.05fr] lg:gap-20">
-          <div className="relative mx-auto w-full max-w-md" data-reveal="zoom">
+          <div className="relative mx-auto w-full max-w-[16rem] sm:max-w-md" data-reveal="zoom">
             <div aria-hidden className="absolute -inset-6 -z-10 animate-spin-slow rounded-full border-2 border-dashed border-brand/40 motion-reduce:animate-none" />
             <div aria-hidden className="absolute -bottom-8 -left-8 -z-10 h-40 w-40 animate-blob bg-brand/20 motion-reduce:animate-none" />
             <div className="overflow-hidden rounded-[2.5rem] shadow-lift">
@@ -188,16 +188,16 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           <div>
             <p className="eyebrow" data-reveal>{t.home.aboutEyebrow}</p>
             <h2 id="about-title" className="mt-3 font-display text-4xl font-semibold leading-tight sm:text-5xl" data-reveal style={{ ["--d" as string]: "80ms" }}>{t.home.aboutTitle}</h2>
-            <p className="mt-6 text-lg leading-relaxed text-ink-muted" data-reveal style={{ ["--d" as string]: "160ms" }}>{t.home.aboutText}</p>
-            <blockquote className="relative mt-8 rounded-3xl bg-navy p-7 font-display text-xl italic leading-relaxed text-white sm:text-2xl" data-reveal style={{ ["--d" as string]: "240ms" }}>
+            <p className="mt-4 text-base leading-relaxed text-ink-muted sm:mt-6 sm:text-lg" data-reveal style={{ ["--d" as string]: "160ms" }}>{t.home.aboutText}</p>
+            <blockquote className="relative mt-8 rounded-3xl bg-navy p-5 font-display text-lg italic sm:p-7 sm:text-xl leading-relaxed text-white sm:text-2xl" data-reveal style={{ ["--d" as string]: "240ms" }}>
               <span aria-hidden className="absolute -top-6 left-6 font-display text-7xl leading-none text-brand">“</span>
               {site.quote[lang]}
             </blockquote>
-            <ul className="mt-8 grid gap-3 sm:grid-cols-3">
+            <ul className="mt-6 grid gap-2 sm:mt-8 sm:grid-cols-3 sm:gap-3">
               {t.home.trust.map((x, i) => (
-                <li key={x.title} data-reveal style={{ ["--d" as string]: `${300 + i * 100}ms` }} className="rounded-2xl border border-navy-100 p-4 transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-card">
+                <li key={x.title} data-reveal style={{ ["--d" as string]: `${300 + i * 100}ms` }} className="rounded-2xl border border-navy-100 p-3 transition-all duration-300 hover:-translate-y-1 sm:p-4 hover:border-brand/40 hover:shadow-card">
                   <p className="flex items-center gap-2 text-sm font-semibold text-navy"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand text-white"><IconCheck size={14} /></span> {x.title}</p>
-                  <p className="mt-2 text-sm leading-snug text-ink-muted">{x.text}</p>
+                  <p className="mt-2 hidden text-sm leading-snug text-ink-muted sm:block">{x.text}</p>
                 </li>
               ))}
             </ul>
@@ -220,18 +220,18 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               <Link href={href(lang, "services")} className="btn-glass group">{t.nav.services} <IconArrowRight size={16} className="transition-transform group-hover:translate-x-1" /></Link>
             </div>
           </div>
-          <ul className="mt-14 grid gap-px overflow-hidden rounded-3xl border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-white/10 bg-white/10 sm:mt-14 lg:grid-cols-3">
             {t.services.list.map((s, i) => {
               const Icon = serviceIcons[i % serviceIcons.length];
               return (
-                <li key={s.title} data-reveal style={{ ["--d" as string]: `${(i % 3) * 100}ms` }} className="group relative bg-navy-900 p-7 transition-colors duration-500 hover:bg-navy-800 sm:p-8">
+                <li key={s.title} data-reveal style={{ ["--d" as string]: `${(i % 3) * 100}ms` }} className="group relative bg-navy-900 p-4 transition-colors duration-500 hover:bg-navy-800 sm:p-8">
                   <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-brand transition-transform duration-500 group-hover:scale-x-100" />
                   <div className="flex items-start justify-between">
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-brand-200 transition-all duration-500 group-hover:scale-110 group-hover:bg-brand group-hover:text-white"><Icon size={24} /></span>
-                    <span className="font-display text-4xl font-semibold text-white/10 transition-colors duration-500 group-hover:text-brand/60">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-brand-200 sm:h-12 sm:w-12 sm:rounded-2xl transition-all duration-500 group-hover:scale-110 group-hover:bg-brand group-hover:text-white"><Icon size={24} /></span>
+                    <span className="font-display text-2xl font-semibold text-white/10 sm:text-4xl transition-colors duration-500 group-hover:text-brand/60">{String(i + 1).padStart(2, "0")}</span>
                   </div>
-                  <h3 className="mt-6 font-display text-xl font-semibold text-white">{s.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-navy-100">{s.text}</p>
+                  <h3 className="mt-3 font-display text-base font-semibold leading-snug text-white sm:mt-6 sm:text-xl">{s.title}</h3>
+                  <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-navy-100 sm:mt-2 sm:line-clamp-none sm:text-sm">{s.text}</p>
                 </li>
               );
             })}
@@ -240,7 +240,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       </section>
 
       {/* CTA */}
-      <section className="container py-20 sm:py-28" aria-labelledby="cta-title">
+      <section className="container py-12 sm:py-28" aria-labelledby="cta-title">
         <div data-reveal="zoom" className="relative isolate overflow-hidden rounded-[2.5rem] bg-[linear-gradient(120deg,#EB6500,#C75400,#A04300,#EB6500)] bg-[length:300%_300%] px-6 py-14 text-white animate-gradient-pan motion-reduce:animate-none sm:px-14 sm:py-20">
           <div aria-hidden className="absolute -right-20 -top-20 -z-10 h-80 w-80 animate-blob bg-white/15 motion-reduce:animate-none" />
           <div aria-hidden className="absolute -bottom-24 left-1/3 -z-10 h-72 w-72 animate-blob bg-navy/25 [animation-delay:-8s] motion-reduce:animate-none" />
@@ -265,7 +265,7 @@ function Zones({ lang, facets, inventory }: { lang: Lang; facets: Facets; invent
   const cats = facets.categories.slice(0, 8);
   const span = ["lg:col-span-2 lg:row-span-2", "", "", "", ""];
   return (
-    <section className="bg-sand py-20 sm:py-28" aria-labelledby="zones-title">
+    <section className="bg-sand py-12 sm:py-28" aria-labelledby="zones-title">
       <div className="container">
         <div className="max-w-2xl" data-reveal>
           <p className="eyebrow">{lang === "es" ? "Zonas" : "Areas"}</p>
@@ -292,10 +292,10 @@ function Zones({ lang, facets, inventory }: { lang: Lang; facets: Facets; invent
             );
           })}
         </ul>
-        <ul className="mt-8 flex flex-wrap gap-2.5" data-reveal>
+        <ul className="-mx-4 mt-6 flex gap-2.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:mt-8 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden" data-reveal>
           {cats.map((c) => (
-            <li key={c.id}>
-              <Link href={href(lang, "catalog", undefined, `tipo=${c.id}`)} className="group inline-flex min-h-[44px] items-center gap-2 rounded-full border border-navy-200 bg-white px-5 text-sm font-medium text-navy transition-all duration-300 hover:-translate-y-0.5 hover:border-navy hover:bg-navy hover:text-white">
+            <li key={c.id} className="shrink-0">
+              <Link href={href(lang, "catalog", undefined, `tipo=${c.id}`)} className="group inline-flex min-h-[44px] whitespace-nowrap items-center gap-2 rounded-full border border-navy-200 bg-white px-5 text-sm font-medium text-navy transition-all duration-300 hover:-translate-y-0.5 hover:border-navy hover:bg-navy hover:text-white">
                 {(lang === "en" ? c.nameEn : null) || c.name} <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs text-ink-muted transition-colors group-hover:bg-white/15 group-hover:text-white">{c.count}</span>
               </Link>
             </li>

@@ -17,17 +17,17 @@ export function Footer({ lang }: { lang: Lang }) {
   return (
     <footer className="grain relative mt-auto overflow-hidden rounded-t-[2.5rem] bg-navy-900 text-navy-100">
       <div aria-hidden className="pointer-events-none absolute -left-32 top-10 h-80 w-80 animate-blob bg-brand/15 blur-3xl motion-reduce:animate-none" />
-      <div className="container relative border-b border-white/10 py-14 sm:py-20" data-reveal>
+      <div className="container relative hidden border-b border-white/10 py-10 sm:block sm:py-20" data-reveal>
         <p className="eyebrow text-brand-200">{lang === "es" ? "¿Hablamos?" : "Let's talk"}</p>
-        <a href={`https://wa.me/${site.whatsapp}`} target="_blank" rel="noopener noreferrer" className="group mt-3 inline-flex flex-wrap items-center gap-x-5 gap-y-2 font-display text-4xl font-semibold leading-tight text-white sm:text-6xl lg:text-7xl">
+        <a href={`https://wa.me/${site.whatsapp}`} target="_blank" rel="noopener noreferrer" className="group mt-3 inline-flex flex-wrap items-center gap-x-4 gap-y-2 font-display text-3xl font-semibold leading-tight text-white sm:text-6xl lg:text-7xl">
           <span className="link-underline">{lang === "es" ? "Encuentra tu lugar en el Caribe" : "Find your place in the Caribbean"}</span>
-          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white transition-transform duration-500 group-hover:rotate-45 sm:h-20 sm:w-20">
+          <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand text-white transition-transform duration-500 group-hover:rotate-45 sm:h-20 sm:w-20">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M7 17 17 7M8 7h9v9" /></svg>
           </span>
         </a>
       </div>
-      <div className="container relative grid gap-10 py-14 md:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1.3fr]">
-        <div>
+      <div className="container relative grid grid-cols-2 gap-x-6 gap-y-8 py-10 sm:gap-10 sm:py-14 lg:grid-cols-[1.3fr_1fr_1fr_1.3fr]">
+        <div className="col-span-2 lg:col-span-1">
           <Logo variant="white" className="max-h-14" />
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-navy-200">{t.footer.about}</p>
           <ul className="mt-5 flex gap-2" aria-label={lang === "es" ? "Redes sociales" : "Social media"}>
@@ -58,7 +58,7 @@ export function Footer({ lang }: { lang: Lang }) {
             <li><Link className="link-underline hover:text-white" href={href(lang, "contact")}>{t.nav.contact}</Link></li>
           </ul>
         </nav>
-        <div>
+        <div className="col-span-2 lg:col-span-1">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-white">{t.footer.contact}</h2>
           <ul className="mt-4 space-y-3 text-sm">
             <li><a className="flex items-start gap-2.5 hover:text-white" href={`tel:${site.phone.e164}`}><IconPhone size={18} className="mt-0.5 shrink-0 text-brand-200" />{site.phone.display}</a></li>
