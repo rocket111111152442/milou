@@ -13,7 +13,8 @@ export function Header({ lang }: { lang: Lang }) {
   const pathname = usePathname() || "/";
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const overHero = false; // the bar always sits on light backgrounds
+  const isHome = pathname === "/" || pathname === "/en";
+  const overHero = isHome && !scrolled && !open;
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -68,7 +69,7 @@ export function Header({ lang }: { lang: Lang }) {
   }, [open]);
 
   return (
-    <header className={`sticky inset-x-0 top-0 z-40 transition-[padding] duration-500 ${scrolled ? "pt-2 sm:pt-3" : "pt-0 sm:pt-4"}`}>
+    <header className={`${isHome ? "fixed" : "sticky"} inset-x-0 top-0 z-40 transition-[padding] duration-500 ${scrolled ? "pt-2 sm:pt-3" : "pt-0 sm:pt-4"}`}>
       <div
         className={`mx-auto flex items-center justify-between gap-4 transition-all duration-500 ease-out ${
           overHero
