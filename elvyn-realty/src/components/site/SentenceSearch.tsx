@@ -45,7 +45,7 @@ export function SentenceSearch({ lang, types, cities }: { lang: Lang; types: Fac
         {es ? "en " : "in "}
         <label className="sr-only" htmlFor="ss-city">{t.city}</label>
         <select id="ss-city" className={`${sel} max-w-[14ch] sm:max-w-none`} value={ciudad} onChange={(e) => setCiudad(e.target.value)}>
-          <option value="">{es ? "toda la República Dominicana" : "anywhere in the Dominican Republic"}</option>
+          <option value="">{es ? "todo el país" : "the whole country"}</option>
           {cities.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>{" "}
         {es ? "hasta " : "up to "}
