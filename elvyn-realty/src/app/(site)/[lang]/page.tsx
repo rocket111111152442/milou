@@ -68,7 +68,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       {/* Hero: full screen, slow zoom, words rising one by one */}
       <section className="grain relative isolate flex min-h-[100svh] flex-col overflow-hidden bg-navy-900">
         <div className="absolute inset-0 -z-20 animate-kenburns motion-reduce:animate-none">
-          <Image src={heroImg} alt={t.home.heroAlt} fill priority placeholder="blur" sizes="100vw" className="object-cover" />
+          <Image src={heroImg} alt={t.home.heroAlt} fill priority placeholder="blur" sizes="100vw" quality={60} className="object-cover" />
         </div>
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_20%_30%,rgba(16,38,50,.35),rgba(10,26,35,.88)_70%)]" />
         <div className="absolute inset-x-0 bottom-0 -z-10 h-1/2 bg-gradient-to-t from-navy-900 to-transparent" />
