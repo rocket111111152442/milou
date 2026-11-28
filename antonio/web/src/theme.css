@@ -558,3 +558,49 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 
 /* Sélecteurs intégrés dans une ligne d'information (ex. corriger la catégorie d'un message) */
 .kv .select { min-height: 32px; padding: 4px 32px 4px 10px; background-position: right 10px center; }
+
+/* ------------------------------------------------------------------ Espace assistant : tout tient dans l'écran
+ * Sur ordinateur, l'accueil de l'assistant ne défile pas : l'orbe s'adapte à la hauteur disponible
+ * et les espacements se resserrent sur les écrans peu hauts. (Le téléphone garde un défilement vertical.)
+ */
+.studio-composer textarea { line-height: 20px; overflow-y: auto; scrollbar-width: none; }
+.studio-composer textarea::-webkit-scrollbar { display: none; }
+
+@media (min-width: 701px) {
+  .studio-workspace:not(.has-context) {
+    --orb-box: clamp(96px, calc(100dvh - 600px), 267px);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .studio-workspace:not(.has-context) .studio-stage { min-height: 0; flex: 1 1 0; padding-top: 8px; padding-bottom: 12px; container-type: size; }
+  /* L'orbe prend la place réellement libre dans la zone centrale (titre et état déduits). */
+  .studio-workspace:not(.has-context) .studio-stage > * { --orb-box: clamp(64px, calc(100cqh - 160px), 267px); }
+  .studio-workspace:not(.has-context) .orb-button { height: var(--orb-box); flex: 0 0 var(--orb-box); width: calc(var(--orb-box) * 1.12); margin: 0 0 -6px; }
+  .studio-workspace:not(.has-context) .assistant-orb { width: calc(var(--orb-box) * 1.24); height: calc(var(--orb-box) * 1.24); }
+  .studio-workspace.is-engaged:not(.has-context) .orb-button { height: var(--orb-box); flex-basis: var(--orb-box); }
+  .studio-workspace.is-engaged:not(.has-context) .assistant-orb { width: calc(var(--orb-box) * 1.24); height: calc(var(--orb-box) * 1.24); }
+  .studio-workspace:not(.has-context) .studio-composer-wrap { margin-top: 18px; }
+  .studio-workspace:not(.has-context) .studio-shortcuts { margin-bottom: 12px; }
+}
+
+/* Écrans peu hauts (portables) : on resserre sans rien retirer */
+@media (min-width: 701px) and (max-height: 760px) {
+  .studio-status-strip { min-height: 32px; padding-top: 8px; }
+  .studio-workspace:not(.has-context) .stage-welcome { margin-top: 6px; }
+  .studio-workspace:not(.has-context) .stage-welcome h1 { font-size: 30px; }
+  .studio-workspace:not(.has-context) .stage-welcome p { margin-top: 4px; font-size: 14px; }
+  .studio-workspace:not(.has-context) .workbench-heading { margin-bottom: 9px; }
+  .studio-workspace:not(.has-context) .overview-card { padding: 13px 16px 10px; }
+  .studio-workspace:not(.has-context) .overview-card h3 { margin-top: 9px; font-size: 16px; }
+  .studio-workspace:not(.has-context) .overview-card p { margin: 4px 0 10px; }
+  .studio-workspace:not(.has-context) .overview-card-bottom { padding-top: 8px; }
+  .studio-workspace:not(.has-context) .studio-composer-wrap { margin-top: 12px; }
+  .studio-workspace:not(.has-context) .studio-shortcuts { margin-bottom: 9px; }
+  .studio-workspace:not(.has-context) .studio-shortcuts > button { padding: 5px 12px; }
+  .studio-workspace:not(.has-context) .studio-composer { min-height: 52px; }
+}
+@media (min-width: 701px) and (max-height: 700px) {
+  /* Mention décorative masquée sur les écrans très bas : le titre d'accueil reste. */
+  .studio-workspace:not(.has-context) .stage-overline { display: none; }
+}
