@@ -115,7 +115,7 @@ export async function upgradeSubscriptionFor(user: { userId: string }, planId: P
   const stripe = client ?? stripeClient();
   const current = await stripe.subscriptions.retrieve(row.stripeSubscriptionId);
   if (!["active", "trialing"].includes(current.status)) throw new AppError(400, "subscription_not_active", "Cet abonnement ne peut pas être modifié pour le moment.");
-  const currentPlan = offerFor(current.metadata.waverti_plan ?? row.plan);
+  const currentPlan = offerFor(planFromSubscription(current) ?? row.plan);
   const nextPlan = offerFor(planId);
   if (nextPlan.euros <= currentPlan.euros) throw new AppError(400, "upgrade_only", "Choisissez une offre supérieure à votre offre actuelle.");
   const item = current.items.data[0];
@@ -123,21 +123,51 @@ export async function upgradeSubscriptionFor(user: { userId: string }, planId: P
 
   const price = await usablePlanPrice(stripe, planId);
 
+  // Changement de prix seul : le mode « pending_if_incomplete » n'applique l'offre
+  // supérieure qu'une fois le complément au prorata réellement payé.
   let updated: Stripe.Subscription;
   try {
     updated = await stripe.subscriptions.update(current.id, {
       items: [{ id: item.id, price: price.id }],
-      metadata: { ...current.metadata, waverti_user_id: user.userId, waverti_plan: planId },
       proration_behavior: "always_invoice",
       payment_behavior: "pending_if_incomplete",
-      cancel_at_period_end: false,
+      expand: ["latest_invoice"],
     }, { idempotencyKey: `waverti-upgrade:${current.id}:${planId}:${requestId}:${price.id}` });
   } catch (error) {
     console.error("[billing] changement d'offre refusé par Stripe :", (error as Error).message);
     throw new AppError(502, "upgrade_failed", "Le changement d’offre n’a pas pu être effectué. Aucun montant n’a été prélevé. Réessayez dans un instant.");
   }
-  if (["active", "trialing"].includes(updated.status)) await refreshSubscription(updated.id, stripe);
+
+  if (updated.pending_update) {
+    // Paiement à confirmer (3D Secure) ou refusé : l'offre ne change qu'après paiement de la facture.
+    const invoice = typeof updated.latest_invoice === "object" ? updated.latest_invoice : null;
+    console.warn("[billing] changement d'offre en attente de paiement :", invoice?.status ?? "facture inconnue");
+    if (invoice?.hosted_invoice_url && invoice.status === "open") {
+      return { ok: false, status: "payment_required", plan: planId, paymentUrl: invoice.hosted_invoice_url };
+    }
+    throw new AppError(402, "upgrade_payment_failed", "Votre banque n’a pas validé le paiement du complément. Votre offre actuelle est conservée. Vérifiez votre carte dans « Gérer les paiements et les factures », puis réessayez.");
+  }
+
+  try {
+    await stripe.subscriptions.update(current.id, {
+      metadata: { ...current.metadata, waverti_user_id: user.userId, waverti_plan: planId },
+      ...(updated.cancel_at_period_end ? { cancel_at_period_end: false } : {}),
+    }, { idempotencyKey: `waverti-upgrade-meta:${current.id}:${planId}:${requestId}` });
+  } catch (error) {
+    // L'offre est déjà appliquée (le prix fait foi) : on ne bloque pas l'utilisateur pour la métadonnée.
+    console.error("[billing] métadonnées de l'abonnement non mises à jour :", (error as Error).message);
+  }
+  await refreshSubscription(updated.id, stripe);
   return { ok: true, status: updated.status, plan: planId };
+}
+
+/** L'offre réelle d'un abonnement : d'abord le prix facturé, sinon la métadonnée posée au paiement. */
+export function planFromSubscription(sub: Stripe.Subscription): PlanId | null {
+  const price = sub.items?.data?.[0]?.price;
+  const fromPrice = price?.metadata?.waverti_plan ?? price?.lookup_key?.match(/^waverti_([a-z]+)_monthly$/)?.[1];
+  if (fromPrice && OFFERS.some((p) => p.id === fromPrice)) return fromPrice as PlanId;
+  const fromMeta = sub.metadata?.waverti_plan;
+  return fromMeta && OFFERS.some((p) => p.id === fromMeta) ? (fromMeta as PlanId) : null;
 }
 
 export async function grantTopupFromSession(session: Stripe.Checkout.Session, userId: string) {
@@ -185,8 +215,8 @@ export async function refreshSubscription(subscriptionId: string, client?: Strip
   const [owner] = await db().select().from(schema.subscriptions).where(eq(schema.subscriptions.stripeSubscriptionId, sub.id));
   const userId = owner?.userId ?? sub.metadata.waverti_user_id;
   if (!userId) return;
-  const candidate = sub.metadata.waverti_plan;
-  if (!OFFERS.some((p) => p.id === candidate)) throw new Error("Offre Stripe inconnue");
+  const candidate = planFromSubscription(sub);
+  if (!candidate) throw new Error("Offre Stripe inconnue");
   const [existingUser] = await db().select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, userId));
   if (!existingUser) return;
   const current = await subscriptionFor(userId);

@@ -18,7 +18,10 @@ export function BillingPage() {
   const [checkoutStatus, setCheckoutStatus] = useState<"confirming" | "confirmed" | "pending" | null>(null);
   const preference = useMutation({ mutationFn: (plan: PlanId) => api("/api/billing/preference", { method: "PUT", body: { plan } }), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["billing"] }); toast("Préférence enregistrée. Aucun paiement demandé."); } });
   const checkout = useMutation({ mutationFn: (plan: PlanId) => api<{ url: string }>("/api/billing/checkout", { body: { plan, requestId: uid() } }), onSuccess: (r) => { window.location.href = r.url; } });
-  const upgrade = useMutation({ mutationFn: (plan: PlanId) => api<{ ok: boolean; status: string; plan: PlanId }>("/api/billing/upgrade", { body: { plan, requestId: uid() } }), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["billing"] }); void queryClient.invalidateQueries({ queryKey: ["usage"] }); toast("Le changement d’offre a été envoyé à Stripe."); } });
+  const upgrade = useMutation({ mutationFn: (plan: PlanId) => api<{ ok: boolean; status: string; plan: PlanId; paymentUrl?: string }>("/api/billing/upgrade", { body: { plan, requestId: uid() } }), onSuccess: (r) => {
+    if (r.paymentUrl) { toast("Votre banque demande une confirmation : finalisez le paiement du complément pour activer la nouvelle offre."); window.location.href = r.paymentUrl; return; }
+    void queryClient.invalidateQueries({ queryKey: ["billing"] }); void queryClient.invalidateQueries({ queryKey: ["usage"] }); toast(`Votre offre est passée à ${offerFor(r.plan).name}.`);
+  } });
   const portal = useMutation({ mutationFn: () => api<{ url: string }>("/api/billing/portal", { method: "POST" }), onSuccess: (r) => { window.location.href = r.url; } });
   useEffect(() => {
     const sessionId = params.get("session_id");
