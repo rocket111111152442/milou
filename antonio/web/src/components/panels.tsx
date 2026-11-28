@@ -28,7 +28,7 @@ export function MessageRow({ m, onOpen, active }: { m: MessageDTO; onOpen: () =>
         <div className="ellipsis small">{m.subject || "(sans objet)"}</div>
         <div className="row wrap">
           <CategoryBadge category={m.category} />
-          {m.needsAction && <span className="badge wait">À traiter</span>}
+          {m.needsAction && m.category !== "to_handle" && <span className="badge wait">À traiter</span>}
           {m.hasAttachments && <Icon.Paperclip width={14} height={14} />}
           {m.inTrash && <span className="badge">Corbeille</span>}
           {m.simulated && <DemoBadge />}

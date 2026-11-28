@@ -17,6 +17,7 @@ import { BillingPage, IntegrationsPage } from "./pages/Business";
 import "./styles.css";
 import "./studio.css";
 import "./marketing.css";
+import "./theme.css";
 
 function Guard({ children, allowOnboarding }: { children: ReactNode; allowOnboarding?: boolean }) {
   const me = useMe();
