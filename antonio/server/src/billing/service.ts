@@ -83,6 +83,28 @@ export async function creditTopupFor(user: { userId: string; email: string }, eu
   return { url: session.url };
 }
 
+/**
+ * Prix mensuel réutilisable pour une offre. Un prix dont le produit a été archivé dans Stripe
+ * (ou dont le montant ne correspond plus à l'offre) est remplacé : Stripe refuse sinon de l'utiliser.
+ */
+export async function usablePlanPrice(stripe: Stripe, planId: PlanId): Promise<Stripe.Price> {
+  const plan = offerFor(planId);
+  const lookupKey = `waverti_${planId}_monthly`;
+  const found = (await stripe.prices.list({ lookup_keys: [lookupKey], active: true, limit: 1, expand: ["data.product"] })).data[0];
+  const product = found && typeof found.product === "object" ? found.product : null;
+  const productActive = Boolean(product && !("deleted" in product && product.deleted) && (product as Stripe.Product).active);
+  if (found && productActive && found.unit_amount === plan.euros * 100) return found;
+  return stripe.prices.create({
+    currency: "eur",
+    unit_amount: plan.euros * 100,
+    recurring: { interval: "month" },
+    product_data: { name: `Waverti ${plan.name}`, metadata: { waverti_plan: planId } },
+    lookup_key: lookupKey,
+    transfer_lookup_key: true,
+    metadata: { waverti_plan: planId },
+  }, { idempotencyKey: `waverti-price:${planId}:${plan.euros}:${found?.id ?? "new"}` });
+}
+
 export async function upgradeSubscriptionFor(user: { userId: string }, planId: PlanId, requestId: string, client?: Stripe) {
   if (!billingEnabled()) throw new AppError(503, "billing_unavailable", "Les abonnements ne sont pas encore ouverts.");
   const row = await subscriptionFor(user.userId);
@@ -99,24 +121,21 @@ export async function upgradeSubscriptionFor(user: { userId: string }, planId: P
   const item = current.items.data[0];
   if (!item) throw new AppError(400, "subscription_item_missing", "Aucune offre modifiable n’a été trouvée.");
 
-  const lookupKey = `waverti_${planId}_monthly`;
-  const existingPrice = await stripe.prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 });
-  const price = existingPrice.data[0] ?? await stripe.prices.create({
-    currency: "eur",
-    unit_amount: nextPlan.euros * 100,
-    recurring: { interval: "month" },
-    product_data: { name: `Waverti ${nextPlan.name}`, metadata: { waverti_plan: planId } },
-    lookup_key: lookupKey,
-    metadata: { waverti_plan: planId },
-  }, { idempotencyKey: `waverti-price:${planId}` });
+  const price = await usablePlanPrice(stripe, planId);
 
-  const updated = await stripe.subscriptions.update(current.id, {
-    items: [{ id: item.id, price: price.id }],
-    metadata: { ...current.metadata, waverti_user_id: user.userId, waverti_plan: planId },
-    proration_behavior: "always_invoice",
-    payment_behavior: "pending_if_incomplete",
-    cancel_at_period_end: false,
-  }, { idempotencyKey: `waverti-upgrade:${current.id}:${planId}:${requestId}` });
+  let updated: Stripe.Subscription;
+  try {
+    updated = await stripe.subscriptions.update(current.id, {
+      items: [{ id: item.id, price: price.id }],
+      metadata: { ...current.metadata, waverti_user_id: user.userId, waverti_plan: planId },
+      proration_behavior: "always_invoice",
+      payment_behavior: "pending_if_incomplete",
+      cancel_at_period_end: false,
+    }, { idempotencyKey: `waverti-upgrade:${current.id}:${planId}:${requestId}:${price.id}` });
+  } catch (error) {
+    console.error("[billing] changement d'offre refusé par Stripe :", (error as Error).message);
+    throw new AppError(502, "upgrade_failed", "Le changement d’offre n’a pas pu être effectué. Aucun montant n’a été prélevé. Réessayez dans un instant.");
+  }
   if (["active", "trialing"].includes(updated.status)) await refreshSubscription(updated.id, stripe);
   return { ok: true, status: updated.status, plan: planId };
 }
